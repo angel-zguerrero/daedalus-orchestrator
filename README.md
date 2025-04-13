@@ -40,6 +40,7 @@ Keep tenants in check. Avoid noisy neighbors. Deliver predictable performance.
 
 ## 📦 Structure
 
+```
 ├── 🖥️ server/                # Server code (Go, gRPC, etc.)
 │   ├── 🚀 cmd/              # Main entry point
 │   │   └── 🧠 main.go
@@ -56,7 +57,7 @@ Keep tenants in check. Avoid noisy neighbors. Deliver predictable performance.
 │
 └── 🔄 shared/               # Code shared between client and server
     └── 📦 models/           # Shared models or DTOs
-
+```
 ---
 
 ## 🧪 Status
