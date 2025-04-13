@@ -1,5 +1,10 @@
 # DaedalusOrchestrator 🧠⚙️
 
+before execute the example execute this command line 
+
+export CGO_CFLAGS="-I/opt/homebrew/include"                
+export CGO_LDFLAGS="-L/opt/homebrew/lib -lrocksdb"
+
 **Welcome to the brain of your distributed system.**  
 DaedalusOrchestrator ain’t your typical task runner — this is where *you* call the shots, and the system listens.  
 

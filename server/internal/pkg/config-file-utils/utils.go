@@ -8,7 +8,7 @@ import (
 )
 
 func FindConfigFile(forcePath string) (string, error) {
-	paths := []string{}
+	var paths []string
 	if forcePath != "" {
 		paths = []string{
 			forcePath,
@@ -22,11 +22,12 @@ func FindConfigFile(forcePath string) (string, error) {
 		if env == "development" {
 			paths = []string{
 				"/etc/daedalus/daedalus.conf",
-				"./daedalus.conf",
+				"../daedalus.conf",
 			}
-		}
-		paths = []string{
-			"/etc/daedalus/daedalus.conf",
+		} else {
+			paths = []string{
+				"/etc/daedalus/daedalus.conf",
+			}
 		}
 	}
 
