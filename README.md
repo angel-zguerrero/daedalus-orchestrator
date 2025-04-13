@@ -41,22 +41,22 @@ Keep tenants in check. Avoid noisy neighbors. Deliver predictable performance.
 ## 📦 Structure
 
 ```
-├── 🖥️ server/                # Server code (Go, gRPC, etc.)
-│   ├── 🚀 cmd/              # Main entry point
+├── 🖥️ server/                  # Server code (Go, gRPC, etc.)
+│   ├── 🚀 cmd/                 # Main entry point
 │   │   └── 🧠 main.go
-│   ├── 🧩 internal/         # Internal logic and layered organization
-│   │   ├── ⚙️ app/         # Use case coordinators
-│   │   ├── 🧠 domain/      # Entities, interfaces, business rules
-│   │   ├── 🏗️ infrastructure/ # External integrations (DB, gRPC, etc.)
-│   │   ├── 🧪 usecase/     # Application use cases
-│   │   └── 📚 pkg/         # Reusable internal utilities
-│   ├── 🛠️ scripts/         # Deployment or maintenance scripts
-│   └── 🐳 Dockerfile        # Server Dockerfile
+│   ├── 🧩 internal/            # Internal logic and layered organization
+│   │   ├── ⚙️ app/             # Use case coordinators
+│   │   ├── 🧠 domain/          # Entities, interfaces, business rules
+│   │   ├── 🏗️ infrastructure/  # External integrations (DB, gRPC, etc.)
+│   │   ├── 🧪 usecase/         # Application use cases
+│   │   └── 📚 pkg/             # Reusable internal utilities
+│   ├── 🛠️ scripts/             # Deployment or maintenance scripts
+│   └── 🐳 Dockerfile           # Server Dockerfile
 │
-├── 🧑‍💻 client/              # Client application (Buffalo)
+├── 🧑‍💻 client/                  # Client application (Buffalo)
 │
-└── 🔄 shared/               # Code shared between client and server
-    └── 📦 models/           # Shared models or DTOs
+└── 🔄 shared/                  # Code shared between client and server
+    └── 📦 models/              # Shared models or DTOs
 ```
 ---
 
