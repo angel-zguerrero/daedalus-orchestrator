@@ -1,9 +1,8 @@
 package db
 
 import (
-	"fmt"
-
 	"deadalus-orch/shared/models"
+	"fmt"
 
 	"github.com/linxGnu/grocksdb"
 )

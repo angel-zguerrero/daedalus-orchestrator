@@ -1,12 +1,11 @@
 package db
 
 import (
+	"deadalus-orch/server/internal/pkg/utils"
 	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
-
-	"deadalus-orch/server/internal/pkg/utils"
 
 	"github.com/linxGnu/grocksdb"
 )

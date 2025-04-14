@@ -1,14 +1,13 @@
 package server
 
 import (
+	"deadalus-orch/server/internal/pkg/utils"
 	"fmt"
 	"log"
 	"net"
 	"strconv"
 
 	"google.golang.org/grpc"
-
-	"deadalus-orch/server/internal/pkg/utils"
 )
 
 func StartGRPC(config map[string]string, db interface{}) error {
