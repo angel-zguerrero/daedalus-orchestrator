@@ -7,31 +7,41 @@ import (
 	"strings"
 )
 
-func LoadOrDefault(path string) map[string]string {
+func LoadOrDefault(path string) (map[string]string, error) {
 	config := map[string]string{}
 
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "development"
+	}
+	fmt.Println("*******env")
+	fmt.Println(env)
+	switch env {
+	case "development", "staging", "production":
+		// valid
+	default:
+		return nil, fmt.Errorf("invalid ENV value: %s. Must be one of: development, staging, production", env)
+	}
+
 	if path == "" {
-		env := os.Getenv("ENV")
-		if env == "" {
-			env = "development"
-		}
 
 		if env == "development" {
 			path = "../daedalus.conf"
 		} else {
 			path = "/etc/daedalus/daedalus.conf"
 		}
-	}
-
-	if _, err := os.Stat(path); err == nil {
-		fmt.Println("✅ Using config file:", path)
-		cfg, err := LoadConfig(path)
-		if err == nil {
-			return cfg
-		}
-		fmt.Println("⚠️ Failed to load config file:", err)
 	} else {
-		fmt.Println("⚠️ No config file found. Using ENV/defaults.")
+		if _, err := os.Stat(path); err == nil {
+			fmt.Println("✅ Using config file:", path)
+			cfg, err := LoadConfig(path)
+			config = cfg
+			if err != nil {
+				return nil, err
+			}
+			fmt.Println("⚠️ Failed to load config file:", err)
+		} else {
+			return nil, err
+		}
 	}
 
 	if config["db_name"] == "" {
@@ -49,7 +59,15 @@ func LoadOrDefault(path string) map[string]string {
 		config["default_root_password"] = os.Getenv("DEFAULT_ROOT_PASSWORD")
 	}
 
-	return config
+	if config["default_root_user"] == "" {
+		config["default_root_user"] = "admin"
+	}
+
+	if config["default_root_password"] == "" {
+		config["default_root_password"] = "admin"
+	}
+
+	return config, nil
 }
 
 func LoadConfig(path string) (map[string]string, error) {
@@ -75,7 +93,9 @@ func LoadConfig(path string) (map[string]string, error) {
 
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		config[key] = value
+		if key != "" && value != "" {
+			config[key] = value
+		}
 	}
 
 	return config, scanner.Err()

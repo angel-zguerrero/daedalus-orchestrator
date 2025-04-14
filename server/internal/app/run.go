@@ -12,8 +12,10 @@ func Run() {
 	flagConfig := flag.String("config", "", "Path to the daedalus.conf configuration file (optional)")
 	flag.Parse()
 
-	configMap := config.LoadOrDefault(*flagConfig)
-
+	configMap, err := config.LoadOrDefault(*flagConfig)
+	if err != nil {
+		log.Fatalf("❌ Failed loading configuration: %v", err)
+	}
 	// Database run
 	dbConn, err := db.InitDB(configMap["db_name"])
 	if err != nil {
