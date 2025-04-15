@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/linxGnu/grocksdb"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -60,7 +61,9 @@ func InitDB(dbName string, provider PathProvider) (*grocksdb.DB, error) {
 }
 
 func OpenDB(dbPath string) (*grocksdb.DB, error) {
-	fmt.Println("🗄️  Opening db:", dbPath)
+	log.Info().
+		Str("dbPath", dbPath).
+		Msg("🗄️  Opening db")
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
 	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)

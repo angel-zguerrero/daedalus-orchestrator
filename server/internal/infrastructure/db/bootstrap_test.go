@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/linxGnu/grocksdb"
@@ -14,7 +15,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	constants "deadalus-orch/shared/constants"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
+
+func TestMain(m *testing.M) {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	code := m.Run()
+	os.Exit(code)
+}
 
 func marshal(t *testing.T, v interface{}) []byte {
 	data, err := json.Marshal(v)

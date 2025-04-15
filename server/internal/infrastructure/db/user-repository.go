@@ -154,7 +154,5 @@ func DeleteUser(kvStore KVStore, username string) error {
 	if err := kvStore.Write(wo, batch); err != nil {
 		return err
 	}
-
-	fmt.Printf("✅ User '%s' deleted successfully\n", username)
 	return nil
 }

@@ -5,7 +5,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
+
+func TestMain(m *testing.M) {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestEnsureDirExists(t *testing.T) {
 	// Base para los directorios temporales

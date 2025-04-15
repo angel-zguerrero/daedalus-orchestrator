@@ -3,6 +3,8 @@ package db
 import (
 	"deadalus-orch/shared/models"
 	"fmt"
+
+	"github.com/rs/zerolog/log"
 )
 
 func BootstrapRootUser(kvStore KVStore, config map[string]string) error {
@@ -19,7 +21,10 @@ func BootstrapRootUser(kvStore KVStore, config map[string]string) error {
 			return fmt.Errorf("missing default root user/password")
 		}
 
-		fmt.Println("🧑‍💻 Creating default root user:", username)
+		log.Info().
+			Str("username", username).
+			Msg("🧑‍💻 Creating default root user")
+
 		return PutDefaultRootUserRoot(kvStore, models.CreateUser{
 			Username: username,
 			Email:    "noemail@daedalus.com",
@@ -36,6 +41,9 @@ func BootstrapRootUser(kvStore KVStore, config map[string]string) error {
 		return PutUser(kvStore, *root)
 	}
 
-	fmt.Println("✅ Root user exists:", root.Username)
+	log.Info().
+		Str("Username", root.Username).
+		Msg("✅ Root user exists")
+
 	return nil
 }

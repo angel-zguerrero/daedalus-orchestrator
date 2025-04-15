@@ -2,25 +2,15 @@ package config
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 func LoadOrDefault(path string) (map[string]string, error) {
 	config := map[string]string{}
-
 	env := os.Getenv("ENV")
-	if env == "" {
-		env = "development"
-	}
-
-	switch env {
-	case "development", "staging", "production":
-		// valid
-	default:
-		return nil, fmt.Errorf("invalid ENV value: %s. Must be one of: development, staging, production", env)
-	}
 
 	if path == "" {
 
@@ -31,16 +21,26 @@ func LoadOrDefault(path string) (map[string]string, error) {
 		}
 	} else {
 		if _, err := os.Stat(path); err == nil {
-			fmt.Println("✅ Using config file:", path)
+			log.Info().
+				Str("path", path).
+				Msg("✅ Using config file")
 			cfg, err := LoadConfig(path)
 			config = cfg
 			if err != nil {
 				return nil, err
 			}
-			fmt.Println("⚠️ Failed to load config file:", err)
+			log.Error().
+				Str("path", path).
+				Err(err).
+				Msg("⚠️ Failed to load config file")
+
 		} else {
 			return nil, err
 		}
+	}
+
+	if config["port"] == "" {
+		config["port"] = os.Getenv("PORT")
 	}
 
 	if config["db_name"] == "" {

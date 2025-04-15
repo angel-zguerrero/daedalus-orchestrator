@@ -9,7 +9,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
+
+func TestMain(m *testing.M) {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	code := m.Run()
+	os.Exit(code)
+}
 
 func writeTempFile(t *testing.T, content string) string {
 	t.Helper()
@@ -86,6 +95,7 @@ func TestLoadOrDefault_NoConfigFile_ENVFallback(t *testing.T) {
 	setEnv(t, "DB_NAME", "env.db")
 	setEnv(t, "DEFAULT_ROOT_USER", "envUser")
 	setEnv(t, "DEFAULT_ROOT_PASSWORD", "envPass")
+	setEnv(t, "PORT", "5050")
 
 	cfg, err := config.LoadOrDefault("")
 	if err != nil {
@@ -94,6 +104,9 @@ func TestLoadOrDefault_NoConfigFile_ENVFallback(t *testing.T) {
 
 	if cfg["db_name"] != "env.db" {
 		t.Errorf("expected db_name=env.db, got %s", cfg["db_name"])
+	}
+	if cfg["port"] != "5050" {
+		t.Errorf("expected port=5050, got %s", cfg["port"])
 	}
 	if cfg["default_root_user"] != "envUser" {
 		t.Errorf("expected default_root_user from env")
@@ -215,13 +228,6 @@ func TestLoadOrDefault_ENV_Production_WithFile(t *testing.T) {
 	cfg, err := config.LoadOrDefault(file)
 	require.NoError(t, err)
 	assert.Equal(t, "my.db", cfg["db_name"])
-}
-
-func TestLoadOrDefault_ENV_Invalid(t *testing.T) {
-	t.Setenv("ENV", "invalid")
-	_, err := config.LoadOrDefault("")
-	require.Error(t, err)
-	assert.EqualError(t, err, "invalid ENV value: invalid. Must be one of: development, staging, production")
 }
 
 func TestLoadOrDefault_CustomPath_FileExists(t *testing.T) {

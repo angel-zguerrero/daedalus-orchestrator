@@ -5,6 +5,19 @@ before execute the example execute this command line
 export CGO_CFLAGS="-I/opt/homebrew/include"                
 export CGO_LDFLAGS="-L/opt/homebrew/lib -lrocksdb"
 
+# Env Vars
+
+LOGGER_FORMAT= pretty | json 
+ENV= development | production | staging
+DB_NAME = dabase_name
+DEFAULT_ROOT_USER = an username
+DEFAULT_ROOT_PASSWORD = a password 
+PORT = a port
+
+# Parameters
+
+config = path/configuration.conf
+
 **Welcome to the brain of your distributed system.**  
 DaedalusOrchestrator ain’t your typical task runner — this is where *you* call the shots, and the system listens.  
 
