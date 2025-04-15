@@ -104,9 +104,14 @@ func PutDefaultRootUserRoot(kvStore KVStore, input models.CreateUser) error {
 		return err
 	}
 
+	defaultUserData, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
-	batch.Put([]byte(constants.DefaultRootUserRootKey), userData)
+	batch.Put([]byte(constants.DefaultRootUserRootKey), defaultUserData)
 	userKey := fmt.Sprintf("user:%s", input.Username)
 	batch.Put([]byte(userKey), userData)
 

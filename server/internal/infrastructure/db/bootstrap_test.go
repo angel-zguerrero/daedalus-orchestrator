@@ -1,0 +1,112 @@
+package db
+
+import (
+	"deadalus-orch/shared/models"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"testing"
+
+	"github.com/linxGnu/grocksdb"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"golang.org/x/crypto/bcrypt"
+
+	constants "deadalus-orch/shared/constants"
+)
+
+// -------------------- Helper --------------------
+
+func marshal(t *testing.T, v interface{}) []byte {
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	return data
+}
+
+// -------------------- Tests --------------------
+
+func Test_CreatesRootIfMissing(t *testing.T) {
+	store := new(MockKVStore)
+	config := map[string]string{
+		"default_root_user":     "admin",
+		"default_root_password": "123456",
+	}
+
+	mockSlice := &MockSlice{data: []byte("nil"), exists: false}
+
+	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil).Times(1)
+
+	input := models.CreateUser{
+		Username: config["default_root_user"],
+		Email:    "noemail@daedalus.com",
+		Password: config["default_root_password"],
+	}
+	defaultUserData, err := json.Marshal(input)
+	assert.NoError(t, err)
+
+	batch := grocksdb.NewWriteBatch()
+	defer batch.Destroy()
+	batch.Put([]byte(constants.DefaultRootUserRootKey), defaultUserData)
+	userKey := fmt.Sprintf("user:%s", input.Username)
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	assert.NoError(t, err)
+
+	user := models.User{
+		Username:     input.Username,
+		Email:        input.Email,
+		PasswordHash: string(hash),
+	}
+
+	userData, err := json.Marshal(user)
+	assert.NoError(t, err)
+
+	batch.Put([]byte(userKey), userData)
+
+	store.On("Write", mock.Anything, batch).Return(nil).Times(1)
+
+	err = BootstrapRootUser(store, config)
+	assert.NoError(t, err)
+	store.AssertExpectations(t)
+}
+
+func Test_ErrorGettingRoot(t *testing.T) {
+	store := new(MockKVStore)
+	config := map[string]string{
+		"default_root_user":     "admin",
+		"default_root_password": "123456",
+	}
+
+	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(nil, errors.New("boom")).Once()
+
+	err := BootstrapRootUser(store, config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get default root")
+	store.AssertExpectations(t)
+}
+
+func Test_PutsRootIfMissingInUsers(t *testing.T) {
+	store := new(MockKVStore)
+	config := map[string]string{
+		"default_root_user":     "admin",
+		"default_root_password": "123456",
+	}
+	root := models.CreateUser{
+		Username: "admin",
+		Password: "123456",
+		Email:    "x@x.com",
+	}
+
+	defaultRootUserRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
+	nilRootUser := &MockSlice{data: []byte("nil"), exists: false}
+
+	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
+	store.On("Get", mock.Anything, []byte("user:admin")).Return(nilRootUser, nil).Once()
+	store.On("Put", mock.Anything, []byte("user:admin"), mock.AnythingOfType("[]uint8")).Return(nil).Once()
+
+	err := BootstrapRootUser(store, config)
+	assert.NoError(t, err)
+	store.AssertExpectations(t)
+}
