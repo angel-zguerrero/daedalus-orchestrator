@@ -10,22 +10,43 @@ import (
 	"github.com/linxGnu/grocksdb"
 )
 
-func OpenDB(dbPath string) (*grocksdb.DB, error) {
-	fmt.Println("🗄️  Opening db:", dbPath)
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)
-	db, err := grocksdb.OpenDb(opts, dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("error opening database: %v", err)
-	}
+var (
+	getEnv         = os.Getenv
+	getCurrentUser = user.Current
+	mkdirAll       = os.MkdirAll
+)
 
-	return db, nil
+type PathProvider interface {
+	GetDatabasePath() (string, error)
 }
 
-func InitDB(dbName string) (*grocksdb.DB, error) {
+type DefaultPathProvider struct{}
 
-	dbPath, err := getDatabasePath()
+func (d DefaultPathProvider) GetDatabasePath() (string, error) {
+	env := getEnv("ENV")
+	if env == "" {
+		env = "development"
+	}
+
+	if env == "development" {
+		usr, err := getCurrentUser()
+		if err != nil {
+			return "", fmt.Errorf("could not get user: %v", err)
+		}
+		return filepath.Join(usr.HomeDir, ".daedalus", "data"), nil
+	}
+
+	path := "/var/lib/daedalus/data"
+	if err := mkdirAll(path, 0755); err != nil {
+		return "", fmt.Errorf("could not create path: %v", err)
+	}
+
+	return path, nil
+}
+
+// InitDB usa un PathProvider para determinar dónde crear la base
+func InitDB(dbName string, provider PathProvider) (*grocksdb.DB, error) {
+	dbPath, err := provider.GetDatabasePath()
 	if err != nil {
 		return nil, err
 	}
@@ -38,24 +59,15 @@ func InitDB(dbName string) (*grocksdb.DB, error) {
 	return OpenDB(fullPath)
 }
 
-func getDatabasePath() (string, error) {
-	env := os.Getenv("ENV")
-	if env == "" {
-		env = "development"
+func OpenDB(dbPath string) (*grocksdb.DB, error) {
+	fmt.Println("🗄️  Opening db:", dbPath)
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)
+	db, err := grocksdb.OpenDb(opts, dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening database: %v", err)
 	}
 
-	if env == "development" {
-		usr, err := user.Current()
-		if err != nil {
-			return "", fmt.Errorf("could not get user: %v", err)
-		}
-		return filepath.Join(usr.HomeDir, ".daedalus", "data"), nil
-	}
-
-	path := "/var/lib/daedalus/data"
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return "", fmt.Errorf("could not create path: %v", err)
-	}
-
-	return path, nil
+	return db, nil
 }

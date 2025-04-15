@@ -17,7 +17,7 @@ func Run() {
 		log.Fatalf("❌ Failed loading configuration: %v", err)
 	}
 	// Database run
-	dbConn, err := db.InitDB(configMap["db_name"])
+	dbConn, err := db.InitDB(configMap["db_name"], db.DefaultPathProvider{})
 	if err != nil {
 		log.Fatalf("❌ Failed to init DB: %v", err)
 	}
