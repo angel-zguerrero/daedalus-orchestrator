@@ -1,6 +1,7 @@
-package db
+package db_test
 
 import (
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/shared/models"
 	"encoding/json"
 	"errors"
@@ -63,7 +64,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 
 	store.On("Write", mock.Anything, batch).Return(nil).Times(1)
 
-	err = BootstrapRootUser(store, config)
+	err = db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
@@ -77,7 +78,7 @@ func Test_ErrorGettingRoot(t *testing.T) {
 
 	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(nil, errors.New("boom")).Once()
 
-	err := BootstrapRootUser(store, config)
+	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get default root")
 	store.AssertExpectations(t)
@@ -102,7 +103,7 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	store.On("Get", mock.Anything, []byte("user:admin")).Return(nilRootUser, nil).Once()
 	store.On("Put", mock.Anything, []byte("user:admin"), mock.AnythingOfType("[]uint8")).Return(nil).Once()
 
-	err := BootstrapRootUser(store, config)
+	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
@@ -125,7 +126,7 @@ func Test_SkipsIfUserExists(t *testing.T) {
 	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
 	store.On("Get", mock.Anything, []byte("user:admin")).Return(userRoot, nil).Once()
 
-	err := BootstrapRootUser(store, config)
+	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
@@ -143,7 +144,7 @@ func Test_ErrorFetchingUser(t *testing.T) {
 	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
 	store.On("Get", mock.Anything, []byte("user:admin")).Return(nil, errors.New("read error")).Once()
 
-	err := BootstrapRootUser(store, config)
+	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "read error")
 	store.AssertExpectations(t)
@@ -160,7 +161,7 @@ func Test_ErrorPutsRoot(t *testing.T) {
 	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil).Times(1)
 	store.On("Write", mock.Anything, mock.Anything).Return(errors.New("write fail")).Once()
 
-	err := BootstrapRootUser(store, config)
+	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "write fail")
 	store.AssertExpectations(t)

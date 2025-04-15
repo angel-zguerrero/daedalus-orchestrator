@@ -1,4 +1,4 @@
-package db
+package db_test
 
 import (
 	"testing"
@@ -6,6 +6,8 @@ import (
 	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"deadalus-orch/server/internal/infrastructure/db"
 )
 
 func TestRocksdbStore_PutAndGet(t *testing.T) {
@@ -18,7 +20,7 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 	require.NoError(t, err)
 	defer rocks.Close()
 
-	store := &RocksdbStore{DB: rocks}
+	store := &db.RocksdbStore{DB: rocks}
 
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
@@ -49,7 +51,7 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	defer rocks.Close()
 
-	store := &RocksdbStore{DB: rocks}
+	store := &db.RocksdbStore{DB: rocks}
 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -71,7 +73,7 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	require.NoError(t, err)
 	defer rocks.Close()
 
-	store := &RocksdbStore{DB: rocks}
+	store := &db.RocksdbStore{DB: rocks}
 
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()

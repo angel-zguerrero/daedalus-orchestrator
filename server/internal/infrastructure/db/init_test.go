@@ -1,4 +1,4 @@
-package db
+package db_test
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"deadalus-orch/server/internal/infrastructure/db"
 )
 
 // Fake provider para pruebas
@@ -24,7 +26,7 @@ func TestInitDB_CreatesDBAtCorrectPath(t *testing.T) {
 	provider := FakePathProvider{Path: tmp}
 
 	dbPath := filepath.Join(tmp, "mydb")
-	db, err := InitDB("mydb", provider)
+	db, err := db.InitDB("mydb", provider)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, db)
