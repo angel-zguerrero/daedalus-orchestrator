@@ -11,7 +11,7 @@ import (
 	models "deadalus-orch/shared/models"
 )
 
-func PutUser(db *grocksdb.DB, input models.CreateUser) error {
+func PutUser(kvStore KVStore, input models.CreateUser) error {
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
 
@@ -32,16 +32,16 @@ func PutUser(db *grocksdb.DB, input models.CreateUser) error {
 	}
 
 	key := "user:" + input.Username
-	err = db.Put(wo, []byte(key), userData)
+	err = kvStore.Put(wo, []byte(key), userData)
 	return err
 }
 
-func GetUser(db *grocksdb.DB, username string) (*models.User, error) {
+func GetUser(kvStore KVStore, username string) (*models.User, error) {
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
 
 	key := []byte("user:" + username)
-	value, err := db.Get(ro, key)
+	value, err := kvStore.Get(ro, key)
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +60,12 @@ func GetUser(db *grocksdb.DB, username string) (*models.User, error) {
 	return &user, nil
 }
 
-func GetDefaultRootUserRoot(db *grocksdb.DB) (*models.CreateUser, error) {
+func GetDefaultRootUserRoot(kvStore KVStore) (*models.CreateUser, error) {
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
 
 	key := []byte(constants.DefaultRootUserRootKey)
-	value, err := db.Get(ro, key)
+	value, err := kvStore.Get(ro, key)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func GetDefaultRootUserRoot(db *grocksdb.DB) (*models.CreateUser, error) {
 	return &user, nil
 }
 
-func PutDefaultRootUserRoot(db *grocksdb.DB, input models.CreateUser) error {
+func PutDefaultRootUserRoot(kvStore KVStore, input models.CreateUser) error {
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
 
@@ -110,21 +110,21 @@ func PutDefaultRootUserRoot(db *grocksdb.DB, input models.CreateUser) error {
 	userKey := fmt.Sprintf("user:%s", input.Username)
 	batch.Put([]byte(userKey), userData)
 
-	if err := db.Write(wo, batch); err != nil {
+	if err := kvStore.Write(wo, batch); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func DeleteUser(db *grocksdb.DB, username string) error {
+func DeleteUser(kvStore KVStore, username string) error {
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
 
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
 
-	rootData, err := db.Get(ro, []byte(constants.DefaultRootUserRootKey))
+	rootData, err := kvStore.Get(ro, []byte(constants.DefaultRootUserRootKey))
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func DeleteUser(db *grocksdb.DB, username string) error {
 	userKey := fmt.Sprintf("user:%s", username)
 	batch.Delete([]byte(userKey))
 
-	if err := db.Write(wo, batch); err != nil {
+	if err := kvStore.Write(wo, batch); err != nil {
 		return err
 	}
 

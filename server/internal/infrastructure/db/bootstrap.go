@@ -3,12 +3,10 @@ package db
 import (
 	"deadalus-orch/shared/models"
 	"fmt"
-
-	"github.com/linxGnu/grocksdb"
 )
 
-func BootstrapRootUser(db *grocksdb.DB, config map[string]string) error {
-	root, err := GetDefaultRootUserRoot(db)
+func BootstrapRootUser(kvStore KVStore, config map[string]string) error {
+	root, err := GetDefaultRootUserRoot(kvStore)
 	if err != nil {
 		return fmt.Errorf("failed to get default root: %v", err)
 	}
@@ -22,20 +20,20 @@ func BootstrapRootUser(db *grocksdb.DB, config map[string]string) error {
 		}
 
 		fmt.Println("🧑‍💻 Creating default root user:", username)
-		return PutDefaultRootUserRoot(db, models.CreateUser{
+		return PutDefaultRootUserRoot(kvStore, models.CreateUser{
 			Username: username,
 			Email:    "noemail@daedalus.com",
 			Password: password,
 		})
 	}
 
-	existing, err := GetUser(db, root.Username)
+	existing, err := GetUser(kvStore, root.Username)
 	if err != nil {
 		return err
 	}
 
 	if existing == nil {
-		return PutUser(db, *root)
+		return PutUser(kvStore, *root)
 	}
 
 	fmt.Println("✅ Root user exists:", root.Username)

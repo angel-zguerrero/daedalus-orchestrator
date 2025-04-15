@@ -24,7 +24,8 @@ func Run() {
 
 	defer dbConn.Close()
 
-	if err := db.BootstrapRootUser(dbConn, configMap); err != nil {
+	rocksdbStore := &db.RocksdbStore{DB: dbConn}
+	if err := db.BootstrapRootUser(rocksdbStore, configMap); err != nil {
 		log.Fatalf("❌ Bootstrap failed: %v", err)
 	}
 
