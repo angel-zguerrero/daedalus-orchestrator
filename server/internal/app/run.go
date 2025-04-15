@@ -28,8 +28,12 @@ func Run() {
 		log.Fatalf("❌ Bootstrap failed: %v", err)
 	}
 
-	err = server.StartGRPC(configMap, dbConn)
+	err = server.StartGRPC(
+		configMap,
+		server.DefaultListener,
+		server.DefaultGRPCServerFactory,
+	)
 	if err != nil {
-		log.Fatalf("❌ Server failed: %v", err)
+		log.Fatalf("Failed to start gRPC server: %v", err)
 	}
 }

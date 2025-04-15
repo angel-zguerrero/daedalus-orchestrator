@@ -10,28 +10,50 @@ import (
 	"google.golang.org/grpc"
 )
 
-func StartGRPC(config map[string]string, db interface{}) error {
+type ListenerFunc func(network, address string) (net.Listener, error)
+
+type GRPCServer interface {
+	Serve(lis net.Listener) error
+	GracefulStop()
+}
+
+type GRPCServerFactory func() GRPCServer
+
+func DefaultListener(network, address string) (net.Listener, error) {
+	return net.Listen(network, address)
+}
+
+func DefaultGRPCServerFactory() GRPCServer {
+	return grpc.NewServer()
+}
+
+func StartGRPC(
+	config map[string]string,
+	listen ListenerFunc,
+	gprcServerFactory GRPCServerFactory,
+) error {
 	const defaultPort = 50052
 	port := defaultPort
 
 	if val, ok := config["port"]; ok {
-		if p, err := strconv.Atoi(val); err == nil {
-			port = p
+		p, err := strconv.Atoi(val)
+		if err != nil {
+			return err
 		}
+		port = p
 	}
 
 	if !utils.IsValidPort(port) {
-		fmt.Printf("❌ Invalid 'port' in config: '%d'. Using fallback.\n", port)
-		port = defaultPort
+		return fmt.Errorf("invalid 'port' in config: '%d'", port)
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	lis, err := listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %v", err)
 	}
 	defer lis.Close()
 
-	s := grpc.NewServer()
+	s := gprcServerFactory()
 	defer s.GracefulStop()
 
 	log.Printf("🚀 gRPC server listening at :%d\n", port)

@@ -14,8 +14,7 @@ func LoadOrDefault(path string) (map[string]string, error) {
 	if env == "" {
 		env = "development"
 	}
-	fmt.Println("*******env")
-	fmt.Println(env)
+
 	switch env {
 	case "development", "staging", "production":
 		// valid
