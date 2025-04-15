@@ -15,8 +15,6 @@ import (
 	constants "deadalus-orch/shared/constants"
 )
 
-// -------------------- Helper --------------------
-
 func marshal(t *testing.T, v interface{}) []byte {
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -24,8 +22,6 @@ func marshal(t *testing.T, v interface{}) []byte {
 	}
 	return data
 }
-
-// -------------------- Tests --------------------
 
 func Test_CreatesRootIfMissing(t *testing.T) {
 	store := new(MockKVStore)
