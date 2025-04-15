@@ -110,3 +110,62 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
+
+func Test_SkipsIfUserExists(t *testing.T) {
+	store := new(MockKVStore)
+	config := map[string]string{
+		"default_root_user":     "admin",
+		"default_root_password": "123456",
+	}
+	root := models.User{
+		Username:     "admin",
+		PasswordHash: "hash",
+		Email:        "x@x.com",
+	}
+
+	defaultRootUserRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
+	userRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
+
+	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
+	store.On("Get", mock.Anything, []byte("user:admin")).Return(userRoot, nil).Once()
+
+	err := BootstrapRootUser(store, config)
+	assert.NoError(t, err)
+	store.AssertExpectations(t)
+}
+
+func Test_ErrorFetchingUser(t *testing.T) {
+	store := new(MockKVStore)
+	config := map[string]string{
+		"default_root_user":     "admin",
+		"default_root_password": "123456",
+	}
+	root := models.User{Username: "admin"}
+
+	defaultRootUserRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
+
+	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
+	store.On("Get", mock.Anything, []byte("user:admin")).Return(nil, errors.New("read error")).Once()
+
+	err := BootstrapRootUser(store, config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "read error")
+	store.AssertExpectations(t)
+}
+
+func Test_ErrorPutsRoot(t *testing.T) {
+	store := new(MockKVStore)
+	config := map[string]string{
+		"default_root_user":     "admin",
+		"default_root_password": "123456",
+	}
+
+	mockSlice := &MockSlice{data: []byte("nil"), exists: false}
+	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil).Times(1)
+	store.On("Write", mock.Anything, mock.Anything).Return(errors.New("write fail")).Once()
+
+	err := BootstrapRootUser(store, config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "write fail")
+	store.AssertExpectations(t)
+}
