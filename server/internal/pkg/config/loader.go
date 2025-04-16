@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
 	"strconv"
@@ -123,20 +124,20 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 
 	for k, v := range data {
 		switch k {
-		case "port":
+		case constants.ConfigPortKey:
 			p, err := strconv.Atoi(v)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing port: %w", err)
 			}
 			cfg.port = p
 
-		case "db_name":
+		case constants.ConfigDBName:
 			cfg.db_name = v
 
-		case "default_root_user":
+		case constants.ConfigDefaultRootUser:
 			cfg.default_root_user = v
 
-		case "default_root_password":
+		case constants.ConfigDefaultRootPassword:
 			cfg.default_root_password = v
 		}
 	}
