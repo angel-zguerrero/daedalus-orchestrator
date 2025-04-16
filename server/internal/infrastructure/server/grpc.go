@@ -1,11 +1,11 @@
 package server
 
 import (
+	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 
 	"google.golang.org/grpc"
 )
@@ -28,20 +28,12 @@ func DefaultGRPCServerFactory() GRPCServer {
 }
 
 func StartGRPC(
-	config map[string]string,
+	config config.Config,
 	listen ListenerFunc,
 	gprcServerFactory GRPCServerFactory,
 ) error {
-	const defaultPort = 50052
-	port := defaultPort
 
-	if val, ok := config["port"]; ok {
-		p, err := strconv.Atoi(val)
-		if err != nil {
-			return err
-		}
-		port = p
-	}
+	port := config.Port
 
 	if !utils.IsValidPort(port) {
 		return fmt.Errorf("invalid 'port' in config: '%d'", port)

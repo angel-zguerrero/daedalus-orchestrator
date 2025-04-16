@@ -2,14 +2,18 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog/log"
 )
 
-func LoadOrDefault(path string) (map[string]string, error) {
-	config := map[string]string{}
+func LoadOrDefault(path string) (*Config, error) {
+	config := &Config{
+		Port: 50052,
+	}
 	env := os.Getenv("ENV")
 
 	if path == "" {
@@ -27,54 +31,61 @@ func LoadOrDefault(path string) (map[string]string, error) {
 			cfg, err := LoadConfig(path)
 			config = cfg
 			if err != nil {
+				log.Error().
+					Str("path", path).
+					Err(err).
+					Msg("⚠️ Failed to load config file")
 				return nil, err
 			}
+		} else {
 			log.Error().
 				Str("path", path).
 				Err(err).
 				Msg("⚠️ Failed to load config file")
-
-		} else {
 			return nil, err
 		}
 	}
 
-	if config["port"] == "" {
-		config["port"] = os.Getenv("PORT")
+	if os.Getenv("PORT") != "" {
+		p, err := strconv.Atoi(os.Getenv("PORT"))
+		if err != nil {
+			return nil, err
+		}
+		config.Port = p
 	}
 
-	if config["db_name"] == "" {
-		config["db_name"] = os.Getenv("DB_NAME")
+	if config.DBname == "" {
+		config.DBname = os.Getenv("DB_NAME")
 	}
-	if config["db_name"] == "" {
-		config["db_name"] = "daedalus.db"
-	}
-
-	if config["default_root_user"] == "" {
-		config["default_root_user"] = os.Getenv("DEFAULT_ROOT_USER")
+	if config.DBname == "" {
+		config.DBname = "daedalus.db"
 	}
 
-	if config["default_root_password"] == "" {
-		config["default_root_password"] = os.Getenv("DEFAULT_ROOT_PASSWORD")
+	if config.DefaultRootUser == "" {
+		config.DefaultRootUser = os.Getenv("DEFAULT_ROOT_USER")
 	}
 
-	if config["default_root_user"] == "" {
-		config["default_root_user"] = "admin"
+	if config.DefaultRootPassword == "" {
+		config.DefaultRootPassword = os.Getenv("DEFAULT_ROOT_PASSWORD")
 	}
 
-	if config["default_root_password"] == "" {
-		config["default_root_password"] = "admin"
+	if config.DefaultRootUser == "" {
+		config.DefaultRootUser = "admin"
 	}
 
-	if config["port"] == "" {
-		config["port"] = "50052"
+	if config.DefaultRootPassword == "" {
+		config.DefaultRootPassword = "admin"
+	}
+
+	if config.Port == 0 {
+		config.Port = 50052
 	}
 
 	return config, nil
 }
 
-func LoadConfig(path string) (map[string]string, error) {
-	config := make(map[string]string)
+func LoadConfig(path string) (*Config, error) {
+	configMap := make(map[string]string)
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -97,9 +108,38 @@ func LoadConfig(path string) (map[string]string, error) {
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 		if key != "" && value != "" {
-			config[key] = value
+			configMap[key] = value
+		}
+	}
+	config, err := mapToConfig(configMap)
+	if err != nil {
+		return nil, err
+	}
+	return ConfigFromMapToConfig(*config), scanner.Err()
+}
+
+func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
+	cfg := &ConfigFromMap{}
+
+	for k, v := range data {
+		switch k {
+		case "port":
+			p, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing port: %w", err)
+			}
+			cfg.port = p
+
+		case "db_name":
+			cfg.db_name = v
+
+		case "default_root_user":
+			cfg.default_root_user = v
+
+		case "default_root_password":
+			cfg.default_root_password = v
 		}
 	}
 
-	return config, scanner.Err()
+	return cfg, nil
 }

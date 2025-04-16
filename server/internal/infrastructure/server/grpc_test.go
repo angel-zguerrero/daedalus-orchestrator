@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"deadalus-orch/server/internal/infrastructure/server"
+	"deadalus-orch/server/internal/pkg/config"
 	"errors"
 	"net"
 	"testing"
@@ -35,28 +36,16 @@ func makeListener(t *testing.T, addr string) net.Listener {
 func TestStartGRPC(t *testing.T) {
 	tests := []struct {
 		name          string
-		config        map[string]string
+		config        config.Config
 		listenFunc    server.ListenerFunc
 		newServerFunc server.GRPCServerFactory
 		expectError   bool
 	}{
 		{
-			name:   "default port success",
-			config: map[string]string{},
-			listenFunc: func(network, address string) (net.Listener, error) {
-				return makeListener(t, ":50052"), nil
+			name: "custom valid port",
+			config: config.Config{
+				Port: 5050,
 			},
-			newServerFunc: func() server.GRPCServer {
-				mockSrv := new(MockGRPCServer)
-				mockSrv.On("Serve", mock.Anything).Return(nil)
-				mockSrv.On("GracefulStop").Return()
-				return mockSrv
-			},
-			expectError: false,
-		},
-		{
-			name:   "custom valid port",
-			config: map[string]string{"port": "5050"},
 			listenFunc: func(network, address string) (net.Listener, error) {
 				return makeListener(t, ":5050"), nil
 			},
@@ -69,18 +58,10 @@ func TestStartGRPC(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:   "invalid port format",
-			config: map[string]string{"port": "notanumber"},
-			listenFunc: func(network, address string) (net.Listener, error) {
-				t.Fatal("should not call listen when port is invalid")
-				return nil, nil
+			name: "port out of range",
+			config: config.Config{
+				Port: 99999,
 			},
-			newServerFunc: nil,
-			expectError:   true,
-		},
-		{
-			name:   "port out of range",
-			config: map[string]string{"port": "99999"},
 			listenFunc: func(network, address string) (net.Listener, error) {
 				t.Fatal("should not call listen when port is invalid")
 				return nil, nil
@@ -90,7 +71,7 @@ func TestStartGRPC(t *testing.T) {
 		},
 		{
 			name:   "listen fails",
-			config: map[string]string{},
+			config: config.Config{},
 			listenFunc: func(network, address string) (net.Listener, error) {
 				return nil, errors.New("mock listen failure")
 			},
@@ -99,7 +80,7 @@ func TestStartGRPC(t *testing.T) {
 		},
 		{
 			name:   "serve fails",
-			config: map[string]string{},
+			config: config.Config{},
 			listenFunc: func(network, address string) (net.Listener, error) {
 				return makeListener(t, ":50052"), nil
 			},

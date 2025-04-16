@@ -4,18 +4,20 @@ import (
 	"deadalus-orch/shared/models"
 	"fmt"
 
+	"deadalus-orch/server/internal/pkg/config"
+
 	"github.com/rs/zerolog/log"
 )
 
-func BootstrapRootUser(kvStore KVStore, config map[string]string) error {
+func BootstrapRootUser(kvStore KVStore, config config.Config) error {
 	root, err := GetDefaultRootUserRoot(kvStore)
 	if err != nil {
 		return fmt.Errorf("failed to get default root: %v", err)
 	}
 
 	if root == nil {
-		username := config["default_root_user"]
-		password := config["default_root_password"]
+		username := config.DefaultRootUser
+		password := config.DefaultRootPassword
 
 		if username == "" || password == "" {
 			return fmt.Errorf("missing default root user/password")

@@ -47,18 +47,18 @@ default_root_password=secret
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg["db_name"] != "my.db" {
-		t.Errorf("expected db_name=my.db, got %s", cfg["db_name"])
+	if cfg.DBname != "my.db" {
+		t.Errorf("expected db_name=my.db, got %s", cfg.DBname)
 	}
-	if cfg["default_root_user"] != "admin" {
+	if cfg.DefaultRootUser != "admin" {
 		t.Errorf("expected default_root_user=admin")
 	}
-	if cfg["default_root_password"] != "secret" {
+	if cfg.DefaultRootPassword != "secret" {
 		t.Errorf("expected default_root_password=secret")
 	}
 
-	if cfg["port"] != "50052" {
-		t.Errorf("expected port=50052")
+	if cfg.Port != 50052 {
+		t.Errorf("expected port=50052, got %d", cfg.Port)
 	}
 }
 
@@ -75,13 +75,13 @@ db_name=my.db
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg["db_name"] != "my.db" {
-		t.Errorf("expected db_name=my.db, got %s", cfg["db_name"])
+	if cfg.DBname != "my.db" {
+		t.Errorf("expected db_name=my.db, got %s", cfg.DBname)
 	}
-	if cfg["default_root_user"] != "envUser" {
+	if cfg.DefaultRootUser != "envUser" {
 		t.Errorf("expected default_root_user from env")
 	}
-	if cfg["default_root_password"] != "envPass" {
+	if cfg.DefaultRootPassword != "envPass" {
 		t.Errorf("expected default_root_password from env")
 	}
 }
@@ -106,16 +106,16 @@ func TestLoadOrDefault_NoConfigFile_ENVFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cfg["db_name"] != "env.db" {
-		t.Errorf("expected db_name=env.db, got %s", cfg["db_name"])
+	if cfg.DBname != "env.db" {
+		t.Errorf("expected db_name=env.db, got %s", cfg.DBname)
 	}
-	if cfg["port"] != "5050" {
-		t.Errorf("expected port=5050, got %s", cfg["port"])
+	if cfg.Port != 5050 {
+		t.Errorf("expected port=5050, got %d", cfg.Port)
 	}
-	if cfg["default_root_user"] != "envUser" {
+	if cfg.DefaultRootUser != "envUser" {
 		t.Errorf("expected default_root_user from env")
 	}
-	if cfg["default_root_password"] != "envPass" {
+	if cfg.DefaultRootPassword != "envPass" {
 		t.Errorf("expected default_root_password from env")
 	}
 }
@@ -126,15 +126,15 @@ func TestLoadOrDefault_NoFile_NoEnv_DefaultFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cfg["db_name"] != "daedalus.db" {
+	if cfg.DBname != "daedalus.db" {
 		t.Errorf("expected fallback db_name=daedalus.db")
 	}
 
-	if cfg["default_root_user"] != "admin" {
+	if cfg.DefaultRootUser != "admin" {
 		t.Errorf("expected fallback default_root_user=admin")
 	}
 
-	if cfg["default_root_password"] != "admin" {
+	if cfg.DefaultRootPassword != "admin" {
 		t.Errorf("expected fallback default_root_password=admin")
 	}
 }
@@ -156,21 +156,14 @@ valid_key = value
 		t.Fatal(err)
 	}
 
-	if cfg["db_name"] != "my.db" {
-		t.Errorf("expected db_name=my.db")
+	if cfg.DBname != "my.db" {
+		t.Errorf("expected db_name=my.db, got %s", cfg.DBname)
 	}
-	if cfg["valid_key"] != "value" {
-		t.Errorf("expected valid_key=value")
+
+	if cfg.Port != 0 {
+		t.Errorf("expected Port 0, got %d", cfg.Port)
 	}
-	if cfg["spaced_key"] != "spaced_value" {
-		t.Errorf("expected spaced_key=spaced_value")
-	}
-	if _, ok := cfg["invalidline"]; ok {
-		t.Errorf("should not include malformed lines")
-	}
-	if _, ok := cfg[""]; ok {
-		t.Errorf("should not include empty keys")
-	}
+
 }
 
 func TestLoadOrDefault_ENVSelection(t *testing.T) {
@@ -180,7 +173,7 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg["db_name"] != "dev.db" {
+	if cfg.DBname != "dev.db" {
 		t.Errorf("expected db_name from ENV in development")
 	}
 
@@ -190,7 +183,7 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg["db_name"] != "stage.db" {
+	if cfg.DBname != "stage.db" {
 		t.Errorf("expected db_name from ENV in staging")
 	}
 
@@ -200,7 +193,7 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg["db_name"] != "prod.db" {
+	if cfg.DBname != "prod.db" {
 		t.Errorf("expected db_name from ENV in production")
 	}
 }
@@ -208,21 +201,21 @@ func TestLoadOrDefault_ENV_DefaultDevelopment(t *testing.T) {
 	t.Setenv("ENV", "")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "daedalus.db", cfg["db_name"])
+	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Development(t *testing.T) {
 	t.Setenv("ENV", "development")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "daedalus.db", cfg["db_name"])
+	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Staging_FileMissing(t *testing.T) {
 	t.Setenv("ENV", "staging")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "daedalus.db", cfg["db_name"])
+	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Production_WithFile(t *testing.T) {
@@ -231,7 +224,7 @@ func TestLoadOrDefault_ENV_Production_WithFile(t *testing.T) {
 	defer os.Remove(file)
 	cfg, err := config.LoadOrDefault(file)
 	require.NoError(t, err)
-	assert.Equal(t, "my.db", cfg["db_name"])
+	assert.Equal(t, "my.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_CustomPath_FileExists(t *testing.T) {
@@ -239,7 +232,7 @@ func TestLoadOrDefault_CustomPath_FileExists(t *testing.T) {
 	defer os.Remove(file)
 	cfg, err := config.LoadOrDefault(file)
 	require.NoError(t, err)
-	assert.Equal(t, "custom.db", cfg["db_name"])
+	assert.Equal(t, "custom.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_CustomPath_FileMissing(t *testing.T) {
@@ -254,30 +247,14 @@ func TestLoadOrDefault_ENVFallbacks(t *testing.T) {
 	t.Setenv("DEFAULT_ROOT_PASSWORD", "rootpass")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "fromenv.db", cfg["db_name"])
-	assert.Equal(t, "root", cfg["default_root_user"])
-	assert.Equal(t, "rootpass", cfg["default_root_password"])
+	assert.Equal(t, "fromenv.db", cfg.DBname)
+	assert.Equal(t, "root", cfg.DefaultRootUser)
+	assert.Equal(t, "rootpass", cfg.DefaultRootPassword)
 }
 
 func TestLoadOrDefault_DefaultRootFallbacks(t *testing.T) {
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "admin", cfg["default_root_user"])
-	assert.Equal(t, "admin", cfg["default_root_password"])
-}
-
-func TestLoadOrDefault_ConfigIgnoresMalformedLines(t *testing.T) {
-	file := writeTempFile(t, `
-# this is a comment
-invalid_line
-keyonly=
-=valonly
-valid = yes
-`)
-	defer os.Remove(file)
-	cfg, err := config.LoadOrDefault(file)
-	require.NoError(t, err)
-	assert.Equal(t, "yes", cfg["valid"])
-	_, exists := cfg["invalid_line"]
-	assert.False(t, exists)
+	assert.Equal(t, "admin", cfg.DefaultRootUser)
+	assert.Equal(t, "admin", cfg.DefaultRootPassword)
 }

@@ -18,6 +18,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"deadalus-orch/server/internal/pkg/config"
 )
 
 func TestMain(m *testing.M) {
@@ -36,9 +38,9 @@ func marshal(t *testing.T, v interface{}) []byte {
 
 func Test_CreatesRootIfMissing(t *testing.T) {
 	store := new(MockKVStore)
-	config := map[string]string{
-		"default_root_user":     "admin",
-		"default_root_password": "123456",
+	config := config.Config{
+		DefaultRootUser:     "admin",
+		DefaultRootPassword: "123456",
 	}
 
 	mockSlice := &MockSlice{data: []byte("nil"), exists: false}
@@ -46,9 +48,9 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil).Times(1)
 
 	input := models.CreateUser{
-		Username: config["default_root_user"],
+		Username: config.DefaultRootUser,
 		Email:    "noemail@daedalus.com",
-		Password: config["default_root_password"],
+		Password: config.DefaultRootPassword,
 	}
 	defaultUserData, err := json.Marshal(input)
 	assert.NoError(t, err)
@@ -81,9 +83,9 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 
 func Test_ErrorGettingRoot(t *testing.T) {
 	store := new(MockKVStore)
-	config := map[string]string{
-		"default_root_user":     "admin",
-		"default_root_password": "123456",
+	config := config.Config{
+		DefaultRootUser:     "admin",
+		DefaultRootPassword: "123456",
 	}
 
 	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(nil, errors.New("boom")).Once()
@@ -96,9 +98,9 @@ func Test_ErrorGettingRoot(t *testing.T) {
 
 func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	store := new(MockKVStore)
-	config := map[string]string{
-		"default_root_user":     "admin",
-		"default_root_password": "123456",
+	config := config.Config{
+		DefaultRootUser:     "admin",
+		DefaultRootPassword: "123456",
 	}
 	root := models.CreateUser{
 		Username: "admin",
@@ -120,10 +122,11 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 
 func Test_SkipsIfUserExists(t *testing.T) {
 	store := new(MockKVStore)
-	config := map[string]string{
-		"default_root_user":     "admin",
-		"default_root_password": "123456",
+	config := config.Config{
+		DefaultRootUser:     "admin",
+		DefaultRootPassword: "123456",
 	}
+
 	root := models.User{
 		Username:     "admin",
 		PasswordHash: "hash",
@@ -143,9 +146,9 @@ func Test_SkipsIfUserExists(t *testing.T) {
 
 func Test_ErrorFetchingUser(t *testing.T) {
 	store := new(MockKVStore)
-	config := map[string]string{
-		"default_root_user":     "admin",
-		"default_root_password": "123456",
+	config := config.Config{
+		DefaultRootUser:     "admin",
+		DefaultRootPassword: "123456",
 	}
 	root := models.User{Username: "admin"}
 
@@ -162,9 +165,9 @@ func Test_ErrorFetchingUser(t *testing.T) {
 
 func Test_ErrorPutsRoot(t *testing.T) {
 	store := new(MockKVStore)
-	config := map[string]string{
-		"default_root_user":     "admin",
-		"default_root_password": "123456",
+	config := config.Config{
+		DefaultRootUser:     "admin",
+		DefaultRootPassword: "123456",
 	}
 
 	mockSlice := &MockSlice{data: []byte("nil"), exists: false}

@@ -47,7 +47,7 @@ func Run() {
 	}
 
 	// Database run
-	dbConn, err := db.InitDB(configMap["db_name"], db.DefaultPathProvider{})
+	dbConn, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
 	if err != nil {
 
 		log.Fatal().
@@ -60,7 +60,7 @@ func Run() {
 	defer dbConn.Close()
 
 	rocksdbStore := &db.RocksdbStore{DB: dbConn}
-	if err := db.BootstrapRootUser(rocksdbStore, configMap); err != nil {
+	if err := db.BootstrapRootUser(rocksdbStore, *configMap); err != nil {
 		log.Fatal().
 			Err(err).
 			Str("package", "app").
@@ -69,7 +69,7 @@ func Run() {
 	}
 
 	err = server.StartGRPC(
-		configMap,
+		*configMap,
 		server.DefaultListener,
 		server.DefaultGRPCServerFactory,
 	)
