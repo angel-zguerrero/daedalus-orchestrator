@@ -7,12 +7,15 @@ export CGO_LDFLAGS="-L/opt/homebrew/lib -lrocksdb"
 
 # Env Vars
 
+```
 LOGGER_FORMAT= pretty | json 
 ENV= development | production | staging
 DB_NAME = dabase_name
 DEFAULT_ROOT_USER = an username
 DEFAULT_ROOT_PASSWORD = a password 
 PORT = a port
+
+```
 
 # Parameters
 
