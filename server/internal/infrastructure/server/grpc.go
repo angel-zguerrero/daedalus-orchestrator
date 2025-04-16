@@ -2,7 +2,6 @@ package server
 
 import (
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
 	"fmt"
 	"log"
 	"net"
@@ -34,10 +33,6 @@ func StartGRPC(
 ) error {
 
 	port := config.Port
-
-	if !utils.IsValidPort(port) {
-		return fmt.Errorf("invalid 'port' in config: '%d'", port)
-	}
 
 	lis, err := listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
@@ -12,9 +13,7 @@ import (
 )
 
 func LoadOrDefault(path string) (*Config, error) {
-	config := &Config{
-		Port: 50052,
-	}
+	config := &Config{}
 	env := os.Getenv("ENV")
 
 	if path == "" {
@@ -55,19 +54,20 @@ func LoadOrDefault(path string) (*Config, error) {
 		config.Port = p
 	}
 
-	if config.DBname == "" {
+	if os.Getenv("DB_NAME") != "" {
 		config.DBname = os.Getenv("DB_NAME")
 	}
-	if config.DBname == "" {
-		config.DBname = "daedalus.db"
-	}
 
-	if config.DefaultRootUser == "" {
+	if os.Getenv("DEFAULT_ROOT_USER") != "" {
 		config.DefaultRootUser = os.Getenv("DEFAULT_ROOT_USER")
 	}
 
-	if config.DefaultRootPassword == "" {
+	if os.Getenv("DEFAULT_ROOT_PASSWORD") != "" {
 		config.DefaultRootPassword = os.Getenv("DEFAULT_ROOT_PASSWORD")
+	}
+
+	if config.DBname == "" {
+		config.DBname = "daedalus.db"
 	}
 
 	if config.DefaultRootUser == "" {
@@ -80,6 +80,10 @@ func LoadOrDefault(path string) (*Config, error) {
 
 	if config.Port == 0 {
 		config.Port = 50052
+	}
+
+	if !utils.IsValidPort(config.Port) {
+		return nil, fmt.Errorf("invalid 'port' in config: '%d'", config.Port)
 	}
 
 	return config, nil

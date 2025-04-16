@@ -42,34 +42,6 @@ func TestStartGRPC(t *testing.T) {
 		expectError   bool
 	}{
 		{
-			name: "custom valid port",
-			config: config.Config{
-				Port: 5050,
-			},
-			listenFunc: func(network, address string) (net.Listener, error) {
-				return makeListener(t, ":5050"), nil
-			},
-			newServerFunc: func() server.GRPCServer {
-				mockSrv := new(MockGRPCServer)
-				mockSrv.On("Serve", mock.Anything).Return(nil)
-				mockSrv.On("GracefulStop").Return()
-				return mockSrv
-			},
-			expectError: false,
-		},
-		{
-			name: "port out of range",
-			config: config.Config{
-				Port: 99999,
-			},
-			listenFunc: func(network, address string) (net.Listener, error) {
-				t.Fatal("should not call listen when port is invalid")
-				return nil, nil
-			},
-			newServerFunc: nil,
-			expectError:   true,
-		},
-		{
 			name:   "listen fails",
 			config: config.Config{},
 			listenFunc: func(network, address string) (net.Listener, error) {

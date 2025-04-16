@@ -62,6 +62,51 @@ default_root_password=secret
 	}
 }
 
+func TestLoadOrDefault_ConfigFileOverwriteKeysWithEnvVars(t *testing.T) {
+	content := `
+db_name=my.db
+default_root_user=admin
+default_root_password=secret
+port=50005
+`
+
+	setEnv(t, "DB_NAME", "other-name-db")
+	setEnv(t, "DEFAULT_ROOT_PASSWORD", "envPass")
+	setEnv(t, "DEFAULT_ROOT_USER", "envUser")
+	setEnv(t, "PORT", "50006")
+
+	path := writeTempFile(t, content)
+	defer os.Remove(path)
+	cfg, err := config.LoadOrDefault(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DBname != "other-name-db" {
+		t.Errorf("expected DBname=other-name-db, got %s", cfg.DBname)
+	}
+	if cfg.DefaultRootUser != "envUser" {
+		t.Errorf("expected DefaultRootUser=envUser, got %s", cfg.DefaultRootUser)
+	}
+	if cfg.DefaultRootPassword != "envPass" {
+		t.Errorf("expected DefaultRootPassword=envPass, got %s", cfg.DefaultRootPassword)
+	}
+
+	if cfg.Port != 50006 {
+		t.Errorf("expected port=50006, got %d", cfg.Port)
+	}
+}
+
+func TestLoadOrDefault_InvalidPort(t *testing.T) {
+	content := `
+port=9
+`
+	path := writeTempFile(t, content)
+	defer os.Remove(path)
+	_, err := config.LoadOrDefault(path)
+	require.Error(t, err)
+	assert.EqualError(t, err, "invalid 'port' in config: '9'")
+}
+
 func TestLoadOrDefault_ConfigFilePartialKeys_ENVFallback(t *testing.T) {
 	content := `
 db_name=my.db
