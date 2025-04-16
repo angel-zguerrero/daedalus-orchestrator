@@ -14,7 +14,7 @@ import (
 
 func LoadOrDefault(path string) (*Config, error) {
 	config := &Config{}
-	env := os.Getenv("ENV")
+	env := os.Getenv(constants.EnvVarEnvKey)
 
 	if path == "" {
 
@@ -46,24 +46,24 @@ func LoadOrDefault(path string) (*Config, error) {
 		}
 	}
 
-	if os.Getenv("PORT") != "" {
-		p, err := strconv.Atoi(os.Getenv("PORT"))
+	if os.Getenv(constants.EnvVarPortKey) != "" {
+		p, err := strconv.Atoi(os.Getenv(constants.EnvVarPortKey))
 		if err != nil {
 			return nil, err
 		}
 		config.Port = p
 	}
 
-	if os.Getenv("DB_NAME") != "" {
-		config.DBname = os.Getenv("DB_NAME")
+	if os.Getenv(constants.EnvVarDBName) != "" {
+		config.DBname = os.Getenv(constants.EnvVarDBName)
 	}
 
-	if os.Getenv("DEFAULT_ROOT_USER") != "" {
-		config.DefaultRootUser = os.Getenv("DEFAULT_ROOT_USER")
+	if os.Getenv(constants.EnvVarDefaultRootUser) != "" {
+		config.DefaultRootUser = os.Getenv(constants.EnvVarDefaultRootUser)
 	}
 
-	if os.Getenv("DEFAULT_ROOT_PASSWORD") != "" {
-		config.DefaultRootPassword = os.Getenv("DEFAULT_ROOT_PASSWORD")
+	if os.Getenv(constants.EnvVarDefaultRootPassword) != "" {
+		config.DefaultRootPassword = os.Getenv(constants.EnvVarDefaultRootPassword)
 	}
 
 	if config.DBname == "" {

@@ -2,6 +2,7 @@ package utils_test
 
 import (
 	"deadalus-orch/server/internal/pkg/utils"
+	"deadalus-orch/shared/constants"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,26 +10,26 @@ import (
 )
 
 func TestENVValidator_ENV_Invalid(t *testing.T) {
-	t.Setenv("ENV", "invalid")
+	t.Setenv(constants.EnvVarEnvKey, "invalid")
 	err := utils.ValidateEnvVar()
 	require.Error(t, err)
 	assert.EqualError(t, err, "invalid ENV value: invalid. Must be one of: development, staging, production")
 }
 
 func TestENVValidator_ENV_ValidProduction(t *testing.T) {
-	t.Setenv("ENV", "production")
+	t.Setenv(constants.EnvVarEnvKey, "production")
 	err := utils.ValidateEnvVar()
 	assert.NoError(t, err)
 }
 
 func TestENVValidator_ENV_ValidDevelopment(t *testing.T) {
-	t.Setenv("ENV", "development")
+	t.Setenv(constants.EnvVarEnvKey, "development")
 	err := utils.ValidateEnvVar()
 	assert.NoError(t, err)
 }
 
 func TestENVValidator_ENV_ValidStagin(t *testing.T) {
-	t.Setenv("ENV", "staging")
+	t.Setenv(constants.EnvVarEnvKey, "staging")
 	err := utils.ValidateEnvVar()
 	assert.NoError(t, err)
 }

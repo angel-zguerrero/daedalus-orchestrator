@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/shared/constants"
 	"errors"
 	"os"
 	"path/filepath"
@@ -70,10 +71,10 @@ default_root_password=secret
 port=50005
 `
 
-	setEnv(t, "DB_NAME", "other-name-db")
-	setEnv(t, "DEFAULT_ROOT_PASSWORD", "envPass")
-	setEnv(t, "DEFAULT_ROOT_USER", "envUser")
-	setEnv(t, "PORT", "50006")
+	setEnv(t, constants.EnvVarDBName, "other-name-db")
+	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
+	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
+	setEnv(t, constants.EnvVarPortKey, "50006")
 
 	path := writeTempFile(t, content)
 	defer os.Remove(path)
@@ -113,8 +114,8 @@ db_name=my.db
 `
 	path := writeTempFile(t, content)
 	defer os.Remove(path)
-	setEnv(t, "DEFAULT_ROOT_USER", "envUser")
-	setEnv(t, "DEFAULT_ROOT_PASSWORD", "envPass")
+	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
+	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
 
 	cfg, err := config.LoadOrDefault(path)
 	if err != nil {
@@ -141,10 +142,10 @@ func TestLoadOrDefault_InvalidPath(t *testing.T) {
 }
 
 func TestLoadOrDefault_NoConfigFile_ENVFallback(t *testing.T) {
-	setEnv(t, "DB_NAME", "env.db")
-	setEnv(t, "DEFAULT_ROOT_USER", "envUser")
-	setEnv(t, "DEFAULT_ROOT_PASSWORD", "envPass")
-	setEnv(t, "PORT", "5050")
+	setEnv(t, constants.EnvVarDBName, "env.db")
+	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
+	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
+	setEnv(t, constants.EnvVarPortKey, "5050")
 
 	cfg, err := config.LoadOrDefault("")
 	if err != nil {
@@ -212,8 +213,8 @@ valid_key = value
 }
 
 func TestLoadOrDefault_ENVSelection(t *testing.T) {
-	setEnv(t, "ENV", "development")
-	setEnv(t, "DB_NAME", "dev.db")
+	setEnv(t, constants.EnvVarEnvKey, "development")
+	setEnv(t, constants.EnvVarDBName, "dev.db")
 	cfg, err := config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
@@ -222,8 +223,8 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 		t.Errorf("expected db_name from ENV in development")
 	}
 
-	setEnv(t, "ENV", "staging")
-	setEnv(t, "DB_NAME", "stage.db")
+	setEnv(t, constants.EnvVarEnvKey, "staging")
+	setEnv(t, constants.EnvVarDBName, "stage.db")
 	cfg, err = config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
@@ -232,8 +233,8 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 		t.Errorf("expected db_name from ENV in staging")
 	}
 
-	setEnv(t, "ENV", "production")
-	setEnv(t, "DB_NAME", "prod.db")
+	setEnv(t, constants.EnvVarEnvKey, "production")
+	setEnv(t, constants.EnvVarDBName, "prod.db")
 	cfg, err = config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
@@ -243,28 +244,28 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 	}
 }
 func TestLoadOrDefault_ENV_DefaultDevelopment(t *testing.T) {
-	t.Setenv("ENV", "")
+	t.Setenv(constants.EnvVarEnvKey, "")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
 	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Development(t *testing.T) {
-	t.Setenv("ENV", "development")
+	t.Setenv(constants.EnvVarEnvKey, "development")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
 	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Staging_FileMissing(t *testing.T) {
-	t.Setenv("ENV", "staging")
+	t.Setenv(constants.EnvVarEnvKey, "staging")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
 	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Production_WithFile(t *testing.T) {
-	t.Setenv("ENV", "production")
+	t.Setenv(constants.EnvVarEnvKey, "production")
 	file := writeTempFile(t, `db_name = my.db`) // simulate file at /etc/daedalus
 	defer os.Remove(file)
 	cfg, err := config.LoadOrDefault(file)
@@ -287,9 +288,9 @@ func TestLoadOrDefault_CustomPath_FileMissing(t *testing.T) {
 }
 
 func TestLoadOrDefault_ENVFallbacks(t *testing.T) {
-	t.Setenv("DB_NAME", "fromenv.db")
-	t.Setenv("DEFAULT_ROOT_USER", "root")
-	t.Setenv("DEFAULT_ROOT_PASSWORD", "rootpass")
+	t.Setenv(constants.EnvVarDBName, "fromenv.db")
+	t.Setenv(constants.EnvVarDefaultRootUser, "root")
+	t.Setenv(constants.EnvVarDefaultRootPassword, "rootpass")
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
 	assert.Equal(t, "fromenv.db", cfg.DBname)

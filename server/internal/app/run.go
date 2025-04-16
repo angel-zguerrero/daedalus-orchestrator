@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
+	"deadalus-orch/shared/constants"
 	"flag"
 	"os"
 
@@ -28,7 +29,7 @@ func Run() {
 			Msgf("❌ Failed validation of ENV var")
 	}
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	if os.Getenv("ENV") == "production" {
+	if os.Getenv(constants.EnvVarEnvKey) == "production" {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	} else {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)

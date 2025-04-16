@@ -2,6 +2,7 @@ package db
 
 import (
 	"deadalus-orch/server/internal/pkg/utils"
+	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
 	"os/user"
@@ -24,7 +25,7 @@ type PathProvider interface {
 type DefaultPathProvider struct{}
 
 func (d DefaultPathProvider) GetDatabasePath() (string, error) {
-	env := getEnv("ENV")
+	env := getEnv(constants.EnvVarEnvKey)
 	if env == "" {
 		env = "development"
 	}
