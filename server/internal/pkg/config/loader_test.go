@@ -56,6 +56,10 @@ default_root_password=secret
 	if cfg["default_root_password"] != "secret" {
 		t.Errorf("expected default_root_password=secret")
 	}
+
+	if cfg["port"] != "50052" {
+		t.Errorf("expected port=50052")
+	}
 }
 
 func TestLoadOrDefault_ConfigFilePartialKeys_ENVFallback(t *testing.T) {

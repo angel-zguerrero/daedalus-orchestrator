@@ -66,6 +66,10 @@ func LoadOrDefault(path string) (map[string]string, error) {
 		config["default_root_password"] = "admin"
 	}
 
+	if config["port"] == "" {
+		config["port"] = "50052"
+	}
+
 	return config, nil
 }
 
