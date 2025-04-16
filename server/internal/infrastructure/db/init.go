@@ -27,10 +27,10 @@ type DefaultPathProvider struct{}
 func (d DefaultPathProvider) GetDatabasePath() (string, error) {
 	env := getEnv(constants.EnvVarEnvKey)
 	if env == "" {
-		env = "development"
+		env = string(constants.DEVELOPMENT)
 	}
 
-	if env == "development" {
+	if env == string(constants.DEVELOPMENT) {
 		usr, err := getCurrentUser()
 		if err != nil {
 			return "", fmt.Errorf("could not get user: %v", err)

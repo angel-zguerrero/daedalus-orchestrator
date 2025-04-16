@@ -12,12 +12,12 @@ import (
 func ValidateEnvVar() error {
 	env := os.Getenv(constants.EnvVarEnvKey)
 	if env == "" {
-		env = "development"
+		env = string(constants.DEVELOPMENT)
 		os.Setenv(constants.EnvVarEnvKey, env)
 	}
 
 	switch env {
-	case "development", "staging", "production":
+	case string(constants.DEVELOPMENT), string(constants.STAGING), string(constants.PRODUCTION):
 
 		log.Info().
 			Str(constants.EnvVarEnvKey, env).

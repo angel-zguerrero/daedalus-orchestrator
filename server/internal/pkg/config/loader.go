@@ -18,7 +18,7 @@ func LoadOrDefault(path string) (*Config, error) {
 
 	if path == "" {
 
-		if env == "development" {
+		if env == string(constants.DEVELOPMENT) {
 			path = "../daedalus.conf"
 		} else {
 			path = "/etc/daedalus/daedalus.conf"

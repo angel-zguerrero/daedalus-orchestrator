@@ -17,19 +17,19 @@ func TestENVValidator_ENV_Invalid(t *testing.T) {
 }
 
 func TestENVValidator_ENV_ValidProduction(t *testing.T) {
-	t.Setenv(constants.EnvVarEnvKey, "production")
+	t.Setenv(constants.EnvVarEnvKey, string(constants.PRODUCTION))
 	err := utils.ValidateEnvVar()
 	assert.NoError(t, err)
 }
 
 func TestENVValidator_ENV_ValidDevelopment(t *testing.T) {
-	t.Setenv(constants.EnvVarEnvKey, "development")
+	t.Setenv(constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
 	err := utils.ValidateEnvVar()
 	assert.NoError(t, err)
 }
 
 func TestENVValidator_ENV_ValidStagin(t *testing.T) {
-	t.Setenv(constants.EnvVarEnvKey, "staging")
+	t.Setenv(constants.EnvVarEnvKey, string(constants.STAGING))
 	err := utils.ValidateEnvVar()
 	assert.NoError(t, err)
 }

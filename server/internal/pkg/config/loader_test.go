@@ -213,7 +213,7 @@ valid_key = value
 }
 
 func TestLoadOrDefault_ENVSelection(t *testing.T) {
-	setEnv(t, constants.EnvVarEnvKey, "development")
+	setEnv(t, constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
 	setEnv(t, constants.EnvVarDBName, "dev.db")
 	cfg, err := config.LoadOrDefault("")
 	if err != nil {
@@ -223,7 +223,7 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 		t.Errorf("expected db_name from ENV in development")
 	}
 
-	setEnv(t, constants.EnvVarEnvKey, "staging")
+	setEnv(t, constants.EnvVarEnvKey, string(constants.STAGING))
 	setEnv(t, constants.EnvVarDBName, "stage.db")
 	cfg, err = config.LoadOrDefault("")
 	if err != nil {
@@ -233,7 +233,7 @@ func TestLoadOrDefault_ENVSelection(t *testing.T) {
 		t.Errorf("expected db_name from ENV in staging")
 	}
 
-	setEnv(t, constants.EnvVarEnvKey, "production")
+	setEnv(t, constants.EnvVarEnvKey, string(constants.PRODUCTION))
 	setEnv(t, constants.EnvVarDBName, "prod.db")
 	cfg, err = config.LoadOrDefault("")
 	if err != nil {
@@ -251,21 +251,21 @@ func TestLoadOrDefault_ENV_DefaultDevelopment(t *testing.T) {
 }
 
 func TestLoadOrDefault_ENV_Development(t *testing.T) {
-	t.Setenv(constants.EnvVarEnvKey, "development")
+	t.Setenv(constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
 	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Staging_FileMissing(t *testing.T) {
-	t.Setenv(constants.EnvVarEnvKey, "staging")
+	t.Setenv(constants.EnvVarEnvKey, string(constants.STAGING))
 	cfg, err := config.LoadOrDefault("")
 	require.NoError(t, err)
 	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Production_WithFile(t *testing.T) {
-	t.Setenv(constants.EnvVarEnvKey, "production")
+	t.Setenv(constants.EnvVarEnvKey, string(constants.PRODUCTION))
 	file := writeTempFile(t, `db_name = my.db`) // simulate file at /etc/daedalus
 	defer os.Remove(file)
 	cfg, err := config.LoadOrDefault(file)

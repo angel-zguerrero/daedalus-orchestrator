@@ -11,3 +11,11 @@ const EnvVarPortKey = "PORT"
 const EnvVarDBName = "DB_NAME"
 const EnvVarDefaultRootUser = "DEFAULT_ROOT_USER"
 const EnvVarDefaultRootPassword = "DEFAULT_ROOT_PASSWORD"
+
+type Env string
+
+const (
+	PRODUCTION  Env = "production"
+	DEVELOPMENT Env = "development"
+	STAGING     Env = "staging"
+)

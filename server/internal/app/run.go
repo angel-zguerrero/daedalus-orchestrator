@@ -29,7 +29,7 @@ func Run() {
 			Msgf("❌ Failed validation of ENV var")
 	}
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	if os.Getenv(constants.EnvVarEnvKey) == "production" {
+	if os.Getenv(constants.EnvVarEnvKey) == string(constants.PRODUCTION) {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	} else {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
