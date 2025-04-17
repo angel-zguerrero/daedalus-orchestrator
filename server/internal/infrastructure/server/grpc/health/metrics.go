@@ -25,6 +25,10 @@ func NewMetricsServer(nodeType string) *MetricsServer {
 }
 
 func (s *MetricsServer) GetSystemMetrics(ctx context.Context, _ *pb.SystemMetricsRequest) (*pb.SystemMetricsResponse, error) {
+	// "manual" way
+	// tracer := otel.Tracer("deadalus.system.metrics")
+	// _, span := tracer.Start(ctx, "GetSystemMetrics")
+	// defer span.End()
 	vmStat, _ := mem.VirtualMemory()
 	cpuPercent, _ := cpu.Percent(0, false)
 	hostname, _ := os.Hostname()

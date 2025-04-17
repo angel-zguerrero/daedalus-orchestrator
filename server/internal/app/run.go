@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	"deadalus-orch/server/internal/pkg/config"
@@ -13,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Run() {
+func Run(ctx context.Context) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	if os.Getenv("LOGGER_FORMAT") == "pretty" {

@@ -9,6 +9,8 @@ import (
 	pb "deadalus-orch/server/internal/infrastructure/common/proto/health/metrics"
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/health"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+
 	"google.golang.org/grpc"
 )
 
@@ -27,7 +29,8 @@ func DefaultListener(network, address string) (net.Listener, error) {
 }
 
 func DefaultGRPCServerFactory() GRPCServer {
-	return grpc.NewServer()
+	handler := otelgrpc.NewServerHandler()
+	return grpc.NewServer(grpc.StatsHandler(handler))
 }
 
 func StartGRPC(
