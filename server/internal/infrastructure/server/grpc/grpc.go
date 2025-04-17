@@ -6,6 +6,9 @@ import (
 	"log"
 	"net"
 
+	pb "deadalus-orch/server/internal/infrastructure/common/proto/health/metrics"
+	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/health"
+
 	"google.golang.org/grpc"
 )
 
@@ -14,6 +17,7 @@ type ListenerFunc func(network, address string) (net.Listener, error)
 type GRPCServer interface {
 	Serve(lis net.Listener) error
 	GracefulStop()
+	RegisterService(*grpc.ServiceDesc, interface{})
 }
 
 type GRPCServerFactory func() GRPCServer
@@ -42,6 +46,11 @@ func StartGRPC(
 
 	s := gprcServerFactory()
 	defer s.GracefulStop()
+
+	// registration gRPC implementations
+
+	metricsSrv := healthmetrics.NewMetricsServer("main") // main or follower
+	pb.RegisterMetricsServiceServer(s, metricsSrv)
 
 	log.Printf("🚀 gRPC server listening at :%d\n", port)
 	return s.Serve(lis)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"google.golang.org/grpc"
 )
 
 // Mock del GRPC server
@@ -22,6 +23,10 @@ func (m *MockGRPCServer) Serve(lis net.Listener) error {
 }
 
 func (m *MockGRPCServer) GracefulStop() {
+	m.Called()
+}
+
+func (m *MockGRPCServer) RegisterService(*grpc.ServiceDesc, interface{}) {
 	m.Called()
 }
 
@@ -60,6 +65,7 @@ func TestStartGRPC(t *testing.T) {
 				mockSrv := new(MockGRPCServer)
 				mockSrv.On("Serve", mock.Anything).Return(errors.New("serve failed"))
 				mockSrv.On("GracefulStop").Return()
+				mockSrv.On("RegisterService").Return()
 				return mockSrv
 			},
 			expectError: true,
