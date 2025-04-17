@@ -2,7 +2,7 @@ package app
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/infrastructure/server"
+	server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/shared/constants"

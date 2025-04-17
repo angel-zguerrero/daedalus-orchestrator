@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package health;
+
+option go_package = "health;health";
+
+service MetricsService {
+  rpc GetSystemMetrics (SystemMetricsRequest) returns (SystemMetricsResponse);
+}
+
+message SystemMetricsRequest {}
+
+message SystemMetricsResponse {
+  float cpu_usage_percent = 1;
+  uint64 memory_total_bytes = 2;
+  uint64 memory_used_bytes = 3;
+  uint64 memory_free_bytes = 4;
+  uint64 uptime_seconds = 5;
+  string hostname = 6;
+  string node_type = 7; // "main" o "follower"
+  int64 timestamp = 8;
+}
+
+//protoc --go_out=./internal/infrastructure/common/proto --go-grpc_out=./internal/infrastructure/common/proto ./internal/infrastructure/common/proto/definitions/metrics.proto

@@ -1,7 +1,7 @@
 package server_test
 
 import (
-	"deadalus-orch/server/internal/infrastructure/server"
+	server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	"deadalus-orch/server/internal/pkg/config"
 	"errors"
 	"net"
