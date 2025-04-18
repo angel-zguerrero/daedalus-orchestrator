@@ -64,7 +64,7 @@ func InitDB(dbName string, provider PathProvider) (*grocksdb.DB, error) {
 func OpenDB(dbPath string) (*grocksdb.DB, error) {
 	log.Info().
 		Str("dbPath", dbPath).
-		Msg("🗄️  Opening db")
+		Msg("🗄️  Opening index db")
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
 	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)

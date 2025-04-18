@@ -14,7 +14,9 @@ DB_NAME = dabase_name
 DEFAULT_ROOT_USER = an username
 DEFAULT_ROOT_PASSWORD = a password 
 PORT = a port
-
+OTEL_ACTIVE = "true" | "false"
+OTEL_ENDPOINT =  url:port // default localhost:4317
+OTEL_TRACER_SERVICE_NAME = "otl tracer service name" // default deadalus-server
 ```
 
 # Parameters

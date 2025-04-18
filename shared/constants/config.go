@@ -11,6 +11,9 @@ const EnvVarPortKey = "PORT"
 const EnvVarDBName = "DB_NAME"
 const EnvVarDefaultRootUser = "DEFAULT_ROOT_USER"
 const EnvVarDefaultRootPassword = "DEFAULT_ROOT_PASSWORD"
+const EnvVarOtelActived = "OTEL_ACTIVE"
+const EnvVarOtelEndpoint = "OTEL_ENDPOINT"
+const EnvVarOtelTracerServiceName = "OTEL_TRACER_SERVICE_NAME"
 
 type Env string
 
@@ -18,4 +21,9 @@ const (
 	PRODUCTION  Env = "production"
 	DEVELOPMENT Env = "development"
 	STAGING     Env = "staging"
+)
+
+const (
+	OTEL_ACTIVE_TRUE  string = "true"
+	OTEL_ACTIVE_FALSE string = "false"
 )

@@ -3,8 +3,9 @@ package server
 import (
 	"deadalus-orch/server/internal/pkg/config"
 	"fmt"
-	"log"
 	"net"
+
+	"github.com/rs/zerolog/log"
 
 	pb "deadalus-orch/server/internal/infrastructure/common/proto/health/metrics"
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/health"
@@ -55,6 +56,9 @@ func StartGRPC(
 	metricsSrv := healthmetrics.NewMetricsServer("main") // main or follower
 	pb.RegisterMetricsServiceServer(s, metricsSrv)
 
-	log.Printf("🚀 gRPC server listening at :%d\n", port)
+	log.Info().
+		Int("port", port).
+		Msg("🚀 gRPC server listening")
+
 	return s.Serve(lis)
 }

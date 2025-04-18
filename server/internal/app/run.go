@@ -1,11 +1,11 @@
 package app
 
 import (
-	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
+	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
 	"flag"
 	"os"
@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Run(ctx context.Context) {
+func Run() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	if os.Getenv("LOGGER_FORMAT") == "pretty" {
@@ -29,6 +29,26 @@ func Run(ctx context.Context) {
 			Str("func", "Run").
 			Msgf("❌ Failed validation of ENV var")
 	}
+
+	ctx, tp, err := telemetry.Init(
+		constants.Env(os.Getenv(constants.EnvVarEnvKey)),
+		os.Getenv(constants.EnvVarOtelActived) == string(constants.OTEL_ACTIVE_TRUE),
+		os.Getenv(constants.EnvVarOtelEndpoint),
+		os.Getenv(constants.EnvVarOtelTracerServiceName),
+	)
+
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed Init Telemetry")
+	}
+
+	defer func() {
+		_ = tp.Shutdown(ctx)
+	}()
+
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	if os.Getenv(constants.EnvVarEnvKey) == string(constants.PRODUCTION) {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
