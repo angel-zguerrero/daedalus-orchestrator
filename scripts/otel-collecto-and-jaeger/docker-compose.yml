@@ -6,15 +6,15 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
+      - "4317:4317"    
+      - "4318:4318"   
     depends_on:
       - jaeger
 
   jaeger:
     image: jaegertracing/all-in-one:1.56
     ports:
-      - "16686:16686"  # UI
+      - "16686:16686" 
     environment:
       - SPAN_STORAGE_TYPE=elasticsearch
       - ES_SERVER_URLS=http://elasticsearch:9200
@@ -27,3 +27,17 @@ services:
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - "9200:9200"
+
+  spark-dependencies:
+    image: jaegertracing/spark-dependencies
+    platform: linux/amd64
+    depends_on:
+      - elasticsearch
+    environment:
+      - STORAGE=elasticsearch
+      - ES_NODES=http://elasticsearch:9200
+      - HADOOP_USER_NAME=sparkuser
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "echo 'sparkuser:x:185:0:sparkuser:/home/sparkuser:/sbin/nologin' >> /etc/passwd &&
+      java -jar ./jaeger-spark-dependencies-0.0.1-SNAPSHOT.jar"
