@@ -2,6 +2,7 @@ package raft
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"sync"
@@ -22,6 +23,7 @@ type Node struct {
 	Transport Transport
 	ctx       context.Context
 	cancel    context.CancelFunc
+	TenantID  string
 
 	mu            sync.Mutex
 	currentTerm   int
@@ -32,7 +34,7 @@ type Node struct {
 	heartbeatCancel    context.CancelFunc // para detener el heartbeat cuando ya no es líder
 }
 
-func NewNode(id string, transport Transport) *Node {
+func NewNode(id string, TenantID string, transport Transport) *Node {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Node{
 		ID:                 id,
@@ -40,12 +42,13 @@ func NewNode(id string, transport Transport) *Node {
 		Transport:          transport,
 		ctx:                ctx,
 		cancel:             cancel,
+		TenantID:           TenantID,
 		electionResetEvent: make(chan struct{}, 1),
 	}
 }
 
 func (n *Node) Run() {
-	recvCh, err := n.Transport.Receive(n.ctx)
+	recvCh, err := n.Transport.Receive(n.ctx, n.TenantID, n.ID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,6 +71,11 @@ func (n *Node) handleMessage(msg Message) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	if msg.Term < n.currentTerm {
+		log.Printf("[%s] got OLD message from %s (Type: %s) Term %d", n.ID, msg.From, msg.Type, msg.Term)
+		return //some stuck leader send a message?
+	}
+
 	switch msg.Type {
 	case MsgRequestVote:
 		n.handleRequestVote(msg)
@@ -76,7 +84,7 @@ func (n *Node) handleMessage(msg Message) {
 		if n.State == Candidate || n.State == Leader {
 			n.becomeFollower()
 		}
-	case "Vote":
+	case MsgVote:
 		if n.State == Candidate {
 			n.votesReceived++
 			log.Printf("[%s] got VOTE from %s (total: %d)", n.ID, msg.From, n.votesReceived)
@@ -88,22 +96,41 @@ func (n *Node) handleMessage(msg Message) {
 }
 
 func (n *Node) hasMajority() bool {
-	return n.votesReceived >= (len(n.Transport.GetPeers())+1)/2+1
+	peers := n.Transport.GetPeers(n.TenantID)
+
+	count := 0
+	for _, peerID := range peers {
+		if peerID != n.ID {
+			count++
+		}
+	}
+
+	totalNodes := count + 1 // sumar el propio nodo
+	majority := totalNodes/2 + 1
+	return n.votesReceived >= majority
 }
 
 func (n *Node) handleRequestVote(msg Message) {
+
+	if msg.Term > n.currentTerm {
+		n.currentTerm = msg.Term
+		n.votedFor = ""
+		n.becomeFollower()
+	}
+
 	if n.votedFor == "" {
 		n.votedFor = msg.From
 		n.resetElectionTimer()
-		log.Printf("[%s] voted for %s", n.ID, msg.From)
+		log.Printf("[%s] voted for %s in term %d", n.ID, msg.From, msg.Term)
 
 		resp := Message{
 			From:    n.ID,
 			To:      msg.From,
-			Type:    "Vote",
+			Type:    MsgVote,
 			Payload: []byte("yes"),
+			Term:    n.currentTerm,
 		}
-		go n.Transport.Send(n.ctx, resp)
+		go n.Transport.Send(n.ctx, n.TenantID, resp)
 	}
 }
 
@@ -121,12 +148,12 @@ func (n *Node) runElectionTimer() {
 		case <-n.ctx.Done():
 			return
 		case <-n.electionResetEvent:
+			fmt.Println("[" + n.ID + "] > electionResetEvent >")
 			timer.Stop()
 			timeout = randomElectionTimeout()
 			timer = time.NewTimer(timeout)
 		case <-timer.C:
 			n.startElection()
-			return
 		}
 	}
 }
@@ -142,6 +169,10 @@ func (n *Node) startElection() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	if n.State == Leader || n.State == Candidate {
+		return
+	}
+
 	n.State = Candidate
 	n.currentTerm++
 	n.votedFor = n.ID
@@ -150,7 +181,7 @@ func (n *Node) startElection() {
 
 	log.Printf("[%s] became CANDIDATE (term %d)", n.ID, n.currentTerm)
 
-	for peerID := range n.Transport.GetPeers() {
+	for _, peerID := range n.Transport.GetPeers(n.TenantID) {
 		if peerID == n.ID {
 			continue
 		}
@@ -159,8 +190,10 @@ func (n *Node) startElection() {
 			To:      peerID,
 			Type:    MsgRequestVote,
 			Payload: []byte("vote-request"),
+			Term:    n.currentTerm,
 		}
-		go n.Transport.Send(n.ctx, msg)
+		log.Printf("[%s] sending ´vote-request´ to [%s]", n.ID, peerID)
+		go n.Transport.Send(n.ctx, n.TenantID, msg)
 	}
 }
 
@@ -172,6 +205,7 @@ func (n *Node) becomeLeader() {
 
 func (n *Node) becomeFollower() {
 	if n.heartbeatCancel != nil {
+		log.Printf("[%s] stopping heartbeat", n.ID)
 		n.heartbeatCancel()
 		n.heartbeatCancel = nil
 	}
@@ -200,7 +234,7 @@ func (n *Node) startHeartbeat() {
 					n.mu.Unlock()
 					return
 				}
-				for peerID := range n.Transport.GetPeers() {
+				for _, peerID := range n.Transport.GetPeers(n.TenantID) {
 					if peerID == n.ID {
 						continue
 					}
@@ -209,8 +243,11 @@ func (n *Node) startHeartbeat() {
 						To:      peerID,
 						Type:    MsgAppendEntries,
 						Payload: []byte("heartbeat"),
+						Term:    n.currentTerm,
 					}
-					go n.Transport.Send(n.ctx, msg)
+					log.Printf("Stuck Heartbeat for ["+n.ID+"] Term %d", n.currentTerm)
+					//time.Sleep(10 * time.Second) // test slow connection
+					go n.Transport.Send(n.ctx, n.TenantID, msg)
 				}
 				n.mu.Unlock()
 			}

@@ -3,32 +3,42 @@ package raft
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 )
 
 type InMemoryTransport struct {
-	id       string
 	mu       sync.RWMutex
-	incoming chan Message
-	peers    map[string]Transport
+	incoming map[string]map[string]chan Message
+	peers    map[string][]string
 	closed   bool
 }
 
-func NewInMemoryTransport(id string) *InMemoryTransport {
+func NewInMemoryTransport() *InMemoryTransport {
 	return &InMemoryTransport{
-		id:       id,
-		incoming: make(chan Message, 100),
-		peers:    make(map[string]Transport),
+		incoming: make(map[string]map[string]chan Message),
+		peers:    make(map[string][]string),
 	}
 }
 
-func (t *InMemoryTransport) AddPeer(peerID string, peer Transport) {
+func (t *InMemoryTransport) AddPeer(TenantID string, peer string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.peers[peerID] = peer
+	if t.peers[TenantID] == nil {
+		t.peers[TenantID] = []string{}
+	}
+
+	if t.incoming[TenantID] == nil {
+		t.incoming[TenantID] = make(map[string]chan Message)
+	}
+	if t.incoming[TenantID][peer] == nil {
+		t.incoming[TenantID][peer] = make(chan Message, 100)
+	}
+	t.peers[TenantID] = append(t.peers[TenantID], peer)
 }
 
-func (t *InMemoryTransport) Send(ctx context.Context, msg Message) error {
+func (t *InMemoryTransport) Send(ctx context.Context, TenantID string, msg Message) error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -36,41 +46,43 @@ func (t *InMemoryTransport) Send(ctx context.Context, msg Message) error {
 		return errors.New("transport closed")
 	}
 
-	peer, ok := t.peers[msg.To]
-	if !ok {
-		return errors.New("peer not found: " + msg.To)
-	}
-	peerTransport, ok := peer.(*InMemoryTransport)
+	peerTransport, ok := t.incoming[TenantID][msg.To]
 	if !ok {
 		return errors.New("peer is not of type *InMemoryTransport")
 	}
 
 	select {
-	case peerTransport.incoming <- msg:
+	case peerTransport <- msg:
 		return nil
+	case <-time.After(100 * time.Millisecond):
+		return fmt.Errorf("timeout sending to %s", msg.To)
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (t *InMemoryTransport) Receive(ctx context.Context) (<-chan Message, error) {
+func (t *InMemoryTransport) Receive(ctx context.Context, TenantID string, id string) (<-chan Message, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	if t.closed {
 		return nil, errors.New("transport closed")
 	}
-	return t.incoming, nil
+	return t.incoming[TenantID][id], nil
 }
 
 func (t *InMemoryTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if !t.closed {
-		close(t.incoming)
+		for _, mch := range t.incoming {
+			for _, ch := range mch {
+				close(ch)
+			}
+		}
 		t.closed = true
 	}
 	return nil
 }
-func (t *InMemoryTransport) GetPeers() map[string]Transport {
-	return t.peers
+func (t *InMemoryTransport) GetPeers(TenantID string) []string {
+	return t.peers[TenantID]
 }
