@@ -12,8 +12,6 @@ import (
 )
 
 func PutUser(kvStore KVStore, input models.CreateUser) error {
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -32,16 +30,13 @@ func PutUser(kvStore KVStore, input models.CreateUser) error {
 	}
 
 	key := "user:" + input.Username
-	err = kvStore.Put(wo, []byte(key), userData)
+	err = kvStore.Put([]byte(key), userData)
 	return err
 }
 
 func GetUser(kvStore KVStore, username string) (*models.User, error) {
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
-
 	key := []byte("user:" + username)
-	value, err := kvStore.Get(ro, key)
+	value, err := kvStore.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +56,8 @@ func GetUser(kvStore KVStore, username string) (*models.User, error) {
 }
 
 func GetDefaultRootUserRoot(kvStore KVStore) (*models.CreateUser, error) {
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
-
 	key := []byte(constants.DefaultRootUserRootKey)
-	value, err := kvStore.Get(ro, key)
+	value, err := kvStore.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +107,7 @@ func PutDefaultRootUserRoot(kvStore KVStore, input models.CreateUser) error {
 	userKey := fmt.Sprintf("user:%s", input.Username)
 	batch.Put([]byte(userKey), userData)
 
-	if err := kvStore.Write(wo, batch); err != nil {
+	if err := kvStore.Write(batch); err != nil {
 		return err
 	}
 
@@ -123,13 +115,7 @@ func PutDefaultRootUserRoot(kvStore KVStore, input models.CreateUser) error {
 }
 
 func DeleteUser(kvStore KVStore, username string) error {
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
-
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
-
-	rootData, err := kvStore.Get(ro, []byte(constants.DefaultRootUserRootKey))
+	rootData, err := kvStore.Get([]byte(constants.DefaultRootUserRootKey))
 	if err != nil {
 		return err
 	}
@@ -151,7 +137,7 @@ func DeleteUser(kvStore KVStore, username string) error {
 	userKey := fmt.Sprintf("user:%s", username)
 	batch.Delete([]byte(userKey))
 
-	if err := kvStore.Write(wo, batch); err != nil {
+	if err := kvStore.Write(batch); err != nil {
 		return err
 	}
 	return nil

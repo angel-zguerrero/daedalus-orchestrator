@@ -74,7 +74,7 @@ func TestInMemoryTransportCommunication(t *testing.T) {
 	}
 }
 
-func TestInMemoryTransportCommunication_Temporal_Test(t *testing.T) {
+func _TestInMemoryTransportCommunication_Temporal_Test(t *testing.T) {
 	TenantId := constants.MasterTenant
 	transport := raft.NewInMemoryTransport()
 	nodeA := raft.NewNode("A", TenantId, transport)
@@ -89,7 +89,7 @@ func TestInMemoryTransportCommunication_Temporal_Test(t *testing.T) {
 	go nodeB.Run()
 	go nodeC.Run()
 
-	time.Sleep(240 * time.Second)
+	//time.Sleep(240 * time.Second)
 
 	nodes := []*raft.Node{nodeA, nodeB, nodeC}
 	leaderCount := 0

@@ -22,18 +22,13 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 
 	store := &db.RocksdbStore{DB: rocks}
 
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
-
 	key := []byte("key")
 	value := []byte("value")
 
-	err = store.Put(wo, key, value)
+	err = store.Put(key, value)
 	require.NoError(t, err)
 
-	result, err := store.Get(ro, key)
+	result, err := store.Get(key)
 	require.NoError(t, err)
 	defer result.Free()
 
@@ -53,10 +48,7 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 
 	store := &db.RocksdbStore{DB: rocks}
 
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
-
-	result, err := store.Get(ro, []byte("nonexistent"))
+	result, err := store.Get([]byte("nonexistent"))
 	require.NoError(t, err)
 	defer result.Free()
 
@@ -75,29 +67,24 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 
 	store := &db.RocksdbStore{DB: rocks}
 
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
-
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
 
 	batch.Put([]byte("a"), []byte("valueA"))
 	batch.Put([]byte("b"), []byte("valueB"))
 
-	err = store.Write(wo, batch)
+	err = store.Write(batch)
 	require.NoError(t, err)
 
 	// Verifica clave "a"
-	resultA, err := store.Get(ro, []byte("a"))
+	resultA, err := store.Get([]byte("a"))
 	require.NoError(t, err)
 	defer resultA.Free()
 	assert.True(t, resultA.Exists())
 	assert.Equal(t, []byte("valueA"), resultA.Data())
 
 	// Verifica clave "b"
-	resultB, err := store.Get(ro, []byte("b"))
+	resultB, err := store.Get([]byte("b"))
 	require.NoError(t, err)
 	defer resultB.Free()
 	assert.True(t, resultB.Exists())

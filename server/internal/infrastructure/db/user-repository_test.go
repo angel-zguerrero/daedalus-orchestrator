@@ -6,7 +6,6 @@ import (
 
 	"testing"
 
-	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -31,8 +30,8 @@ type MockKVStore struct {
 	mock.Mock
 }
 
-func (m *MockKVStore) Get(ro *grocksdb.ReadOptions, key []byte) (db.Slice, error) {
-	args := m.Called(ro, key)
+func (m *MockKVStore) Get(key []byte) (db.Slice, error) {
+	args := m.Called(key)
 	var s db.Slice
 	if tmp := args.Get(0); tmp != nil {
 		s = tmp.(db.Slice)
@@ -40,14 +39,31 @@ func (m *MockKVStore) Get(ro *grocksdb.ReadOptions, key []byte) (db.Slice, error
 	return s, args.Error(1)
 }
 
-func (m *MockKVStore) Put(wo *grocksdb.WriteOptions, key, value []byte) error {
-	args := m.Called(wo, key, value)
+func (m *MockKVStore) Put(key, value []byte) error {
+	args := m.Called(key, value)
 	return args.Error(0)
 }
 
-func (m *MockKVStore) Write(wo *grocksdb.WriteOptions, batch *grocksdb.WriteBatch) error {
-	args := m.Called(wo, batch)
+func (m *MockKVStore) Write(batch interface{}) error {
+	args := m.Called(batch)
 	return args.Error(0)
+}
+
+func (m *MockKVStore) DumpAll() (interface{}, error) {
+	args := m.Called()
+	var s db.Slice
+	if tmp := args.Get(0); tmp != nil {
+		s = tmp.(db.Slice)
+	}
+	return s, args.Error(1)
+}
+
+func (r *MockKVStore) Iterate(fn func(key, value []byte) error) error {
+	return nil
+}
+
+func (r *MockKVStore) ClearAll() error {
+	return nil
 }
 
 func TestPutUser_Success(t *testing.T) {
@@ -55,7 +71,7 @@ func TestPutUser_Success(t *testing.T) {
 
 	user := models.CreateUser{Username: "foo", Email: "foo@mail.com", Password: "1234"}
 
-	mockStore.On("Put", mock.Anything, []byte("user:foo"), mock.Anything).Return(nil)
+	mockStore.On("Put", []byte("user:foo"), mock.Anything).Return(nil)
 
 	err := db.PutUser(mockStore, user)
 	assert.NoError(t, err)
@@ -69,7 +85,7 @@ func TestGetUser_Success(t *testing.T) {
 	data, _ := json.Marshal(u)
 	mockSlice := &MockSlice{data: data, exists: true}
 
-	mockStore.On("Get", mock.Anything, []byte("user:foo")).Return(mockSlice, nil)
+	mockStore.On("Get", []byte("user:foo")).Return(mockSlice, nil)
 
 	user, err := db.GetUser(mockStore, "foo")
 	assert.NoError(t, err)
@@ -79,7 +95,7 @@ func TestGetUser_Success(t *testing.T) {
 func TestGetUser_NotFound(t *testing.T) {
 	mockStore := new(MockKVStore)
 	mockSlice := &MockSlice{exists: false}
-	mockStore.On("Get", mock.Anything, []byte("user:bar")).Return(mockSlice, nil)
+	mockStore.On("Get", []byte("user:bar")).Return(mockSlice, nil)
 
 	user, err := db.GetUser(mockStore, "bar")
 	assert.NoError(t, err)
@@ -88,7 +104,7 @@ func TestGetUser_NotFound(t *testing.T) {
 
 func TestGetUser_ErrorOnGet(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockStore.On("Get", mock.Anything, []byte("user:x")).Return(nil, errors.New("get failed"))
+	mockStore.On("Get", []byte("user:x")).Return(nil, errors.New("get failed"))
 
 	user, err := db.GetUser(mockStore, "x")
 	assert.Error(t, err)
@@ -98,7 +114,7 @@ func TestGetUser_ErrorOnGet(t *testing.T) {
 func TestGetUser_UnmarshalError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	mockSlice := &MockSlice{data: []byte("invalid-json"), exists: true}
-	mockStore.On("Get", mock.Anything, []byte("user:x")).Return(mockSlice, nil)
+	mockStore.On("Get", []byte("user:x")).Return(mockSlice, nil)
 
 	user, err := db.GetUser(mockStore, "x")
 	assert.Error(t, err)
@@ -107,7 +123,7 @@ func TestGetUser_UnmarshalError(t *testing.T) {
 
 func TestPutDefaultRootUserRoot_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil)
+	mockStore.On("Write", mock.Anything).Return(nil)
 
 	input := models.CreateUser{Username: "admin", Email: "root@mail.com", Password: "pass"}
 	err := db.PutDefaultRootUserRoot(mockStore, input)
@@ -116,7 +132,7 @@ func TestPutDefaultRootUserRoot_Success(t *testing.T) {
 
 func TestPutDefaultRootUserRoot_WriteError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
+	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
 
 	input := models.CreateUser{Username: "admin", Email: "x", Password: "x"}
 	err := db.PutDefaultRootUserRoot(mockStore, input)
@@ -126,7 +142,7 @@ func TestPutDefaultRootUserRoot_WriteError(t *testing.T) {
 func TestGetDefaultRootUserRoot_UnmarshalError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	mockSlice := &MockSlice{data: []byte("bad-json"), exists: true}
-	mockStore.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
 
 	root, err := db.GetDefaultRootUserRoot(mockStore)
 	assert.Error(t, err)
@@ -138,8 +154,8 @@ func TestDeleteUser_Success(t *testing.T) {
 	root := models.User{Username: "other"}
 	rootData, _ := json.Marshal(root)
 	mockSlice := &MockSlice{data: rootData, exists: true}
-	mockStore.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
-	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Write", mock.Anything).Return(nil)
 
 	err := db.DeleteUser(mockStore, "bob")
 	assert.NoError(t, err)
@@ -150,7 +166,7 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 	root := models.User{Username: "admin"}
 	rootData, _ := json.Marshal(root)
 	mockSlice := &MockSlice{data: rootData, exists: true}
-	mockStore.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
 
 	err := db.DeleteUser(mockStore, "admin")
 	assert.Error(t, err)
@@ -159,7 +175,7 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 
 func TestDeleteUser_GetError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockStore.On("Get", mock.Anything, mock.Anything).Return(nil, errors.New("get failed"))
+	mockStore.On("Get", mock.Anything).Return(nil, errors.New("get failed"))
 
 	err := db.DeleteUser(mockStore, "someone")
 	assert.Error(t, err)
@@ -168,7 +184,7 @@ func TestDeleteUser_GetError(t *testing.T) {
 func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	mockSlice := &MockSlice{data: []byte("bad"), exists: true}
-	mockStore.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
 
 	err := db.DeleteUser(mockStore, "x")
 	assert.Error(t, err)
@@ -179,8 +195,8 @@ func TestDeleteUser_WriteError(t *testing.T) {
 	root := models.User{Username: "root"}
 	rootData, _ := json.Marshal(root)
 	mockSlice := &MockSlice{data: rootData, exists: true}
-	mockStore.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
-	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
 
 	err := db.DeleteUser(mockStore, "user")
 	assert.Error(t, err)

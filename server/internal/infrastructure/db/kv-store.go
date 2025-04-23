@@ -1,15 +1,19 @@
 package db
 
-import "github.com/linxGnu/grocksdb"
-
 type Slice interface {
 	Data() []byte
 	Free()
 	Exists() bool
 }
 
+type WriteBatch interface {
+}
+
 type KVStore interface {
-	Get(ro *grocksdb.ReadOptions, key []byte) (Slice, error)
-	Put(wo *grocksdb.WriteOptions, key, value []byte) error
-	Write(wo *grocksdb.WriteOptions, batch *grocksdb.WriteBatch) error
+	Get(key []byte) (Slice, error)
+	Put(key, value []byte) error
+	Write(batch interface{}) error
+	DumpAll() (interface{}, error)
+	Iterate(fn func(key, value []byte) error) error
+	ClearAll() error
 }
