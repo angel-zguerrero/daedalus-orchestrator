@@ -130,3 +130,9 @@ func (r *RocksdbStore) ClearAll() error {
 
 	return nil
 }
+
+func (r *RocksdbStore) Flush() error {
+	fo := grocksdb.NewDefaultFlushOptions()
+	defer fo.Destroy()
+	return r.DB.Flush(fo)
+}

@@ -66,6 +66,10 @@ func (r *MockKVStore) ClearAll() error {
 	return nil
 }
 
+func (r *MockKVStore) Flush() error {
+	return nil
+}
+
 func TestPutUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 

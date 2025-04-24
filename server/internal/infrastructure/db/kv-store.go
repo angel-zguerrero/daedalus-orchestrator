@@ -16,4 +16,5 @@ type KVStore interface {
 	DumpAll() (interface{}, error)
 	Iterate(fn func(key, value []byte) error) error
 	ClearAll() error
+	Flush() error
 }

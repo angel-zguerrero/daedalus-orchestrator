@@ -10,34 +10,40 @@ import (
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-type KVStateMachine struct {
+type OnDiskKVStateMachine struct {
 	store db.KVStore
 }
 
-func NewKVStateMachine(store db.KVStore) statemachine.IStateMachine {
-	return &KVStateMachine{store: store}
+func NewOnDiskKVStateMachine(store db.KVStore) statemachine.IOnDiskStateMachine {
+	return &OnDiskKVStateMachine{store: store}
 }
 
-func (s *KVStateMachine) Update(data statemachine.Entry) (statemachine.Result, error) {
-	var cmd struct {
-		Key   []byte
-		Value []byte
-	}
-
-	dec := gob.NewDecoder(bytes.NewReader(data.Cmd))
-	if err := dec.Decode(&cmd); err != nil {
-		return statemachine.Result{}, err
-	}
-
-	err := s.store.Put(cmd.Key, cmd.Value)
-	if err != nil {
-		return statemachine.Result{}, err
-	}
-
-	return statemachine.Result{Value: uint64(len(cmd.Value))}, nil
+func (s *OnDiskKVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
+	// Devuelve el log index del último snapshot aplicado, 0 si no hay.
+	return 0, nil
 }
 
-func (s *KVStateMachine) Lookup(query interface{}) (interface{}, error) {
+func (s *OnDiskKVStateMachine) Update(data []statemachine.Entry) ([]statemachine.Entry, error) {
+	for i := range data {
+		var cmd struct {
+			Key   []byte
+			Value []byte
+		}
+
+		if err := gob.NewDecoder(bytes.NewReader(data[i].Cmd)).Decode(&cmd); err != nil {
+			return nil, err
+		}
+
+		if err := s.store.Put(cmd.Key, cmd.Value); err != nil {
+			return nil, err
+		}
+
+		data[i].Result.Value = uint64(len(cmd.Value))
+	}
+	return data, nil
+}
+
+func (s *OnDiskKVStateMachine) Lookup(query interface{}) (interface{}, error) {
 	key, ok := query.([]byte)
 	if !ok {
 		return nil, fmt.Errorf("invalid query type")
@@ -47,8 +53,8 @@ func (s *KVStateMachine) Lookup(query interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer slice.Free()
+
 	if !slice.Exists() {
 		return nil, nil
 	}
@@ -56,11 +62,17 @@ func (s *KVStateMachine) Lookup(query interface{}) (interface{}, error) {
 	return slice.Data(), nil
 }
 
-func (s *KVStateMachine) Close() error { return nil }
+func (s *OnDiskKVStateMachine) Sync() error {
+	return s.store.Flush()
+}
 
-func (s *KVStateMachine) SaveSnapshot(
+func (s *OnDiskKVStateMachine) PrepareSnapshot() (interface{}, error) {
+	return nil, nil
+}
+
+func (s *OnDiskKVStateMachine) SaveSnapshot(
+	ctx interface{},
 	w io.Writer,
-	fc statemachine.ISnapshotFileCollection,
 	done <-chan struct{},
 ) error {
 	enc := gob.NewEncoder(w)
@@ -80,11 +92,7 @@ func (s *KVStateMachine) SaveSnapshot(
 			Value: append([]byte(nil), value...),
 		}
 
-		if err := enc.Encode(&entry); err != nil {
-			return fmt.Errorf("encoding failed: %w", err)
-		}
-
-		return nil
+		return enc.Encode(&entry)
 	})
 
 	if err != nil {
@@ -94,14 +102,12 @@ func (s *KVStateMachine) SaveSnapshot(
 	return nil
 }
 
-func (s *KVStateMachine) RecoverFromSnapshot(
+func (s *OnDiskKVStateMachine) RecoverFromSnapshot(
 	r io.Reader,
-	files []statemachine.SnapshotFile,
 	done <-chan struct{},
 ) error {
-	// Limpiar el estado actual antes de aplicar snapshot
 	if err := s.store.ClearAll(); err != nil {
-		return fmt.Errorf("failed to clear existing state: %w", err)
+		return fmt.Errorf("failed to clear state: %w", err)
 	}
 
 	dec := gob.NewDecoder(r)
@@ -111,7 +117,6 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 		case <-done:
 			return fmt.Errorf("snapshot recovery cancelled")
 		default:
-			// seguimos
 		}
 
 		var entry struct {
@@ -119,18 +124,26 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 			Value []byte
 		}
 
-		err := dec.Decode(&entry)
-		if err != nil {
+		if err := dec.Decode(&entry); err != nil {
 			if err == io.EOF {
-				break // Terminamos la lectura
+				break
 			}
-			return fmt.Errorf("failed to decode snapshot: %w", err)
+			return fmt.Errorf("decode failed: %w", err)
 		}
 
 		if err := s.store.Put(entry.Key, entry.Value); err != nil {
-			return fmt.Errorf("failed to write key in snapshot recovery: %w", err)
+			return fmt.Errorf("put failed during snapshot recovery: %w", err)
 		}
 	}
 
 	return nil
+}
+
+func (s *OnDiskKVStateMachine) Close() error {
+	return nil
+}
+
+func (s *OnDiskKVStateMachine) GetHash() (uint64, error) {
+	// Opcional: puedes devolver un hash del estado actual si quieres integridad
+	return 0, nil
 }
