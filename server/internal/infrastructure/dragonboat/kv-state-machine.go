@@ -32,7 +32,9 @@ func NewKVStateMachine(clusterID uint64, nodeID uint64) statemachine.IOnDiskStat
 		nodeID:    nodeID,
 	}
 }
-
+func (s *KVStateMachine) GetLastApplied() uint64 {
+	return s.lastApplied
+}
 func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 	dir, err := getNodeDBDirName(s.clusterID, s.nodeID)
 	if err != nil {
@@ -157,7 +159,8 @@ func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
 			return nil, nil
 		}
 
-		return slice.Data(), err
+		data := append([]byte(nil), slice.Data()...)
+		return data, err
 	}
 	return nil, errors.New("db closed")
 }
