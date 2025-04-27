@@ -1,7 +1,7 @@
 package dragonboat
 
 const (
-	appliedIndexKey    string = "disk_kv_applied_index"
-	currentDBFilename  string = "current"
-	updatingDBFilename string = "current.updating"
+	AppliedIndexKey    string = "disk_kv_applied_index"
+	CurrentDBFilename  string = "current"
+	UpdatingDBFilename string = "current.updating"
 )

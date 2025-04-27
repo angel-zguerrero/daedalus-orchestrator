@@ -53,14 +53,14 @@ func createNodeDataDir(dir string) error {
 }
 
 func isNewRun(dir string) bool {
-	fp := filepath.Join(dir, currentDBFilename)
+	fp := filepath.Join(dir, CurrentDBFilename)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
 		return true
 	}
 	return false
 }
 func getCurrentDBDirName(dir string) (string, error) {
-	fp := filepath.Join(dir, currentDBFilename)
+	fp := filepath.Join(dir, CurrentDBFilename)
 	f, err := os.OpenFile(fp, os.O_RDONLY, 0755)
 	if err != nil {
 		return "", err
@@ -89,7 +89,7 @@ func getCurrentDBDirName(dir string) (string, error) {
 	return string(content), nil
 }
 func cleanupNodeDataDir(dir string) error {
-	os.RemoveAll(filepath.Join(dir, updatingDBFilename))
+	os.RemoveAll(filepath.Join(dir, UpdatingDBFilename))
 	dbdir, err := getCurrentDBDirName(dir)
 	if err != nil {
 		return err
@@ -125,7 +125,7 @@ func saveCurrentDBDirName(dir string, dbdir string) error {
 	if _, err := h.Write([]byte(dbdir)); err != nil {
 		return err
 	}
-	fp := filepath.Join(dir, updatingDBFilename)
+	fp := filepath.Join(dir, UpdatingDBFilename)
 	f, err := os.Create(fp)
 	if err != nil {
 		return err
@@ -150,8 +150,8 @@ func saveCurrentDBDirName(dir string, dbdir string) error {
 	return nil
 }
 func replaceCurrentDBFile(dir string) error {
-	fp := filepath.Join(dir, currentDBFilename)
-	tmpFp := filepath.Join(dir, updatingDBFilename)
+	fp := filepath.Join(dir, CurrentDBFilename)
+	tmpFp := filepath.Join(dir, UpdatingDBFilename)
 	if err := os.Rename(tmpFp, fp); err != nil {
 		return err
 	}

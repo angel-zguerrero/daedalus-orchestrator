@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"encoding/binary"
 	"encoding/gob"
 	"io"
 	"testing"
@@ -29,18 +30,18 @@ func TestOne(t *testing.T) {
 
 	//time.Sleep(240 * time.Second)
 }
-func _TestOpen_Close(t *testing.T) {
+func TestOpen_Close(t *testing.T) {
 	kv := setupKV(t)
 
 	err := kv.Close()
 	require.NoError(t, err)
 
-	// require.Panics(t, func() {
-	// 	//_ = kv.Close()
-	// })
+	require.Panics(t, func() {
+		_ = kv.Close()
+	})
 }
 
-func _TestUpdate_SingleEntry(t *testing.T) {
+func TestUpdate_SingleEntry(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
@@ -65,7 +66,7 @@ func _TestUpdate_SingleEntry(t *testing.T) {
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 }
 
-func _TestUpdate_AfterClose_Panics(t *testing.T) {
+func TestUpdate_AfterClose_Panics(t *testing.T) {
 	kv := setupKV(t)
 	_ = kv.Close()
 
@@ -74,11 +75,10 @@ func _TestUpdate_AfterClose_Panics(t *testing.T) {
 	})
 }
 
-func _TestLookup_ExistingKey(t *testing.T) {
+func TestLookup_ExistingKey(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
-	// Insertar un valor
 	var buf bytes.Buffer
 	cmd := struct {
 		Key   []byte
@@ -100,7 +100,7 @@ func _TestLookup_ExistingKey(t *testing.T) {
 	require.Equal(t, []byte("lookup_value"), val)
 }
 
-func _TestLookup_NonExistingKey(t *testing.T) {
+func TestLookup_NonExistingKey(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
@@ -109,7 +109,7 @@ func _TestLookup_NonExistingKey(t *testing.T) {
 	require.Nil(t, val)
 }
 
-func _TestLookup_InvalidType(t *testing.T) {
+func TestLookup_InvalidType(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
@@ -125,11 +125,9 @@ func TestSync(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func _TestSaveSnapshotAndRecover(t *testing.T) {
+func TestSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupKV(t)
-	defer kv.Close()
 
-	// Insertamos algo
 	var buf bytes.Buffer
 	cmd := struct {
 		Key   []byte
@@ -139,13 +137,11 @@ func _TestSaveSnapshotAndRecover(t *testing.T) {
 		Value: []byte("snap_value"),
 	}
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
-
 	_, err := kv.Update([]statemachine.Entry{
-		{Cmd: buf.Bytes(), Index: 10},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
 	})
 	require.NoError(t, err)
 
-	// Guardamos snapshot
 	var snap bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -153,7 +149,6 @@ func _TestSaveSnapshotAndRecover(t *testing.T) {
 	err = kv.SaveSnapshot(nil, &snap, ctx.Done())
 	require.NoError(t, err)
 
-	// Cerramos y creamos uno nuevo
 	_ = kv.Close()
 
 	kv2 := dragonboat.NewKVStateMachine(1, 1).(*dragonboat.KVStateMachine)
@@ -162,17 +157,19 @@ func _TestSaveSnapshotAndRecover(t *testing.T) {
 	require.NoError(t, err)
 	defer kv2.Close()
 
-	// Recuperamos desde snapshot
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	// Verificamos que el dato esté
 	val, err := kv2.Lookup([]byte("snap_key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
+
+	val, err = kv2.Lookup([]byte(dragonboat.AppliedIndexKey))
+	require.NoError(t, err)
+	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
 
-func _TestSaveSnapshot_Cancelled(t *testing.T) {
+func TestSaveSnapshot_Cancelled(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
@@ -184,7 +181,7 @@ func _TestSaveSnapshot_Cancelled(t *testing.T) {
 	require.Contains(t, err.Error(), "snapshot cancelled")
 }
 
-func _TestRecoverSnapshot_Cancelled(t *testing.T) {
+func TestRecoverSnapshot_Cancelled(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 

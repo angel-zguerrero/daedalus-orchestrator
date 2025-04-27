@@ -84,7 +84,7 @@ func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 }
 
 func (s *KVStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uint64, error) {
-	result, err := rocks_kv_store.Get([]byte(appliedIndexKey))
+	result, err := rocks_kv_store.Get([]byte(AppliedIndexKey))
 	if err != nil {
 		return 0, err
 	}
@@ -123,8 +123,7 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 	// save the applied index to the DB.
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
-	batch.Put([]byte(appliedIndexKey), appliedIndex)
-
+	batch.Put([]byte(AppliedIndexKey), appliedIndex)
 	err := rocks_kv_store.Write(batch)
 
 	if err != nil {
@@ -290,7 +289,7 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 
 func (s *KVStateMachine) Close() error {
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
-	if rocks_kv_store != nil {
+	if rocks_kv_store != nil && !s.closed {
 		s.closed = true
 		rocks_kv_store.Close()
 	} else {
