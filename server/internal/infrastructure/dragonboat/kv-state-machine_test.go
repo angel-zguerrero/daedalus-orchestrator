@@ -25,10 +25,10 @@ func setupKV(t *testing.T) *dragonboat.KVStateMachine {
 
 func TestOne(t *testing.T) {
 
-	//dragonboat.Init(1, 1, "3435")
-	//dragonboat.Init(1, 2, "3436")
+	dragonboat.Init(101, 1, "3435")
+	dragonboat.Init(101, 2, "3436")
 
-	//time.Sleep(240 * time.Second)
+	time.Sleep(10 * time.Second)
 }
 func TestOpen_Close(t *testing.T) {
 	kv := setupKV(t)
