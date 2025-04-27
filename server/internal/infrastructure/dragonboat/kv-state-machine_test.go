@@ -94,7 +94,6 @@ func TestLookup_ExistingKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Buscar
 	val, err := kv.Lookup([]byte("lookup_key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("lookup_value"), val)
@@ -174,7 +173,7 @@ func TestSaveSnapshot_Cancelled(t *testing.T) {
 	defer kv.Close()
 
 	done := make(chan struct{})
-	close(done) // ya cancelado
+	close(done)
 
 	err := kv.SaveSnapshot(nil, io.Discard, done)
 	require.Error(t, err)
@@ -185,13 +184,11 @@ func TestRecoverSnapshot_Cancelled(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
-	// simulamos un reader infinito
 	r, w := io.Pipe()
 	done := make(chan struct{})
 	close(done)
 
 	go func() {
-		// no escribimos nada
 		_ = w.Close()
 	}()
 
