@@ -2,13 +2,14 @@ package dragonboat
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"strconv"
 
 	"github.com/lni/dragonboat/v4"
 	"github.com/lni/dragonboat/v4/config"
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-func Init(store db.KVStore, ShardID uint64, ReplicaID uint64, port string) {
+func Init(ShardID uint64, ReplicaID uint64, port string) {
 
 	cfg := config.Config{
 		ReplicaID:          ReplicaID,
@@ -21,12 +22,16 @@ func Init(store db.KVStore, ShardID uint64, ReplicaID uint64, port string) {
 	}
 
 	stateMachine := func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
-		return NewOnDiskKVStateMachine(store)
+		return NewKVStateMachine(clusterID, nodeID)
 	}
 
+	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
+	if err != nil {
+		panic(err)
+	}
 	nh, err := dragonboat.NewNodeHost(config.NodeHostConfig{
-		WALDir:         "./data/wal/" + port,
-		NodeHostDir:    "./data/node/" + port,
+		WALDir:         base_path + "/wal/" + strconv.FormatUint(ReplicaID, 10) + "/" + port,
+		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(ReplicaID, 10) + "/" + port,
 		RTTMillisecond: 200,
 		RaftAddress:    "localhost:" + port,
 	})
