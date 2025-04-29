@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -24,6 +25,7 @@ type KVStateMachine struct {
 	store       unsafe.Pointer // we will use db.KVStore
 	closed      bool
 	aborted     bool
+	mu          sync.RWMutex
 }
 
 func NewKVStateMachine(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
@@ -102,6 +104,8 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 	if s.closed {
 		panic("update called after Close()")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
@@ -139,6 +143,8 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 }
 
 func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	key, ok := key.([]byte)
 	if !ok {
 		return nil, fmt.Errorf("invalid query type")
@@ -178,6 +184,8 @@ func (s *KVStateMachine) SaveSnapshot(
 	w io.Writer,
 	done <-chan struct{},
 ) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 
 	if rocks_kv_store == nil {

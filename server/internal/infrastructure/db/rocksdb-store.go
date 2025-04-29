@@ -2,7 +2,6 @@ package db
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/linxGnu/grocksdb"
 )
@@ -25,12 +24,9 @@ func (w *sliceWrapper) Exists() bool {
 
 type RocksdbStore struct {
 	*grocksdb.DB
-	mu sync.RWMutex
 }
 
 func (r *RocksdbStore) Get(key []byte) (Slice, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -42,8 +38,6 @@ func (r *RocksdbStore) Get(key []byte) (Slice, error) {
 }
 
 func (r *RocksdbStore) Put(key, value []byte) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
@@ -51,8 +45,6 @@ func (r *RocksdbStore) Put(key, value []byte) error {
 }
 
 func (r *RocksdbStore) Write(batch interface{}) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
@@ -64,8 +56,6 @@ func (r *RocksdbStore) Write(batch interface{}) error {
 }
 
 func (r *RocksdbStore) DumpAll() (interface{}, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -92,8 +82,6 @@ func (r *RocksdbStore) DumpAll() (interface{}, error) {
 }
 
 func (r *RocksdbStore) Iterate(fn func(key, value []byte) error) error {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -123,8 +111,6 @@ func (r *RocksdbStore) Iterate(fn func(key, value []byte) error) error {
 }
 
 func (r *RocksdbStore) ClearAll() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -152,8 +138,6 @@ func (r *RocksdbStore) ClearAll() error {
 }
 
 func (r *RocksdbStore) Flush() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	fo := grocksdb.NewDefaultFlushOptions()
 	defer fo.Destroy()
