@@ -296,6 +296,8 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 }
 
 func (s *KVStateMachine) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	if rocks_kv_store != nil && !s.closed {
 		s.closed = true
