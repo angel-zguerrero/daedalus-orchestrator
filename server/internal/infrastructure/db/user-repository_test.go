@@ -14,27 +14,15 @@ import (
 	"deadalus-orch/shared/models"
 )
 
-type MockSlice struct {
-	mock.Mock
-	data   []byte
-	exists bool
-}
-
-func (m *MockSlice) Data() []byte {
-	return m.data
-}
-func (m *MockSlice) Free()        {}
-func (m *MockSlice) Exists() bool { return m.exists }
-
 type MockKVStore struct {
 	mock.Mock
 }
 
-func (m *MockKVStore) Get(key []byte) (db.Slice, error) {
+func (m *MockKVStore) Get(key []byte) ([]byte, error) {
 	args := m.Called(key)
-	var s db.Slice
+	var s []byte
 	if tmp := args.Get(0); tmp != nil {
-		s = tmp.(db.Slice)
+		s = tmp.([]byte)
 	}
 	return s, args.Error(1)
 }
@@ -51,9 +39,9 @@ func (m *MockKVStore) Write(batch interface{}) error {
 
 func (m *MockKVStore) DumpAll() (interface{}, error) {
 	args := m.Called()
-	var s db.Slice
+	var s []byte
 	if tmp := args.Get(0); tmp != nil {
-		s = tmp.(db.Slice)
+		s = tmp.([]byte)
 	}
 	return s, args.Error(1)
 }
@@ -87,9 +75,8 @@ func TestGetUser_Success(t *testing.T) {
 
 	u := models.User{Username: "foo", Email: "bar"}
 	data, _ := json.Marshal(u)
-	mockSlice := &MockSlice{data: data, exists: true}
 
-	mockStore.On("Get", []byte("user:foo")).Return(mockSlice, nil)
+	mockStore.On("Get", []byte("user:foo")).Return(data, nil)
 
 	user, err := db.GetUser(mockStore, "foo")
 	assert.NoError(t, err)
@@ -98,8 +85,7 @@ func TestGetUser_Success(t *testing.T) {
 
 func TestGetUser_NotFound(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockSlice := &MockSlice{exists: false}
-	mockStore.On("Get", []byte("user:bar")).Return(mockSlice, nil)
+	mockStore.On("Get", []byte("user:bar")).Return(nil, nil)
 
 	user, err := db.GetUser(mockStore, "bar")
 	assert.NoError(t, err)
@@ -117,8 +103,8 @@ func TestGetUser_ErrorOnGet(t *testing.T) {
 
 func TestGetUser_UnmarshalError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockSlice := &MockSlice{data: []byte("invalid-json"), exists: true}
-	mockStore.On("Get", []byte("user:x")).Return(mockSlice, nil)
+
+	mockStore.On("Get", []byte("user:x")).Return([]byte("invalid-json"), nil)
 
 	user, err := db.GetUser(mockStore, "x")
 	assert.Error(t, err)
@@ -145,8 +131,7 @@ func TestPutDefaultRootUserRoot_WriteError(t *testing.T) {
 
 func TestGetDefaultRootUserRoot_UnmarshalError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockSlice := &MockSlice{data: []byte("bad-json"), exists: true}
-	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return([]byte("bad-json"), nil)
 
 	root, err := db.GetDefaultRootUserRoot(mockStore)
 	assert.Error(t, err)
@@ -157,8 +142,8 @@ func TestDeleteUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	root := models.User{Username: "other"}
 	rootData, _ := json.Marshal(root)
-	mockSlice := &MockSlice{data: rootData, exists: true}
-	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(rootData, nil)
 	mockStore.On("Write", mock.Anything).Return(nil)
 
 	err := db.DeleteUser(mockStore, "bob")
@@ -169,8 +154,7 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 	mockStore := new(MockKVStore)
 	root := models.User{Username: "admin"}
 	rootData, _ := json.Marshal(root)
-	mockSlice := &MockSlice{data: rootData, exists: true}
-	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(rootData, nil)
 
 	err := db.DeleteUser(mockStore, "admin")
 	assert.Error(t, err)
@@ -187,8 +171,7 @@ func TestDeleteUser_GetError(t *testing.T) {
 
 func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockSlice := &MockSlice{data: []byte("bad"), exists: true}
-	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return([]byte("bad"), nil)
 
 	err := db.DeleteUser(mockStore, "x")
 	assert.Error(t, err)
@@ -198,8 +181,7 @@ func TestDeleteUser_WriteError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	root := models.User{Username: "root"}
 	rootData, _ := json.Marshal(root)
-	mockSlice := &MockSlice{data: rootData, exists: true}
-	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil)
+	mockStore.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(rootData, nil)
 	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
 
 	err := db.DeleteUser(mockStore, "user")

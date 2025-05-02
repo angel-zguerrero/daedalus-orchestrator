@@ -40,14 +40,13 @@ func GetUser(kvStore KVStore, username string) (*models.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer value.Free()
 
-	if !value.Exists() {
+	if value == nil {
 		return nil, nil
 	}
 
 	var user models.User
-	err = json.Unmarshal(value.Data(), &user)
+	err = json.Unmarshal(value, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -61,14 +60,13 @@ func GetDefaultRootUserRoot(kvStore KVStore) (*models.CreateUser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer value.Free()
 
-	if !value.Exists() {
+	if value == nil {
 		return nil, nil
 	}
 
 	var user models.CreateUser
-	err = json.Unmarshal(value.Data(), &user)
+	err = json.Unmarshal(value, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -119,11 +117,10 @@ func DeleteUser(kvStore KVStore, username string) error {
 	if err != nil {
 		return err
 	}
-	defer rootData.Free()
 
-	if rootData.Exists() {
+	if rootData != nil {
 		var rootUser models.User
-		if err := json.Unmarshal(rootData.Data(), &rootUser); err != nil {
+		if err := json.Unmarshal(rootData, &rootUser); err != nil {
 			return err
 		}
 		if rootUser.Username == username {

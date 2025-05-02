@@ -90,11 +90,11 @@ func (s *KVStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uin
 	if err != nil {
 		return 0, err
 	}
-	defer result.Free()
-	if len(result.Data()) == 0 {
+
+	if len(result) == 0 {
 		return 0, nil
 	}
-	return binary.LittleEndian.Uint64(result.Data()), nil
+	return binary.LittleEndian.Uint64(result), nil
 }
 
 func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
@@ -152,20 +152,16 @@ func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
 
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	if rocks_kv_store != nil {
-		slice, err := rocks_kv_store.Get(key.([]byte))
-		if slice != nil {
-			defer slice.Free()
-		}
+		data, err := rocks_kv_store.Get(key.([]byte))
+
 		if err == nil && s.closed {
 			panic("lookup returned valid result when DiskKV is already closed")
 		}
 
-		if !slice.Exists() {
-			return nil, nil
+		if data != nil {
+			return data, err
 		}
-
-		data := append([]byte(nil), slice.Data()...)
-		return data, err
+		return nil, nil
 	}
 	return nil, errors.New("db closed")
 }

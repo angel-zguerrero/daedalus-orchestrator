@@ -6,27 +6,11 @@ import (
 	"github.com/linxGnu/grocksdb"
 )
 
-type sliceWrapper struct {
-	s *grocksdb.Slice
-}
-
-func (w *sliceWrapper) Data() []byte {
-	return w.s.Data()
-}
-
-func (w *sliceWrapper) Free() {
-	w.s.Free()
-}
-
-func (w *sliceWrapper) Exists() bool {
-	return w.s.Exists()
-}
-
 type RocksdbStore struct {
 	*grocksdb.DB
 }
 
-func (r *RocksdbStore) Get(key []byte) (Slice, error) {
+func (r *RocksdbStore) Get(key []byte) ([]byte, error) {
 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -34,7 +18,12 @@ func (r *RocksdbStore) Get(key []byte) (Slice, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &sliceWrapper{s: slice}, nil
+	defer slice.Free()
+	if slice.Exists() {
+		data := append([]byte(nil), slice.Data()...)
+		return data, nil
+	}
+	return nil, nil
 }
 
 func (r *RocksdbStore) Put(key, value []byte) error {

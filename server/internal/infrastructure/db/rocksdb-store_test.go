@@ -30,10 +30,7 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 
 	result, err := store.Get(key)
 	require.NoError(t, err)
-	defer result.Free()
-
-	assert.True(t, result.Exists())
-	assert.Equal(t, value, result.Data())
+	assert.Equal(t, value, result)
 }
 
 func TestRocksdbStore_Get_NotFound(t *testing.T) {
@@ -50,9 +47,7 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 
 	result, err := store.Get([]byte("nonexistent"))
 	require.NoError(t, err)
-	defer result.Free()
-
-	assert.False(t, result.Exists())
+	assert.Nil(t, result)
 }
 
 func TestRocksdbStore_WriteBatch(t *testing.T) {
@@ -79,14 +74,10 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	// Verifica clave "a"
 	resultA, err := store.Get([]byte("a"))
 	require.NoError(t, err)
-	defer resultA.Free()
-	assert.True(t, resultA.Exists())
-	assert.Equal(t, []byte("valueA"), resultA.Data())
+	assert.Equal(t, []byte("valueA"), resultA)
 
 	// Verifica clave "b"
 	resultB, err := store.Get([]byte("b"))
 	require.NoError(t, err)
-	defer resultB.Free()
-	assert.True(t, resultB.Exists())
-	assert.Equal(t, []byte("valueB"), resultB.Data())
+	assert.Equal(t, []byte("valueB"), resultB)
 }
