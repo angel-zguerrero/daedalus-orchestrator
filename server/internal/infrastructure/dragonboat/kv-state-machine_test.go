@@ -3,6 +3,7 @@ package dragonboat_test
 import (
 	"bytes"
 	"context"
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"encoding/binary"
 	"encoding/gob"
@@ -47,11 +48,13 @@ func TestUpdate_SingleEntry(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := struct {
-		Key   string
-		Value []byte
+		Key              string
+		Value            []byte
+		ColumnFamilyName string
 	}{
-		Key:   "foo",
-		Value: []byte("bar"),
+		Key:              "foo",
+		Value:            []byte("bar"),
+		ColumnFamilyName: db.DefaultFC,
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
@@ -81,11 +84,13 @@ func TestLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := struct {
-		Key   string
-		Value []byte
+		Key              string
+		Value            []byte
+		ColumnFamilyName string
 	}{
-		Key:   "lookup_key",
-		Value: []byte("lookup_value"),
+		Key:              "lookup_key",
+		Value:            []byte("lookup_value"),
+		ColumnFamilyName: db.DefaultFC,
 	}
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
 
@@ -94,7 +99,12 @@ func TestLookup_ExistingKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	val, err := kv.Lookup("lookup_key")
+	query := dragonboat.LookupQuery{
+		Key:              "lookup_key",
+		ColumnFamilyName: db.DefaultFC,
+	}
+
+	val, err := kv.Lookup(query)
 	require.NoError(t, err)
 	require.Equal(t, []byte("lookup_value"), val)
 }
@@ -103,7 +113,11 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
-	val, err := kv.Lookup("missing_key")
+	query := dragonboat.LookupQuery{
+		Key:              "missing_key",
+		ColumnFamilyName: db.DefaultFC,
+	}
+	val, err := kv.Lookup(query)
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -129,11 +143,13 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := struct {
-		Key   string
-		Value []byte
+		Key              string
+		Value            []byte
+		ColumnFamilyName string
 	}{
-		Key:   "snap_key",
-		Value: []byte("snap_value"),
+		Key:              "snap_key",
+		Value:            []byte("snap_value"),
+		ColumnFamilyName: db.DefaultFC,
 	}
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
 	_, err := kv.Update([]statemachine.Entry{
@@ -159,11 +175,22 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	val, err := kv2.Lookup("snap_key")
+	query := dragonboat.LookupQuery{
+		Key:              "snap_key",
+		ColumnFamilyName: db.DefaultFC,
+	}
+
+	val, err := kv2.Lookup(query)
+
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	val, err = kv2.Lookup(dragonboat.AppliedIndexKey)
+	query = dragonboat.LookupQuery{
+		Key:              dragonboat.AppliedIndexKey,
+		ColumnFamilyName: db.MetaFC,
+	}
+
+	val, err = kv2.Lookup(query)
 	require.NoError(t, err)
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }

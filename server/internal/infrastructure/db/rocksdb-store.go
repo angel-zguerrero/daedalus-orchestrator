@@ -8,13 +8,18 @@ import (
 
 type RocksdbStore struct {
 	*grocksdb.DB
+	ColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle
 }
 
-func (r *RocksdbStore) Get(key string) ([]byte, error) {
-
+func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
+	cf, ok := r.ColumnFamilyHandles[columnFamily]
+	if !ok {
+		return nil, fmt.Errorf("column family %s not found", columnFamily)
+	}
+	r.DB.GetColumnFamilyMetadata()
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
-	slice, err := r.DB.Get(ro, []byte(key))
+	slice, err := r.DB.GetCF(ro, cf, []byte(key))
 	if err != nil {
 		return nil, err
 	}
@@ -26,11 +31,14 @@ func (r *RocksdbStore) Get(key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (r *RocksdbStore) Put(key string, value []byte) error {
-
+func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {
+	cf, ok := r.ColumnFamilyHandles[columnFamily]
+	if !ok {
+		return fmt.Errorf("column family %s not found", columnFamily)
+	}
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
-	return r.DB.Put(wo, []byte(key), value)
+	return r.DB.PutCF(wo, cf, []byte(key), value)
 }
 
 func (r *RocksdbStore) Write(batch interface{}) error {
@@ -70,30 +78,31 @@ func (r *RocksdbStore) DumpAll() (interface{}, error) {
 	return result, nil
 }
 
-func (r *RocksdbStore) Iterate(fn func(key, value []byte) error) error {
-
+func (r *RocksdbStore) Iterate(fn func(cfName string, key, value []byte) error) error {
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
 
-	it := r.DB.NewIterator(ro)
-	defer it.Close()
+	for cfName, cfHandle := range r.ColumnFamilyHandles {
+		it := r.DB.NewIteratorCF(ro, cfHandle)
+		defer it.Close()
 
-	for it.SeekToFirst(); it.Valid(); it.Next() {
-		key := it.Key()
-		value := it.Value()
+		for it.SeekToFirst(); it.Valid(); it.Next() {
+			key := it.Key()
+			value := it.Value()
 
-		err := fn(key.Data(), value.Data())
+			err := fn(cfName, key.Data(), value.Data())
 
-		key.Free()
-		value.Free()
+			key.Free()
+			value.Free()
 
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	if err := it.Err(); err != nil {
-		return fmt.Errorf("iterator error: %w", err)
+		if err := it.Err(); err != nil {
+			return fmt.Errorf("iterator error in CF %s: %w", cfName, err)
+		}
 	}
 
 	return nil

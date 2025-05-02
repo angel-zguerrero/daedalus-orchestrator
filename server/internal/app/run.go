@@ -69,7 +69,7 @@ func Run() {
 	}
 
 	// Database run
-	dbConn, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
+	dbConn, columnFamilyHandles, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
 	if err != nil {
 
 		log.Fatal().
@@ -81,7 +81,7 @@ func Run() {
 
 	defer dbConn.Close()
 
-	rocksdbStore := &db.RocksdbStore{DB: dbConn}
+	rocksdbStore := &db.RocksdbStore{DB: dbConn, ColumnFamilyHandles: columnFamilyHandles}
 	if err := db.BootstrapRootUser(rocksdbStore, *configMap); err != nil {
 		log.Fatal().
 			Err(err).

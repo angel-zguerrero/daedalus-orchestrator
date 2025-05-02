@@ -30,13 +30,13 @@ func PutUser(kvStore KVStore, input models.CreateUser) error {
 	}
 
 	key := "user:" + input.Username
-	err = kvStore.Put(key, userData)
+	err = kvStore.Put(AdminFC, key, userData)
 	return err
 }
 
 func GetUser(kvStore KVStore, username string) (*models.User, error) {
 	key := "user:" + username
-	value, err := kvStore.Get(key)
+	value, err := kvStore.Get(AdminFC, key)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func GetUser(kvStore KVStore, username string) (*models.User, error) {
 
 func GetDefaultRootUserRoot(kvStore KVStore) (*models.CreateUser, error) {
 	key := constants.DefaultRootUserRootKey
-	value, err := kvStore.Get(key)
+	value, err := kvStore.Get(AdminFC, key)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func PutDefaultRootUserRoot(kvStore KVStore, input models.CreateUser) error {
 }
 
 func DeleteUser(kvStore KVStore, username string) error {
-	rootData, err := kvStore.Get(constants.DefaultRootUserRootKey)
+	rootData, err := kvStore.Get(AdminFC, constants.DefaultRootUserRootKey)
 	if err != nil {
 		return err
 	}

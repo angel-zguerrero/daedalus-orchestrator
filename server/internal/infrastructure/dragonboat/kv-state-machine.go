@@ -69,12 +69,13 @@ func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 			return 0, err
 		}
 	}
-	rocks_db, err := db.OpenDB(dbdir)
+	rocks_db, columnFamilyHandles, err := db.OpenDB(dbdir)
 	if err != nil {
 		return 0, err
 	}
 	store := &db.RocksdbStore{
-		DB: rocks_db,
+		DB:                  rocks_db,
+		ColumnFamilyHandles: columnFamilyHandles,
 	}
 	atomic.SwapPointer(&s.store, unsafe.Pointer(store))
 	appliedIndex, err := s.queryAppliedIndex(store)
@@ -86,7 +87,7 @@ func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 }
 
 func (s *KVStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uint64, error) {
-	result, err := rocks_kv_store.Get(AppliedIndexKey)
+	result, err := rocks_kv_store.Get(db.MetaFC, AppliedIndexKey)
 	if err != nil {
 		return 0, err
 	}
@@ -113,21 +114,22 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 	for idx, _ := range ents {
 
 		var cmd struct {
-			Key   string
-			Value []byte
+			Key              string
+			Value            []byte
+			ColumnFamilyName string
 		}
 
 		if err := gob.NewDecoder(bytes.NewReader(ents[idx].Cmd)).Decode(&cmd); err != nil {
 			return nil, err
 		}
 
-		batch.Put([]byte(cmd.Key), cmd.Value)
+		batch.PutCF(rocks_kv_store.ColumnFamilyHandles[cmd.ColumnFamilyName], []byte(cmd.Key), cmd.Value)
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 	// save the applied index to the DB.
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
-	batch.Put([]byte(AppliedIndexKey), appliedIndex)
+	batch.PutCF(rocks_kv_store.ColumnFamilyHandles[db.MetaFC], []byte(AppliedIndexKey), appliedIndex)
 	err := rocks_kv_store.Write(batch)
 
 	if err != nil {
@@ -142,18 +144,23 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 
 }
 
+type LookupQuery struct {
+	Key              string
+	ColumnFamilyName string
+}
+
 func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	if rocks_kv_store != nil {
 
-		strKey, ok := key.(string)
+		lookupQuery, ok := key.(LookupQuery)
 		if !ok {
 			return nil, fmt.Errorf("expected key to be string, got %T", key)
 		}
 
-		data, err := rocks_kv_store.Get(strKey)
+		data, err := rocks_kv_store.Get(lookupQuery.ColumnFamilyName, lookupQuery.Key)
 
 		if err == nil && s.closed {
 			panic("lookup returned valid result when DiskKV is already closed")
@@ -191,7 +198,7 @@ func (s *KVStateMachine) SaveSnapshot(
 
 	enc := gob.NewEncoder(w)
 
-	err := rocks_kv_store.Iterate(func(key, value []byte) error {
+	err := rocks_kv_store.Iterate(func(cfName string, key, value []byte) error {
 		select {
 		case <-done:
 			return fmt.Errorf("snapshot cancelled")
@@ -199,11 +206,13 @@ func (s *KVStateMachine) SaveSnapshot(
 		}
 
 		entry := struct {
-			Key   []byte
-			Value []byte
+			CFName string
+			Key    []byte
+			Value  []byte
 		}{
-			Key:   append([]byte(nil), key...),
-			Value: append([]byte(nil), value...),
+			CFName: cfName,
+			Key:    append([]byte(nil), key...),
+			Value:  append([]byte(nil), value...),
 		}
 
 		return enc.Encode(&entry)
@@ -231,12 +240,13 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 	dbdir := getNewRandomDBDirName(dir)
 	oldDirName, err := getCurrentDBDirName(dir)
 
-	rocks_db, err := db.OpenDB(dbdir)
+	rocks_db, columnFamilyHandles, err := db.OpenDB(dbdir)
 	if err != nil {
 		return err
 	}
 	rocks_db_store := &db.RocksdbStore{
-		DB: rocks_db,
+		DB:                  rocks_db,
+		ColumnFamilyHandles: columnFamilyHandles,
 	}
 
 	dec := gob.NewDecoder(r)
@@ -249,8 +259,9 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 		}
 
 		var entry struct {
-			Key   []byte
-			Value []byte
+			CFName string
+			Key    []byte
+			Value  []byte
 		}
 
 		if err := dec.Decode(&entry); err != nil {
@@ -260,7 +271,7 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 			return fmt.Errorf("decode failed: %w", err)
 		}
 
-		if err := rocks_db_store.Put(string(entry.Key), entry.Value); err != nil {
+		if err := rocks_db_store.Put(entry.CFName, string(entry.Key), entry.Value); err != nil {
 			return fmt.Errorf("put failed during snapshot recovery: %w", err)
 		}
 	}
