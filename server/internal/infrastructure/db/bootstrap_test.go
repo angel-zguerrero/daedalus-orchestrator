@@ -43,7 +43,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(nil, nil).Times(1)
+	store.On("Get", constants.DefaultRootUserRootKey).Return(nil, nil).Times(1)
 
 	input := models.CreateUser{
 		Username: config.DefaultRootUser,
@@ -86,7 +86,7 @@ func Test_ErrorGettingRoot(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(nil, errors.New("boom")).Once()
+	store.On("Get", constants.DefaultRootUserRootKey).Return(nil, errors.New("boom")).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
@@ -106,9 +106,9 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 		Email:    "x@x.com",
 	}
 
-	store.On("Get", []byte(constants.DefaultRootUserRootKey)).Return([]byte(marshal(t, root)), nil).Once()
-	store.On("Get", []byte("user:admin")).Return(nil, nil).Once()
-	store.On("Put", []byte("user:admin"), mock.AnythingOfType("[]uint8")).Return(nil).Once()
+	store.On("Get", constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Get", "user:admin").Return(nil, nil).Once()
+	store.On("Put", "user:admin", mock.AnythingOfType("[]uint8")).Return(nil).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
@@ -128,8 +128,8 @@ func Test_SkipsIfUserExists(t *testing.T) {
 		Email:        "x@x.com",
 	}
 
-	store.On("Get", []byte(constants.DefaultRootUserRootKey)).Return([]byte(marshal(t, root)), nil).Once()
-	store.On("Get", []byte("user:admin")).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Get", constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Get", "user:admin").Return([]byte(marshal(t, root)), nil).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
@@ -144,8 +144,8 @@ func Test_ErrorFetchingUser(t *testing.T) {
 	}
 	root := models.User{Username: "admin"}
 
-	store.On("Get", []byte(constants.DefaultRootUserRootKey)).Return([]byte(marshal(t, root)), nil).Once()
-	store.On("Get", []byte("user:admin")).Return(nil, errors.New("read error")).Once()
+	store.On("Get", constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Get", "user:admin").Return(nil, errors.New("read error")).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
@@ -160,7 +160,7 @@ func Test_ErrorPutsRoot(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("Get", []byte(constants.DefaultRootUserRootKey)).Return(nil, nil).Times(1)
+	store.On("Get", constants.DefaultRootUserRootKey).Return(nil, nil).Times(1)
 	store.On("Write", mock.Anything).Return(errors.New("write fail")).Once()
 
 	err := db.BootstrapRootUser(store, config)

@@ -86,7 +86,7 @@ func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 }
 
 func (s *KVStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uint64, error) {
-	result, err := rocks_kv_store.Get([]byte(AppliedIndexKey))
+	result, err := rocks_kv_store.Get(AppliedIndexKey)
 	if err != nil {
 		return 0, err
 	}
@@ -113,7 +113,7 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 	for idx, _ := range ents {
 
 		var cmd struct {
-			Key   []byte
+			Key   string
 			Value []byte
 		}
 
@@ -121,7 +121,7 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 			return nil, err
 		}
 
-		batch.Put(cmd.Key, cmd.Value)
+		batch.Put([]byte(cmd.Key), cmd.Value)
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 	// save the applied index to the DB.
@@ -145,14 +145,15 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	key, ok := key.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("invalid query type")
-	}
-
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	if rocks_kv_store != nil {
-		data, err := rocks_kv_store.Get(key.([]byte))
+
+		strKey, ok := key.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected key to be string, got %T", key)
+		}
+
+		data, err := rocks_kv_store.Get(strKey)
 
 		if err == nil && s.closed {
 			panic("lookup returned valid result when DiskKV is already closed")
@@ -259,7 +260,7 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 			return fmt.Errorf("decode failed: %w", err)
 		}
 
-		if err := rocks_db_store.Put(entry.Key, entry.Value); err != nil {
+		if err := rocks_db_store.Put(string(entry.Key), entry.Value); err != nil {
 			return fmt.Errorf("put failed during snapshot recovery: %w", err)
 		}
 	}

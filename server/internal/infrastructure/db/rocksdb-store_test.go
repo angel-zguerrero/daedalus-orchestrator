@@ -22,7 +22,7 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 
 	store := &db.RocksdbStore{DB: rocks}
 
-	key := []byte("key")
+	key := "key"
 	value := []byte("value")
 
 	err = store.Put(key, value)
@@ -45,7 +45,7 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 
 	store := &db.RocksdbStore{DB: rocks}
 
-	result, err := store.Get([]byte("nonexistent"))
+	result, err := store.Get("nonexistent")
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -72,12 +72,12 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verifica clave "a"
-	resultA, err := store.Get([]byte("a"))
+	resultA, err := store.Get("a")
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueA"), resultA)
 
 	// Verifica clave "b"
-	resultB, err := store.Get([]byte("b"))
+	resultB, err := store.Get("b")
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueB"), resultB)
 }

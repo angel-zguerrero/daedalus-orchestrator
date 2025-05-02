@@ -47,10 +47,10 @@ func TestUpdate_SingleEntry(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := struct {
-		Key   []byte
+		Key   string
 		Value []byte
 	}{
-		Key:   []byte("foo"),
+		Key:   "foo",
 		Value: []byte("bar"),
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -81,10 +81,10 @@ func TestLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := struct {
-		Key   []byte
+		Key   string
 		Value []byte
 	}{
-		Key:   []byte("lookup_key"),
+		Key:   "lookup_key",
 		Value: []byte("lookup_value"),
 	}
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
@@ -94,7 +94,7 @@ func TestLookup_ExistingKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	val, err := kv.Lookup([]byte("lookup_key"))
+	val, err := kv.Lookup("lookup_key")
 	require.NoError(t, err)
 	require.Equal(t, []byte("lookup_value"), val)
 }
@@ -103,7 +103,7 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
-	val, err := kv.Lookup([]byte("missing_key"))
+	val, err := kv.Lookup("missing_key")
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -112,7 +112,7 @@ func TestLookup_InvalidType(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
-	_, err := kv.Lookup("not_bytes")
+	_, err := kv.Lookup(0)
 	require.Error(t, err)
 }
 
@@ -129,10 +129,10 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := struct {
-		Key   []byte
+		Key   string
 		Value []byte
 	}{
-		Key:   []byte("snap_key"),
+		Key:   "snap_key",
 		Value: []byte("snap_value"),
 	}
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
@@ -159,11 +159,11 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	val, err := kv2.Lookup([]byte("snap_key"))
+	val, err := kv2.Lookup("snap_key")
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	val, err = kv2.Lookup([]byte(dragonboat.AppliedIndexKey))
+	val, err = kv2.Lookup(dragonboat.AppliedIndexKey)
 	require.NoError(t, err)
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }

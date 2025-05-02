@@ -18,6 +18,11 @@ var (
 	mkdirAll       = os.MkdirAll
 )
 
+const (
+	AdminFC   = "admin"
+	DefaultFC = "default"
+)
+
 type PathProvider interface {
 	GetDatabasePath() (string, error)
 }
@@ -68,7 +73,42 @@ func OpenDB(dbPath string) (*grocksdb.DB, error) {
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
 	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)
-	db, err := grocksdb.OpenDb(opts, dbPath)
+
+	opts.SetCreateIfMissingColumnFamilies(true)
+	columnFamilyNames := []string{}
+	var err error
+	if exists, _ := utils.DirExists(dbPath); exists {
+		columnFamilyNames, err = grocksdb.ListColumnFamilies(opts, dbPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(columnFamilyNames) == 0 {
+		columnFamilyNames = []string{AdminFC, DefaultFC}
+	} else {
+		cfSet := make(map[string]struct{}, len(columnFamilyNames))
+		for _, name := range columnFamilyNames {
+			cfSet[name] = struct{}{}
+		}
+		if _, ok := cfSet[AdminFC]; !ok {
+			columnFamilyNames = append(columnFamilyNames, AdminFC)
+		}
+		if _, ok := cfSet[DefaultFC]; !ok {
+			columnFamilyNames = append(columnFamilyNames, DefaultFC)
+		}
+	}
+
+	cfOpts := make([]*grocksdb.Options, len(columnFamilyNames))
+
+	for index, _ := range columnFamilyNames {
+		cfOpts[index] = grocksdb.NewDefaultOptions()
+	}
+
+	fmt.Println("columnFamilyNames")
+	fmt.Println(columnFamilyNames)
+
+	db, _, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, columnFamilyNames, cfOpts)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
 	}

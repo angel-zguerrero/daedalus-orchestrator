@@ -10,11 +10,11 @@ type RocksdbStore struct {
 	*grocksdb.DB
 }
 
-func (r *RocksdbStore) Get(key []byte) ([]byte, error) {
+func (r *RocksdbStore) Get(key string) ([]byte, error) {
 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
-	slice, err := r.DB.Get(ro, key)
+	slice, err := r.DB.Get(ro, []byte(key))
 	if err != nil {
 		return nil, err
 	}
@@ -26,11 +26,11 @@ func (r *RocksdbStore) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (r *RocksdbStore) Put(key, value []byte) error {
+func (r *RocksdbStore) Put(key string, value []byte) error {
 
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
-	return r.DB.Put(wo, key, value)
+	return r.DB.Put(wo, []byte(key), value)
 }
 
 func (r *RocksdbStore) Write(batch interface{}) error {
