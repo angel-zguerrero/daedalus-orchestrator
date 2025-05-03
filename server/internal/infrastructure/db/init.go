@@ -103,6 +103,7 @@ func OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandl
 
 	for index, _ := range columnFamilyNames {
 		cfOpts[index] = grocksdb.NewDefaultOptions()
+		defer cfOpts[index].Destroy()
 	}
 
 	db, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, columnFamilyNames, cfOpts)

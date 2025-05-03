@@ -142,11 +142,21 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 		}
 		switch ddlCmd.Op {
 		case Add_CF_Op:
-			cfh, err := rocks_kv_store.DB.CreateColumnFamily(grocksdb.NewDefaultOptions(), ddlCmd.ColumnFamilyName)
-			if err != nil {
-				return nil, err
+			cfName := ddlCmd.ColumnFamilyName
+			if cfName == "" {
+				return nil, fmt.Errorf("the family column name cannot be empty")
 			}
-			rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName] = cfh
+
+			if _, exists := rocks_kv_store.ColumnFamilyHandles[cfName]; !exists {
+				opts := grocksdb.NewDefaultOptions()
+				defer opts.Destroy()
+
+				cfh, err := rocks_kv_store.DB.CreateColumnFamily(opts, cfName)
+				if err != nil {
+					return nil, fmt.Errorf("error creando CF %s: %w", cfName, err)
+				}
+				rocks_kv_store.ColumnFamilyHandles[cfName] = cfh
+			}
 		case Remove_CF_Op:
 			cfh := rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName]
 			if cfh == nil {
