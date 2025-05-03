@@ -113,20 +113,37 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 
 	for idx, _ := range ents {
 
-		var cmd struct {
-			Key              string
-			Value            []byte
-			ColumnFamilyName string
-		}
+		var cmd Command
 
 		if err := gob.NewDecoder(bytes.NewReader(ents[idx].Cmd)).Decode(&cmd); err != nil {
 			return nil, err
 		}
 
-		batch.PutCF(rocks_kv_store.ColumnFamilyHandles[cmd.ColumnFamilyName], []byte(cmd.Key), cmd.Value)
+		switch cmd.Type {
+		case RW:
+			rwCmd, ok := cmd.CMD.(RWK_Command)
+			if !ok {
+				return nil, fmt.Errorf("expected RWK_Command for RW type, got %T", cmd.CMD)
+			}
+
+			switch rwCmd.Op {
+			case PutOp:
+				batch.PutCF(rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName], []byte(rwCmd.Key), rwCmd.Value)
+				break
+			case DeleteOp:
+				batch.DeleteCF(rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName], []byte(rwCmd.Key))
+				break
+			default:
+				return nil, fmt.Errorf("unknown RW Operation: %v", rwCmd.Op)
+			}
+
+		default:
+			return nil, fmt.Errorf("unknown command type: %v", cmd.Type)
+		}
+
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
-	// save the applied index to the DB.
+
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
 	batch.PutCF(rocks_kv_store.ColumnFamilyHandles[db.MetaFC], []byte(AppliedIndexKey), appliedIndex)

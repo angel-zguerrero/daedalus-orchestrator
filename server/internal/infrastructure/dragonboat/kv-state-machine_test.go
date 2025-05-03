@@ -26,10 +26,10 @@ func setupKV(t *testing.T) *dragonboat.KVStateMachine {
 
 func TestOne(t *testing.T) {
 
-	dragonboat.Init(101, 1, "3435")
-	dragonboat.Init(101, 2, "3436")
+	//dragonboat.Init(101, 1, "3435")
+	//dragonboat.Init(101, 2, "3436")
 
-	time.Sleep(10 * time.Second)
+	//time.Sleep(10 * time.Second)
 }
 func TestOpen_Close(t *testing.T) {
 	kv := setupKV(t)
@@ -47,14 +47,14 @@ func TestUpdate_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := struct {
-		Key              string
-		Value            []byte
-		ColumnFamilyName string
-	}{
-		Key:              "foo",
-		Value:            []byte("bar"),
-		ColumnFamilyName: db.DefaultFC,
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Key:              "foo",
+			Value:            []byte("bar"),
+			ColumnFamilyName: db.DefaultFC,
+			Op:               dragonboat.PutOp,
+		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
@@ -83,15 +83,17 @@ func TestLookup_ExistingKey(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := struct {
-		Key              string
-		Value            []byte
-		ColumnFamilyName string
-	}{
-		Key:              "lookup_key",
-		Value:            []byte("lookup_value"),
-		ColumnFamilyName: db.DefaultFC,
+
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Key:              "lookup_key",
+			Value:            []byte("lookup_value"),
+			ColumnFamilyName: db.DefaultFC,
+			Op:               dragonboat.PutOp,
+		},
 	}
+
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
 
 	_, err := kv.Update([]statemachine.Entry{
@@ -142,15 +144,16 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupKV(t)
 
 	var buf bytes.Buffer
-	cmd := struct {
-		Key              string
-		Value            []byte
-		ColumnFamilyName string
-	}{
-		Key:              "snap_key",
-		Value:            []byte("snap_value"),
-		ColumnFamilyName: db.DefaultFC,
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Key:              "snap_key",
+			Value:            []byte("snap_value"),
+			ColumnFamilyName: db.DefaultFC,
+			Op:               dragonboat.PutOp,
+		},
 	}
+
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
 	_, err := kv.Update([]statemachine.Entry{
 		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
