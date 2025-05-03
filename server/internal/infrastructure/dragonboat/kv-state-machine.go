@@ -105,60 +105,102 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 	if s.closed {
 		panic("update called after Close()")
 	}
+	if len(ents) == 0 {
+		return nil, nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
-	batch := grocksdb.NewWriteBatch()
-	defer batch.Destroy()
 
-	for idx, _ := range ents {
+	var dllFCEntries []int
+	var rwEntries []int
 
+	commands := make([]Command, len(ents))
+	for i, ent := range ents {
 		var cmd Command
-
-		if err := gob.NewDecoder(bytes.NewReader(ents[idx].Cmd)).Decode(&cmd); err != nil {
+		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
 			return nil, err
 		}
+		commands[i] = cmd
 
 		switch cmd.Type {
+		case DLL_FC:
+			dllFCEntries = append(dllFCEntries, i)
 		case RW:
-			rwCmd, ok := cmd.CMD.(RWK_Command)
-			if !ok {
-				return nil, fmt.Errorf("expected RWK_Command for RW type, got %T", cmd.CMD)
-			}
-
-			switch rwCmd.Op {
-			case PutOp:
-				batch.PutCF(rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName], []byte(rwCmd.Key), rwCmd.Value)
-				break
-			case DeleteOp:
-				batch.DeleteCF(rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName], []byte(rwCmd.Key))
-				break
-			default:
-				return nil, fmt.Errorf("unknown RW Operation: %v", rwCmd.Op)
-			}
-
+			rwEntries = append(rwEntries, i)
 		default:
 			return nil, fmt.Errorf("unknown command type: %v", cmd.Type)
 		}
+	}
 
+	for _, idx := range dllFCEntries {
+		cmd := commands[idx]
+		ddlCmd, ok := cmd.CMD.(DDL_Command)
+		if !ok {
+			return nil, fmt.Errorf("expected DDL_Command for DLL type, got %T", cmd.CMD)
+		}
+		switch ddlCmd.Op {
+		case Add_CF_Op:
+			cfh, err := rocks_kv_store.DB.CreateColumnFamily(grocksdb.NewDefaultOptions(), ddlCmd.ColumnFamilyName)
+			if err != nil {
+				return nil, err
+			}
+			rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName] = cfh
+		case Remove_CF_Op:
+			cfh := rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %T to Drop process", ddlCmd.ColumnFamilyName)
+			}
+			err := rocks_kv_store.DB.DropColumnFamily(cfh)
+			if err != nil {
+				return nil, err
+			}
+			cfh.Destroy()
+		}
+		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
+	}
+
+	batch := grocksdb.NewWriteBatch()
+	defer batch.Destroy()
+	for _, idx := range rwEntries {
+		cmd := commands[idx]
+		rwCmd, ok := cmd.CMD.(RWK_Command)
+		if !ok {
+			return nil, fmt.Errorf("expected RWK_Command for RW type, got %T", cmd.CMD)
+		}
+		switch rwCmd.Op {
+		case PutOp:
+			cfh := rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found: %s", rwCmd.ColumnFamilyName)
+			}
+			batch.PutCF(cfh, []byte(rwCmd.Key), rwCmd.Value)
+		case DeleteOp:
+			cfh := rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %s", rwCmd.ColumnFamilyName)
+			}
+			batch.DeleteCF(cfh, []byte(rwCmd.Key))
+		default:
+			return nil, fmt.Errorf("unknown RW Operation: %v", rwCmd.Op)
+		}
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
 	batch.PutCF(rocks_kv_store.ColumnFamilyHandles[db.MetaFC], []byte(AppliedIndexKey), appliedIndex)
-	err := rocks_kv_store.Write(batch)
 
-	if err != nil {
+	if err := rocks_kv_store.Write(batch); err != nil {
 		return nil, err
 	}
 
 	if s.lastApplied >= ents[len(ents)-1].Index {
-		panic("lastApplied not moving forward")
+		return nil, fmt.Errorf("lastApplied not moving forward: current=%d new=%d", s.lastApplied, ents[len(ents)-1].Index)
 	}
 	s.lastApplied = ents[len(ents)-1].Index
 	return ents, nil
-
 }
 
 type LookupQuery struct {

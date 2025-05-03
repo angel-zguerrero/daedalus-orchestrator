@@ -226,3 +226,74 @@ func TestRecoverSnapshot_Cancelled(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "snapshot recovery cancelled")
 }
+
+func TestUpdate_AddColumnFamily(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.DLL_FC,
+		CMD: dragonboat.DDL_Command{
+			ColumnFamilyName: "new_cf",
+			Op:               dragonboat.Add_CF_Op,
+		},
+	}
+	err := gob.NewEncoder(&buf).Encode(cmd)
+	require.NoError(t, err)
+
+	entry := statemachine.Entry{
+		Cmd:   buf.Bytes(),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	result, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+}
+func TestUpdate_DropColumnFamily(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+	{
+		var buf bytes.Buffer
+		cmd := dragonboat.Command{
+			Type: dragonboat.DLL_FC,
+			CMD: dragonboat.DDL_Command{
+
+				ColumnFamilyName: "to_delete_cf",
+				Op:               dragonboat.Add_CF_Op,
+			},
+		}
+		err := gob.NewEncoder(&buf).Encode(cmd)
+		require.NoError(t, err)
+
+		entry := statemachine.Entry{
+			Cmd:   buf.Bytes(),
+			Index: kv.GetLastApplied() + 1,
+		}
+
+		_, err = kv.Update([]statemachine.Entry{entry})
+		require.NoError(t, err)
+	}
+
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.DLL_FC,
+		CMD: dragonboat.DDL_Command{
+
+			ColumnFamilyName: "to_delete_cf",
+			Op:               dragonboat.Remove_CF_Op,
+		},
+	}
+	err := gob.NewEncoder(&buf).Encode(cmd)
+	require.NoError(t, err)
+
+	entry := statemachine.Entry{
+		Cmd:   buf.Bytes(),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	result, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+}
