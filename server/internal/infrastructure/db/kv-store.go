@@ -11,4 +11,5 @@ type KVStore interface {
 	Iterate(fn func(cfName string, key, value []byte) error) error
 	ClearAll() error
 	Flush() error
+	Close() error
 }

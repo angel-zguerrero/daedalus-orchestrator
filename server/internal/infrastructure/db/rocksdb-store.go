@@ -147,3 +147,7 @@ func (r *RocksdbStore) Flush() error {
 	}
 	return r.DB.FlushWAL(true)
 }
+func (r *RocksdbStore) Close() error {
+	r.DB.Close()
+	return nil
+}
