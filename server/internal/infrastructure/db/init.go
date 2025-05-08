@@ -20,6 +20,7 @@ var (
 
 const (
 	DefaultFC = "default"
+	MetaFC    = "meta"
 )
 
 type PathProvider interface {
@@ -104,6 +105,10 @@ func OpenDB(dbPath string, columnFamilyNames []string) (*grocksdb.DB, map[string
 
 	if _, ok := cfSet[DefaultFC]; !ok {
 		allCFs = append(allCFs, DefaultFC)
+	}
+
+	if _, ok := cfSet[MetaFC]; !ok {
+		allCFs = append(allCFs, MetaFC)
 	}
 
 	cfOpts := make([]*grocksdb.Options, len(allCFs))
