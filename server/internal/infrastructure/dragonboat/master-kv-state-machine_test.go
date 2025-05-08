@@ -50,12 +50,16 @@ func TestUpdate_SingleEntry(t *testing.T) {
 	cmd := dragonboat.Command{
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
-			Key:              "foo",
-			Value:            []byte("bar"),
-			ColumnFamilyName: db.DefaultFC,
-			Op:               dragonboat.PutOp,
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "foo",
+				Value:            []byte("bar"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.PutOp,
+			},
 		},
 	}
+
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
 
@@ -87,10 +91,13 @@ func TestLookup_ExistingKey(t *testing.T) {
 	cmd := dragonboat.Command{
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
-			Key:              "lookup_key",
-			Value:            []byte("lookup_value"),
-			ColumnFamilyName: db.DefaultFC,
-			Op:               dragonboat.PutOp,
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "lookup_key",
+				Value:            []byte("lookup_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.PutOp,
+			},
 		},
 	}
 
@@ -147,10 +154,13 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	cmd := dragonboat.Command{
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
-			Key:              "snap_key",
-			Value:            []byte("snap_value"),
-			ColumnFamilyName: db.DefaultFC,
-			Op:               dragonboat.PutOp,
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "snap_key",
+				Value:            []byte("snap_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.PutOp,
+			},
 		},
 	}
 

@@ -19,7 +19,7 @@ import (
 
 type KVRocksDBStateMachineImpl interface {
 	OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error)
-	Update(rocks_kv_store *db.RocksdbStore, ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]statemachine.Entry, error)
+	Update(rocks_kv_store *db.RocksdbStore, ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error)
 	Lookup(rocks_kv_store *db.RocksdbStore, key LookupQuery) (interface{}, error)
 }
 
@@ -121,7 +121,95 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
-	ents, err := s.stateMachineImpl.Update(rocks_kv_store, ents, batch)
+	commands, err := s.stateMachineImpl.Update(rocks_kv_store, ents, batch)
+
+	var dllFCEntries []int
+	var rwEntries []int
+
+	for i, cmd := range commands {
+		switch cmd.Type {
+		case DLL_FC:
+			dllFCEntries = append(dllFCEntries, i)
+		case RW:
+			rwEntries = append(rwEntries, i)
+		default:
+			return nil, fmt.Errorf("unknown command type: %v", cmd.Type)
+		}
+	}
+
+	for _, idx := range dllFCEntries {
+		cmd := commands[idx]
+		ddlCmd, ok := cmd.CMD.(DDL_Command)
+		if !ok {
+			return nil, fmt.Errorf("expected DDL_Command for DLL type, got %T", cmd.CMD)
+		}
+		switch ddlCmd.Op {
+		case Add_CF_Op:
+			cfName := ddlCmd.ColumnFamilyName
+			if cfName == "" {
+				return nil, fmt.Errorf("the family column name cannot be empty")
+			}
+
+			if _, exists := rocks_kv_store.ColumnFamilyHandles[cfName]; !exists {
+				opts := grocksdb.NewDefaultOptions()
+				defer opts.Destroy()
+
+				cfh, err := rocks_kv_store.DB.CreateColumnFamily(opts, cfName)
+				if err != nil {
+					return nil, fmt.Errorf("error creando CF %s: %w", cfName, err)
+				}
+				rocks_kv_store.ColumnFamilyHandles[cfName] = cfh
+			}
+		case Remove_CF_Op:
+			cfh := rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %T to Drop process", ddlCmd.ColumnFamilyName)
+			}
+			err := rocks_kv_store.DB.DropColumnFamily(cfh)
+			if err != nil {
+				return nil, err
+			}
+			cfh.Destroy()
+		}
+		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
+	}
+
+	for _, idx := range rwEntries {
+		cmd := commands[idx]
+		rwCmd, ok := cmd.CMD.(RWK_Command)
+		if !ok {
+			return nil, fmt.Errorf("expected RWK_Command for RW type, got %T", cmd.CMD)
+		}
+		switch rwCmd.Op {
+		case Read:
+		case Write:
+			wCmd, ok := rwCmd.CMD.(WK_Command)
+			if !ok {
+				return nil, fmt.Errorf("expected WK_Command for RW type, got %T", cmd.CMD)
+			}
+			switch wCmd.Op {
+
+			case PutOp:
+				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
+				if cfh == nil {
+					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
+				}
+				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
+			case DeleteOp:
+				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
+				if cfh == nil {
+					return nil, fmt.Errorf("Column Family not found %s", wCmd.ColumnFamilyName)
+				}
+				batch.DeleteCF(cfh, []byte(wCmd.Key))
+			default:
+				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
+
+			}
+		default:
+			return nil, fmt.Errorf("unknown RW Operation: %v", rwCmd.Op)
+		}
+		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
+	}
 
 	if err != nil {
 		return nil, err

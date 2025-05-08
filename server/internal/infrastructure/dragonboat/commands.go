@@ -4,23 +4,51 @@ import "encoding/gob"
 
 func init() {
 	gob.Register(Command{})
-	gob.Register(RWK_Command{})
+	gob.Register(WK_Command{})
+	gob.Register(RK_Command{})
 	gob.Register(DDL_Command{})
+	gob.Register(RWK_Command{})
 }
 
 // ----BEGINNING RW Type ---- //
 type RW_Type int
+type W_Type int
+type R_Type int
 
 const (
-	PutOp RW_Type = iota
+	Read RW_Type = iota
+	Write
+)
+
+const (
+	PutOp W_Type = iota
+	PutOpTTL
 	DeleteOp
 )
 
-type RWK_Command struct {
+const (
+	GetOp R_Type = iota
+	GetTTL
+)
+
+type WK_Command struct {
 	Key              string
 	Value            []byte
 	ColumnFamilyName string
-	Op               RW_Type
+	TTL              int
+	Op               W_Type
+}
+
+type RK_Command struct {
+	Key              string
+	ColumnFamilyName string
+	TTL              int
+	Op               R_Type
+}
+
+type RWK_Command struct {
+	Op  RW_Type
+	CMD any
 }
 
 // ----END RW Type ---- //

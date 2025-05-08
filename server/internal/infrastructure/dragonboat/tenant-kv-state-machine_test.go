@@ -17,13 +17,20 @@ import (
 
 func setupTenantKV(t *testing.T) *dragonboat.KVBaseRocksDBStateMachine {
 	t.Helper()
-	kv := dragonboat.NewTenantKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	kv := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
 	return kv
 }
 
+func TestTenantOne(t *testing.T) {
+
+	//dragonboat.Init(101, 1, "3435")
+	//dragonboat.Init(101, 2, "3436")
+
+	//time.Sleep(10 * time.Second)
+}
 func TestTenantOpen_Close(t *testing.T) {
 	kv := setupTenantKV(t)
 
@@ -43,12 +50,16 @@ func TestTenantUpdate_SingleEntry(t *testing.T) {
 	cmd := dragonboat.Command{
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
-			Key:              "foo",
-			Value:            []byte("bar"),
-			ColumnFamilyName: db.DefaultFC,
-			Op:               dragonboat.PutOp,
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "foo",
+				Value:            []byte("bar"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.PutOp,
+			},
 		},
 	}
+
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
 
@@ -80,10 +91,13 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 	cmd := dragonboat.Command{
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
-			Key:              "lookup_key",
-			Value:            []byte("lookup_value"),
-			ColumnFamilyName: db.DefaultFC,
-			Op:               dragonboat.PutOp,
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "lookup_key",
+				Value:            []byte("lookup_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.PutOp,
+			},
 		},
 	}
 
@@ -140,10 +154,13 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	cmd := dragonboat.Command{
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
-			Key:              "snap_key",
-			Value:            []byte("snap_value"),
-			ColumnFamilyName: db.DefaultFC,
-			Op:               dragonboat.PutOp,
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "snap_key",
+				Value:            []byte("snap_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.PutOp,
+			},
 		},
 	}
 
@@ -162,7 +179,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewTenantKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	kv2 := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
