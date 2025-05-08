@@ -19,9 +19,7 @@ var (
 )
 
 const (
-	AdminFC   = "admin"
 	DefaultFC = "default"
-	MetaFC    = "meta"
 )
 
 type PathProvider interface {
@@ -53,7 +51,7 @@ func (d DefaultPathProvider) GetDatabasePath() (string, error) {
 }
 
 // InitDB usa un PathProvider para determinar dónde crear la base
-func InitDB(dbName string, provider PathProvider) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error) {
+func InitDB(dbName string, provider PathProvider, columnFamilyNames []string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error) {
 	dbPath, err := provider.GetDatabasePath()
 	if err != nil {
 		return nil, nil, err
@@ -64,10 +62,10 @@ func InitDB(dbName string, provider PathProvider) (*grocksdb.DB, map[string]*gro
 		return nil, nil, fmt.Errorf("could not create db dir: %w", err)
 	}
 
-	return OpenDB(fullPath)
+	return OpenDB(fullPath, columnFamilyNames)
 }
 
-func OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error) {
+func OpenDB(dbPath string, columnFamilyNames []string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error) {
 	log.Info().
 		Str("dbPath", dbPath).
 		Msg("🗄️  Opening index db")
@@ -76,42 +74,51 @@ func OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandl
 	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)
 
 	opts.SetCreateIfMissingColumnFamilies(true)
-	columnFamilyNames := []string{}
+
 	var err error
+	var currentColumnFamilies []string
+	uniqueCF := make(map[string]struct{})
 	if exists, _ := utils.DirExists(dbPath); exists {
-		columnFamilyNames, err = grocksdb.ListColumnFamilies(opts, dbPath)
+		currentColumnFamilies, err = grocksdb.ListColumnFamilies(opts, dbPath)
 		if err != nil {
 			return nil, nil, err
 		}
+		for _, cf := range currentColumnFamilies {
+			uniqueCF[cf] = struct{}{}
+		}
 	}
 
-	cfSet := make(map[string]struct{}, len(columnFamilyNames))
-	for _, name := range columnFamilyNames {
+	for _, cf := range columnFamilyNames {
+		uniqueCF[cf] = struct{}{}
+	}
+
+	var allCFs []string
+	for cf := range uniqueCF {
+		allCFs = append(allCFs, cf)
+	}
+
+	cfSet := make(map[string]struct{}, len(allCFs))
+	for _, name := range allCFs {
 		cfSet[name] = struct{}{}
 	}
-	if _, ok := cfSet[AdminFC]; !ok {
-		columnFamilyNames = append(columnFamilyNames, AdminFC)
-	}
+
 	if _, ok := cfSet[DefaultFC]; !ok {
-		columnFamilyNames = append(columnFamilyNames, DefaultFC)
-	}
-	if _, ok := cfSet[MetaFC]; !ok {
-		columnFamilyNames = append(columnFamilyNames, MetaFC)
+		allCFs = append(allCFs, DefaultFC)
 	}
 
-	cfOpts := make([]*grocksdb.Options, len(columnFamilyNames))
+	cfOpts := make([]*grocksdb.Options, len(allCFs))
 
-	for index, _ := range columnFamilyNames {
+	for index, _ := range allCFs {
 		cfOpts[index] = grocksdb.NewDefaultOptions()
 		defer cfOpts[index].Destroy()
 	}
 
-	db, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, columnFamilyNames, cfOpts)
+	db, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, allCFs, cfOpts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error opening database: %v", err)
 	}
-	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
-	for index, name := range columnFamilyNames {
+	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(allCFs))
+	for index, name := range allCFs {
 		ColumnFamilyHandles[name] = cfHs[index]
 	}
 

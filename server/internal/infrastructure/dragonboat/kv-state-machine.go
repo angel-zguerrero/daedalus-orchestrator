@@ -1,7 +1,6 @@
 package dragonboat
 
 import (
-	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/binary"
 	"encoding/gob"
@@ -18,26 +17,34 @@ import (
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-type KVStateMachine struct {
-	clusterID   uint64
-	nodeID      uint64
-	lastApplied uint64
-	store       unsafe.Pointer // we will use db.KVStore
-	closed      bool
-	aborted     bool
-	mu          sync.RWMutex
+type KVRocksDBStateMachineImpl interface {
+	OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error)
+	Update(rocks_kv_store *db.RocksdbStore, ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]statemachine.Entry, error)
+	Lookup(rocks_kv_store *db.RocksdbStore, key LookupQuery) (interface{}, error)
 }
 
-func NewKVStateMachine(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
-	return &KVStateMachine{
-		clusterID: clusterID,
-		nodeID:    nodeID,
+type KVBaseRocksDBStateMachine struct {
+	clusterID        uint64
+	nodeID           uint64
+	lastApplied      uint64
+	store            unsafe.Pointer // we will use db.KVStore
+	closed           bool
+	aborted          bool
+	mu               sync.RWMutex
+	stateMachineImpl KVRocksDBStateMachineImpl
+}
+
+func NewKVStateMachine(clusterID uint64, nodeID uint64, stateMachineImpl KVRocksDBStateMachineImpl) statemachine.IOnDiskStateMachine {
+	return &KVBaseRocksDBStateMachine{
+		clusterID:        clusterID,
+		nodeID:           nodeID,
+		stateMachineImpl: stateMachineImpl,
 	}
 }
-func (s *KVStateMachine) GetLastApplied() uint64 {
+func (s *KVBaseRocksDBStateMachine) GetLastApplied() uint64 {
 	return s.lastApplied
 }
-func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
+func (s *KVBaseRocksDBStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 	dir, err := getNodeDBDirName(s.clusterID, s.nodeID)
 	if err != nil {
 		panic(err)
@@ -69,7 +76,7 @@ func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 			return 0, err
 		}
 	}
-	rocks_db, columnFamilyHandles, err := db.OpenDB(dbdir)
+	rocks_db, columnFamilyHandles, err := db.OpenMasterDB(dbdir)
 	if err != nil {
 		return 0, err
 	}
@@ -86,7 +93,7 @@ func (s *KVStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 	return appliedIndex, nil
 }
 
-func (s *KVStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uint64, error) {
+func (s *KVBaseRocksDBStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uint64, error) {
 	result, err := rocks_kv_store.Get(db.MetaFC, AppliedIndexKey)
 	if err != nil {
 		return 0, err
@@ -98,7 +105,7 @@ func (s *KVStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uin
 	return binary.LittleEndian.Uint64(result), nil
 }
 
-func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
+func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
 	if s.aborted {
 		panic("update() called after abort set to true")
 	}
@@ -112,90 +119,12 @@ func (s *KVStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry
 	defer s.mu.Unlock()
 
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
-
-	var dllFCEntries []int
-	var rwEntries []int
-
-	commands := make([]Command, len(ents))
-	for i, ent := range ents {
-		var cmd Command
-		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
-			return nil, err
-		}
-		commands[i] = cmd
-
-		switch cmd.Type {
-		case DLL_FC:
-			dllFCEntries = append(dllFCEntries, i)
-		case RW:
-			rwEntries = append(rwEntries, i)
-		default:
-			return nil, fmt.Errorf("unknown command type: %v", cmd.Type)
-		}
-	}
-
-	for _, idx := range dllFCEntries {
-		cmd := commands[idx]
-		ddlCmd, ok := cmd.CMD.(DDL_Command)
-		if !ok {
-			return nil, fmt.Errorf("expected DDL_Command for DLL type, got %T", cmd.CMD)
-		}
-		switch ddlCmd.Op {
-		case Add_CF_Op:
-			cfName := ddlCmd.ColumnFamilyName
-			if cfName == "" {
-				return nil, fmt.Errorf("the family column name cannot be empty")
-			}
-
-			if _, exists := rocks_kv_store.ColumnFamilyHandles[cfName]; !exists {
-				opts := grocksdb.NewDefaultOptions()
-				defer opts.Destroy()
-
-				cfh, err := rocks_kv_store.DB.CreateColumnFamily(opts, cfName)
-				if err != nil {
-					return nil, fmt.Errorf("error creando CF %s: %w", cfName, err)
-				}
-				rocks_kv_store.ColumnFamilyHandles[cfName] = cfh
-			}
-		case Remove_CF_Op:
-			cfh := rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %T to Drop process", ddlCmd.ColumnFamilyName)
-			}
-			err := rocks_kv_store.DB.DropColumnFamily(cfh)
-			if err != nil {
-				return nil, err
-			}
-			cfh.Destroy()
-		}
-		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
-	}
-
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
-	for _, idx := range rwEntries {
-		cmd := commands[idx]
-		rwCmd, ok := cmd.CMD.(RWK_Command)
-		if !ok {
-			return nil, fmt.Errorf("expected RWK_Command for RW type, got %T", cmd.CMD)
-		}
-		switch rwCmd.Op {
-		case PutOp:
-			cfh := rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found: %s", rwCmd.ColumnFamilyName)
-			}
-			batch.PutCF(cfh, []byte(rwCmd.Key), rwCmd.Value)
-		case DeleteOp:
-			cfh := rocks_kv_store.ColumnFamilyHandles[rwCmd.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %s", rwCmd.ColumnFamilyName)
-			}
-			batch.DeleteCF(cfh, []byte(rwCmd.Key))
-		default:
-			return nil, fmt.Errorf("unknown RW Operation: %v", rwCmd.Op)
-		}
-		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
+	ents, err := s.stateMachineImpl.Update(rocks_kv_store, ents, batch)
+
+	if err != nil {
+		return nil, err
 	}
 
 	appliedIndex := make([]byte, 8)
@@ -218,7 +147,7 @@ type LookupQuery struct {
 	ColumnFamilyName string
 }
 
-func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
+func (s *KVBaseRocksDBStateMachine) Lookup(key interface{}) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
@@ -229,7 +158,7 @@ func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("expected key to be string, got %T", key)
 		}
 
-		data, err := rocks_kv_store.Get(lookupQuery.ColumnFamilyName, lookupQuery.Key)
+		data, err := s.stateMachineImpl.Lookup(rocks_kv_store, lookupQuery)
 
 		if err == nil && s.closed {
 			panic("lookup returned valid result when DiskKV is already closed")
@@ -243,16 +172,16 @@ func (s *KVStateMachine) Lookup(key interface{}) (interface{}, error) {
 	return nil, errors.New("db closed")
 }
 
-func (s *KVStateMachine) Sync() error {
+func (s *KVBaseRocksDBStateMachine) Sync() error {
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	return rocks_kv_store.Flush()
 }
 
-func (s *KVStateMachine) PrepareSnapshot() (interface{}, error) {
+func (s *KVBaseRocksDBStateMachine) PrepareSnapshot() (interface{}, error) {
 	return nil, nil
 }
 
-func (s *KVStateMachine) SaveSnapshot(
+func (s *KVBaseRocksDBStateMachine) SaveSnapshot(
 	ctx interface{},
 	w io.Writer,
 	done <-chan struct{},
@@ -294,7 +223,7 @@ func (s *KVStateMachine) SaveSnapshot(
 	return nil
 }
 
-func (s *KVStateMachine) RecoverFromSnapshot(
+func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 	r io.Reader,
 	done <-chan struct{},
 ) error {
@@ -309,7 +238,7 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 	dbdir := getNewRandomDBDirName(dir)
 	oldDirName, err := getCurrentDBDirName(dir)
 
-	rocks_db, columnFamilyHandles, err := db.OpenDB(dbdir)
+	rocks_db, columnFamilyHandles, err := db.OpenMasterDB(dbdir)
 	if err != nil {
 		return err
 	}
@@ -372,7 +301,7 @@ func (s *KVStateMachine) RecoverFromSnapshot(
 	return syncDir(parent)
 }
 
-func (s *KVStateMachine) Close() error {
+func (s *KVBaseRocksDBStateMachine) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))

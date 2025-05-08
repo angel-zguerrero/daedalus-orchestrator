@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupKV(t *testing.T) *dragonboat.KVStateMachine {
+func setupKV(t *testing.T) *dragonboat.KVBaseRocksDBStateMachine {
 	t.Helper()
-	kv := dragonboat.NewKVStateMachine(1, 1).(*dragonboat.KVStateMachine)
+	kv := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewKVStateMachine(1, 1).(*dragonboat.KVStateMachine)
+	kv2 := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)

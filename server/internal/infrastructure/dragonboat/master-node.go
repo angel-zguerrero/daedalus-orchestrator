@@ -22,7 +22,7 @@ func Init(ShardID uint64, ReplicaID uint64, port string) {
 	}
 
 	stateMachine := func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
-		return NewKVStateMachine(clusterID, nodeID)
+		return NewMasterKVRocksDBStateMachine(clusterID, nodeID)
 	}
 
 	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()

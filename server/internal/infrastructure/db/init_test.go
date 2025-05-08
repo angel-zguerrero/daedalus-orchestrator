@@ -26,7 +26,7 @@ func TestInitDB_CreatesDBAtCorrectPath(t *testing.T) {
 	provider := FakePathProvider{Path: tmp}
 
 	dbPath := filepath.Join(tmp, "mydb")
-	db, _, err := db.InitDB("mydb", provider)
+	db, _, err := db.InitDB("mydb", provider, []string{db.AdminFC, db.MetaFC})
 
 	assert.NoError(t, err)
 	assert.NotNil(t, db)

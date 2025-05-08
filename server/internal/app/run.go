@@ -1,7 +1,6 @@
 package app
 
 import (
-	"deadalus-orch/server/internal/infrastructure/db"
 	server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
@@ -68,28 +67,28 @@ func Run() {
 			Msgf("❌ Failed loading configuration")
 	}
 
-	// Database run
-	dbConn, columnFamilyHandles, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
-	if err != nil {
+	/*
+		dbConn, columnFamilyHandles, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
+		if err != nil {
 
-		log.Fatal().
-			Err(err).
-			Str("package", "app").
-			Str("func", "Run").
-			Msgf("❌ Failed to init DB")
-	}
+			log.Fatal().
+				Err(err).
+				Str("package", "app").
+				Str("func", "Run").
+				Msgf("❌ Failed to init DB")
+		}
 
-	defer dbConn.Close()
+		defer dbConn.Close()
 
-	rocksdbStore := &db.RocksdbStore{DB: dbConn, ColumnFamilyHandles: columnFamilyHandles}
-	if err := db.BootstrapRootUser(rocksdbStore, *configMap); err != nil {
-		log.Fatal().
-			Err(err).
-			Str("package", "app").
-			Str("func", "Run").
-			Msgf("❌ Bootstrap failed")
-	}
-
+		rocksdbStore := &db.RocksdbStore{DB: dbConn, ColumnFamilyHandles: columnFamilyHandles}
+		if err := db.BootstrapRootUser(rocksdbStore, *configMap); err != nil {
+			log.Fatal().
+				Err(err).
+				Str("package", "app").
+				Str("func", "Run").
+				Msgf("❌ Bootstrap failed")
+		}
+	*/
 	err = server.StartGRPC(
 		*configMap,
 		server.DefaultListener,
