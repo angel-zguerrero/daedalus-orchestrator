@@ -307,3 +307,33 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 }
+
+func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Read,
+			CMD: dragonboat.RK_Command{
+				Key:              "foo",
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.GetOp,
+			},
+		},
+	}
+
+	err := gob.NewEncoder(&buf).Encode(cmd)
+	require.NoError(t, err)
+
+	entry := statemachine.Entry{
+		Cmd:   buf.Bytes(),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	result, err := kv.Update([]statemachine.Entry{entry})
+	require.Error(t, err)
+	require.Nil(t, result)
+}

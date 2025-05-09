@@ -182,6 +182,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 		}
 		switch rwCmd.Op {
 		case Read:
+			return nil, fmt.Errorf("Invalid read operation: %T", cmd.CMD)
 		case Write:
 			wCmd, ok := rwCmd.CMD.(WK_Command)
 			if !ok {
