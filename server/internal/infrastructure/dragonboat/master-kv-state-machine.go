@@ -12,7 +12,7 @@ import (
 type MasterKVBaseRocksDBStateMachine struct {
 }
 
-func (r *MasterKVBaseRocksDBStateMachine) OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error) {
+func (r *MasterKVBaseRocksDBStateMachine) OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error) {
 	return db.OpenMasterDB(dbPath)
 }
 

@@ -12,7 +12,7 @@ import (
 type TenantKVBaseRocksDBStateMachine struct {
 }
 
-func (r *TenantKVBaseRocksDBStateMachine) OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error) {
+func (r *TenantKVBaseRocksDBStateMachine) OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error) {
 	return db.OpenTenantDB(dbPath)
 }
 

@@ -309,7 +309,7 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 }
 
 func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
-	kv := setupKV(t)
+	kv := setupTenantKV(t)
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -336,4 +336,129 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	result, err := kv.Update([]statemachine.Entry{entry})
 	require.Error(t, err)
 	require.Nil(t, result)
+}
+func TestTenantUpdate_PutWithTTL(t *testing.T) {
+	kv := setupTenantKV(t)
+	defer kv.Close()
+
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "ttl_key",
+				Value:            []byte("ttl_value"),
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              5,
+				Op:               dragonboat.PutOpTTL,
+			},
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
+
+	entry := statemachine.Entry{
+		Cmd:   buf.Bytes(),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	_, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+}
+func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
+	kv := setupTenantKV(t)
+	defer kv.Close()
+	{
+		var buf bytes.Buffer
+		cmd := dragonboat.Command{
+			Type: dragonboat.DLL_FC,
+			CMD: dragonboat.DDL_Command{
+
+				ColumnFamilyName: "to_delete_cf",
+				Op:               dragonboat.Add_TTL_CF_Op,
+			},
+		}
+		err := gob.NewEncoder(&buf).Encode(cmd)
+		require.NoError(t, err)
+
+		entry := statemachine.Entry{
+			Cmd:   buf.Bytes(),
+			Index: kv.GetLastApplied() + 1,
+		}
+
+		_, err = kv.Update([]statemachine.Entry{entry})
+		require.NoError(t, err)
+	}
+
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.DLL_FC,
+		CMD: dragonboat.DDL_Command{
+			ColumnFamilyName: "to_delete_cf",
+			Op:               dragonboat.Remove_TTL_CF_Op,
+		},
+	}
+	err := gob.NewEncoder(&buf).Encode(cmd)
+	require.NoError(t, err)
+
+	entry := statemachine.Entry{
+		Cmd:   buf.Bytes(),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	result, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+}
+
+func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
+	kv := setupTenantKV(t)
+	defer kv.Close()
+
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "ttl_key",
+				Value:            []byte("ttl_value"),
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              5,
+				Op:               dragonboat.PutOpTTL,
+			},
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
+
+	entry := statemachine.Entry{
+		Cmd:   buf.Bytes(),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	_, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+
+	var bufDel bytes.Buffer
+	cmd = dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "ttl_key",
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              5,
+				Op:               dragonboat.DeleteOpTTL,
+			},
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&bufDel).Encode(cmd))
+
+	entry = statemachine.Entry{
+		Cmd:   bufDel.Bytes(),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	_, err = kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
 }

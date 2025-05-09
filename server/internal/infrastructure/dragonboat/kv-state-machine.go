@@ -18,7 +18,7 @@ import (
 )
 
 type KVRocksDBStateMachineImpl interface {
-	OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, error)
+	OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error)
 	Update(rocks_kv_store *db.RocksdbStore, ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error)
 	Lookup(rocks_kv_store *db.RocksdbStore, key LookupQuery) (interface{}, error)
 }
@@ -76,13 +76,14 @@ func (s *KVBaseRocksDBStateMachine) Open(stopc <-chan struct{}) (uint64, error) 
 			return 0, err
 		}
 	}
-	rocks_db, columnFamilyHandles, err := db.OpenMasterDB(dbdir)
+	rocks_db, columnFamilyHandles, ttlColumnFamilyHandles, err := db.OpenMasterDB(dbdir)
 	if err != nil {
 		return 0, err
 	}
 	store := &db.RocksdbStore{
-		DB:                  rocks_db,
-		ColumnFamilyHandles: columnFamilyHandles,
+		DB:                     rocks_db,
+		ColumnFamilyHandles:    columnFamilyHandles,
+		TTLColumnFamilyHandles: ttlColumnFamilyHandles,
 	}
 	atomic.SwapPointer(&s.store, unsafe.Pointer(store))
 	appliedIndex, err := s.queryAppliedIndex(store)
@@ -160,8 +161,34 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 				}
 				rocks_kv_store.ColumnFamilyHandles[cfName] = cfh
 			}
+		case Add_TTL_CF_Op:
+			cfName := ddlCmd.ColumnFamilyName
+			if cfName == "" {
+				return nil, fmt.Errorf("the family column name cannot be empty")
+			}
+
+			if _, exists := rocks_kv_store.TTLColumnFamilyHandles[cfName]; !exists {
+				opts := grocksdb.NewDefaultOptions()
+				defer opts.Destroy()
+
+				cfh, err := rocks_kv_store.DB.CreateColumnFamily(opts, cfName)
+				if err != nil {
+					return nil, fmt.Errorf("error creando CF %s: %w", cfName, err)
+				}
+				rocks_kv_store.TTLColumnFamilyHandles[cfName] = cfh
+			}
 		case Remove_CF_Op:
 			cfh := rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %T to Drop process", ddlCmd.ColumnFamilyName)
+			}
+			err := rocks_kv_store.DB.DropColumnFamily(cfh)
+			if err != nil {
+				return nil, err
+			}
+			cfh.Destroy()
+		case Remove_TTL_CF_Op:
+			cfh := rocks_kv_store.TTLColumnFamilyHandles[ddlCmd.ColumnFamilyName]
 			if cfh == nil {
 				return nil, fmt.Errorf("Column Family not found %T to Drop process", ddlCmd.ColumnFamilyName)
 			}
@@ -196,8 +223,20 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
 				}
 				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
+			case PutOpTTL:
+				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
+				if cfh == nil {
+					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
+				}
+				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
 			case DeleteOp:
 				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
+				if cfh == nil {
+					return nil, fmt.Errorf("Column Family not found %s", wCmd.ColumnFamilyName)
+				}
+				batch.DeleteCF(cfh, []byte(wCmd.Key))
+			case DeleteOpTTL:
+				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
 					return nil, fmt.Errorf("Column Family not found %s", wCmd.ColumnFamilyName)
 				}
@@ -327,13 +366,14 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 	dbdir := getNewRandomDBDirName(dir)
 	oldDirName, err := getCurrentDBDirName(dir)
 
-	rocks_db, columnFamilyHandles, err := db.OpenMasterDB(dbdir)
+	rocks_db, columnFamilyHandles, ttlColumnFamilyHandles, err := db.OpenMasterDB(dbdir)
 	if err != nil {
 		return err
 	}
 	rocks_db_store := &db.RocksdbStore{
-		DB:                  rocks_db,
-		ColumnFamilyHandles: columnFamilyHandles,
+		DB:                     rocks_db,
+		ColumnFamilyHandles:    columnFamilyHandles,
+		TTLColumnFamilyHandles: ttlColumnFamilyHandles,
 	}
 
 	dec := gob.NewDecoder(r)

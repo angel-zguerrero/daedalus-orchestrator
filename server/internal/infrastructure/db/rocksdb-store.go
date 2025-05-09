@@ -8,7 +8,8 @@ import (
 
 type RocksdbStore struct {
 	*grocksdb.DB
-	ColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle
+	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle
+	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle
 }
 
 func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {

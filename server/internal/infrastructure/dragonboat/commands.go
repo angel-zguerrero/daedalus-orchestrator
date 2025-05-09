@@ -24,6 +24,7 @@ const (
 	PutOp W_Type = iota
 	PutOpTTL
 	DeleteOp
+	DeleteOpTTL
 )
 
 const (
@@ -59,6 +60,8 @@ type DDL_FC_Type int
 const (
 	Add_CF_Op DDL_FC_Type = iota
 	Remove_CF_Op
+	Add_TTL_CF_Op
+	Remove_TTL_CF_Op
 )
 
 type DDL_Command struct {
