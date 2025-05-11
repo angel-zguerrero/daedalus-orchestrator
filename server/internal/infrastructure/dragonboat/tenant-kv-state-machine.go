@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/gob"
+	"fmt"
 
 	"github.com/linxGnu/grocksdb"
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -16,11 +17,16 @@ func (r *TenantKVBaseRocksDBStateMachine) OpenDB(dbPath string) (*grocksdb.DB, m
 	return db.OpenTenantDB(dbPath)
 }
 
-func (r *TenantKVBaseRocksDBStateMachine) Lookup(rocks_kv_store *db.RocksdbStore, lookupQuery LookupQuery) (interface{}, error) {
-	return rocks_kv_store.Get(lookupQuery.ColumnFamilyName, lookupQuery.Key)
+func (r *TenantKVBaseRocksDBStateMachine) Lookup(query interface{}) (RK_Command, error) {
+	lookupQuery, ok := query.(RK_Command)
+	if !ok {
+		return RK_Command{}, fmt.Errorf("expected key to be string, got %T", query)
+	}
+
+	return lookupQuery, nil
 }
 
-func (r *TenantKVBaseRocksDBStateMachine) Update(rocks_kv_store *db.RocksdbStore, ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error) {
+func (r *TenantKVBaseRocksDBStateMachine) Update(ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error) {
 	commands := make([]Command, len(ents))
 
 	for i, ent := range ents {

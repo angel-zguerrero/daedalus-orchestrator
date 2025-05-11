@@ -15,7 +15,10 @@ type RocksdbStore struct {
 func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	cf, ok := r.ColumnFamilyHandles[columnFamily]
 	if !ok {
-		return nil, fmt.Errorf("column family %s not found", columnFamily)
+		cf, ok = r.TTLColumnFamilyHandles[columnFamily]
+		if !ok {
+			return nil, fmt.Errorf("column family %s not found", columnFamily)
+		}
 	}
 	r.DB.GetColumnFamilyMetadata()
 	ro := grocksdb.NewDefaultReadOptions()
@@ -35,7 +38,10 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {
 	cf, ok := r.ColumnFamilyHandles[columnFamily]
 	if !ok {
-		return fmt.Errorf("column family %s not found", columnFamily)
+		cf, ok = r.TTLColumnFamilyHandles[columnFamily]
+		if !ok {
+			return fmt.Errorf("column family %s not found", columnFamily)
+		}
 	}
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
@@ -54,26 +60,42 @@ func (r *RocksdbStore) Write(batch interface{}) error {
 }
 
 func (r *RocksdbStore) DumpAll() (interface{}, error) {
-
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
-	result := make(map[string][]byte)
 
-	it := r.DB.NewIterator(ro)
-	defer it.Close()
+	result := make(map[string]map[string][]byte)
 
-	for it.SeekToFirst(); it.Valid(); it.Next() {
-		key := it.Key()
-		value := it.Value()
+	allCFs := map[string]*grocksdb.ColumnFamilyHandle{}
 
-		result[string(key.Data())] = append([]byte(nil), value.Data()...)
-
-		key.Free()
-		value.Free()
+	for name, handle := range r.ColumnFamilyHandles {
+		allCFs[name] = handle
+	}
+	for name, handle := range r.TTLColumnFamilyHandles {
+		if _, exists := allCFs[name]; !exists {
+			allCFs[name] = handle
+		}
 	}
 
-	if err := it.Err(); err != nil {
-		return nil, fmt.Errorf("iterator error: %w", err)
+	for cfName, cfHandle := range allCFs {
+		cfResult := make(map[string][]byte)
+		it := r.DB.NewIteratorCF(ro, cfHandle)
+		defer it.Close()
+
+		for it.SeekToFirst(); it.Valid(); it.Next() {
+			key := it.Key()
+			value := it.Value()
+
+			cfResult[string(key.Data())] = append([]byte(nil), value.Data()...)
+
+			key.Free()
+			value.Free()
+		}
+
+		if err := it.Err(); err != nil {
+			return nil, fmt.Errorf("iterator error in CF %s: %w", cfName, err)
+		}
+
+		result[cfName] = cfResult
 	}
 
 	return result, nil
@@ -83,7 +105,18 @@ func (r *RocksdbStore) Iterate(fn func(cfName string, key, value []byte) error) 
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
 
-	for cfName, cfHandle := range r.ColumnFamilyHandles {
+	allCFs := map[string]*grocksdb.ColumnFamilyHandle{}
+
+	for name, handle := range r.ColumnFamilyHandles {
+		allCFs[name] = handle
+	}
+	for name, handle := range r.TTLColumnFamilyHandles {
+		if _, exists := allCFs[name]; !exists {
+			allCFs[name] = handle
+		}
+	}
+
+	for cfName, cfHandle := range allCFs {
 		it := r.DB.NewIteratorCF(ro, cfHandle)
 		defer it.Close()
 
@@ -110,44 +143,83 @@ func (r *RocksdbStore) Iterate(fn func(cfName string, key, value []byte) error) 
 }
 
 func (r *RocksdbStore) ClearAll() error {
+	// Combinamos ColumnFamilyHandles y TTLColumnFamilyHandles en un solo mapa
+	allCFs := map[string]*grocksdb.ColumnFamilyHandle{}
 
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
+	// Añadimos las ColumnFamilyHandles
+	for name, handle := range r.ColumnFamilyHandles {
+		allCFs[name] = handle
+	}
 
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
-
-	it := r.DB.NewIterator(ro)
-	defer it.Close()
-
-	for it.SeekToFirst(); it.Valid(); it.Next() {
-		key := it.Key()
-		err := r.DB.Delete(wo, key.Data())
-		key.Free()
-		if err != nil {
-			return fmt.Errorf("failed to delete key: %w", err)
+	// Añadimos las TTLColumnFamilyHandles, sin duplicados
+	for name, handle := range r.TTLColumnFamilyHandles {
+		if _, exists := allCFs[name]; !exists {
+			allCFs[name] = handle
 		}
 	}
 
-	if err := it.Err(); err != nil {
-		return fmt.Errorf("iterator error: %w", err)
+	// Iteramos sobre todas las ColumnFamilyHandles combinadas
+	for _, cf := range allCFs {
+		ro := grocksdb.NewDefaultReadOptions()
+		defer ro.Destroy()
+
+		wo := grocksdb.NewDefaultWriteOptions()
+		defer wo.Destroy()
+
+		it := r.DB.NewIteratorCF(ro, cf)
+		defer it.Close()
+
+		// Eliminamos las claves de esta columna
+		for it.SeekToFirst(); it.Valid(); it.Next() {
+			key := it.Key()
+			err := r.DB.DeleteCF(wo, cf, key.Data())
+			key.Free()
+			if err != nil {
+				return fmt.Errorf("failed to delete key from column family: %w", err)
+			}
+		}
+
+		// Verificamos si hubo algún error durante la iteración
+		if err := it.Err(); err != nil {
+			return fmt.Errorf("iterator error: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func (r *RocksdbStore) Flush() error {
-
 	fo := grocksdb.NewDefaultFlushOptions()
 	defer fo.Destroy()
 	fo.SetWait(true)
 
+	allCFs := map[string]*grocksdb.ColumnFamilyHandle{}
+
+	for name, handle := range r.ColumnFamilyHandles {
+		allCFs[name] = handle
+	}
+
+	for name, handle := range r.TTLColumnFamilyHandles {
+		if _, exists := allCFs[name]; !exists {
+			allCFs[name] = handle
+		}
+	}
+
+	for _, cf := range allCFs {
+		err := r.DB.FlushCF(cf, fo)
+		if err != nil {
+			return fmt.Errorf("failed to flush column family: %w", err)
+		}
+	}
+
 	err := r.DB.Flush(fo)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to flush: %w", err)
 	}
+
 	return r.DB.FlushWAL(true)
 }
+
 func (r *RocksdbStore) Close() error {
 	r.DB.Close()
 	return nil

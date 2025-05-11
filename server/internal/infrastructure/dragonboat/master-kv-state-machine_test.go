@@ -108,7 +108,7 @@ func TestLookup_ExistingKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	query := dragonboat.LookupQuery{
+	query := dragonboat.RK_Command{
 		Key:              "lookup_key",
 		ColumnFamilyName: db.DefaultFC,
 	}
@@ -122,7 +122,7 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
-	query := dragonboat.LookupQuery{
+	query := dragonboat.RK_Command{
 		Key:              "missing_key",
 		ColumnFamilyName: db.DefaultFC,
 	}
@@ -188,7 +188,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	query := dragonboat.LookupQuery{
+	query := dragonboat.RK_Command{
 		Key:              "snap_key",
 		ColumnFamilyName: db.DefaultFC,
 	}
@@ -198,7 +198,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	query = dragonboat.LookupQuery{
+	query = dragonboat.RK_Command{
 		Key:              dragonboat.AppliedIndexKey,
 		ColumnFamilyName: db.MetaFC,
 	}

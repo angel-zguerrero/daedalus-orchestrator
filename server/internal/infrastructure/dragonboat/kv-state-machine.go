@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,8 +21,8 @@ import (
 
 type KVRocksDBStateMachineImpl interface {
 	OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error)
-	Update(rocks_kv_store *db.RocksdbStore, ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error)
-	Lookup(rocks_kv_store *db.RocksdbStore, key LookupQuery) (interface{}, error)
+	Update(ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error)
+	Lookup(key interface{}) (RK_Command, error)
 }
 
 type KVBaseRocksDBStateMachine struct {
@@ -123,7 +124,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
-	commands, err := s.stateMachineImpl.Update(rocks_kv_store, ents, batch)
+	commands, err := s.stateMachineImpl.Update(ents, batch)
 
 	var dllFCEntries []int
 	var rwEntries []int
@@ -225,15 +226,37 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 				}
 				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
 			case PutOpTTL:
+				fmt.Println("rocks_kv_store.TTLColumnFamilyHandles")
+				fmt.Println(rocks_kv_store.TTLColumnFamilyHandles)
 				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
-					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
+					return nil, fmt.Errorf("Column Family not found2222: %s", wCmd.ColumnFamilyName)
 				}
+
 				ttlMillis := time.Now().Add(time.Duration(wCmd.TTL) * time.Second).UnixMilli()
 
-				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
-				indexKey := fmt.Sprintf("ttls::%020d::%s", ttlMillis, wCmd.Key)
-				batch.PutCF(cfh, []byte(indexKey), nil)
+				ttlRealKey := fmt.Sprintf("%s%s", prefixData, wCmd.Key)
+				ttlExpireIndexKey := fmt.Sprintf("%s%s", prefixTTLExpire, wCmd.Key)
+
+				oldTTLBytes, err := rocks_kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
+				if err != nil {
+					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
+				}
+				if oldTTLBytes != nil {
+					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+					if err == nil {
+						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, oldTTLMillis, wCmd.Key)
+						batch.DeleteCF(cfh, []byte(oldTTLIndexKey))
+					}
+				}
+
+				batch.PutCF(cfh, []byte(ttlRealKey), wCmd.Value)
+
+				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, ttlMillis, wCmd.Key)
+				batch.PutCF(cfh, []byte(newTTLIndexKey), nil)
+
+				batch.PutCF(cfh, []byte(ttlExpireIndexKey), []byte(strconv.FormatInt(ttlMillis, 10)))
+
 			case DeleteOp:
 				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
@@ -275,28 +298,56 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	return ents, nil
 }
 
-type LookupQuery struct {
-	Key              string
-	ColumnFamilyName string
-}
-
-func (s *KVBaseRocksDBStateMachine) Lookup(key interface{}) (interface{}, error) {
+func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
 	if rocks_kv_store != nil {
 
-		lookupQuery, ok := key.(LookupQuery)
-		if !ok {
-			return nil, fmt.Errorf("expected key to be string, got %T", key)
-		}
-
-		data, err := s.stateMachineImpl.Lookup(rocks_kv_store, lookupQuery)
+		query, err := s.stateMachineImpl.Lookup(query)
 
 		if err == nil && s.closed {
-			panic("lookup returned valid result when DiskKV is already closed")
+			return nil, errors.New("lookup returned valid result when DiskKV is already closed")
+		}
+		var data []byte
+		switch query.Op {
+
+		case GetOp:
+			cfh := rocks_kv_store.ColumnFamilyHandles[query.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
+			}
+			data, err = rocks_kv_store.Get(query.ColumnFamilyName, query.Key)
+		case GetOpTTL:
+			cfh := rocks_kv_store.TTLColumnFamilyHandles[query.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
+			}
+			expireKey := fmt.Sprintf("%s%s", prefixTTLExpire, query.Key)
+			expireBytes, err := rocks_kv_store.Get(query.ColumnFamilyName, expireKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read expire key: %w", err)
+			}
+			if len(expireBytes) == 0 {
+				return nil, fmt.Errorf("key not found or expired")
+			}
+
+			expireAt, err := strconv.ParseInt(string(expireBytes), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid expire timestamp: %w", err)
+			}
+
+			if time.Now().UnixMilli() > expireAt {
+				return nil, nil
+			}
+
+			dataKey := fmt.Sprintf("%s%s", prefixData, query.Key)
+			data, err = rocks_kv_store.Get(query.ColumnFamilyName, dataKey)
 		}
 
+		if err != nil {
+			return nil, err
+		}
 		if data != nil {
 			return data, err
 		}

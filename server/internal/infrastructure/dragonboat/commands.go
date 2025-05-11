@@ -29,7 +29,7 @@ const (
 
 const (
 	GetOp R_Type = iota
-	GetTTL
+	GetOpTTL
 )
 
 type WK_Command struct {

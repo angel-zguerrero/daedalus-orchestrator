@@ -5,3 +5,9 @@ const (
 	CurrentDBFilename  string = "current"
 	UpdatingDBFilename string = "current.updating"
 )
+
+const (
+	prefixData      = "data:"
+	prefixTTLIndex  = "ttl-index:"
+	prefixTTLExpire = "ttl-expire:"
+)
