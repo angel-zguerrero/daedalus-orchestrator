@@ -43,7 +43,7 @@ type WK_Command struct {
 type RK_Command struct {
 	Key              string
 	ColumnFamilyName string
-	TTL              int
+	TTL              int64
 	Op               R_Type
 }
 

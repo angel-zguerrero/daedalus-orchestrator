@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/linxGnu/grocksdb"
@@ -228,7 +229,11 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 				if cfh == nil {
 					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
 				}
+				ttlMillis := time.Now().Add(time.Duration(wCmd.TTL) * time.Second).UnixMilli()
+
 				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
+				indexKey := fmt.Sprintf("ttls::%020d::%s", ttlMillis, wCmd.Key)
+				batch.PutCF(cfh, []byte(indexKey), nil)
 			case DeleteOp:
 				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
