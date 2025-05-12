@@ -226,8 +226,6 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 				}
 				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
 			case PutOpTTL:
-				fmt.Println("rocks_kv_store.TTLColumnFamilyHandles")
-				fmt.Println(rocks_kv_store.TTLColumnFamilyHandles)
 				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
 					return nil, fmt.Errorf("Column Family not found2222: %s", wCmd.ColumnFamilyName)
@@ -266,9 +264,26 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 			case DeleteOpTTL:
 				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
-					return nil, fmt.Errorf("Column Family not found %s", wCmd.ColumnFamilyName)
+					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
 				}
-				batch.DeleteCF(cfh, []byte(wCmd.Key))
+
+				ttlExpireIndexKey := fmt.Sprintf("%s%s", prefixTTLExpire, wCmd.Key)
+				oldTTLBytes, err := rocks_kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
+				if err != nil {
+					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
+				}
+
+				if oldTTLBytes != nil {
+					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+					if err == nil {
+						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, oldTTLMillis, wCmd.Key)
+						batch.DeleteCF(cfh, []byte(oldTTLIndexKey))
+					}
+				}
+
+				ttlRealKey := fmt.Sprintf("%s%s", prefixData, wCmd.Key)
+				batch.DeleteCF(cfh, []byte(ttlRealKey))
+				batch.DeleteCF(cfh, []byte(ttlExpireIndexKey))
 			default:
 				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
 
@@ -329,7 +344,7 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 				return nil, fmt.Errorf("failed to read expire key: %w", err)
 			}
 			if len(expireBytes) == 0 {
-				return nil, fmt.Errorf("key not found or expired")
+				return nil, nil
 			}
 
 			expireAt, err := strconv.ParseInt(string(expireBytes), 10, 64)

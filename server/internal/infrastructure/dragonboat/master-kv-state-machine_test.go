@@ -462,3 +462,128 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	_, err = kv.Update([]statemachine.Entry{entry})
 	require.NoError(t, err)
 }
+func TestPutTTLStoresWithExpiration(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "ttl_test_key",
+				Value:            []byte("ttl_test_value"),
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              10,
+				Op:               dragonboat.PutOpTTL,
+			},
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
+	entry := statemachine.Entry{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1}
+	_, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+
+	query := dragonboat.RK_Command{
+		Key:              "ttl_test_key",
+		ColumnFamilyName: db.MasterEventFC,
+		Op:               dragonboat.GetOpTTL,
+	}
+
+	val, err := kv.Lookup(query)
+	require.NoError(t, err)
+	require.Equal(t, []byte("ttl_test_value"), val)
+}
+
+func TestTTLExpirationRemovesKey(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	key := "expiring_key"
+
+	// Put TTL entry
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              key,
+				Value:            []byte("soon_gone"),
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              1,
+				Op:               dragonboat.PutOpTTL,
+			},
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
+	entry := statemachine.Entry{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1}
+	_, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
+
+	query := dragonboat.RK_Command{
+		Key:              key,
+		ColumnFamilyName: db.MasterEventFC,
+		Op:               dragonboat.GetOpTTL,
+	}
+	val, err := kv.Lookup(query)
+	require.NoError(t, err)
+	require.Nil(t, val)
+}
+
+func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	key := "delete_ttl_key"
+
+	// Insert with TTL
+	var bufPut bytes.Buffer
+	cmdPut := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              key,
+				Value:            []byte("value"),
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              60,
+				Op:               dragonboat.PutOpTTL,
+			},
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&bufPut).Encode(cmdPut))
+	entry := statemachine.Entry{Cmd: bufPut.Bytes(), Index: kv.GetLastApplied() + 1}
+	_, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+
+	// Delete it
+	var bufDel bytes.Buffer
+	cmdDel := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              key,
+				ColumnFamilyName: db.MasterEventFC,
+				Op:               dragonboat.DeleteOpTTL,
+			},
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&bufDel).Encode(cmdDel))
+	entry = statemachine.Entry{Cmd: bufDel.Bytes(), Index: kv.GetLastApplied() + 1}
+	_, err = kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+
+	query := dragonboat.RK_Command{
+		Key:              key,
+		ColumnFamilyName: db.MasterEventFC,
+		Op:               dragonboat.GetOpTTL,
+	}
+	val, err := kv.Lookup(query)
+	require.NoError(t, err)
+	require.Nil(t, val)
+}
