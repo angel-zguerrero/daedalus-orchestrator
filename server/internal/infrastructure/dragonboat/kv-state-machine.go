@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -128,6 +129,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 
 	var dllFCEntries []int
 	var rwEntries []int
+	var mclEntries []int
 
 	for i, cmd := range commands {
 		switch cmd.Type {
@@ -135,6 +137,8 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 			dllFCEntries = append(dllFCEntries, i)
 		case RW:
 			rwEntries = append(rwEntries, i)
+		case MCL:
+			mclEntries = append(mclEntries, i)
 		default:
 			return nil, fmt.Errorf("unknown command type: %v", cmd.Type)
 		}
@@ -228,7 +232,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 			case PutOpTTL:
 				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
-					return nil, fmt.Errorf("Column Family not found2222: %s", wCmd.ColumnFamilyName)
+					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
 				}
 
 				ttlMillis := time.Now().Add(time.Duration(wCmd.TTL) * time.Second).UnixMilli()
@@ -294,6 +298,26 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 
+	for _, idx := range mclEntries {
+		cmd := commands[idx]
+		mlcCmd, ok := cmd.CMD.(MCLK_Command)
+		if !ok {
+			return nil, fmt.Errorf("expected MCLK_Command for RW type, got %T", cmd.CMD)
+		}
+		switch mlcCmd.Op {
+		case ClearExpiredTTL:
+			for name, handle := range rocks_kv_store.TTLColumnFamilyHandles {
+				err = cleanExpiredKeys(rocks_kv_store.DB, handle)
+				if err != nil {
+					return nil, fmt.Errorf("error cleaning expired keys for CF %s: %w", name, err)
+				}
+			}
+		default:
+			return nil, fmt.Errorf("unknown MCL Operation: %v", mlcCmd.Op)
+		}
+		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -311,6 +335,81 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	}
 	s.lastApplied = ents[len(ents)-1].Index
 	return ents, nil
+}
+
+func cleanExpiredKeys(db *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle) error {
+	const maxDeletions = 1000
+	var deleted int64
+
+	readOpts := grocksdb.NewDefaultReadOptions()
+	defer readOpts.Destroy()
+
+	writeOpts := grocksdb.NewDefaultWriteOptions()
+	defer writeOpts.Destroy()
+
+	batch := grocksdb.NewWriteBatch()
+	defer batch.Destroy()
+
+	it := db.NewIteratorCF(readOpts, cf)
+	defer it.Close()
+
+	nowMillis := time.Now().UnixMilli()
+	prefix := []byte(prefixTTLIndex)
+	fmt.Println("-------> prefixTTLIndex")
+	fmt.Println(prefixTTLIndex)
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		key := it.Key()
+		keyBytes := append([]byte(nil), key.Data()...)
+		key.Free()
+
+		keyStr := string(keyBytes)
+		fmt.Println("------>  keyStr")
+		fmt.Println(keyStr)
+		trimmed := strings.TrimPrefix(keyStr, prefixTTLIndex)
+		sepIdx := strings.IndexByte(trimmed, ':')
+		if sepIdx <= 0 || sepIdx >= len(trimmed)-1 {
+			continue
+		}
+
+		expireAtStr := trimmed[:sepIdx]
+		originalKey := trimmed[sepIdx+1:]
+
+		expireAt, err := strconv.ParseInt(expireAtStr, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		if expireAt > nowMillis {
+			break
+		}
+
+		dataKey := []byte(prefixData + originalKey)
+		expireRefKey := []byte(prefixTTLExpire + originalKey)
+
+		ro := grocksdb.NewDefaultReadOptions()
+		defer ro.Destroy()
+
+		batch.DeleteCF(cf, dataKey)
+		batch.DeleteCF(cf, expireRefKey)
+		batch.DeleteCF(cf, keyBytes)
+
+		deleted++
+		if deleted >= maxDeletions {
+			break
+		}
+	}
+
+	if err := it.Err(); err != nil {
+		return fmt.Errorf("iterator error: %w", err)
+	}
+
+	if deleted > 0 {
+		if err := db.Write(writeOpts, batch); err != nil {
+			return fmt.Errorf("failed to write batch for expired keys: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, error) {

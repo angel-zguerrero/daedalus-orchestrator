@@ -587,3 +587,65 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
+
+func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	key := "expiredKey"
+	value := []byte("some-value")
+
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              key,
+				Value:            value,
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              1,
+				Op:               dragonboat.PutOpTTL,
+			},
+		},
+	}
+	data := encodeCommand(t, cmd)
+
+	entry := statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
+
+	_, err := kv.Update([]statemachine.Entry{entry})
+	if err != nil {
+		t.Fatalf("failed to insert key with TTL: %v", err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	clearCmd := dragonboat.Command{
+		Type: dragonboat.MCL,
+		CMD: dragonboat.MCLK_Command{
+			Op: dragonboat.ClearExpiredTTL,
+		},
+	}
+	data = encodeCommand(t, clearCmd)
+	entry = statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
+	_, err = kv.Update([]statemachine.Entry{entry})
+	if err != nil {
+		t.Fatalf("failed to clear expired TTL entries: %v", err)
+	}
+
+	query := dragonboat.RK_Command{
+		Op:               dragonboat.GetOpTTL,
+		ColumnFamilyName: db.MasterEventFC,
+		Key:              key,
+	}
+	val, err := kv.Lookup(query)
+	require.NoError(t, err)
+	require.Nil(t, val)
+}
+func encodeCommand(t *testing.T, cmd dragonboat.Command) []byte {
+	var buf bytes.Buffer
+	err := gob.NewEncoder(&buf).Encode(cmd)
+	if err != nil {
+		t.Fatalf("failed to encode command: %v", err)
+	}
+	return buf.Bytes()
+}

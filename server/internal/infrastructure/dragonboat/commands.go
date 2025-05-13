@@ -8,12 +8,14 @@ func init() {
 	gob.Register(RK_Command{})
 	gob.Register(DDL_Command{})
 	gob.Register(RWK_Command{})
+	gob.Register(MCLK_Command{})
 }
 
 // ----BEGINNING RW Type ---- //
 type RW_Type int
 type W_Type int
 type R_Type int
+type MCL_Type int
 
 const (
 	Read RW_Type = iota
@@ -30,6 +32,10 @@ const (
 const (
 	GetOp R_Type = iota
 	GetOpTTL
+)
+
+const (
+	ClearExpiredTTL MCL_Type = iota
 )
 
 type WK_Command struct {
@@ -54,6 +60,14 @@ type RWK_Command struct {
 
 // ----END RW Type ---- //
 
+// ----            ---- //
+type MCLK_Command struct {
+	Op  MCL_Type
+	CMD any
+}
+
+// ---- END      --------//
+
 // ----BEGINNING DDL Type ---- //
 type DDL_FC_Type int
 
@@ -76,6 +90,7 @@ type Command_Type int
 const (
 	RW Command_Type = iota
 	DLL_FC
+	MCL // Maintenance Control Language
 )
 
 type Command struct {
