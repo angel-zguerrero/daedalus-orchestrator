@@ -5,10 +5,15 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"flag"
 	"log"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 )
 
 func main() {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	roleFlag := flag.String("role", "", "Comma-separated node roles: consensus, scheduler, connector")
 	membersFlag := flag.String("members", "", "Cluster members as ip:port,ip:port,...")
 	addr := flag.String("addr", "", "Nodehost address (ip:port)")
@@ -38,4 +43,5 @@ func main() {
 		return
 	}
 	app.Run(*replicaID, roles, selfMember, members)
+	<-stop
 }
