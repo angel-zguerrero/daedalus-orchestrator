@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"crypto/md5"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand/v2"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -156,4 +160,105 @@ func replaceCurrentDBFile(dir string) error {
 		return err
 	}
 	return syncDir(dir)
+}
+
+func ParseRolesFlag(roleSeparateComma *string) ([]string, error) {
+	var validRoles = map[string]bool{
+		string(RoleConsensus): true,
+		string(RoleScheduler): true,
+		string(RoleConnector): true,
+	}
+
+	if *roleSeparateComma == "" {
+		return []string{
+			string(RoleConsensus),
+			string(RoleScheduler),
+			string(RoleConnector),
+		}, nil
+	}
+
+	parts := strings.Split(*roleSeparateComma, ",")
+	roles := make([]string, 0, len(parts))
+	for _, r := range parts {
+		role := strings.TrimSpace(r)
+		if !validRoles[role] {
+			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, scheduler, connector", role)
+		}
+		roles = append(roles, role)
+	}
+
+	return roles, nil
+}
+
+func ParseMember(raw string) (Member, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return Member{}, errors.New("empty member entry")
+	}
+
+	host, portStr, err := net.SplitHostPort(raw)
+	if err != nil {
+		return Member{}, fmt.Errorf("invalid member format '%s': %v", raw, err)
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return Member{}, fmt.Errorf("invalid IP address: %s", host)
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port <= 0 || port > 65535 {
+		return Member{}, fmt.Errorf("invalid port: %s", portStr)
+	}
+
+	return Member{
+		IP:   ip.String(),
+		Port: port,
+	}, nil
+}
+
+func ParseMembersFlag(membersFlag *string) ([]Member, error) {
+	if *membersFlag == "" {
+		return []Member{}, nil
+	}
+
+	rawParts := strings.Split(*membersFlag, ",")
+	members := make([]Member, 0, len(rawParts))
+
+	for _, raw := range rawParts {
+		member, err := ParseMember(raw)
+		if err != nil {
+			return nil, err
+		}
+		members = append(members, member)
+	}
+
+	return members, nil
+}
+
+func ToInitialMembers(members []Member) map[uint64]string {
+	initialMembers := make(map[uint64]string, len(members))
+	for i, m := range members {
+		nodeID := uint64(i + 1)
+		addr := MemmberToAddr(m)
+		initialMembers[nodeID] = addr
+	}
+	return initialMembers
+}
+
+func MemmberToAddr(member Member) string {
+	return fmt.Sprintf("%s:%d", member.IP, member.Port)
+}
+func GetLocalIP() (string, error) {
+	return "127.0.0.1", nil
+}
+
+func MergeUniqueMembers(self Member, others []Member) ([]Member, error) {
+	for _, m := range others {
+		if m.IP == self.IP && m.Port == self.Port {
+			return nil, fmt.Errorf("selfMember (%s:%d) already exists in otherMembers", self.IP, self.Port)
+		}
+	}
+	combined := append([]Member{self}, others...)
+	return combined, nil
 }

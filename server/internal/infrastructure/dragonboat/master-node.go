@@ -2,6 +2,7 @@ package dragonboat
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"fmt"
 	"strconv"
 
 	"github.com/lni/dragonboat/v4"
@@ -9,11 +10,11 @@ import (
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-func Init(ShardID uint64, ReplicaID uint64, port string) {
+func InitMasterNode(ReplicaID uint64, selfMember Member, otherMembers []Member) error {
 
 	cfg := config.Config{
 		ReplicaID:          ReplicaID,
-		ShardID:            ShardID,
+		ShardID:            MasterShardID,
 		CheckQuorum:        true,
 		ElectionRTT:        10,
 		HeartbeatRTT:       1,
@@ -27,22 +28,26 @@ func Init(ShardID uint64, ReplicaID uint64, port string) {
 
 	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	fmt.Println(base_path + "/wal/" + strconv.FormatUint(ReplicaID, 10) + "/" + strconv.Itoa(selfMember.Port))
 	nh, err := dragonboat.NewNodeHost(config.NodeHostConfig{
-		WALDir:         base_path + "/wal/" + strconv.FormatUint(ReplicaID, 10) + "/" + port,
-		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(ReplicaID, 10) + "/" + port,
+		WALDir:         base_path + "/wal/" + strconv.FormatUint(ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
 		RTTMillisecond: 200,
-		RaftAddress:    "localhost:" + port,
+		RaftAddress:    MemmberToAddr(selfMember),
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	initialMembers := map[uint64]string{
-		1: "localhost:3435",
-		2: "localhost:3436",
+	allMembers, err := MergeUniqueMembers(selfMember, otherMembers)
+	if err != nil {
+		return err
 	}
-	err = nh.StartOnDiskReplica(initialMembers, false, stateMachine, cfg)
-
+	initialMembers := ToInitialMembers(allMembers)
+	fmt.Println("initialMembers")
+	fmt.Println(initialMembers)
+	return nh.StartOnDiskReplica(initialMembers, false, stateMachine, cfg)
 }
