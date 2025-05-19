@@ -10,35 +10,41 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 )
 
+const TestFC = "test_fc"
+const DefaultFC = "default"
+
 func TestRocksdbStore_PutAndGet(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
 
-	rocks, err := grocksdb.OpenDb(opts, tmpDir)
+	goOp := grocksdb.NewDefaultOptions()
+
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
 	require.NoError(t, err)
 	defer rocks.Close()
 
-	store := &db.RocksdbStore{DB: rocks}
+	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
+	require.NoError(t, err)
 
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
+	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	for index, name := range columnFamilyNames {
+		ColumnFamilyHandles[name] = cfHs[index]
+	}
 
-	key := []byte("key")
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: ColumnFamilyHandles}
+
+	key := "key"
 	value := []byte("value")
 
-	err = store.Put(wo, key, value)
+	err = store.Put(TestFC, key, value)
 	require.NoError(t, err)
 
-	result, err := store.Get(ro, key)
+	result, err := store.Get(TestFC, key)
 	require.NoError(t, err)
-	defer result.Free()
-
-	assert.True(t, result.Exists())
-	assert.Equal(t, value, result.Data())
+	assert.Equal(t, value, result)
 }
 
 func TestRocksdbStore_Get_NotFound(t *testing.T) {
@@ -46,21 +52,27 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
 
-	rocks, err := grocksdb.OpenDb(opts, tmpDir)
+	goOp := grocksdb.NewDefaultOptions()
+
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
 	require.NoError(t, err)
 	defer rocks.Close()
 
-	store := &db.RocksdbStore{DB: rocks}
-
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
-
-	result, err := store.Get(ro, []byte("nonexistent"))
+	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
 	require.NoError(t, err)
-	defer result.Free()
 
-	assert.False(t, result.Exists())
+	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	for index, name := range columnFamilyNames {
+		ColumnFamilyHandles[name] = cfHs[index]
+	}
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: ColumnFamilyHandles}
+
+	result, err := store.Get(TestFC, "nonexistent")
+	require.NoError(t, err)
+	assert.Nil(t, result)
 }
 
 func TestRocksdbStore_WriteBatch(t *testing.T) {
@@ -68,38 +80,40 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
 
-	rocks, err := grocksdb.OpenDb(opts, tmpDir)
+	goOp := grocksdb.NewDefaultOptions()
+
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
 	require.NoError(t, err)
 	defer rocks.Close()
 
-	store := &db.RocksdbStore{DB: rocks}
+	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
+	require.NoError(t, err)
 
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
-	ro := grocksdb.NewDefaultReadOptions()
-	defer ro.Destroy()
+	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	for index, name := range columnFamilyNames {
+		ColumnFamilyHandles[name] = cfHs[index]
+	}
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: ColumnFamilyHandles}
 
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
 
-	batch.Put([]byte("a"), []byte("valueA"))
-	batch.Put([]byte("b"), []byte("valueB"))
+	batch.PutCF(ColumnFamilyHandles[TestFC], []byte("a"), []byte("valueA"))
+	batch.PutCF(ColumnFamilyHandles[TestFC], []byte("b"), []byte("valueB"))
 
-	err = store.Write(wo, batch)
+	err = store.Write(batch)
 	require.NoError(t, err)
 
 	// Verifica clave "a"
-	resultA, err := store.Get(ro, []byte("a"))
+	resultA, err := store.Get(TestFC, "a")
 	require.NoError(t, err)
-	defer resultA.Free()
-	assert.True(t, resultA.Exists())
-	assert.Equal(t, []byte("valueA"), resultA.Data())
+	assert.Equal(t, []byte("valueA"), resultA)
 
 	// Verifica clave "b"
-	resultB, err := store.Get(ro, []byte("b"))
+	resultB, err := store.Get(TestFC, "b")
 	require.NoError(t, err)
-	defer resultB.Free()
-	assert.True(t, resultB.Exists())
-	assert.Equal(t, []byte("valueB"), resultB.Data())
+	assert.Equal(t, []byte("valueB"), resultB)
 }

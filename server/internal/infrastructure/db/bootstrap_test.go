@@ -43,9 +43,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 
-	mockSlice := &MockSlice{data: []byte("nil"), exists: false}
-
-	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil).Times(1)
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Times(1)
 
 	input := models.CreateUser{
 		Username: config.DefaultRootUser,
@@ -74,7 +72,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 
 	batch.Put([]byte(userKey), userData)
 
-	store.On("Write", mock.Anything, batch).Return(nil).Times(1)
+	store.On("Write", batch).Return(nil).Times(1)
 
 	err = db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
@@ -88,7 +86,7 @@ func Test_ErrorGettingRoot(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(nil, errors.New("boom")).Once()
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, errors.New("boom")).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
@@ -108,12 +106,9 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 		Email:    "x@x.com",
 	}
 
-	defaultRootUserRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
-	nilRootUser := &MockSlice{data: []byte("nil"), exists: false}
-
-	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
-	store.On("Get", mock.Anything, []byte("user:admin")).Return(nilRootUser, nil).Once()
-	store.On("Put", mock.Anything, []byte("user:admin"), mock.AnythingOfType("[]uint8")).Return(nil).Once()
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Get", db.AdminFC, "user:admin").Return(nil, nil).Once()
+	store.On("Put", db.AdminFC, "user:admin", mock.AnythingOfType("[]uint8")).Return(nil).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
@@ -133,11 +128,8 @@ func Test_SkipsIfUserExists(t *testing.T) {
 		Email:        "x@x.com",
 	}
 
-	defaultRootUserRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
-	userRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
-
-	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
-	store.On("Get", mock.Anything, []byte("user:admin")).Return(userRoot, nil).Once()
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Get", db.AdminFC, "user:admin").Return([]byte(marshal(t, root)), nil).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
@@ -152,10 +144,8 @@ func Test_ErrorFetchingUser(t *testing.T) {
 	}
 	root := models.User{Username: "admin"}
 
-	defaultRootUserRoot := &MockSlice{data: []byte(marshal(t, root)), exists: true}
-
-	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(defaultRootUserRoot, nil).Once()
-	store.On("Get", mock.Anything, []byte("user:admin")).Return(nil, errors.New("read error")).Once()
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Get", db.AdminFC, "user:admin").Return(nil, errors.New("read error")).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
@@ -170,9 +160,8 @@ func Test_ErrorPutsRoot(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 
-	mockSlice := &MockSlice{data: []byte("nil"), exists: false}
-	store.On("Get", mock.Anything, []byte(constants.DefaultRootUserRootKey)).Return(mockSlice, nil).Times(1)
-	store.On("Write", mock.Anything, mock.Anything).Return(errors.New("write fail")).Once()
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Times(1)
+	store.On("Write", mock.Anything).Return(errors.New("write fail")).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
