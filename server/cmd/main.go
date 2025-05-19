@@ -26,7 +26,7 @@ func main() {
 		log.Fatal("❌ Failed Parsing roles", err)
 	}
 
-	members, err := dragonboat.ParseMembersFlag(membersFlag)
+	otherMembers, err := dragonboat.ParseMembersFlag(membersFlag)
 	if err != nil {
 		log.Fatal("Error parsing members:", err)
 		return
@@ -42,6 +42,6 @@ func main() {
 		log.Fatal("Self mermber parsing error:", err)
 		return
 	}
-	app.Run(*replicaID, roles, selfMember, members)
+	app.Run(*replicaID, roles, selfMember, otherMembers)
 	<-stop
 }
