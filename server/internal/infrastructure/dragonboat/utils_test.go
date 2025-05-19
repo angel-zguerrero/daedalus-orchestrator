@@ -208,13 +208,6 @@ func TestMemmberToAddr(t *testing.T) {
 	}
 }
 
-func TestGetLocalIP(t *testing.T) {
-	ip, err := GetLocalIP()
-	if err != nil || ip != "127.0.0.1" {
-		t.Errorf("unexpected IP: %v", err)
-	}
-}
-
 func TestMergeUniqueMembers(t *testing.T) {
 	self := Member{IP: "127.0.0.1", Port: 1234}
 	others := []Member{{IP: "10.0.0.1", Port: 9999}}

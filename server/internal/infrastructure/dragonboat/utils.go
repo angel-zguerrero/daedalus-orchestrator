@@ -249,9 +249,6 @@ func ToInitialMembers(members []Member) map[uint64]string {
 func MemmberToAddr(member Member) string {
 	return fmt.Sprintf("%s:%d", member.IP, member.Port)
 }
-func GetLocalIP() (string, error) {
-	return "127.0.0.1", nil
-}
 
 func MergeUniqueMembers(self Member, others []Member) ([]Member, error) {
 	for _, m := range others {

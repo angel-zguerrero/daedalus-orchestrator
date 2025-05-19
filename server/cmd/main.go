@@ -28,11 +28,7 @@ func main() {
 	}
 
 	if *addr == "" {
-		localIp, err := dragonboat.GetLocalIP()
-		if err != nil {
-			log.Fatal("Error getting local IP:", err)
-			return
-		}
+		localIp := dragonboat.LocalDefaultHost
 		*addr = localIp + ":" + strconv.Itoa(dragonboat.LocalDefaultPort)
 	}
 

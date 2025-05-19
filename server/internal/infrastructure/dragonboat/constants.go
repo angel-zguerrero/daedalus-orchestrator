@@ -1,6 +1,8 @@
 package dragonboat
 
 const LocalDefaultPort = 7000
+const LocalDefaultHost = "127.0.0.1"
+
 const (
 	AppliedIndexKey    string = "disk_kv_applied_index"
 	CurrentDBFilename  string = "current"
