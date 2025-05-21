@@ -2,6 +2,7 @@ package dragonboat
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-func InitMasterNode(ReplicaID uint64, selfMember Member, otherMembers []Member) error {
+func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member) error {
 
 	cfg := config.Config{
 		ReplicaID:          ReplicaID,
@@ -42,12 +43,10 @@ func InitMasterNode(ReplicaID uint64, selfMember Member, otherMembers []Member) 
 		return err
 	}
 
-	allMembers, err := MergeUniqueMembers(selfMember, otherMembers)
-	if err != nil {
-		return err
+	if !IsMemberInMemberArray(selfMember, initialMembers) {
+		return errors.New("the node itself must be inside initial-members")
 	}
-	initialMembers := ToInitialMembers(allMembers)
-	fmt.Println("initialMembers")
-	fmt.Println(initialMembers)
-	return nh.StartOnDiskReplica(initialMembers, false, stateMachine, cfg)
+
+	initialMembersMap := ToInitialMembersMap(initialMembers)
+	return nh.StartOnDiskReplica(initialMembersMap, false, stateMachine, cfg)
 }

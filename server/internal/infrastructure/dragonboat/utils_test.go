@@ -194,7 +194,7 @@ func TestToInitialMembers(t *testing.T) {
 		{IP: "127.0.0.1", Port: 1},
 		{IP: "127.0.0.2", Port: 2},
 	}
-	res := ToInitialMembers(members)
+	res := ToInitialMembersMap(members)
 	if len(res) != 2 {
 		t.Errorf("expected 2 members, got %d", len(res))
 	}

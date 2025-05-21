@@ -236,7 +236,7 @@ func ParseMembersFlag(membersFlag *string) ([]Member, error) {
 	return members, nil
 }
 
-func ToInitialMembers(members []Member) map[uint64]string {
+func ToInitialMembersMap(members []Member) map[uint64]string {
 	initialMembers := make(map[uint64]string, len(members))
 	for i, m := range members {
 		nodeID := uint64(i + 1)
@@ -258,4 +258,13 @@ func MergeUniqueMembers(self Member, others []Member) ([]Member, error) {
 	}
 	combined := append([]Member{self}, others...)
 	return combined, nil
+}
+
+func IsMemberInMemberArray(selfMember Member, initialMembers []Member) bool {
+	for _, member := range initialMembers {
+		if member == selfMember {
+			return true
+		}
+	}
+	return false
 }

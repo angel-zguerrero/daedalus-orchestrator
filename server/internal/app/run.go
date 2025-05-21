@@ -7,13 +7,12 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
-func Run(replicaID int, roles []string, selfMember dragonboat.Member, otherMembers []dragonboat.Member) {
+func Run(replicaID int, roles []string, selfMember dragonboat.Member, initialMembers []dragonboat.Member) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	if os.Getenv("LOGGER_FORMAT") == "pretty" {
@@ -57,10 +56,7 @@ func Run(replicaID int, roles []string, selfMember dragonboat.Member, otherMembe
 	}
 
 	fmt.Println("This node has these roles: ", roles)
-
-	dragonboat.InitMasterNode(uint64(replicaID), selfMember, otherMembers)
-	time.Sleep(30 * time.Second)
-
+	dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers)
 	/*
 		configMap, err := config.LoadOrDefault(*flagConfig)
 		if err != nil {
