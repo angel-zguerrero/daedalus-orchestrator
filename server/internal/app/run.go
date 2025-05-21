@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Run(replicaID int, roles []string, selfMember dragonboat.Member, initialMembers []dragonboat.Member) {
+func Run(replicaID int, roles []string, selfMember dragonboat.Member, initialMembers []dragonboat.Member, join bool) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	if os.Getenv("LOGGER_FORMAT") == "pretty" {
@@ -56,7 +56,7 @@ func Run(replicaID int, roles []string, selfMember dragonboat.Member, initialMem
 	}
 
 	fmt.Println("This node has these roles: ", roles)
-	dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers)
+	dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join)
 	/*
 		configMap, err := config.LoadOrDefault(*flagConfig)
 		if err != nil {

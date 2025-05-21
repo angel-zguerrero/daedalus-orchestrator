@@ -11,7 +11,7 @@ import (
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member) error {
+func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool) error {
 
 	cfg := config.Config{
 		ReplicaID:          ReplicaID,
@@ -48,5 +48,9 @@ func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member
 	}
 
 	initialMembersMap := ToInitialMembersMap(initialMembers)
-	return nh.StartOnDiskReplica(initialMembersMap, false, stateMachine, cfg)
+	if join {
+		initialMembersMap = map[uint64]string{}
+	}
+	return nh.StartOnDiskReplica(initialMembersMap, join, stateMachine, cfg)
+
 }

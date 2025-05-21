@@ -22,64 +22,55 @@ func main() {
 	replicaID := flag.Int("replica", 0, "Nodehost replica")
 	flag.Parse()
 
+	// Parse roles
 	roles, err := dragonboat.ParseRolesFlag(roleFlag)
 	if err != nil {
 		log.Fatal("❌ Failed Parsing roles:", err)
 	}
 
-	initialMembers, err := dragonboat.ParseMembersFlag(initialMembersFlag)
-	if err != nil {
-		log.Fatal("❌ Error parsing initial members:", err)
-		return
-	}
-
-	if *join && len(initialMembers) > 0 {
-		log.Println("⚠️ Do not use 'initial-members' when joining an existing cluster.")
-		return
-	}
-
-	if !*join && len(initialMembers) == 0 && *addr != "" {
-		log.Fatal("❌ 'initial-members' must be provided when creating a new cluster (with addr set).")
-		return
-	}
-
-	if *addr == "" && len(initialMembers) > 0 {
-		log.Fatal("❌ 'addr' must be provided when initializing a node in a multi-node cluster.")
-		return
-	}
-
-	if *replicaID == 0 && len(initialMembers) > 0 {
-		log.Fatal("❌ 'replica' must be specified when creating a new cluster.")
-		return
-	}
-
-	// 👇 Consolidación de lógica default para addr y replica
-	appendSelfToInitialMembers := false
+	// Parse addr early (even for join mode)
 	if *addr == "" {
 		localIP := dragonboat.LocalDefaultHost
 		*addr = localIP + ":" + strconv.Itoa(dragonboat.LocalDefaultPort)
-		appendSelfToInitialMembers = true
-
-		if *replicaID == 0 && len(initialMembers) == 0 {
-			*replicaID = 1
-		}
 	}
 
-	// 👇 Parseo justo después de determinar addr
 	selfMember, err := dragonboat.ParseMember(*addr)
 	if err != nil {
 		log.Fatal("❌ Failed to parse self member:", err)
-		return
 	}
 
-	if appendSelfToInitialMembers {
-		initialMembers = append(initialMembers, selfMember)
+	var initialMembers []dragonboat.Member
+
+	if *join {
+		// 🚫 No se debe usar initial-members cuando se une a un clúster
+		if *initialMembersFlag != "" {
+			log.Fatal("❌ Cannot use --initial-members when --join is set to true.")
+		}
+		if *replicaID == 0 {
+			log.Fatal("❌ Must specify --replica when joining a cluster.")
+		}
+	} else {
+		// ✅ initial-members requerido cuando NO se está uniendo
+		if *initialMembersFlag == "" {
+			log.Fatal("❌ Must provide --initial-members when creating a new cluster.")
+		}
+
+		initialMembers, err = dragonboat.ParseMembersFlag(initialMembersFlag)
+		if err != nil {
+			log.Fatal("❌ Error parsing initial members:", err)
+		}
+
+		// Agregar self si no está incluido explícitamente
+		if !dragonboat.IsMemberInMemberArray(selfMember, initialMembers) {
+			log.Fatalf("❌ This node (%s) must be present in initial-members: %v", selfMember.IP, initialMembers)
+		}
+
+		if *replicaID == 0 {
+			log.Fatal("❌ Must specify --replica when creating a new cluster.")
+		}
 	}
 
-	if !dragonboat.IsMemberInMemberArray(selfMember, initialMembers) {
-		log.Fatalf("❌ This node (%s) must be present in initial-members: %v", selfMember.IP, initialMembers)
-	}
-
-	app.Run(*replicaID, roles, selfMember, initialMembers)
+	// Ejecutar app
+	app.Run(*replicaID, roles, selfMember, initialMembers, *join)
 	<-stop
 }
