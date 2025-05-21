@@ -5,23 +5,34 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/lni/dragonboat/v4"
+	"github.com/lni/dragonboat/v4/client"
 	"github.com/lni/dragonboat/v4/config"
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole) error {
+type MasterNode struct {
+	NH             *dragonboat.NodeHost
+	ReplicaID      uint64
+	SelfMember     Member
+	InitialMembers []Member
+	Join           bool
+	Roles          []NodeRole
+}
+
+func (mn *MasterNode) StartReplica() error {
 
 	cfg := config.Config{
-		ReplicaID:          ReplicaID,
+		ReplicaID:          mn.ReplicaID,
 		ShardID:            MasterShardID,
 		CheckQuorum:        true,
 		ElectionRTT:        10,
 		HeartbeatRTT:       1,
 		SnapshotEntries:    1000,
 		CompactionOverhead: 500,
-		IsNonVoting:        !ContainsRole(roles, RoleConsensus),
+		IsNonVoting:        !ContainsRole(mn.Roles, RoleConsensus),
 	}
 
 	stateMachine := func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
@@ -33,25 +44,59 @@ func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member
 		return err
 	}
 
-	fmt.Println(base_path + "/wal/" + strconv.FormatUint(ReplicaID, 10) + "/" + strconv.Itoa(selfMember.Port))
-	nh, err := dragonboat.NewNodeHost(config.NodeHostConfig{
-		WALDir:         base_path + "/wal/" + strconv.FormatUint(ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
-		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+	fmt.Println(base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + strconv.Itoa(mn.SelfMember.Port))
+	mn.NH, err = dragonboat.NewNodeHost(config.NodeHostConfig{
+		WALDir:         base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
+		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
 		RTTMillisecond: 200,
-		RaftAddress:    MemmberToAddr(selfMember),
+		RaftAddress:    MemmberToAddr(mn.SelfMember),
 	})
 	if err != nil {
 		return err
 	}
 
-	if !IsMemberInMemberArray(selfMember, initialMembers) {
+	if !mn.Join && !IsMemberInMemberArray(mn.SelfMember, mn.InitialMembers) {
 		return errors.New("the node itself must be inside initial-members")
 	}
 
-	initialMembersMap := ToInitialMembersMap(initialMembers)
-	if join {
+	initialMembersMap := ToInitialMembersMap(mn.InitialMembers)
+	if mn.Join {
 		initialMembersMap = map[uint64]string{}
 	}
-	return nh.StartOnDiskReplica(initialMembersMap, join, stateMachine, cfg)
+	return mn.NH.StartOnDiskReplica(initialMembersMap, mn.Join, stateMachine, cfg)
 
+}
+
+func (mn *MasterNode) RequestAddReplica(replicaID uint64, member Member) error {
+	addr := MemmberToAddr(member)
+	rs, err := mn.NH.RequestAddReplica(MasterShardID, replicaID, addr, 0, 3*time.Second)
+	select {
+	case r := <-rs.ResultC():
+		if r.Completed() {
+			fmt.Println("✅ Réplica añadida exitosamente")
+		} else {
+			fmt.Printf("❌ Error añadiendo réplica: Result=%v", r)
+		}
+	}
+	return err
+}
+
+func (mn *MasterNode) GetClient() *client.Session {
+	return mn.NH.GetNoOPSession(MasterShardID)
+}
+
+func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole) (*MasterNode, error) {
+	masterNode := &MasterNode{}
+	masterNode.ReplicaID = ReplicaID
+	masterNode.SelfMember = selfMember
+	masterNode.InitialMembers = initialMembers
+	masterNode.Join = join
+	masterNode.Roles = roles
+
+	err := masterNode.StartReplica()
+	if err != nil {
+		return nil, err
+	}
+
+	return masterNode, nil
 }

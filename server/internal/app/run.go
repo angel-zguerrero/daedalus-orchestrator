@@ -56,7 +56,17 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 	}
 
 	fmt.Println("This node has these roles: ", roles)
-	dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join, roles)
+
+	masterNode, err := dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join, roles)
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed Init raft Master node")
+	}
+	fmt.Println(masterNode)
+
 	/*
 		configMap, err := config.LoadOrDefault(*flagConfig)
 		if err != nil {
