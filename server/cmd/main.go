@@ -68,6 +68,9 @@ func main() {
 		if *replicaID == 0 {
 			log.Fatal("❌ Must specify --replica when creating a new cluster.")
 		}
+		if !dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
+			log.Fatal("❌ The role 'consensus' is required when creating a new cluster.")
+		}
 	}
 
 	// Ejecutar app

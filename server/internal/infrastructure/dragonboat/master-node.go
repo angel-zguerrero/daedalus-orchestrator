@@ -11,7 +11,7 @@ import (
 	"github.com/lni/dragonboat/v4/statemachine"
 )
 
-func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool) error {
+func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole) error {
 
 	cfg := config.Config{
 		ReplicaID:          ReplicaID,
@@ -21,6 +21,7 @@ func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member
 		HeartbeatRTT:       1,
 		SnapshotEntries:    1000,
 		CompactionOverhead: 500,
+		IsNonVoting:        !ContainsRole(roles, RoleConsensus),
 	}
 
 	stateMachine := func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {

@@ -162,7 +162,7 @@ func replaceCurrentDBFile(dir string) error {
 	return syncDir(dir)
 }
 
-func ParseRolesFlag(roleSeparateComma *string) ([]string, error) {
+func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 	var validRoles = map[string]bool{
 		string(RoleConsensus): true,
 		string(RoleScheduler): true,
@@ -170,21 +170,21 @@ func ParseRolesFlag(roleSeparateComma *string) ([]string, error) {
 	}
 
 	if *roleSeparateComma == "" {
-		return []string{
-			string(RoleConsensus),
-			string(RoleScheduler),
-			string(RoleConnector),
+		return []NodeRole{
+			(RoleConsensus),
+			(RoleScheduler),
+			(RoleConnector),
 		}, nil
 	}
 
 	parts := strings.Split(*roleSeparateComma, ",")
-	roles := make([]string, 0, len(parts))
+	roles := make([]NodeRole, 0, len(parts))
 	for _, r := range parts {
 		role := strings.TrimSpace(r)
 		if !validRoles[role] {
 			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, scheduler, connector", role)
 		}
-		roles = append(roles, role)
+		roles = append(roles, NodeRole(role))
 	}
 
 	return roles, nil
@@ -263,6 +263,15 @@ func MergeUniqueMembers(self Member, others []Member) ([]Member, error) {
 func IsMemberInMemberArray(selfMember Member, initialMembers []Member) bool {
 	for _, member := range initialMembers {
 		if member == selfMember {
+			return true
+		}
+	}
+	return false
+}
+
+func ContainsRole(roles []NodeRole, role NodeRole) bool {
+	for _, s := range roles {
+		if s == role {
 			return true
 		}
 	}
