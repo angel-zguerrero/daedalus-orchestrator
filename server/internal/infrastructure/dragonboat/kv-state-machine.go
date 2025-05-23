@@ -460,24 +460,29 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 				return data, err
 			}
 		case Search:
-			var data [][]byte
 			cfh := rocks_kv_store.ColumnFamilyHandles[query.ColumnFamilyName]
 			if cfh == nil {
 				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
 			}
-			data, nextCursor, err := rocks_kv_store.SearchByPatternPaginated(query.ColumnFamilyName, query.KeyPatter, query.cursor, int(query.limit))
+
+			pairs, nextCursor, err := rocks_kv_store.SearchByPatternPaginatedKV(
+				query.ColumnFamilyName,
+				query.KeyPatter,
+				query.Cursor,
+				int(query.Limit),
+			)
 			if err != nil {
 				return nil, err
 			}
 
-			if data != nil {
-				result := &PagedResult{
-					Data:       data,
+			if len(pairs) > 0 {
+				result := &PagedResultKV{
+					Data:       pairs, // Data ahora es []KeyValuePair
 					NextCursor: []byte(nextCursor),
 				}
-
 				return result, nil
 			}
+
 		case GetOpTTL:
 			var data []byte
 			cfh := rocks_kv_store.TTLColumnFamilyHandles[query.ColumnFamilyName]
@@ -511,6 +516,62 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 			if data != nil {
 				return data, err
 			}
+		case SearchTTL:
+			cfh := rocks_kv_store.TTLColumnFamilyHandles[query.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
+			}
+
+			var resultData []db.KeyValuePair
+			cursor := query.Cursor
+			remaining := int(query.Limit)
+
+			for remaining > 0 {
+				keyPatter := fmt.Sprintf("%s%s", prefixData, query.KeyPatter)
+				pairs, nextCursor, err := rocks_kv_store.SearchByPatternPaginatedKV(
+					query.ColumnFamilyName,
+					keyPatter,
+					cursor,
+					remaining*2,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, pair := range pairs {
+					key := strings.TrimPrefix(pair.Key, prefixData)
+					expireKey := fmt.Sprintf("%s%s", prefixTTLExpire, key)
+
+					expireBytes, err := rocks_kv_store.Get(query.ColumnFamilyName, expireKey)
+					if err != nil || len(expireBytes) == 0 {
+						continue
+					}
+
+					expireAt, err := strconv.ParseInt(string(expireBytes), 10, 64)
+					if err != nil || time.Now().UnixMilli() > expireAt {
+						continue
+					}
+
+					resultData = append(resultData, pair)
+					remaining--
+
+					if remaining == 0 {
+						cursor = nextCursor
+						break
+					}
+				}
+
+				if nextCursor == "" {
+					cursor = ""
+					break
+				}
+				cursor = nextCursor
+			}
+
+			return &PagedResultKV{
+				Data:       resultData,
+				NextCursor: []byte(cursor),
+			}, nil
 
 		}
 

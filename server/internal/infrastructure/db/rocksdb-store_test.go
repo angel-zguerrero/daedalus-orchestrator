@@ -118,7 +118,7 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	assert.Equal(t, []byte("valueB"), resultB)
 }
 
-func TestRocksdbStore_SearchByPatternPaginated_MatchSingle(t *testing.T) {
+func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := grocksdb.NewDefaultOptions()
@@ -142,14 +142,14 @@ func TestRocksdbStore_SearchByPatternPaginated_MatchSingle(t *testing.T) {
 
 	require.NoError(t, store.Put(TestFC, "user:123:name", []byte("Alice")))
 
-	values, next, err := store.SearchByPatternPaginated(TestFC, "user:123:", "", 10)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:123:*", "", 10)
 	require.NoError(t, err)
-	require.Len(t, values, 1)
-	assert.Equal(t, []byte("Alice"), values[0])
+	require.Len(t, results, 1)
+	assert.Equal(t, "user:123:name", results[0].Key)
+	assert.Equal(t, []byte("Alice"), results[0].Value)
 	assert.Equal(t, "", next)
 }
-
-func TestRocksdbStore_SearchByPatternPaginated_MatchMultiplePages(t *testing.T) {
+func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := grocksdb.NewDefaultOptions()
@@ -171,15 +171,14 @@ func TestRocksdbStore_SearchByPatternPaginated_MatchMultiplePages(t *testing.T) 
 
 	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
 
-	// Insertar múltiples claves
 	require.NoError(t, store.Put(TestFC, "user:1", []byte("a")))
 	require.NoError(t, store.Put(TestFC, "user:2", []byte("b")))
 	require.NoError(t, store.Put(TestFC, "user:3", []byte("c")))
 
-	var all [][]byte
+	var all []db.KeyValuePair
 	cursor := ""
 	for {
-		page, next, err := store.SearchByPatternPaginated(TestFC, "user:", cursor, 2)
+		page, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:*", cursor, 2)
 		require.NoError(t, err)
 		all = append(all, page...)
 		if next == "" {
@@ -190,8 +189,7 @@ func TestRocksdbStore_SearchByPatternPaginated_MatchMultiplePages(t *testing.T) 
 
 	require.Len(t, all, 3)
 }
-
-func TestRocksdbStore_SearchByPatternPaginated_NoMatch(t *testing.T) {
+func TestRocksdbStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := grocksdb.NewDefaultOptions()
@@ -215,13 +213,13 @@ func TestRocksdbStore_SearchByPatternPaginated_NoMatch(t *testing.T) {
 
 	require.NoError(t, store.Put(TestFC, "product:1", []byte("item")))
 
-	values, next, err := store.SearchByPatternPaginated(TestFC, "user:", "", 10)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:*", "", 10)
 	require.NoError(t, err)
-	require.Empty(t, values)
+	require.Empty(t, results)
 	require.Equal(t, "", next)
 }
 
-func TestRocksdbStore_SearchByPatternPaginated_InvalidColumnFamily(t *testing.T) {
+func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	opts := grocksdb.NewDefaultOptions()
@@ -235,7 +233,7 @@ func TestRocksdbStore_SearchByPatternPaginated_InvalidColumnFamily(t *testing.T)
 
 	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: map[string]*grocksdb.ColumnFamilyHandle{}}
 
-	_, _, err = store.SearchByPatternPaginated("nonexistent", "pattern:", "", 10)
+	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", "pattern:*", "", 10)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }

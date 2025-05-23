@@ -37,8 +37,8 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (r *RocksdbStore) SearchByPatternPaginated(cfName, pattern, cursor string, limit int) ([][]byte, string, error) {
-	var results [][]byte
+func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error) {
+	var results []KeyValuePair
 	var nextCursor string
 
 	cf, ok := r.ColumnFamilyHandles[cfName]
@@ -55,11 +55,17 @@ func (r *RocksdbStore) SearchByPatternPaginated(cfName, pattern, cursor string, 
 	iter := r.DB.NewIteratorCF(readOpts, cf)
 	defer iter.Close()
 
+	usePrefixMatch := strings.HasSuffix(pattern, "*") && !strings.HasPrefix(pattern, "*")
+	prefix := strings.TrimSuffix(pattern, "*")
+
 	if cursor == "" {
-		iter.SeekToFirst()
+		if usePrefixMatch {
+			iter.Seek([]byte(prefix))
+		} else {
+			iter.SeekToFirst()
+		}
 	} else {
 		iter.Seek([]byte(cursor))
-		// Si existe exactamente en cursor, avanzamos para no repetir
 		if iter.Valid() && string(iter.Key().Data()) == cursor {
 			iter.Next()
 		}
@@ -71,16 +77,43 @@ func (r *RocksdbStore) SearchByPatternPaginated(cfName, pattern, cursor string, 
 		keyStr := string(key.Data())
 		key.Free()
 
-		if strings.Contains(keyStr, pattern) {
-			val := iter.Value()
-			results = append(results, append([]byte(nil), val.Data()...))
-			val.Free()
-
-			count++
-			if count == limit {
-				nextCursor = keyStr
+		if usePrefixMatch {
+			if !strings.HasPrefix(keyStr, prefix) {
 				break
 			}
+		} else {
+			// fallback to contains/endswith if not prefix pattern
+			switch {
+			case strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*"):
+				if !strings.Contains(keyStr, strings.Trim(pattern, "*")) {
+					continue
+				}
+			case strings.HasPrefix(pattern, "*"):
+				if !strings.HasSuffix(keyStr, strings.TrimPrefix(pattern, "*")) {
+					continue
+				}
+			case strings.HasSuffix(pattern, "*"):
+				if !strings.HasPrefix(keyStr, strings.TrimSuffix(pattern, "*")) {
+					continue
+				}
+			default:
+				if keyStr != pattern {
+					continue
+				}
+			}
+		}
+
+		val := iter.Value()
+		results = append(results, KeyValuePair{
+			Key:   keyStr,
+			Value: append([]byte(nil), val.Data()...),
+		})
+		val.Free()
+
+		count++
+		if count == limit {
+			nextCursor = keyStr
+			break
 		}
 	}
 

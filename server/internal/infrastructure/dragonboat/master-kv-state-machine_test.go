@@ -743,3 +743,103 @@ func TestUpdate_InternalErrorLogging(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 }
+func TestLookup_Search_MultipleResults(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	// Insert some entries
+	entries := []dragonboat.WK_Command{
+		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
+		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
+		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
+		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
+	}
+
+	for _, entry := range entries {
+		cmd := dragonboat.Command{
+			Type: dragonboat.RW,
+			CMD:  dragonboat.RWK_Command{Op: dragonboat.Write, CMD: entry},
+		}
+		data := encodeCommand(t, cmd)
+		_, err := kv.Update([]statemachine.Entry{{Cmd: data, Index: kv.GetLastApplied() + 1}})
+		require.NoError(t, err)
+	}
+
+	// Search with pattern "user:"
+	query := dragonboat.RK_Command{
+		KeyPatter:        "user:*",
+		ColumnFamilyName: db.DefaultFC,
+		Cursor:           "",
+		Limit:            10,
+		Op:               dragonboat.Search,
+	}
+
+	res, err := kv.Lookup(query)
+	require.NoError(t, err)
+	paged := res.(*dragonboat.PagedResultKV)
+	require.Len(t, paged.Data, 3)
+}
+
+func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	// Insert 3 TTL entries: one expired, two valid
+	entries := []struct {
+		key   string
+		value string
+		ttl   int
+	}{
+		{"k:1", "v1", 1}, // expired
+		{"k:2", "v2", 30},
+		{"k:3", "v3", 30},
+	}
+
+	for _, e := range entries {
+		cmd := dragonboat.Command{
+			Type: dragonboat.RW,
+			CMD: dragonboat.RWK_Command{
+				Op: dragonboat.Write,
+				CMD: dragonboat.WK_Command{
+					Key:              e.key,
+					Value:            []byte(e.value),
+					ColumnFamilyName: db.MasterEventFC,
+					TTL:              e.ttl,
+					Op:               dragonboat.PutOpTTL,
+				},
+			},
+		}
+
+		data := encodeCommand(t, cmd)
+		_, err := kv.Update([]statemachine.Entry{{Cmd: data, Index: kv.GetLastApplied() + 1}})
+		require.NoError(t, err)
+	}
+	time.Sleep(2 * time.Second)
+
+	query := dragonboat.RK_Command{
+		KeyPatter:        "k:*",
+		ColumnFamilyName: db.MasterEventFC,
+		Cursor:           "",
+		Limit:            10,
+		Op:               dragonboat.SearchTTL,
+	}
+
+	res, err := kv.Lookup(query)
+	require.NoError(t, err)
+	paged := res.(*dragonboat.PagedResultKV)
+	require.Len(t, paged.Data, 2)
+
+	validValues := []string{"v2", "v3"}
+	actual := paged.Data
+	require.Len(t, actual, 2)
+	for _, expected := range validValues {
+		found := false
+		for _, kv := range actual {
+			if string(kv.Value) == expected {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "missing value %s", expected)
+	}
+}

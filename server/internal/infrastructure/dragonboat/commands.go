@@ -51,8 +51,8 @@ type WK_Command struct {
 type RK_Command struct {
 	Key              string
 	KeyPatter        string
-	cursor           string
-	limit            int64
+	Cursor           string
+	Limit            int64
 	ColumnFamilyName string
 	TTL              int64
 	Op               R_Type

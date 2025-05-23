@@ -1,12 +1,14 @@
 package dragonboat
 
+import "deadalus-orch/server/internal/infrastructure/db"
+
 type NodeRole string
 
 type Member struct {
 	IP   string
 	Port int
 }
-type PagedResult struct {
-	Data       [][]byte
+type PagedResultKV struct {
+	Data       []db.KeyValuePair
 	NextCursor []byte
 }
