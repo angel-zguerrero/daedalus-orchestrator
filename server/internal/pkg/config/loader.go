@@ -2,7 +2,6 @@ package config
 
 import (
 	"bufio"
-	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
@@ -12,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func LoadOrDefault(path string) (*Config, error) {
+func LoadOrDefault(path string) error {
 	config := &Config{}
 	env := os.Getenv(constants.EnvVarEnvKey)
 
@@ -35,27 +34,15 @@ func LoadOrDefault(path string) (*Config, error) {
 					Str("path", path).
 					Err(err).
 					Msg("⚠️ Failed to load config file")
-				return nil, err
+				return err
 			}
 		} else {
 			log.Error().
 				Str("path", path).
 				Err(err).
 				Msg("⚠️ Failed to load config file")
-			return nil, err
+			return err
 		}
-	}
-
-	if os.Getenv(constants.EnvVarPortKey) != "" {
-		p, err := strconv.Atoi(os.Getenv(constants.EnvVarPortKey))
-		if err != nil {
-			return nil, err
-		}
-		config.Port = p
-	}
-
-	if os.Getenv(constants.EnvVarDBName) != "" {
-		config.DBname = os.Getenv(constants.EnvVarDBName)
 	}
 
 	if os.Getenv(constants.EnvVarDefaultRootUser) != "" {
@@ -66,10 +53,6 @@ func LoadOrDefault(path string) (*Config, error) {
 		config.DefaultRootPassword = os.Getenv(constants.EnvVarDefaultRootPassword)
 	}
 
-	if config.DBname == "" {
-		config.DBname = "daedalus.db"
-	}
-
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
 	}
@@ -77,16 +60,8 @@ func LoadOrDefault(path string) (*Config, error) {
 	if config.DefaultRootPassword == "" {
 		config.DefaultRootPassword = "admin"
 	}
-
-	if config.Port == 0 {
-		config.Port = 50052
-	}
-
-	if !utils.IsValidPort(config.Port) {
-		return nil, fmt.Errorf("invalid 'port' in config: '%d'", config.Port)
-	}
-
-	return config, nil
+	GlobalConfiguration = config
+	return nil
 }
 
 func LoadConfig(path string) (*Config, error) {

@@ -40,7 +40,7 @@ func StartGRPC(
 	gprcServerFactory GRPCServerFactory,
 ) error {
 
-	port := config.Port
+	port := 2000
 
 	lis, err := listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {

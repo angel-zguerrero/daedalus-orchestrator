@@ -2,6 +2,7 @@ package app
 
 import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
@@ -10,16 +11,32 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	stdlog "log"
 )
 
 func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Member, initialMembers []dragonboat.Member, join bool) {
+
+	err := config.LoadOrDefault("")
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed loading configuration")
+	}
+
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	if os.Getenv("LOGGER_FORMAT") == "pretty" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
 
-	err := utils.ValidateEnvVar()
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	stdlog.SetFlags(0)
+	stdlog.SetOutput(logger)
+
+	err = utils.ValidateEnvVar()
 	if err != nil {
 		log.Fatal().
 			Err(err).
@@ -67,18 +84,6 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 	}
 	fmt.Println(masterNode)
 
-	/*
-		configMap, err := config.LoadOrDefault(*flagConfig)
-		if err != nil {
-			log.Fatal().
-				Err(err).
-				Str("package", "app").
-				Str("func", "Run").
-				Msgf("❌ Failed loading configuration")
-		}
-
-		fmt.Println(configMap)
-	*/
 	/*
 		dbConn, columnFamilyHandles, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
 		if err != nil {

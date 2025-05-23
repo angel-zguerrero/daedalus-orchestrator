@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 
+	"strings"
+
 	"github.com/linxGnu/grocksdb"
 )
 
@@ -33,6 +35,60 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 		return data, nil
 	}
 	return nil, nil
+}
+
+func (r *RocksdbStore) SearchByPatternPaginated(cfName, pattern, cursor string, limit int) ([][]byte, string, error) {
+	var results [][]byte
+	var nextCursor string
+
+	cf, ok := r.ColumnFamilyHandles[cfName]
+	if !ok {
+		cf, ok = r.TTLColumnFamilyHandles[cfName]
+		if !ok {
+			return nil, "", fmt.Errorf("column family %s not found", cfName)
+		}
+	}
+
+	readOpts := grocksdb.NewDefaultReadOptions()
+	defer readOpts.Destroy()
+
+	iter := r.DB.NewIteratorCF(readOpts, cf)
+	defer iter.Close()
+
+	if cursor == "" {
+		iter.SeekToFirst()
+	} else {
+		iter.Seek([]byte(cursor))
+		// Si existe exactamente en cursor, avanzamos para no repetir
+		if iter.Valid() && string(iter.Key().Data()) == cursor {
+			iter.Next()
+		}
+	}
+
+	count := 0
+	for ; iter.Valid(); iter.Next() {
+		key := iter.Key()
+		keyStr := string(key.Data())
+		key.Free()
+
+		if strings.Contains(keyStr, pattern) {
+			val := iter.Value()
+			results = append(results, append([]byte(nil), val.Data()...))
+			val.Free()
+
+			count++
+			if count == limit {
+				nextCursor = keyStr
+				break
+			}
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		return nil, "", fmt.Errorf("iterator error: %w", err)
+	}
+
+	return results, nextCursor, nil
 }
 
 func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {

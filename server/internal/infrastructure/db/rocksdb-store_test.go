@@ -117,3 +117,125 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueB"), resultB)
 }
+
+func TestRocksdbStore_SearchByPatternPaginated_MatchSingle(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+	goOp := grocksdb.NewDefaultOptions()
+
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
+	require.NoError(t, err)
+
+	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	for i, name := range columnFamilyNames {
+		cfMap[name] = cfHs[i]
+	}
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+
+	require.NoError(t, store.Put(TestFC, "user:123:name", []byte("Alice")))
+
+	values, next, err := store.SearchByPatternPaginated(TestFC, "user:123:", "", 10)
+	require.NoError(t, err)
+	require.Len(t, values, 1)
+	assert.Equal(t, []byte("Alice"), values[0])
+	assert.Equal(t, "", next)
+}
+
+func TestRocksdbStore_SearchByPatternPaginated_MatchMultiplePages(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+	goOp := grocksdb.NewDefaultOptions()
+
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
+	require.NoError(t, err)
+
+	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	for i, name := range columnFamilyNames {
+		cfMap[name] = cfHs[i]
+	}
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+
+	// Insertar múltiples claves
+	require.NoError(t, store.Put(TestFC, "user:1", []byte("a")))
+	require.NoError(t, store.Put(TestFC, "user:2", []byte("b")))
+	require.NoError(t, store.Put(TestFC, "user:3", []byte("c")))
+
+	var all [][]byte
+	cursor := ""
+	for {
+		page, next, err := store.SearchByPatternPaginated(TestFC, "user:", cursor, 2)
+		require.NoError(t, err)
+		all = append(all, page...)
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+
+	require.Len(t, all, 3)
+}
+
+func TestRocksdbStore_SearchByPatternPaginated_NoMatch(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+	goOp := grocksdb.NewDefaultOptions()
+
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
+	require.NoError(t, err)
+
+	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	for i, name := range columnFamilyNames {
+		cfMap[name] = cfHs[i]
+	}
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+
+	require.NoError(t, store.Put(TestFC, "product:1", []byte("item")))
+
+	values, next, err := store.SearchByPatternPaginated(TestFC, "user:", "", 10)
+	require.NoError(t, err)
+	require.Empty(t, values)
+	require.Equal(t, "", next)
+}
+
+func TestRocksdbStore_SearchByPatternPaginated_InvalidColumnFamily(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+	goOp := grocksdb.NewDefaultOptions()
+
+	rocks, _, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC}, []*grocksdb.Options{goOp})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: map[string]*grocksdb.ColumnFamilyHandle{}}
+
+	_, _, err = store.SearchByPatternPaginated("nonexistent", "pattern:", "", 10)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "column family")
+}

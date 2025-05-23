@@ -25,7 +25,9 @@ type KVRocksDBStateMachineImpl interface {
 	Update(ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error)
 	Lookup(key interface{}) (RK_Command, error)
 }
-
+type KVBaseRocksDBStateMachineConfig struct {
+	InternalErrorTTL uint64
+}
 type KVBaseRocksDBStateMachine struct {
 	clusterID        uint64
 	nodeID           uint64
@@ -35,13 +37,15 @@ type KVBaseRocksDBStateMachine struct {
 	aborted          bool
 	mu               sync.RWMutex
 	stateMachineImpl KVRocksDBStateMachineImpl
+	config           KVBaseRocksDBStateMachineConfig
 }
 
-func NewKVStateMachine(clusterID uint64, nodeID uint64, stateMachineImpl KVRocksDBStateMachineImpl) statemachine.IOnDiskStateMachine {
+func NewKVStateMachine(clusterID uint64, nodeID uint64, stateMachineImpl KVRocksDBStateMachineImpl, config KVBaseRocksDBStateMachineConfig) statemachine.IOnDiskStateMachine {
 	return &KVBaseRocksDBStateMachine{
 		clusterID:        clusterID,
 		nodeID:           nodeID,
 		stateMachineImpl: stateMachineImpl,
+		config:           config,
 	}
 }
 func (s *KVBaseRocksDBStateMachine) GetLastApplied() uint64 {
@@ -126,6 +130,26 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
 	commands, err := s.stateMachineImpl.Update(ents, batch)
+
+	if err != nil {
+		error_key := time.Now().UnixMilli()
+		cmd := Command{
+			Type: RW,
+			CMD: RWK_Command{
+				Op: Write,
+				CMD: WK_Command{
+					Key:              "internal-errors:" + fmt.Sprintf("%020d", error_key),
+					Value:            []byte(err.Error()),
+					ColumnFamilyName: db.MasterEventFC,
+					TTL:              int(s.config.InternalErrorTTL),
+					Op:               PutOpTTL,
+				},
+			},
+		}
+		commands = []Command{
+			cmd,
+		}
+	}
 
 	var dllFCEntries []int
 	var rwEntries []int
@@ -318,10 +342,6 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
 	batch.PutCF(rocks_kv_store.ColumnFamilyHandles[db.MetaFC], []byte(AppliedIndexKey), appliedIndex)
@@ -423,16 +443,43 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 		if err == nil && s.closed {
 			return nil, errors.New("lookup returned valid result when DiskKV is already closed")
 		}
-		var data []byte
+
 		switch query.Op {
 
 		case GetOp:
+			var data []byte
 			cfh := rocks_kv_store.ColumnFamilyHandles[query.ColumnFamilyName]
 			if cfh == nil {
 				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
 			}
 			data, err = rocks_kv_store.Get(query.ColumnFamilyName, query.Key)
+			if err != nil {
+				return nil, err
+			}
+			if data != nil {
+				return data, err
+			}
+		case Search:
+			var data [][]byte
+			cfh := rocks_kv_store.ColumnFamilyHandles[query.ColumnFamilyName]
+			if cfh == nil {
+				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
+			}
+			data, nextCursor, err := rocks_kv_store.SearchByPatternPaginated(query.ColumnFamilyName, query.KeyPatter, query.cursor, int(query.limit))
+			if err != nil {
+				return nil, err
+			}
+
+			if data != nil {
+				result := &PagedResult{
+					Data:       data,
+					NextCursor: []byte(nextCursor),
+				}
+
+				return result, nil
+			}
 		case GetOpTTL:
+			var data []byte
 			cfh := rocks_kv_store.TTLColumnFamilyHandles[query.ColumnFamilyName]
 			if cfh == nil {
 				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
@@ -457,14 +504,16 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 
 			dataKey := fmt.Sprintf("%s%s", prefixData, query.Key)
 			data, err = rocks_kv_store.Get(query.ColumnFamilyName, dataKey)
+
+			if err != nil {
+				return nil, err
+			}
+			if data != nil {
+				return data, err
+			}
+
 		}
 
-		if err != nil {
-			return nil, err
-		}
-		if data != nil {
-			return data, err
-		}
 		return nil, nil
 	}
 	return nil, errors.New("db closed")

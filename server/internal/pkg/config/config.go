@@ -1,8 +1,7 @@
 package config
 
 type Config struct {
-	Port                int
-	DBname              string
+	TTLInternalError    uint64
 	DefaultRootUser     string
 	DefaultRootPassword string
 }
@@ -16,10 +15,10 @@ type ConfigFromMap struct {
 
 func ConfigFromMapToConfig(configFromMap ConfigFromMap) *Config {
 	c := &Config{
-		Port:                configFromMap.port,
-		DBname:              configFromMap.db_name,
 		DefaultRootUser:     configFromMap.default_root_user,
 		DefaultRootPassword: configFromMap.default_root_password,
 	}
 	return c
 }
+
+var GlobalConfiguration *Config

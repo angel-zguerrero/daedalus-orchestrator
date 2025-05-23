@@ -5,18 +5,22 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config"
 	"encoding/binary"
 	"encoding/gob"
+	"errors"
 	"io"
 	"testing"
 	"time"
 
+	"github.com/linxGnu/grocksdb"
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/stretchr/testify/require"
 )
 
 func setupKV(t *testing.T) *dragonboat.KVBaseRocksDBStateMachine {
 	t.Helper()
+	config.LoadOrDefault("")
 	kv := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
@@ -648,4 +652,94 @@ func encodeCommand(t *testing.T, cmd dragonboat.Command) []byte {
 		t.Fatalf("failed to encode command: %v", err)
 	}
 	return buf.Bytes()
+}
+func TestUpdate_UnknownCommandType(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	cmd := dragonboat.Command{
+		Type: 999,
+		CMD:  nil,
+	}
+	data := encodeCommand(t, cmd)
+
+	entry := statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
+	_, err := kv.Update([]statemachine.Entry{entry})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown command type")
+}
+
+func TestUpdate_UnknownWriteOp(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "badop",
+				Value:            []byte("x"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               999,
+			},
+		},
+	}
+	data := encodeCommand(t, cmd)
+	entry := statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
+
+	_, err := kv.Update([]statemachine.Entry{entry})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown W Operation")
+}
+func TestRecoverFromSnapshot_InvalidData(t *testing.T) {
+	kv := setupKV(t)
+	defer kv.Close()
+
+	data := []byte("not-a-valid-gob")
+	r := bytes.NewReader(data)
+
+	err := kv.RecoverFromSnapshot(r, make(chan struct{}))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decode failed")
+}
+
+type failingImpl struct {
+	dragonboat.KVRocksDBStateMachineImpl
+}
+
+func (f *failingImpl) Update(ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]dragonboat.Command, error) {
+	return nil, errors.New("simulated update error")
+}
+func (f *failingImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {
+	return dragonboat.RK_Command{}, nil
+}
+func (f *failingImpl) OpenDB(string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error) {
+	return nil, nil, nil, nil
+}
+func TestUpdate_InternalErrorLogging(t *testing.T) {
+
+	kv := dragonboat.NewKVStateMachine(
+		1,
+		1,
+		&failingImpl{},
+		dragonboat.KVBaseRocksDBStateMachineConfig{
+			InternalErrorTTL: 60,
+		},
+	).(*dragonboat.KVBaseRocksDBStateMachine)
+
+	// Abre normalmente
+	stopc := make(chan struct{})
+	_, err := kv.Open(stopc)
+	require.NoError(t, err)
+	defer kv.Close()
+
+	entry := statemachine.Entry{
+		Cmd:   []byte("trigger-error"),
+		Index: kv.GetLastApplied() + 1,
+	}
+
+	entries, err := kv.Update([]statemachine.Entry{entry})
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
 }

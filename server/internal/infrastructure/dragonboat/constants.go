@@ -15,8 +15,6 @@ const (
 	prefixTTLExpire = "ttl-expire:"
 )
 
-type NodeRole string
-
 const (
 	RoleConsensus NodeRole = "consensus"
 	RoleScheduler NodeRole = "scheduler"
@@ -24,8 +22,3 @@ const (
 )
 
 const MasterShardID = 1
-
-type Member struct {
-	IP   string
-	Port int
-}

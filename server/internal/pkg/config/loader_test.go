@@ -44,23 +44,18 @@ default_root_password=secret
 `
 	path := writeTempFile(t, content)
 	defer os.Remove(path)
-	cfg, err := config.LoadOrDefault(path)
+	err := config.LoadOrDefault(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DBname != "my.db" {
-		t.Errorf("expected db_name=my.db, got %s", cfg.DBname)
-	}
-	if cfg.DefaultRootUser != "admin" {
+
+	if config.GlobalConfiguration.DefaultRootUser != "admin" {
 		t.Errorf("expected default_root_user=admin")
 	}
-	if cfg.DefaultRootPassword != "secret" {
+	if config.GlobalConfiguration.DefaultRootPassword != "secret" {
 		t.Errorf("expected default_root_password=secret")
 	}
 
-	if cfg.Port != 50052 {
-		t.Errorf("expected port=50052, got %d", cfg.Port)
-	}
 }
 
 func TestLoadOrDefault_ConfigFileOverwriteKeysWithEnvVars(t *testing.T) {
@@ -71,41 +66,23 @@ default_root_password=secret
 port=50005
 `
 
-	setEnv(t, constants.EnvVarDBName, "other-name-db")
 	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
 	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
-	setEnv(t, constants.EnvVarPortKey, "50006")
 
 	path := writeTempFile(t, content)
 	defer os.Remove(path)
-	cfg, err := config.LoadOrDefault(path)
+	err := config.LoadOrDefault(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DBname != "other-name-db" {
-		t.Errorf("expected DBname=other-name-db, got %s", cfg.DBname)
+
+	if config.GlobalConfiguration.DefaultRootUser != "envUser" {
+		t.Errorf("expected DefaultRootUser=envUser, got %s", config.GlobalConfiguration.DefaultRootUser)
 	}
-	if cfg.DefaultRootUser != "envUser" {
-		t.Errorf("expected DefaultRootUser=envUser, got %s", cfg.DefaultRootUser)
-	}
-	if cfg.DefaultRootPassword != "envPass" {
-		t.Errorf("expected DefaultRootPassword=envPass, got %s", cfg.DefaultRootPassword)
+	if config.GlobalConfiguration.DefaultRootPassword != "envPass" {
+		t.Errorf("expected DefaultRootPassword=envPass, got %s", config.GlobalConfiguration.DefaultRootPassword)
 	}
 
-	if cfg.Port != 50006 {
-		t.Errorf("expected port=50006, got %d", cfg.Port)
-	}
-}
-
-func TestLoadOrDefault_InvalidPort(t *testing.T) {
-	content := `
-port=9
-`
-	path := writeTempFile(t, content)
-	defer os.Remove(path)
-	_, err := config.LoadOrDefault(path)
-	require.Error(t, err)
-	assert.EqualError(t, err, "invalid 'port' in config: '9'")
 }
 
 func TestLoadOrDefault_ConfigFilePartialKeys_ENVFallback(t *testing.T) {
@@ -117,24 +94,22 @@ db_name=my.db
 	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
 	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
 
-	cfg, err := config.LoadOrDefault(path)
+	err := config.LoadOrDefault(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DBname != "my.db" {
-		t.Errorf("expected db_name=my.db, got %s", cfg.DBname)
-	}
-	if cfg.DefaultRootUser != "envUser" {
+
+	if config.GlobalConfiguration.DefaultRootUser != "envUser" {
 		t.Errorf("expected default_root_user from env")
 	}
-	if cfg.DefaultRootPassword != "envPass" {
+	if config.GlobalConfiguration.DefaultRootPassword != "envPass" {
 		t.Errorf("expected default_root_password from env")
 	}
 }
 
 func TestLoadOrDefault_InvalidPath(t *testing.T) {
 
-	_, err := config.LoadOrDefault("/nonexistent/path.conf")
+	err := config.LoadOrDefault("/nonexistent/path.conf")
 	if err == nil {
 		t.Errorf("expected error but get nil")
 	}
@@ -142,45 +117,33 @@ func TestLoadOrDefault_InvalidPath(t *testing.T) {
 }
 
 func TestLoadOrDefault_NoConfigFile_ENVFallback(t *testing.T) {
-	setEnv(t, constants.EnvVarDBName, "env.db")
 	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
 	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
-	setEnv(t, constants.EnvVarPortKey, "5050")
 
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if cfg.DBname != "env.db" {
-		t.Errorf("expected db_name=env.db, got %s", cfg.DBname)
-	}
-	if cfg.Port != 5050 {
-		t.Errorf("expected port=5050, got %d", cfg.Port)
-	}
-	if cfg.DefaultRootUser != "envUser" {
+	if config.GlobalConfiguration.DefaultRootUser != "envUser" {
 		t.Errorf("expected default_root_user from env")
 	}
-	if cfg.DefaultRootPassword != "envPass" {
+	if config.GlobalConfiguration.DefaultRootPassword != "envPass" {
 		t.Errorf("expected default_root_password from env")
 	}
 }
 
 func TestLoadOrDefault_NoFile_NoEnv_DefaultFallback(t *testing.T) {
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if cfg.DBname != "daedalus.db" {
-		t.Errorf("expected fallback db_name=daedalus.db")
-	}
-
-	if cfg.DefaultRootUser != "admin" {
+	if config.GlobalConfiguration.DefaultRootUser != "admin" {
 		t.Errorf("expected fallback default_root_user=admin")
 	}
 
-	if cfg.DefaultRootPassword != "admin" {
+	if config.GlobalConfiguration.DefaultRootPassword != "admin" {
 		t.Errorf("expected fallback default_root_password=admin")
 	}
 }
@@ -197,110 +160,84 @@ valid_key = value
 `
 	path := writeTempFile(t, content)
 	defer os.Remove(path)
-	cfg, err := config.LoadConfig(path)
+	_, err := config.LoadConfig(path)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if cfg.DBname != "my.db" {
-		t.Errorf("expected db_name=my.db, got %s", cfg.DBname)
-	}
-
-	if cfg.Port != 0 {
-		t.Errorf("expected Port 0, got %d", cfg.Port)
 	}
 
 }
 
 func TestLoadOrDefault_ENVSelection(t *testing.T) {
 	setEnv(t, constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
-	setEnv(t, constants.EnvVarDBName, "dev.db")
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cfg.DBname != "dev.db" {
-		t.Errorf("expected db_name from ENV in development")
 	}
 
 	setEnv(t, constants.EnvVarEnvKey, string(constants.STAGING))
-	setEnv(t, constants.EnvVarDBName, "stage.db")
-	cfg, err = config.LoadOrDefault("")
+	err = config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cfg.DBname != "stage.db" {
-		t.Errorf("expected db_name from ENV in staging")
 	}
 
 	setEnv(t, constants.EnvVarEnvKey, string(constants.PRODUCTION))
-	setEnv(t, constants.EnvVarDBName, "prod.db")
-	cfg, err = config.LoadOrDefault("")
+	err = config.LoadOrDefault("")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cfg.DBname != "prod.db" {
-		t.Errorf("expected db_name from ENV in production")
 	}
 }
 func TestLoadOrDefault_ENV_DefaultDevelopment(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, "")
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Development(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Staging_FileMissing(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, string(constants.STAGING))
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "daedalus.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_ENV_Production_WithFile(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, string(constants.PRODUCTION))
 	file := writeTempFile(t, `db_name = my.db`) // simulate file at /etc/daedalus
 	defer os.Remove(file)
-	cfg, err := config.LoadOrDefault(file)
+	err := config.LoadOrDefault(file)
 	require.NoError(t, err)
-	assert.Equal(t, "my.db", cfg.DBname)
 }
 
 func TestLoadOrDefault_CustomPath_FileExists(t *testing.T) {
 	file := writeTempFile(t, `db_name = custom.db`)
 	defer os.Remove(file)
-	cfg, err := config.LoadOrDefault(file)
+	err := config.LoadOrDefault(file)
 	require.NoError(t, err)
-	assert.Equal(t, "custom.db", cfg.DBname)
+
 }
 
 func TestLoadOrDefault_CustomPath_FileMissing(t *testing.T) {
-	_, err := config.LoadOrDefault("/tmp/does-not-exist.conf")
+	err := config.LoadOrDefault("/tmp/does-not-exist.conf")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, os.ErrNotExist))
 }
 
 func TestLoadOrDefault_ENVFallbacks(t *testing.T) {
-	t.Setenv(constants.EnvVarDBName, "fromenv.db")
 	t.Setenv(constants.EnvVarDefaultRootUser, "root")
 	t.Setenv(constants.EnvVarDefaultRootPassword, "rootpass")
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "fromenv.db", cfg.DBname)
-	assert.Equal(t, "root", cfg.DefaultRootUser)
-	assert.Equal(t, "rootpass", cfg.DefaultRootPassword)
+	assert.Equal(t, "root", config.GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "rootpass", config.GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestLoadOrDefault_DefaultRootFallbacks(t *testing.T) {
-	cfg, err := config.LoadOrDefault("")
+	err := config.LoadOrDefault("")
 	require.NoError(t, err)
-	assert.Equal(t, "admin", cfg.DefaultRootUser)
-	assert.Equal(t, "admin", cfg.DefaultRootPassword)
+	assert.Equal(t, "admin", config.GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "admin", config.GlobalConfiguration.DefaultRootPassword)
 }

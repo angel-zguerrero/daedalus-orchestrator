@@ -7,8 +7,6 @@ const ConfigDefaultRootUser = "default_root_user"
 const ConfigDefaultRootPassword = "default_root_password"
 
 const EnvVarEnvKey = "ENV"
-const EnvVarPortKey = "PORT"
-const EnvVarDBName = "DB_NAME"
 const EnvVarDefaultRootUser = "DEFAULT_ROOT_USER"
 const EnvVarDefaultRootPassword = "DEFAULT_ROOT_PASSWORD"
 const EnvVarOtelActived = "OTEL_ACTIVE"
