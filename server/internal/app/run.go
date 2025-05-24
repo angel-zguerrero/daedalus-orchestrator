@@ -7,6 +7,7 @@ import (
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
 	"os"
+	"time"
 
 	dblog "github.com/lni/dragonboat/v4/logger"
 	"github.com/rs/zerolog"
@@ -66,7 +67,7 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 		_ = tp.Shutdown(ctx)
 	}()
 
-	_, err = dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join, roles)
+	masterNode, err := dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join, roles)
 	if err != nil {
 		log.Fatal().
 			Err(err).
@@ -74,6 +75,18 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 			Str("func", "Run").
 			Msgf("❌ Failed Init raft Master node")
 	}
+
+	go func() {
+		interval := 3 * time.Second
+		readyUpdates := masterNode.StartNodeReadyWatcher(interval)
+		for isReady := range readyUpdates {
+			if isReady {
+				log.Info().Msg("✅ Node is ready for consensus.")
+			} else {
+				log.Info().Msg("⚠️ Node is NOT ready for consensus.")
+			}
+		}
+	}()
 
 	/*
 		dbConn, columnFamilyHandles, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})

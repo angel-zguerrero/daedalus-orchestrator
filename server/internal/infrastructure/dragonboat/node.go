@@ -1,7 +1,10 @@
 package dragonboat
 
 import (
+	"bytes"
+	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"encoding/gob"
 	"errors"
 	"strconv"
 	"time"
@@ -85,6 +88,50 @@ func (mn *RaftNode) RequestAddReplica(replicaID uint64, member Member) error {
 
 func (mn *RaftNode) GetClient() *client.Session {
 	return mn.NH.GetNoOPSession(mn.ShardID)
+}
+
+func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
+	readyChan := make(chan bool)
+
+	go func() {
+		defer close(readyChan)
+		var lastReady bool
+		var initialized bool
+
+		for {
+			session := mn.NH.GetNoOPSession(mn.ShardID)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+
+			var buf bytes.Buffer
+			cmd := Command{
+				Type: RW,
+				CMD: RWK_Command{
+					Op: Write,
+					CMD: WK_Command{
+						Key:              "ready",
+						Value:            []byte(Int64ToBytes(time.Now().UnixMilli())),
+						ColumnFamilyName: db.MetaFC,
+						Op:               PutOp,
+					},
+				},
+			}
+
+			gob.NewEncoder(&buf).Encode(cmd)
+			_, err := mn.NH.SyncPropose(ctx, session, buf.Bytes())
+			cancel()
+
+			currentReady := (err == nil)
+			if !initialized || currentReady != lastReady {
+				lastReady = currentReady
+				initialized = true
+				readyChan <- currentReady
+			}
+
+			time.Sleep(interval)
+		}
+	}()
+
+	return readyChan
 }
 
 func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, stateMachineFn func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine) (*RaftNode, error) {

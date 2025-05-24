@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"crypto/md5"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"math/rand/v2"
 	"net"
@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func getNodeDBDirName(clusterID uint64, nodeID uint64) (string, error) {
@@ -277,4 +279,9 @@ func ContainsRole(roles []NodeRole, role NodeRole) bool {
 		}
 	}
 	return false
+}
+func Int64ToBytes(n int64) []byte {
+	buf := make([]byte, 8) // int64 = 8 bytes
+	binary.BigEndian.PutUint64(buf, uint64(n))
+	return buf
 }
