@@ -6,18 +6,24 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
-	"fmt"
 	"os"
 
+	dblog "github.com/lni/dragonboat/v4/logger"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	stdlog "log"
 )
 
 func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Member, initialMembers []dragonboat.Member, join bool) {
 
-	err := config.LoadOrDefault("")
+	err := utils.ValidateEnvVar()
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed validation of ENV var")
+	}
+	err = config.LoadOrDefault("")
 	if err != nil {
 		log.Fatal().
 			Err(err).
@@ -27,23 +33,19 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 	}
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-
-	if os.Getenv("LOGGER_FORMAT") == "pretty" {
+	if os.Getenv("LOGGER_FORMAT") == "pretty" || os.Getenv("LOGGER_FORMAT") == "" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	if os.Getenv(constants.EnvVarEnvKey) == string(constants.PRODUCTION) {
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	stdlog.SetFlags(0)
-	stdlog.SetOutput(logger)
-
-	err = utils.ValidateEnvVar()
-	if err != nil {
-		log.Fatal().
-			Err(err).
-			Str("package", "app").
-			Str("func", "Run").
-			Msgf("❌ Failed validation of ENV var")
+	} else {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
+	dblog.SetLoggerFactory(dragonboat.CreateZerologger)
+
+	log.Info().Interface("", roles).Msg("This node has these roles")
 
 	ctx, tp, err := telemetry.Init(
 		constants.Env(os.Getenv(constants.EnvVarEnvKey)),
@@ -64,17 +66,7 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 		_ = tp.Shutdown(ctx)
 	}()
 
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	if os.Getenv(constants.EnvVarEnvKey) == string(constants.PRODUCTION) {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	} else {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-
-	}
-
-	fmt.Println("This node has these roles: ", roles)
-
-	masterNode, err := dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join, roles)
+	_, err = dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join, roles)
 	if err != nil {
 		log.Fatal().
 			Err(err).
@@ -82,7 +74,6 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 			Str("func", "Run").
 			Msgf("❌ Failed Init raft Master node")
 	}
-	fmt.Println(masterNode)
 
 	/*
 		dbConn, columnFamilyHandles, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
