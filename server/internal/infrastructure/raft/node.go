@@ -2,11 +2,11 @@ package raft
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type NodeState string
@@ -50,7 +50,7 @@ func NewNode(id string, TenantID string, transport Transport) *Node {
 func (n *Node) Run() {
 	recvCh, err := n.Transport.Receive(n.ctx, n.TenantID, n.ID)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("")
 	}
 
 	go n.runElectionTimer()
@@ -72,7 +72,7 @@ func (n *Node) handleMessage(msg Message) {
 	defer n.mu.Unlock()
 
 	if msg.Term < n.currentTerm {
-		log.Printf("[%s] got OLD message from %s (Type: %s) Term %d", n.ID, msg.From, msg.Type, msg.Term)
+		log.Info().Msgf("[%s] got OLD message from %s (Type: %s) Term %d", n.ID, msg.From, msg.Type, msg.Term)
 		return //some stuck leader send a message?
 	}
 
@@ -87,7 +87,7 @@ func (n *Node) handleMessage(msg Message) {
 	case MsgVote:
 		if n.State == Candidate {
 			n.votesReceived++
-			log.Printf("[%s] got VOTE from %s (total: %d)", n.ID, msg.From, n.votesReceived)
+			log.Info().Msgf("[%s] got VOTE from %s (total: %d)", n.ID, msg.From, n.votesReceived)
 			if n.hasMajority() {
 				n.becomeLeader()
 			}
@@ -121,7 +121,7 @@ func (n *Node) handleRequestVote(msg Message) {
 	if n.votedFor == "" {
 		n.votedFor = msg.From
 		n.resetElectionTimer()
-		log.Printf("[%s] voted for %s in term %d", n.ID, msg.From, msg.Term)
+		log.Info().Msgf("[%s] voted for %s in term %d", n.ID, msg.From, msg.Term)
 
 		resp := Message{
 			From:    n.ID,
@@ -148,7 +148,7 @@ func (n *Node) runElectionTimer() {
 		case <-n.ctx.Done():
 			return
 		case <-n.electionResetEvent:
-			fmt.Println("[" + n.ID + "] > electionResetEvent >")
+			log.Info().Msg("[" + n.ID + "] > electionResetEvent >")
 			timer.Stop()
 			timeout = randomElectionTimeout()
 			timer = time.NewTimer(timeout)
@@ -179,7 +179,7 @@ func (n *Node) startElection() {
 	n.votesReceived = 1
 	n.resetElectionTimer()
 
-	log.Printf("[%s] became CANDIDATE (term %d)", n.ID, n.currentTerm)
+	log.Info().Msgf("[%s] became CANDIDATE (term %d)", n.ID, n.currentTerm)
 
 	for _, peerID := range n.Transport.GetPeers(n.TenantID) {
 		if peerID == n.ID {
@@ -192,27 +192,27 @@ func (n *Node) startElection() {
 			Payload: []byte("vote-request"),
 			Term:    n.currentTerm,
 		}
-		log.Printf("[%s] sending ´vote-request´ to [%s]", n.ID, peerID)
+		log.Info().Msgf("[%s] sending ´vote-request´ to [%s]", n.ID, peerID)
 		go n.Transport.Send(n.ctx, n.TenantID, msg)
 	}
 }
 
 func (n *Node) becomeLeader() {
 	n.State = Leader
-	log.Printf("[%s] became LEADER for term %d", n.ID, n.currentTerm)
+	log.Info().Msgf("[%s] became LEADER for term %d", n.ID, n.currentTerm)
 	n.startHeartbeat()
 }
 
 func (n *Node) becomeFollower() {
 	if n.heartbeatCancel != nil {
-		log.Printf("[%s] stopping heartbeat", n.ID)
+		log.Info().Msgf("[%s] stopping heartbeat", n.ID)
 		n.heartbeatCancel()
 		n.heartbeatCancel = nil
 	}
 	n.State = Follower
 	n.votedFor = ""
 	n.votesReceived = 0
-	log.Printf("[%s] became FOLLOWER", n.ID)
+	log.Info().Msgf("[%s] became FOLLOWER", n.ID)
 	n.resetElectionTimer()
 }
 
@@ -245,7 +245,7 @@ func (n *Node) startHeartbeat() {
 						Payload: []byte("heartbeat"),
 						Term:    n.currentTerm,
 					}
-					log.Printf("Stuck Heartbeat for ["+n.ID+"] Term %d", n.currentTerm)
+					log.Info().Msgf("Stuck Heartbeat for ["+n.ID+"] Term %d", n.currentTerm)
 					//time.Sleep(10 * time.Second) // test slow connection
 					go n.Transport.Send(n.ctx, n.TenantID, msg)
 				}

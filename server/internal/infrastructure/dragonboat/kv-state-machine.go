@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"io"
 	"os"
 	"path/filepath"
@@ -375,16 +376,16 @@ func cleanExpiredKeys(db *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle) error {
 
 	nowMillis := time.Now().UnixMilli()
 	prefix := []byte(prefixTTLIndex)
-	fmt.Println("-------> prefixTTLIndex")
-	fmt.Println(prefixTTLIndex)
+	log.Debug().Msg("-------> prefixTTLIndex")
+	log.Debug().Interface("prefixTTLIndex", prefixTTLIndex).Msg("")
 	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 		key := it.Key()
 		keyBytes := append([]byte(nil), key.Data()...)
 		key.Free()
 
 		keyStr := string(keyBytes)
-		fmt.Println("------>  keyStr")
-		fmt.Println(keyStr)
+		log.Debug().Msg("------>  keyStr")
+		log.Debug().Str("keyStr", keyStr).Msg("")
 		trimmed := strings.TrimPrefix(keyStr, prefixTTLIndex)
 		sepIdx := strings.IndexByte(trimmed, ':')
 		if sepIdx <= 0 || sepIdx >= len(trimmed)-1 {

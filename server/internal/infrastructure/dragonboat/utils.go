@@ -6,6 +6,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"math/rand/v2"
 	"net"
@@ -106,10 +107,10 @@ func cleanupNodeDataDir(dir string) error {
 		if !fi.IsDir() {
 			continue
 		}
-		fmt.Printf("dbdir %s, fi.name %s, dir %s\n", dbdir, fi.Name(), dir)
+		log.Info().Msgf("dbdir %s, fi.name %s, dir %s", dbdir, fi.Name(), dir)
 		toDelete := filepath.Join(dir, fi.Name())
 		if toDelete != dbdir { // delete old databases
-			fmt.Printf("removing %s\n", toDelete)
+			log.Info().Msgf("removing %s", toDelete)
 			if err := os.RemoveAll(toDelete); err != nil {
 				return err
 			}

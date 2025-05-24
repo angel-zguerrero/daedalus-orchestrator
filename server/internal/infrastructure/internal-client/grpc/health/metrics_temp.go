@@ -2,18 +2,18 @@ package main
 
 import (
 	"context"
-	"log"
 	"time"
 
 	pb "deadalus-orch/server/internal/infrastructure/common/proto/health/metrics"
 
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	conn, err := grpc.Dial("localhost:50052", grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatal().Err(err).Msg("did not connect")
 	}
 	defer conn.Close()
 
@@ -24,8 +24,8 @@ func main() {
 
 	systemMetricsResponse, err := client.GetSystemMetrics(ctx, &pb.SystemMetricsRequest{})
 	if err != nil {
-		log.Fatalf("error calling SayHello: %v", err)
+		log.Fatal().Err(err).Msg("error calling SayHello")
 	}
-	log.Printf("📨 Mensaje recibido")
-	log.Println((systemMetricsResponse))
+	log.Info().Msg("📨 Mensaje recibido")
+	log.Info().Interface("systemMetricsResponse", systemMetricsResponse).Msg("")
 }

@@ -2,7 +2,7 @@ package dragonboat
 
 import (
 	"errors"
-	"fmt"
+	"fmt" // Used for errors.New(fmt.Sprintf(...))
 
 	dblog "github.com/lni/dragonboat/v4/logger"
 	"github.com/rs/zerolog/log"
@@ -14,23 +14,22 @@ type zerologgerLogger struct {
 }
 
 func (l *zerologgerLogger) Infof(format string, args ...interface{}) {
-	log.Info().Msg(fmt.Sprintf("%s: %s", l.name, fmt.Sprintf(format, args...)))
+	log.Info().Str("name", l.name).Msgf(format, args...)
 }
 
 func (l *zerologgerLogger) Warningf(format string, args ...interface{}) {
-	log.Warn().Msg(fmt.Sprintf("%s: %s", l.name, fmt.Sprintf(format, args...)))
+	log.Warn().Str("name", l.name).Msgf(format, args...)
 }
 
 func (l *zerologgerLogger) Errorf(format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	log.Err(errors.New(msg)).Str("source", l.name).Msg(msg)
+	log.Error().Err(errors.New(fmt.Sprintf(format, args...))).Str("source", l.name).Msgf(format, args...)
 }
 
 func (l *zerologgerLogger) Debugf(format string, args ...interface{}) {
-	log.Debug().Msg(fmt.Sprintf("%s: %s", l.name, fmt.Sprintf(format, args...)))
+	log.Debug().Str("name", l.name).Msgf(format, args...)
 }
 func (l *zerologgerLogger) Panicf(format string, args ...interface{}) {
-	log.Panic().Msg(fmt.Sprintf("%s: %s", l.name, fmt.Sprintf(format, args...)))
+	log.Panic().Str("name", l.name).Msgf(format, args...)
 }
 
 func (l *zerologgerLogger) SetLevel(logLevel dblog.LogLevel) {
