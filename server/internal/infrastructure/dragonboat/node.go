@@ -3,7 +3,6 @@ package dragonboat
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/lni/dragonboat/v4/client"
 	"github.com/lni/dragonboat/v4/config"
 	"github.com/lni/dragonboat/v4/statemachine"
+	"github.com/rs/zerolog/log"
 )
 
 type RaftNode struct {
@@ -46,7 +46,7 @@ func (mn *RaftNode) StartReplica() error {
 		return err
 	}
 
-	fmt.Println(base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + strconv.Itoa(mn.SelfMember.Port))
+	log.Info().Msg(base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + strconv.Itoa(mn.SelfMember.Port))
 	mn.NH, err = dragonboat.NewNodeHost(config.NodeHostConfig{
 		WALDir:         base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
 		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
@@ -75,9 +75,9 @@ func (mn *RaftNode) RequestAddReplica(replicaID uint64, member Member) error {
 	select {
 	case r := <-rs.ResultC():
 		if r.Completed() {
-			fmt.Println("✅ Réplica añadida exitosamente")
+			log.Info().Msg("✅ Réplica añadida exitosamente")
 		} else {
-			fmt.Printf("❌ Error añadiendo réplica: Result=%v", r)
+			log.Error().Interface("Result", r).Msg("❌ Error añadiendo réplica")
 		}
 	}
 	return err

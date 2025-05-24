@@ -4,7 +4,7 @@ import (
 	"deadalus-orch/server/internal/app"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"flag"
-	"log"
+	"github.com/rs/zerolog/log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -25,7 +25,7 @@ func main() {
 	// Parse roles
 	roles, err := dragonboat.ParseRolesFlag(roleFlag)
 	if err != nil {
-		log.Fatal("❌ Failed Parsing roles:", err)
+		log.Fatal().Err(err).Msg("❌ Failed Parsing roles")
 	}
 
 	// Parse addr early (even for join mode)
@@ -36,7 +36,7 @@ func main() {
 
 	selfMember, err := dragonboat.ParseMember(*addr)
 	if err != nil {
-		log.Fatal("❌ Failed to parse self member:", err)
+		log.Fatal().Err(err).Msg("❌ Failed to parse self member")
 	}
 
 	var initialMembers []dragonboat.Member
@@ -44,32 +44,32 @@ func main() {
 	if *join {
 		// 🚫 No se debe usar initial-members cuando se une a un clúster
 		if *initialMembersFlag != "" {
-			log.Fatal("❌ Cannot use --initial-members when --join is set to true.")
+			log.Fatal().Msg("❌ Cannot use --initial-members when --join is set to true.")
 		}
 		if *replicaID == 0 {
-			log.Fatal("❌ Must specify --replica when joining a cluster.")
+			log.Fatal().Msg("❌ Must specify --replica when joining a cluster.")
 		}
 	} else {
 		// ✅ initial-members requerido cuando NO se está uniendo
 		if *initialMembersFlag == "" {
-			log.Fatal("❌ Must provide --initial-members when creating a new cluster.")
+			log.Fatal().Msg("❌ Must provide --initial-members when creating a new cluster.")
 		}
 
 		initialMembers, err = dragonboat.ParseMembersFlag(initialMembersFlag)
 		if err != nil {
-			log.Fatal("❌ Error parsing initial members:", err)
+			log.Fatal().Err(err).Msg("❌ Error parsing initial members")
 		}
 
 		// Agregar self si no está incluido explícitamente
 		if !dragonboat.IsMemberInMemberArray(selfMember, initialMembers) {
-			log.Fatalf("❌ This node (%s) must be present in initial-members: %v", selfMember.IP, initialMembers)
+			log.Fatal().Msgf("❌ This node (%s) must be present in initial-members: %v", selfMember.IP, initialMembers)
 		}
 
 		if *replicaID == 0 {
-			log.Fatal("❌ Must specify --replica when creating a new cluster.")
+			log.Fatal().Msg("❌ Must specify --replica when creating a new cluster.")
 		}
 		if !dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
-			log.Fatal("❌ The role 'consensus' is required when creating a new cluster.")
+			log.Fatal().Msg("❌ The role 'consensus' is required when creating a new cluster.")
 		}
 	}
 
