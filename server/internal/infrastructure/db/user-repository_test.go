@@ -3,11 +3,14 @@ package db_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"testing"
 
+	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/shared/constants"
@@ -190,4 +193,84 @@ func TestDeleteUser_WriteError(t *testing.T) {
 
 	err := db.DeleteUser(mockStore, "user")
 	assert.Error(t, err)
+}
+func TestPutUser_KVStorePutError(t *testing.T) {
+	store := new(MockKVStore)
+	userInput := models.CreateUser{
+		Username: "testuser",
+		Password: "password123",
+		Email:    "test@example.com",
+	}
+	userKey := fmt.Sprintf("user:%s", userInput.Username)
+
+	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8")).Return(errors.New("kv put failed")).Once()
+
+	err := db.PutUser(store, userInput)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "kv put failed")
+	store.AssertExpectations(t)
+}
+
+func TestGetDefaultRootUserRoot_Success(t *testing.T) {
+	store := new(MockKVStore)
+	expectedUser := models.CreateUser{
+		Username: "admin",
+		Password: "securepassword",
+		Email:    "admin@daedalus.com",
+	}
+	jsonData, err := json.Marshal(expectedUser)
+	require.NoError(t, err)
+
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(jsonData, nil).Once()
+
+	user, err := db.GetDefaultRootUserRoot(store)
+
+	assert.NoError(t, err)
+	require.NotNil(t, user)
+	assert.Equal(t, expectedUser.Username, user.Username)
+	assert.Equal(t, expectedUser.Password, user.Password)
+	assert.Equal(t, expectedUser.Email, user.Email)
+	store.AssertExpectations(t)
+}
+
+func TestGetDefaultRootUserRoot_NotFound(t *testing.T) {
+	store := new(MockKVStore)
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Once()
+
+	user, err := db.GetDefaultRootUserRoot(store)
+
+	assert.NoError(t, err)
+	assert.Nil(t, user)
+	store.AssertExpectations(t)
+}
+
+func TestGetDefaultRootUserRoot_KVStoreGetError(t *testing.T) {
+	store := new(MockKVStore)
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, errors.New("kv get failed")).Once()
+
+	user, err := db.GetDefaultRootUserRoot(store)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "kv get failed")
+	assert.Nil(t, user)
+	store.AssertExpectations(t)
+}
+
+func TestDeleteUser_NoRootUserDefined(t *testing.T) {
+	store := new(MockKVStore)
+	usernameToDelete := "someuser"
+
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Once()
+
+	store.On("Write", mock.AnythingOfType("*grocksdb.WriteBatch")).Run(func(args mock.Arguments) {
+		batch := args.Get(0).(*grocksdb.WriteBatch)
+		assert.Equal(t, 1, batch.Count(), "WriteBatch should have one operation (the delete)")
+
+	}).Return(nil).Once()
+
+	err := db.DeleteUser(store, usernameToDelete)
+
+	assert.NoError(t, err)
+	store.AssertExpectations(t)
 }

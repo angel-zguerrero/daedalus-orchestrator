@@ -12,6 +12,7 @@ import (
 	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
 	constants "deadalus-orch/shared/constants"
@@ -166,5 +167,65 @@ func Test_ErrorPutsRoot(t *testing.T) {
 	err := db.BootstrapRootUser(store, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "write fail")
+	store.AssertExpectations(t)
+}
+
+func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
+	store := new(MockKVStore)
+	cfg := config.Config{
+		DefaultRootUser:     "", // Missing user
+		DefaultRootPassword: "testpass",
+	}
+
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Maybe() // May or may not be called if config check happens first
+
+	err := db.BootstrapRootUser(store, cfg)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing default root user/password")
+	store.AssertExpectations(t)
+}
+
+func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
+	store := new(MockKVStore)
+	cfg := config.Config{
+		DefaultRootUser:     "testuser",
+		DefaultRootPassword: "",
+	}
+
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Maybe()
+
+	err := db.BootstrapRootUser(store, cfg)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing default root user/password")
+	store.AssertExpectations(t)
+}
+
+func TestBootstrapRootUser_PutUserFails(t *testing.T) {
+	store := new(MockKVStore)
+	cfg := config.Config{
+		DefaultRootUser:     "admin",
+		DefaultRootPassword: "password123",
+	}
+
+	rootRecord := models.CreateUser{
+		Username: cfg.DefaultRootUser,
+		Password: cfg.DefaultRootPassword,
+		Email:    "noemail@daedalus.com",
+	}
+	rootRecordData, err := json.Marshal(rootRecord)
+	require.NoError(t, err)
+
+	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(rootRecordData, nil).Once()
+	userKey := fmt.Sprintf("user:%s", cfg.DefaultRootUser)
+	store.On("Get", db.AdminFC, userKey).Return(nil, nil).Once() // User not found in main list
+
+	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8")).Return(errors.New("put failed")).Once()
+
+	err = db.BootstrapRootUser(store, cfg)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "put failed")
 	store.AssertExpectations(t)
 }

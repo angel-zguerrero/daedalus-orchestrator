@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetNodeDBDirName(t *testing.T) {
@@ -221,4 +223,132 @@ func TestMergeUniqueMembers(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected conflict error")
 	}
+}
+
+func TestParseRolesList_ExtendedCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       []string
+		expected    []NodeRole
+		expectError bool
+	}{
+		{
+			name:        "empty list",
+			input:       []string{},
+			expected:    []NodeRole{},
+			expectError: false,
+		},
+		{
+			name:        "valid roles with empty and whitespace strings",
+			input:       []string{"consensus", "", " ", "scheduler", "  "},
+			expected:    []NodeRole{RoleConsensus, RoleScheduler},
+			expectError: false,
+		},
+		{
+			name:        "invalid role with valid ones",
+			input:       []string{"consensus", "invalid_role", "scheduler"},
+			expected:    nil,
+			expectError: true,
+		},
+		{
+			name:        "only empty and whitespace strings",
+			input:       []string{"", " ", "  "},
+			expected:    []NodeRole{},
+			expectError: false,
+		},
+		{
+			name:        "all valid roles",
+			input:       []string{"consensus", "scheduler", "connector"},
+			expected:    []NodeRole{RoleConsensus, RoleScheduler, RoleConnector},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rolesStr := strings.Join(tt.input, ",")
+			if len(tt.input) == 0 {
+				rolesStr = ""
+				if tt.name == "empty list" {
+					rolesStrPtr := ""
+					roles, err := ParseRolesFlag(&rolesStrPtr)
+					if tt.expectError {
+						assert.Error(t, err)
+					} else {
+						assert.NoError(t, err)
+						if tt.name == "empty list" {
+							assert.ElementsMatch(t, []NodeRole{RoleConsensus, RoleScheduler, RoleConnector}, roles, "ParseRolesFlag with empty string should yield all roles")
+						} else {
+							assert.ElementsMatch(t, tt.expected, roles)
+						}
+					}
+					return
+				}
+			}
+
+			roles, err := ParseRolesFlag(&rolesStr)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tt.expected, roles)
+			}
+		})
+	}
+}
+
+func TestParseMember_DetailedErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		expectedError string
+	}{
+		{
+			name:          "missing port",
+			input:         "127.0.0.1",
+			expectedError: "missing port in address",
+		},
+		{
+			name:          "invalid IP",
+			input:         "invalid-ip:8080",
+			expectedError: "invalid IP address",
+		},
+		{
+			name:          "non-numeric port",
+			input:         "127.0.0.1:notaport",
+			expectedError: "invalid port: notaport",
+		},
+		{
+			name:          "port out of range (too high)",
+			input:         "127.0.0.1:70000",
+			expectedError: "invalid port: 70000",
+		},
+		{
+			name:          "port out of range (too low)",
+			input:         "127.0.0.1:0",
+			expectedError: "invalid port: 0",
+		},
+		{
+			name:          "empty string",
+			input:         "",
+			expectedError: "empty member entry",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseMember(tt.input)
+			assert.Error(t, err)
+			if tt.expectedError != "" {
+				assert.Contains(t, err.Error(), tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestGetInitialMembers_EmptyInputs(t *testing.T) {
+	members, err := GetInitialMembers([]string{}, []int{})
+	assert.NoError(t, err)
+	assert.Empty(t, members)
 }
