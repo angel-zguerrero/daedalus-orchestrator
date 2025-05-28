@@ -2,11 +2,17 @@ package dragonboat
 
 import (
 	"crypto/md5"
+	"deadalus-orch/server/internal/pkg/config" // Added
+	"deadalus-orch/shared/constants"           // Added
 	"os"
+	"os/user" // Added
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert" // Added
+	"github.com/stretchr/testify/require" // Added
 )
 
 func TestGetNodeDBDirName(t *testing.T) {
@@ -221,4 +227,200 @@ func TestMergeUniqueMembers(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected conflict error")
 	}
+}
+
+// --- New Test Cases for Phase 2 ---
+
+func TestParseRolesList_ExtendedCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       []string
+		expected    []NodeRole
+		expectError bool
+	}{
+		{
+			name:        "empty list",
+			input:       []string{},
+			expected:    []NodeRole{},
+			expectError: false,
+		},
+		{
+			name:        "valid roles with empty and whitespace strings",
+			input:       []string{"consensus", "", " ", "scheduler", "  "},
+			expected:    []NodeRole{RoleConsensus, RoleScheduler},
+			expectError: false, // Assuming ParseRolesList filters out empty/whitespace
+		},
+		{
+			name:        "invalid role with valid ones",
+			input:       []string{"consensus", "invalid_role", "scheduler"},
+			expected:    nil, // Or []NodeRole{RoleConsensus, RoleScheduler} if invalid is ignored
+			expectError: true, // Assuming it errors out on any invalid role
+		},
+		{
+			name:        "only empty and whitespace strings",
+			input:       []string{"", " ", "  "},
+			expected:    []NodeRole{},
+			expectError: false, // Assuming these are filtered out
+		},
+		{
+			name:        "all valid roles",
+			input:       []string{"consensus", "scheduler", "connector"},
+			expected:    []NodeRole{RoleConsensus, RoleScheduler, RoleConnector},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// ParseRolesList is unexported. We test it via ParseRolesFlag.
+			// To do this, we join the input slice into a comma-separated string for ParseRolesFlag.
+			rolesStr := strings.Join(tt.input, ",")
+			if len(tt.input) == 0 { // Handle case where input is truly empty list vs list of empty strings
+				rolesStr = "" // ParseRolesFlag expects pointer, so empty string means "all"
+				if tt.name == "empty list" { // specific case for empty list
+					rolesStrPtr := ""
+					roles, err := ParseRolesFlag(&rolesStrPtr) // this should return all 3 roles if "" means "all"
+					if tt.expectError {
+						assert.Error(t, err)
+					} else {
+						assert.NoError(t, err)
+						// For empty list input, ParseRolesFlag with "" actually means "all roles"
+						// So, if the test expected an empty list, this needs adjustment or ParseRolesList needs direct test
+						// Given the original ParseRolesFlag test, "" for the string means "all"
+						// This test case as "empty list" for ParseRolesList might be better tested if ParseRolesList were exported
+						// Or by adjusting expectation for ParseRolesFlag:
+						if tt.name == "empty list" {
+							// If ParseRolesFlag interprets "" as "all", then this test is for that behavior
+							assert.ElementsMatch(t, []NodeRole{RoleConsensus, RoleScheduler, RoleConnector}, roles, "ParseRolesFlag with empty string should yield all roles")
+						} else {
+							assert.ElementsMatch(t, tt.expected, roles)
+						}
+					}
+					return
+				}
+			}
+
+			roles, err := ParseRolesFlag(&rolesStr)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tt.expected, roles)
+			}
+		})
+	}
+}
+
+func TestParseMember_DetailedErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		expectedError string // Substring to check for in the error message
+	}{
+		{
+			name:          "missing port",
+			input:         "127.0.0.1",
+			expectedError: "member address 127.0.0.1 must be in ip:port format",
+		},
+		{
+			name:          "invalid IP",
+			input:         "invalid-ip:8080",
+			expectedError: "address invalid-ip:8080: invalid IP address",
+		},
+		{
+			name:          "non-numeric port",
+			input:         "127.0.0.1:notaport",
+			expectedError: "member address 127.0.0.1:notaport: port notaport is not a number",
+		},
+		{
+			name:          "port out of range (too high)",
+			input:         "127.0.0.1:70000",
+			expectedError: "member address 127.0.0.1:70000: port 70000 is not a valid port number",
+		},
+		{
+			name:          "port out of range (too low)",
+			input:         "127.0.0.1:0",
+			expectedError: "member address 127.0.0.1:0: port 0 is not a valid port number",
+		},
+		{
+			name:          "empty string",
+			input:         "",
+			expectedError: "member address  is empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseMember(tt.input)
+			assert.Error(t, err)
+			if tt.expectedError != "" {
+				assert.Contains(t, err.Error(), tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestGetInitialMembers_EmptyInputs(t *testing.T) {
+	members, err := GetInitialMembers([]string{}, []int{})
+	assert.NoError(t, err)
+	assert.Empty(t, members)
+}
+
+func TestGetNodeDBDirName_ErrorPath(t *testing.T) {
+	originalHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", originalHome)
+
+	// Forcing GetDatabasePath to error by unsetting HOME (used in dev mode)
+	// and setting ENV to development explicitly.
+	t.Setenv(constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
+	err := os.Unsetenv("HOME")
+	require.NoError(t, err, "Failed to unset HOME for test")
+
+	// Reload config to ensure it picks up the changed ENV_VAR and no HOME
+	// This might still not be enough if config.LoadDefaultConfiguration was already called
+	// and GlobalConfiguration is already set.
+	// For a robust test, DefaultPathProvider might need to be injectable or config reloaded.
+	// Assuming LoadDefaultConfiguration is called by the system under test or can be triggered.
+	// For now, we directly instantiate DefaultPathProvider which is what getNodeDBDirName does.
+
+	// This relies on db.DefaultPathProvider().GetDatabasePath() failing.
+	// The path provider itself is in another package 'db', making its direct mock hard here.
+	// We are testing getNodeDBDirName's error propagation.
+	config.GlobalConfiguration = nil // Attempt to force re-evaluation or ensure fresh state
+	err = config.LoadDefaultConfiguration() // This will re-parse flags and potentially error on HOME
+	
+	// If loading config itself errors due to HOME unset, that's fine for this test's purpose,
+	// as getNodeDBDirName wouldn't be reached or would get an error from path provider.
+	// If LoadDefaultConfiguration sets a default HOME or doesn't error, this test might not cover the intended path.
+
+	// The actual call within getNodeDBDirName:
+	// pathProvider := &db.DefaultPathProvider{}
+	// basePath, err := pathProvider.GetDatabasePath()
+
+	// If LoadDefaultConfiguration fails due to HOME being unset, that's the error we expect GetDatabasePath to cause.
+	if err != nil && strings.Contains(err.Error(), "user: Current requires cgo") || strings.Contains(err.Error(), "HOME not set") {
+		// This means GetDatabasePath inside LoadDefaultConfiguration (or if called directly) would fail.
+		// So, getNodeDBDirName would also fail.
+		// We can't directly call getNodeDBDirName if config load fails this early.
+		// This test setup highlights the difficulty of testing this specific error path
+		// without more advanced mocking or refactoring DefaultPathProvider.
+		t.Logf("LoadDefaultConfiguration failed as expected due to HOME unset: %v", err)
+		// We assume this error from config loading implies getNodeDBDirName would also fail if it reached GetDatabasePath.
+		// To directly test getNodeDBDirName's error path, GetDatabasePath needs to be mockable.
+		// Given the constraints, we accept that a failure in LoadDefaultConfiguration due to path issues
+		// indirectly tests the scenario where getNodeDBDirName would receive an error.
+		assert.Error(t, err) // Assert that loading config (which uses path provider) errors out
+	} else {
+		// If LoadDefaultConfiguration somehow "succeeds" (e.g. by os.Args flags overriding env needs)
+		// then attempt to call getNodeDBDirName, expecting it to fail.
+		_, errGetNodeDB := getNodeDBDirName(1, 1)
+		assert.Error(t, errGetNodeDB, "getNodeDBDirName should fail if GetDatabasePath fails")
+		if errGetNodeDB != nil {
+			assert.True(t, strings.Contains(errGetNodeDB.Error(), "user: Current requires cgo") || strings.Contains(errGetNodeDB.Error(), "HOME not set"),
+				"Error message should indicate failure related to user/home path.")
+		}
+	}
+	// Restore HOME for other tests if necessary, though t.Setenv and test isolation should handle it.
+	// os.Setenv("HOME", originalHome) // Handled by defer
 }

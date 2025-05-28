@@ -14,8 +14,11 @@ import (
 type TenantKVBaseRocksDBStateMachine struct {
 }
 
+// OpenTenantDBFunc is a variable that can be replaced by a mock in tests.
+var OpenTenantDBFunc = db.OpenTenantDB
+
 func (r *TenantKVBaseRocksDBStateMachine) OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error) {
-	return db.OpenTenantDB(dbPath)
+	return OpenTenantDBFunc(dbPath)
 }
 
 func (r *TenantKVBaseRocksDBStateMachine) Lookup(query interface{}) (RK_Command, error) {
