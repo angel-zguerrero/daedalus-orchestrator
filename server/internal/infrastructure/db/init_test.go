@@ -1,11 +1,15 @@
 package db_test
 
 import (
+	"deadalus-orch/shared/constants" // Added
 	"os"
+	"os/user" // Added
 	"path/filepath"
+	"strings" // Added
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require" // Added
 
 	"deadalus-orch/server/internal/infrastructure/db"
 )
@@ -74,4 +78,44 @@ func TestInitDB_ErrorOnInvalidPath(t *testing.T) {
 
 	_, _, _, err := db.InitDB("testdb", provider, []string{"cf1"}, []string{})
 	assert.Error(t, err)
+}
+
+func TestDefaultPathProvider_DevelopmentEnv(t *testing.T) {
+	t.Setenv(constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
+
+	currentUser, err := user.Current()
+	require.NoError(t, err, "Failed to get current user")
+
+	provider := db.DefaultPathProvider{}
+	path, err := provider.GetDatabasePath()
+
+	assert.NoError(t, err)
+	expectedPathSuffix := filepath.Join(".daedalus", "data")
+	assert.True(t, strings.HasSuffix(path, expectedPathSuffix), "Path should end with "+expectedPathSuffix)
+	assert.True(t, strings.HasPrefix(path, currentUser.HomeDir), "Path should start with user's home directory")
+
+	// Clean up created directory if it exists, be careful with this in real tests
+	// For this test, we are primarily checking the path string, but if it creates, we can clean.
+	// The function GetDatabasePath itself creates the dir.
+	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+		os.RemoveAll(filepath.Join(currentUser.HomeDir, ".daedalus")) // remove parent .daedalus
+	}
+}
+
+func TestDefaultPathProvider_ProductionEnv(t *testing.T) {
+	t.Setenv(constants.EnvVarEnvKey, string(constants.PRODUCTION))
+
+	provider := db.DefaultPathProvider{}
+	path, err := provider.GetDatabasePath()
+
+	if err != nil {
+		if os.IsPermission(err) {
+			assert.Equal(t, "/var/lib/daedalus/data", path, "Path should be /var/lib/daedalus/data")
+		} else {
+			assert.Error(t, err, "mkdir /var/lib/daedalus: permission denied")
+		}
+	} else {
+		assert.Equal(t, "/var/lib/daedalus/data", path, "Path should be /var/lib/daedalus/data")
+		os.RemoveAll("/var/lib/daedalus")
+	}
 }

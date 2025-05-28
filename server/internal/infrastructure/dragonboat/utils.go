@@ -192,7 +192,15 @@ func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 		})
 	}
 
-	parts := strings.Split(*roleSeparateComma, ",")
+	partsRaw := strings.Split(*roleSeparateComma, ",")
+	parts := make([]string, 0, len(partsRaw))
+	for _, part := range partsRaw {
+		partTrimmed := strings.TrimSpace(part)
+		if partTrimmed != "" {
+			parts = append(parts, partTrimmed)
+		}
+	}
+
 	return ParseRolesList(parts)
 }
 

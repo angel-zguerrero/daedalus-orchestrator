@@ -5,6 +5,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config" // Added
 	"encoding/binary"
 	"encoding/gob"
 	"io"
@@ -17,9 +18,13 @@ import (
 
 func setupTenantKV(t *testing.T) *dragonboat.KVBaseRocksDBStateMachine {
 	t.Helper()
-	kv := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	// Ensure config is loaded as NewTenantKVRocksDBStateMachine might depend on it for paths
+	err := config.LoadDefaultConfiguration()
+	require.NoError(t, err, "Failed to load default configuration for test setup")
+
+	kv := dragonboat.NewTenantKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
-	_, err := kv.Open(stopc)
+	_, err = kv.Open(stopc)
 	require.NoError(t, err)
 	return kv
 }
@@ -179,7 +184,10 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	// Also ensure config is loaded for the second instance if it's path dependent
+	err = config.LoadDefaultConfiguration()
+	require.NoError(t, err, "Failed to load default configuration for test setup (kv2)")
+	kv2 := dragonboat.NewTenantKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)

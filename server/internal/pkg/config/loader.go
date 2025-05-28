@@ -65,13 +65,13 @@ Precedence of Configuration:
   If a setting is specified in multiple places, the value from the source with higher precedence will be used.
 `
 
-var configFilePathFlag = flag.String("config", "", "Path to the application configuration file. This flag takes precedence over the CONFIG_PATH environment variable.")
-var roleFlag = flag.String("role", "", "Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.")
-var initialMembersFlag = flag.String("initial-members", "", "Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.")
-var selfMemberAddrFlag = flag.String("self-member-addr", "", "The network address (in ip:port format) that this node will use for communication with other members in the cluster.")
-var joinFlag = flag.Bool("join", false, "Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.")
-var replicaIDFlag = flag.Uint64("replica", 0, "Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.")
-var connectorPortFlag = flag.Int("connector-port", 0, "The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.")
+var ConfigFilePathFlag = flag.String("config", "", "Path to the application configuration file. This flag takes precedence over the CONFIG_PATH environment variable.")
+var RoleFlag = flag.String("role", "", "Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.")
+var InitialMembersFlag = flag.String("initial-members", "", "Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.")
+var SelfMemberAddrFlag = flag.String("self-member-addr", "", "The network address (in ip:port format) that this node will use for communication with other members in the cluster.")
+var JoinFlag = flag.Bool("join", false, "Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.")
+var ReplicaIDFlag = flag.Uint64("replica", 0, "Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.")
+var ConnectorPortFlag = flag.Int("connector-port", 0, "The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.")
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
 
 func LoadDefaultConfiguration() error {
@@ -79,7 +79,7 @@ func LoadDefaultConfiguration() error {
 
 	// Check if the help flag is set
 	if HelpFlag != nil && *HelpFlag {
-		fmt.Println(comprehensiveHelpMessage)
+		fmt.Print(comprehensiveHelpMessage)
 		os.Exit(0)
 	}
 
@@ -91,7 +91,7 @@ func LoadDefaultConfiguration() error {
 
 	configFilePath := os.Getenv(constants.EnvVarConfigPath)
 	if configFilePath == "" {
-		configFilePath = *configFilePathFlag
+		configFilePath = *ConfigFilePathFlag
 	}
 
 	if configFilePath != "" {
@@ -177,27 +177,27 @@ func LoadDefaultConfiguration() error {
 		config.DefaultRootPassword = "admin"
 	}
 	/* overwrite using flags */
-	if *roleFlag != "" {
-		config.Roles = *roleFlag
+	if *RoleFlag != "" {
+		config.Roles = *RoleFlag
 	}
 
-	if *joinFlag {
-		config.Join = *joinFlag
+	if *JoinFlag {
+		config.Join = *JoinFlag
 	}
 
-	if *initialMembersFlag != "" {
-		config.InitialMembers = *initialMembersFlag
+	if *InitialMembersFlag != "" {
+		config.InitialMembers = *InitialMembersFlag
 	}
 
-	if *selfMemberAddrFlag != "" {
-		config.SelfMemberAddr = *selfMemberAddrFlag
+	if *SelfMemberAddrFlag != "" {
+		config.SelfMemberAddr = *SelfMemberAddrFlag
 	}
 
-	if *replicaIDFlag != 0 {
-		config.ReplicaID = *replicaIDFlag
+	if *ReplicaIDFlag != 0 {
+		config.ReplicaID = *ReplicaIDFlag
 	}
-	if *connectorPortFlag != 0 {
-		config.ConnectorPort = *connectorPortFlag
+	if *ConnectorPortFlag != 0 {
+		config.ConnectorPort = *ConnectorPortFlag
 	}
 
 	if !config.Join && config.SelfMemberAddr == "" && config.InitialMembers == "" && config.ReplicaID == 0 {
