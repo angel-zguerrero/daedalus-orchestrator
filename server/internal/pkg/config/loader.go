@@ -12,22 +12,83 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var configFilePathFlag = flag.String("config", "", "Configuration file path")
-var roleFlag = flag.String("role", "", "Comma-separated node roles: consensus, scheduler, connector")
-var initialMembersFlag = flag.String("initial-members", "", "Cluster initial members as ip:port,ip:port,...")
-var selfMemberAddrFlag = flag.String("self-member-addr", "", "Nodehost address (ip:port)")
-var joinFlag = flag.Bool("join", false, "Joining a new node")
-var replicaIDFlag = flag.Uint64("replica", 0, "Nodehost replica")
-var connectorPortFlag = flag.Int("connector-port", 0, "Connector port")
+const comprehensiveHelpMessage = `
+Usage: ./server [flags]
+
+Available Flags:
+  --config			 Path to the application configuration file. This flag takes precedence over the CONFIG_PATH environment variable.
+  --connector-port	 The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.
+  --help			 Show help message and exit.
+  --initial-members	 Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.
+  --join			 Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.
+  --replica			 Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.
+  --role			 Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.
+  --self-member-addr The network address (in ip:port format) that this node will use for communication with other members in the cluster.
+
+Environment Variables:
+  CONFIG_PATH                  Path to the configuration file.
+  ENV                          Application environment (e.g., development, staging, production).
+  DEFAULT_ROOT_USER            Default root username for the application.
+  DEFAULT_ROOT_PASSWORD        Default root password for the application.
+  REPLICA_ID                   Node's replica ID.
+  ROLES                        Comma-separated node roles.
+  SELF_MEMBER_ADDR             Node's own member address (ip:port).
+  INITIAL_MEMBERS              Initial members of the cluster (ip:port,ip:port,...).
+  JOIN                         Set to "true" if the node is joining an existing cluster.
+  CONNECTOR_PORT               Port for the connector service.
+  TTL_INTERNAL_ERROR           TTL for internal error caching in seconds.
+  OTEL_ACTIVE                  Set to "true" or "false" to enable/disable OpenTelemetry.
+  OTEL_ENDPOINT                OpenTelemetry collector endpoint.
+  OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
+
+Configuration File:
+  The application can be configured using a file specified by the --config flag or the CONFIG_PATH environment variable.
+  The file should use key=value pairs, with one pair per line. Lines starting with # are treated as comments and are ignored.
+
+  Available keys:
+    connector_port
+    default_root_user
+    default_root_password
+    replica_id
+    roles
+    self_member_addr
+    initial_members
+    join
+    ttl_internal_error
+
+Precedence of Configuration:
+  The configuration is loaded in the following order of precedence (highest to lowest):
+  1. Command-line flags
+  2. Environment variables
+  3. Configuration file
+
+  If a setting is specified in multiple places, the value from the source with higher precedence will be used.
+`
+
+var configFilePathFlag = flag.String("config", "", "Path to the application configuration file. This flag takes precedence over the CONFIG_PATH environment variable.")
+var roleFlag = flag.String("role", "", "Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.")
+var initialMembersFlag = flag.String("initial-members", "", "Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.")
+var selfMemberAddrFlag = flag.String("self-member-addr", "", "The network address (in ip:port format) that this node will use for communication with other members in the cluster.")
+var joinFlag = flag.Bool("join", false, "Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.")
+var replicaIDFlag = flag.Uint64("replica", 0, "Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.")
+var connectorPortFlag = flag.Int("connector-port", 0, "The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.")
+var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
 
 func LoadDefaultConfiguration() error {
+	flag.Parse() // Parse command-line flags first
+
+	// Check if the help flag is set
+	if HelpFlag != nil && *HelpFlag {
+		fmt.Println(comprehensiveHelpMessage)
+		os.Exit(0)
+	}
+
 	config := &Config{}
 	env := os.Getenv(constants.EnvVarEnvKey)
 	if env == "" {
 		env = string(constants.DEVELOPMENT)
 	}
 
-	flag.Parse()
 	configFilePath := os.Getenv(constants.EnvVarConfigPath)
 	if configFilePath == "" {
 		configFilePath = *configFilePathFlag
