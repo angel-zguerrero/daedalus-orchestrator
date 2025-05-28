@@ -12,6 +12,8 @@ import (
 )
 
 func main() {
+	// Help flag handling and flag parsing is now done in config.LoadDefaultConfiguration()
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
