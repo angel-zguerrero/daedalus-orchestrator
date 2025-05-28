@@ -96,8 +96,8 @@ MIT — because control shouldn’t come with chains.
 
 ## Cluster example
 
-go run . -addr 127.0.0.1:5000 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 1
-go run . -addr 127.0.0.1:5001 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 2
-go run . -addr 127.0.0.1:5002 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 3 -role consensus
+go run . -self-member-addr 127.0.0.1:5000 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 1
+go run . -self-member-addr 127.0.0.1:5001 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 2
+go run . -self-member-addr 127.0.0.1:5002 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 3 -role consensus
 
-go run . -addr 127.0.0.1:5003 -join true -replica 4 -role connector
+go run . -self-member-addr 127.0.0.1:5003 -join true -replica 4 -role connector

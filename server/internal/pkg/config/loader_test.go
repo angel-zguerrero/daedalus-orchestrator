@@ -36,116 +36,90 @@ func setEnv(t *testing.T, key, value string) {
 	t.Setenv(key, value)
 }
 
-func TestLoadOrDefault_ConfigFileAllKeys(t *testing.T) {
+func setFlagConfig(t *testing.T, path string) {
+	t.Helper()
+	setEnv(t, constants.EnvVarConfigPath, path)
+}
+
+func TestLoadDefault_ConfigFileAllKeys(t *testing.T) {
 	content := `
 db_name=my.db
 default_root_user=admin
 default_root_password=secret
 `
 	path := writeTempFile(t, content)
-	defer os.Remove(path)
-	err := config.LoadOrDefault(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	setFlagConfig(t, path)
 
-	if config.GlobalConfiguration.DefaultRootUser != "admin" {
-		t.Errorf("expected default_root_user=admin")
-	}
-	if config.GlobalConfiguration.DefaultRootPassword != "secret" {
-		t.Errorf("expected default_root_password=secret")
-	}
+	err := config.LoadDefaultConfiguration()
+	require.NoError(t, err)
 
+	assert.Equal(t, "admin", config.GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "secret", config.GlobalConfiguration.DefaultRootPassword)
 }
 
-func TestLoadOrDefault_ConfigFileOverwriteKeysWithEnvVars(t *testing.T) {
+func TestLoadDefault_ConfigFileOverwriteWithEnv(t *testing.T) {
 	content := `
 db_name=my.db
 default_root_user=admin
 default_root_password=secret
-port=50005
 `
-
-	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
-	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
-
 	path := writeTempFile(t, content)
-	defer os.Remove(path)
-	err := config.LoadOrDefault(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	setFlagConfig(t, path)
 
-	if config.GlobalConfiguration.DefaultRootUser != "envUser" {
-		t.Errorf("expected DefaultRootUser=envUser, got %s", config.GlobalConfiguration.DefaultRootUser)
-	}
-	if config.GlobalConfiguration.DefaultRootPassword != "envPass" {
-		t.Errorf("expected DefaultRootPassword=envPass, got %s", config.GlobalConfiguration.DefaultRootPassword)
-	}
+	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
+	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
 
+	err := config.LoadDefaultConfiguration()
+	require.NoError(t, err)
+
+	assert.Equal(t, "envUser", config.GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "envPass", config.GlobalConfiguration.DefaultRootPassword)
 }
 
-func TestLoadOrDefault_ConfigFilePartialKeys_ENVFallback(t *testing.T) {
+func TestLoadDefault_ConfigFilePartialKeys_ENVFallback(t *testing.T) {
 	content := `
 db_name=my.db
 `
 	path := writeTempFile(t, content)
-	defer os.Remove(path)
+	setFlagConfig(t, path)
+
 	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
 	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
 
-	err := config.LoadOrDefault(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	err := config.LoadDefaultConfiguration()
+	require.NoError(t, err)
 
-	if config.GlobalConfiguration.DefaultRootUser != "envUser" {
-		t.Errorf("expected default_root_user from env")
-	}
-	if config.GlobalConfiguration.DefaultRootPassword != "envPass" {
-		t.Errorf("expected default_root_password from env")
-	}
+	assert.Equal(t, "envUser", config.GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "envPass", config.GlobalConfiguration.DefaultRootPassword)
 }
 
-func TestLoadOrDefault_InvalidPath(t *testing.T) {
+func TestLoadDefault_InvalidPath(t *testing.T) {
+	setFlagConfig(t, "/nonexistent/path.conf")
 
-	err := config.LoadOrDefault("/nonexistent/path.conf")
-	if err == nil {
-		t.Errorf("expected error but get nil")
-	}
-
+	err := config.LoadDefaultConfiguration()
+	assert.Error(t, err)
 }
 
-func TestLoadOrDefault_NoConfigFile_ENVFallback(t *testing.T) {
+func TestLoadDefault_NoConfigFile_ENVFallback(t *testing.T) {
+	setFlagConfig(t, "")
 	setEnv(t, constants.EnvVarDefaultRootUser, "envUser")
 	setEnv(t, constants.EnvVarDefaultRootPassword, "envPass")
 
-	err := config.LoadOrDefault("")
-	if err != nil {
-		t.Fatal(err)
-	}
+	err := config.LoadDefaultConfiguration()
+	require.NoError(t, err)
 
-	if config.GlobalConfiguration.DefaultRootUser != "envUser" {
-		t.Errorf("expected default_root_user from env")
-	}
-	if config.GlobalConfiguration.DefaultRootPassword != "envPass" {
-		t.Errorf("expected default_root_password from env")
-	}
+	assert.Equal(t, "envUser", config.GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "envPass", config.GlobalConfiguration.DefaultRootPassword)
 }
 
-func TestLoadOrDefault_NoFile_NoEnv_DefaultFallback(t *testing.T) {
-	err := config.LoadOrDefault("")
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestLoadDefault_NoFile_NoEnv_DefaultFallback(t *testing.T) {
+	setFlagConfig(t, "")
 
-	if config.GlobalConfiguration.DefaultRootUser != "admin" {
-		t.Errorf("expected fallback default_root_user=admin")
-	}
+	err := config.LoadDefaultConfiguration()
+	require.NoError(t, err)
 
-	if config.GlobalConfiguration.DefaultRootPassword != "admin" {
-		t.Errorf("expected fallback default_root_password=admin")
-	}
+	assert.Equal(t, "admin", config.GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "admin", config.GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestLoadConfig_ValidAndInvalidLines(t *testing.T) {
@@ -159,84 +133,74 @@ valid_key = value
   spaced_key= spaced_value
 `
 	path := writeTempFile(t, content)
-	defer os.Remove(path)
-	_, err := config.LoadConfig(path)
-	if err != nil {
-		t.Fatal(err)
-	}
 
+	_, err := config.LoadConfigFromPath(path)
+	require.NoError(t, err)
 }
 
-func TestLoadOrDefault_ENVSelection(t *testing.T) {
-	setEnv(t, constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
-	err := config.LoadOrDefault("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	setEnv(t, constants.EnvVarEnvKey, string(constants.STAGING))
-	err = config.LoadOrDefault("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	setEnv(t, constants.EnvVarEnvKey, string(constants.PRODUCTION))
-	err = config.LoadOrDefault("")
-	if err != nil {
-		t.Fatal(err)
+func TestLoadDefault_ENVSelection(t *testing.T) {
+	for _, env := range []string{string(constants.DEVELOPMENT), string(constants.STAGING), string(constants.PRODUCTION)} {
+		t.Setenv(constants.EnvVarEnvKey, env)
+		setFlagConfig(t, "")
+		err := config.LoadDefaultConfiguration()
+		require.NoError(t, err)
 	}
 }
-func TestLoadOrDefault_ENV_DefaultDevelopment(t *testing.T) {
+
+func TestLoadDefault_ENV_DefaultDevelopment(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, "")
-	err := config.LoadOrDefault("")
+	setFlagConfig(t, "")
+	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err)
 }
 
-func TestLoadOrDefault_ENV_Development(t *testing.T) {
-	t.Setenv(constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
-	err := config.LoadOrDefault("")
-	require.NoError(t, err)
-}
-
-func TestLoadOrDefault_ENV_Staging_FileMissing(t *testing.T) {
+func TestLoadDefault_ENV_Staging_FileMissing(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, string(constants.STAGING))
-	err := config.LoadOrDefault("")
+	setFlagConfig(t, "")
+	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err)
 }
 
-func TestLoadOrDefault_ENV_Production_WithFile(t *testing.T) {
+func TestLoadDefault_ENV_Production_WithFile(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, string(constants.PRODUCTION))
-	file := writeTempFile(t, `db_name = my.db`) // simulate file at /etc/daedalus
-	defer os.Remove(file)
-	err := config.LoadOrDefault(file)
+	file := writeTempFile(t, `db_name = my.db`)
+	setFlagConfig(t, file)
+
+	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err)
 }
 
-func TestLoadOrDefault_CustomPath_FileExists(t *testing.T) {
+func TestLoadDefault_CustomPath_FileExists(t *testing.T) {
 	file := writeTempFile(t, `db_name = custom.db`)
-	defer os.Remove(file)
-	err := config.LoadOrDefault(file)
-	require.NoError(t, err)
+	setFlagConfig(t, file)
 
+	err := config.LoadDefaultConfiguration()
+	require.NoError(t, err)
 }
 
-func TestLoadOrDefault_CustomPath_FileMissing(t *testing.T) {
-	err := config.LoadOrDefault("/tmp/does-not-exist.conf")
+func TestLoadDefault_CustomPath_FileMissing(t *testing.T) {
+	setFlagConfig(t, "/tmp/does-not-exist.conf")
+
+	err := config.LoadDefaultConfiguration()
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, os.ErrNotExist))
 }
 
-func TestLoadOrDefault_ENVFallbacks(t *testing.T) {
+func TestLoadDefault_ENVFallbacks(t *testing.T) {
 	t.Setenv(constants.EnvVarDefaultRootUser, "root")
 	t.Setenv(constants.EnvVarDefaultRootPassword, "rootpass")
-	err := config.LoadOrDefault("")
+	setFlagConfig(t, "")
+
+	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err)
 	assert.Equal(t, "root", config.GlobalConfiguration.DefaultRootUser)
 	assert.Equal(t, "rootpass", config.GlobalConfiguration.DefaultRootPassword)
 }
 
-func TestLoadOrDefault_DefaultRootFallbacks(t *testing.T) {
-	err := config.LoadOrDefault("")
+func TestLoadDefault_DefaultRootFallbacks(t *testing.T) {
+	setFlagConfig(t, "")
+
+	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err)
 	assert.Equal(t, "admin", config.GlobalConfiguration.DefaultRootUser)
 	assert.Equal(t, "admin", config.GlobalConfiguration.DefaultRootPassword)

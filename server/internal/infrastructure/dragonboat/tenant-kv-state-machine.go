@@ -43,6 +43,6 @@ func (r *TenantKVBaseRocksDBStateMachine) Update(ents []statemachine.Entry, batc
 
 func NewTenantKVRocksDBStateMachine(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
 	return NewKVStateMachine(clusterID, nodeID, &TenantKVBaseRocksDBStateMachine{}, KVBaseRocksDBStateMachineConfig{
-		InternalErrorTTL: config.GlobalConfiguration.TTLInternalError,
+		TTLInternalError: config.GlobalConfiguration.TTLInternalError,
 	})
 }

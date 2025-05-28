@@ -165,32 +165,35 @@ func replaceCurrentDBFile(dir string) error {
 	return syncDir(dir)
 }
 
-func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
+func ParseRolesList(list []string) ([]NodeRole, error) {
 	var validRoles = map[string]bool{
 		string(RoleConsensus): true,
 		string(RoleScheduler): true,
 		string(RoleConnector): true,
 	}
 
-	if *roleSeparateComma == "" {
-		return []NodeRole{
-			(RoleConsensus),
-			(RoleScheduler),
-			(RoleConnector),
-		}, nil
-	}
-
-	parts := strings.Split(*roleSeparateComma, ",")
-	roles := make([]NodeRole, 0, len(parts))
-	for _, r := range parts {
+	roles := make([]NodeRole, 0, len(list))
+	for _, r := range list {
 		role := strings.TrimSpace(r)
 		if !validRoles[role] {
 			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, scheduler, connector", role)
 		}
 		roles = append(roles, NodeRole(role))
 	}
-
 	return roles, nil
+}
+
+func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
+	if *roleSeparateComma == "" {
+		return ParseRolesList([]string{
+			string(RoleConsensus),
+			string(RoleScheduler),
+			string(RoleConnector),
+		})
+	}
+
+	parts := strings.Split(*roleSeparateComma, ",")
+	return ParseRolesList(parts)
 }
 
 func ParseMember(raw string) (Member, error) {
@@ -284,4 +287,20 @@ func Int64ToBytes(n int64) []byte {
 	buf := make([]byte, 8) // int64 = 8 bytes
 	binary.BigEndian.PutUint64(buf, uint64(n))
 	return buf
+}
+
+func GetInitialMembers(InitialMemberIps []string, InitialMemberPorts []int) ([]Member, error) {
+	if len(InitialMemberIps) != len(InitialMemberPorts) {
+		return nil, fmt.Errorf("mismatched lengths: %d IPs vs %d ports", len(InitialMemberIps), len(InitialMemberPorts))
+	}
+
+	members := make([]Member, 0, len(InitialMemberIps))
+	for i := 0; i < len(InitialMemberIps); i++ {
+		members = append(members, Member{
+			IP:   InitialMemberIps[i],
+			Port: InitialMemberPorts[i],
+		})
+	}
+
+	return members, nil
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/linxGnu/grocksdb"
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -27,7 +28,7 @@ type KVRocksDBStateMachineImpl interface {
 	Lookup(key interface{}) (RK_Command, error)
 }
 type KVBaseRocksDBStateMachineConfig struct {
-	InternalErrorTTL uint64
+	TTLInternalError uint64
 }
 type KVBaseRocksDBStateMachine struct {
 	clusterID        uint64
@@ -142,7 +143,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 					Key:              "internal-errors:" + fmt.Sprintf("%020d", error_key),
 					Value:            []byte(err.Error()),
 					ColumnFamilyName: db.MasterEventFC,
-					TTL:              int(s.config.InternalErrorTTL),
+					TTL:              int(s.config.TTLInternalError),
 					Op:               PutOpTTL,
 				},
 			},

@@ -20,7 +20,7 @@ import (
 
 func setupKV(t *testing.T) *dragonboat.KVBaseRocksDBStateMachine {
 	t.Helper()
-	config.LoadOrDefault("")
+	config.LoadDefaultConfiguration()
 	kv := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
@@ -724,7 +724,7 @@ func TestUpdate_InternalErrorLogging(t *testing.T) {
 		1,
 		&failingImpl{},
 		dragonboat.KVBaseRocksDBStateMachineConfig{
-			InternalErrorTTL: 60,
+			TTLInternalError: 60,
 		},
 	).(*dragonboat.KVBaseRocksDBStateMachine)
 

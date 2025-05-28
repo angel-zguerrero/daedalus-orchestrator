@@ -3,7 +3,6 @@ package app
 import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
 	"os"
@@ -14,24 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Member, initialMembers []dragonboat.Member, join bool) {
-
-	err := utils.ValidateEnvVar()
-	if err != nil {
-		log.Fatal().
-			Err(err).
-			Str("package", "app").
-			Str("func", "Run").
-			Msgf("❌ Failed validation of ENV var")
-	}
-	err = config.LoadOrDefault("")
-	if err != nil {
-		log.Fatal().
-			Err(err).
-			Str("package", "app").
-			Str("func", "Run").
-			Msgf("❌ Failed loading configuration")
-	}
+func Run() {
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	if os.Getenv("LOGGER_FORMAT") == "pretty" || os.Getenv("LOGGER_FORMAT") == "" {
@@ -45,8 +27,6 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 	dblog.SetLoggerFactory(dragonboat.CreateZerologger)
-
-	log.Info().Interface("", roles).Msg("This node has these roles")
 
 	ctx, tp, err := telemetry.Init(
 		constants.Env(os.Getenv(constants.EnvVarEnvKey)),
@@ -67,7 +47,80 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 		_ = tp.Shutdown(ctx)
 	}()
 
-	masterNode, err := dragonboat.InitMasterNode(uint64(replicaID), selfMember, initialMembers, join, roles)
+	selfMember, err := dragonboat.ParseMember(config.GlobalConfiguration.SelfMemberAddr)
+
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed parsing self member")
+	}
+
+	initialMembers, err := dragonboat.ParseMembersFlag(&config.GlobalConfiguration.InitialMembers)
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed Getting initial members")
+	}
+
+	roles, err := dragonboat.ParseRolesFlag(&config.GlobalConfiguration.Roles)
+
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed parsing roles")
+	}
+
+	if config.GlobalConfiguration.Join {
+		if config.GlobalConfiguration.ReplicaID == 0 {
+			log.Fatal().
+				Err(err).
+				Str("package", "app").
+				Str("func", "Run").
+				Msgf("❌ Must specify --replica when joining a cluster.")
+		}
+	}
+
+	if !config.GlobalConfiguration.Join {
+
+		if !dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
+			log.Fatal().
+				Err(err).
+				Str("package", "app").
+				Str("func", "Run").
+				Msgf("❌ The role 'consensus' is required when creating a new cluster.")
+		}
+		if config.GlobalConfiguration.ReplicaID == 0 {
+			log.Fatal().
+				Err(err).
+				Str("package", "app").
+				Str("func", "Run").
+				Msgf("❌ Must specify --replica when creating a new cluster.")
+		}
+
+		if len(config.GlobalConfiguration.InitialMembers) == 0 {
+			log.Fatal().
+				Err(err).
+				Str("package", "app").
+				Str("func", "Run").
+				Msgf("❌ Must provide --initial-members when creating a new cluster.")
+		}
+
+		if !dragonboat.IsMemberInMemberArray(selfMember, initialMembers) {
+			log.Fatal().
+				Err(err).
+				Str("package", "app").
+				Str("func", "Run").
+				Msgf("❌ This node (%s) must be present in initial-members: %v", selfMember.IP, initialMembers)
+		}
+	}
+
+	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles)
 	if err != nil {
 		log.Fatal().
 			Err(err).
@@ -75,6 +128,8 @@ func Run(replicaID int, roles []dragonboat.NodeRole, selfMember dragonboat.Membe
 			Str("func", "Run").
 			Msgf("❌ Failed Init raft Master node")
 	}
+
+	log.Info().Interface("", config.GlobalConfiguration.Roles).Msg("This node has these roles")
 
 	go func() {
 		interval := 3 * time.Second
