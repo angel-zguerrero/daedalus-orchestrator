@@ -16,14 +16,14 @@ const comprehensiveHelpMessage = `
 Usage: ./server [flags]
 
 Available Flags:
-  --config string        Path to the application configuration file. This flag takes precedence over the CONFIG_PATH environment variable.
-  --connector-port int   The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.
-  --help                 Show help message and exit.
-  --initial-members string Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.
-  --join                 Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.
-  --replica uint         Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.
-  --role string          Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.
-  --self-member-addr string The network address (in ip:port format) that this node will use for communication with other members in the cluster.
+  --config			 Path to the application configuration file. This flag takes precedence over the CONFIG_PATH environment variable.
+  --connector-port	 The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.
+  --help			 Show help message and exit.
+  --initial-members	 Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.
+  --join			 Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.
+  --replica			 Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.
+  --role			 Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.
+  --self-member-addr The network address (in ip:port format) that this node will use for communication with other members in the cluster.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
