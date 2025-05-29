@@ -54,11 +54,11 @@ type KVBaseRocksDBStateMachine struct {
 	// lastApplied is the Raft index of the last entry successfully applied to the state machine.
 	// It's crucial for consistency and recovery.
 	lastApplied      uint64
-	store            unsafe.Pointer // Points to a *db.RocksdbStore instance. Used for atomic updates.
-	closed           bool           // True if the state machine has been closed.
-	aborted          bool           // True if the state machine has been aborted (not currently used in logic but present).
-	mu               sync.RWMutex   // Protects access to shared state, especially during Open, Close, Update, and Snapshot operations.
-	stateMachineImpl KVRocksDBStateMachineImpl // The specific implementation for handling DB opening and command processing.
+	store            unsafe.Pointer                  // Points to a *db.RocksdbStore instance. Used for atomic updates.
+	closed           bool                            // True if the state machine has been closed.
+	aborted          bool                            // True if the state machine has been aborted (not currently used in logic but present).
+	mu               sync.RWMutex                    // Protects access to shared state, especially during Open, Close, Update, and Snapshot operations.
+	stateMachineImpl KVRocksDBStateMachineImpl       // The specific implementation for handling DB opening and command processing.
 	config           KVBaseRocksDBStateMachineConfig // Configuration for the state machine.
 }
 
@@ -451,7 +451,7 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle)
 	batch := grocksdb.NewWriteBatch()
 	defer batch.Destroy()
 
-	it := db.NewIteratorCF(readOpts, cf)
+	it := db_instance.NewIteratorCF(readOpts, cf)
 	defer it.Close()
 
 	nowMillis := time.Now().UnixMilli()
@@ -505,7 +505,7 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle)
 	}
 
 	if deleted > 0 {
-			if err := db_instance.Write(writeOpts, batch); err != nil {
+		if err := db_instance.Write(writeOpts, batch); err != nil {
 			return fmt.Errorf("failed to write batch for expired keys: %w", err)
 		}
 	}
@@ -913,13 +913,12 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 			}
 		}
 	}
-	
+
 	// Sync directory of the new DB
 	if err := syncDir(filepath.Dir(dbdir)); err != nil {
 		log.Error().Err(err).Str("path", filepath.Dir(dbdir)).Msg("Failed to sync new database directory")
 		// Not returning error here as primary recovery is done.
 	}
-
 
 	// Important: Update the lastApplied index *after* successfully swapping the store
 	// and cleaning up.
@@ -936,7 +935,6 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 	}
 	s.lastApplied = newLastApplied
 
-
 	return nil
 }
 
@@ -946,6 +944,7 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 //
 // Returns:
 //   - An error if any occurs during the closing of the RocksDB store (though typically, RocksDB Close doesn't return errors).
+//
 // Panics if called more than once.
 func (s *KVBaseRocksDBStateMachine) Close() error {
 	s.mu.Lock()

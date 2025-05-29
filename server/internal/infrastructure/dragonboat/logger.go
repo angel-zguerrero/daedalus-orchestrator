@@ -45,7 +45,7 @@ func (l *zerologgerLogger) Debugf(format string, args ...interface{}) {
 // Panicf logs a panic message using zerolog and then panics.
 // It includes the logger's name as a field.
 func (l *zerologgerLogger) Panicf(format string, args ...interface{}) {
-	log.Panic().Str("name", l.name).Msgf(format, args...)
+	log.Error().Err(errors.New(fmt.Sprintf(format, args...))).Str("source", l.name).Msgf(format, args...)
 }
 
 // SetLevel is part of the dblog.ILogger interface. In this implementation,
