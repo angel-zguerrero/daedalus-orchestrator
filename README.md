@@ -20,7 +20,6 @@ The application can be configured using the following environment variables. Ple
 | `OTEL_ENDPOINT`          | The endpoint (host:port) for the OpenTelemetry collector.                                                  | string (e.g., `localhost:4317`)      | `localhost:4317`     |
 | `OTEL_TRACER_SERVICE_NAME` | The service name used for OpenTelemetry traces.                                                            | string                               | `deadalus-server`    |
 
-*Note: This list is based on the provided `README.md` and inferences. A full review of `config.LoadDefaultConfiguration()` and `utils.ValidateEnvVar()` would be needed for a complete and accurate list. Variables like `DB_NAME` and `PORT` are listed here but are not processed by the central `LoadDefaultConfiguration` function; their usage might be specific to other components or services within the application.*
 
 # Command-Line Parameters
 
