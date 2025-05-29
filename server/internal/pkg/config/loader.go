@@ -296,8 +296,8 @@ func LoadConfigFromPath(path string) (*Config, error) {
 // Returns:
 //   - A pointer to a populated configFromMap struct.
 //   - An error if parsing any known key into its target type fails (e.g., string to int or bool).
-func mapToConfig(data map[string]string) (*configFromMap, error) {
-	cfg := &configFromMap{}
+func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
+	cfg := &ConfigFromMap{}
 
 	for k, v := range data {
 		switch k {

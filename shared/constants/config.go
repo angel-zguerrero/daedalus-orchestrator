@@ -90,11 +90,6 @@ const (
 	STAGING Env = "staging"
 )
 
-// OtelActive defines the activation status for OpenTelemetry, represented as strings "true" or "false".
-// Using a specific type alias, even if underlying is string, can improve type safety if used consistently.
-// However, it's currently defined as const strings directly.
-type OtelActive string // Example of how it could be typed; current usage is string constants.
-
 // Possible string values for OpenTelemetry activation status.
 const (
 	// OTEL_ACTIVE_TRUE represents the "true" string value for enabling OpenTelemetry.

@@ -28,10 +28,10 @@ type Config struct {
 	DefaultRootPassword string
 }
 
-// configFromMap is an unexported struct used as an intermediary when loading
+// ConfigFromMap is an unexported struct used as an intermediary when loading
 // configuration data from a map (e.g., from a JSON or YAML file parsed into a map).
 // Its fields are lowercase and use underscores, matching common conventions for map keys from config files.
-type configFromMap struct {
+type ConfigFromMap struct {
 	replica_id            uint64
 	roles                 string
 	self_member_addr      string
@@ -51,7 +51,7 @@ type configFromMap struct {
 //
 // Returns:
 //   - A pointer to a Config struct populated with values from configFromMapInstance.
-func ConfigFromMapToConfig(configFromMapInstance configFromMap) *Config {
+func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 	c := &Config{
 		ReplicaID:           configFromMapInstance.replica_id,
 		Roles:               configFromMapInstance.roles,

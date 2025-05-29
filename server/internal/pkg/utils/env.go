@@ -50,7 +50,7 @@ func ValidateEnvVar() error {
 		log.Info().Str(constants.EnvVarOtelActived, otelActived).Msg("Defaulted to OTEL_ACTIVED=true")
 	}
 
-	switch constants.OtelActive(otelActived) { // Cast to constants.OtelActive
+	switch otelActived { // Cast to constants.OtelActive
 	case constants.OTEL_ACTIVE_TRUE, constants.OTEL_ACTIVE_FALSE:
 		log.Info().
 			Str(constants.EnvVarOtelActived, otelActived).
