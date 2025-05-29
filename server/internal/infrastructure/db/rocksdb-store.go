@@ -8,12 +8,26 @@ import (
 	"github.com/linxGnu/grocksdb"
 )
 
+// RocksdbStore is an implementation of the KVStore interface using RocksDB as the underlying storage engine.
+// It holds a reference to the RocksDB database instance and maps of column family handles
+// for both regular and TTL (Time-To-Live) column families.
 type RocksdbStore struct {
-	*grocksdb.DB
-	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle
-	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle
+	*grocksdb.DB                                          // Embedded RocksDB database instance.
+	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle // Map of regular column family names to their handles.
+	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
 }
 
+// Get retrieves the value associated with a key from a specific column family.
+// It first checks regular column families, then TTL column families.
+//
+// Parameters:
+//   - columnFamily: The name of the column family to search within.
+//   - key: The key whose value is to be retrieved.
+//
+// Returns:
+//   - A byte slice containing the value if the key is found.
+//   - nil if the key is not found.
+//   - An error if the specified column family does not exist or if any other RocksDB error occurs.
 func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	cf, ok := r.ColumnFamilyHandles[columnFamily]
 	if !ok {
@@ -37,6 +51,25 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	return nil, nil
 }
 
+// SearchByPatternPaginatedKV searches for key-value pairs in a specified column family
+// where the key matches a given pattern. It supports pagination using a cursor and limit.
+//
+// The pattern matching supports:
+//   - Exact match: "key"
+//   - Prefix match: "prefix*"
+//   - Suffix match: "*suffix" (iterates all keys, less efficient)
+//   - Contains match: "*substring*" (iterates all keys, less efficient)
+//
+// Parameters:
+//   - cfName: The name of the column family to search within.
+//   - pattern: The pattern to match keys against.
+//   - cursor: The key to start searching from (exclusive). If empty, starts from the beginning (or prefix for prefix match).
+//   - limit: The maximum number of results to return.
+//
+// Returns:
+//   - A slice of KeyValuePair structs matching the pattern.
+//   - A string representing the next cursor (the key of the last item returned), or an empty string if no more results.
+//   - An error if the column family is not found or if an iterator error occurs.
 func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error) {
 	var results []KeyValuePair
 	var nextCursor string
@@ -124,6 +157,17 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 	return results, nextCursor, nil
 }
 
+// Put stores a key-value pair into the specified column family.
+// If the key already exists, its value will be overwritten.
+// It first checks regular column families, then TTL column families.
+//
+// Parameters:
+//   - columnFamily: The name of the column family where the key-value pair will be stored.
+//   - key: The key to store.
+//   - value: The value to store (as a byte slice).
+//
+// Returns:
+//   - An error if the specified column family does not exist or if any other RocksDB error occurs during the put operation.
 func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {
 	cf, ok := r.ColumnFamilyHandles[columnFamily]
 	if !ok {
@@ -137,6 +181,14 @@ func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {
 	return r.DB.PutCF(wo, cf, []byte(key), value)
 }
 
+// Write applies a batch of operations to the database atomically.
+// The provided batch must be of type *grocksdb.WriteBatch.
+//
+// Parameters:
+//   - batch: A *grocksdb.WriteBatch containing the operations to be written.
+//
+// Returns:
+//   - An error if the provided batch is not of the correct type or if any RocksDB error occurs during the write operation.
 func (r *RocksdbStore) Write(batch interface{}) error {
 
 	wo := grocksdb.NewDefaultWriteOptions()
@@ -148,6 +200,15 @@ func (r *RocksdbStore) Write(batch interface{}) error {
 	return r.DB.Write(wo, batch_)
 }
 
+// DumpAll retrieves all key-value pairs from all column families (both regular and TTL) in the database.
+// The result is returned as a map where keys are column family names and values are maps of key-value pairs
+// within that column family.
+//
+// This method can be memory-intensive for large databases.
+//
+// Returns:
+//   - A map[string]map[string][]byte representing all data in the database.
+//   - An error if any RocksDB iterator error occurs.
 func (r *RocksdbStore) DumpAll() (interface{}, error) {
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -190,6 +251,16 @@ func (r *RocksdbStore) DumpAll() (interface{}, error) {
 	return result, nil
 }
 
+// Iterate iterates over all key-value pairs in all column families (both regular and TTL)
+// and executes the provided function `fn` for each pair.
+// If `fn` returns an error, the iteration stops and the error is returned.
+//
+// Parameters:
+//   - fn: A function that takes the column family name (string), key (byte slice), and value (byte slice)
+//     and returns an error.
+//
+// Returns:
+//   - An error if `fn` returns an error or if any RocksDB iterator error occurs.
 func (r *RocksdbStore) Iterate(fn func(cfName string, key, value []byte) error) error {
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
@@ -231,6 +302,11 @@ func (r *RocksdbStore) Iterate(fn func(cfName string, key, value []byte) error) 
 	return nil
 }
 
+// ClearAll removes all key-value pairs from all column families in the database.
+// This is a destructive operation. It iterates through each key in each column family and deletes it.
+//
+// Returns:
+//   - An error if any RocksDB error occurs during deletion or iteration.
 func (r *RocksdbStore) ClearAll() error {
 	// Combinamos ColumnFamilyHandles y TTLColumnFamilyHandles en un solo mapa
 	allCFs := map[string]*grocksdb.ColumnFamilyHandle{}
@@ -277,6 +353,12 @@ func (r *RocksdbStore) ClearAll() error {
 	return nil
 }
 
+// Flush flushes all memtable data to disk for all column families.
+// It first flushes each column family individually and then performs a general database flush and WAL flush.
+// The flush operations wait for completion.
+//
+// Returns:
+//   - An error if any RocksDB error occurs during the flush operations.
 func (r *RocksdbStore) Flush() error {
 	fo := grocksdb.NewDefaultFlushOptions()
 	defer fo.Destroy()
@@ -309,6 +391,11 @@ func (r *RocksdbStore) Flush() error {
 	return r.DB.FlushWAL(true)
 }
 
+// Close closes the RocksDB database.
+// After this call, the RocksdbStore instance should not be used.
+//
+// Returns:
+//   - nil (errors during close are typically handled internally by grocksdb or are not recoverable).
 func (r *RocksdbStore) Close() error {
 	r.DB.Close()
 	return nil
