@@ -16,17 +16,26 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// RaftNode represents a single node (replica) participating in a Dragonboat Raft consensus group (shard).
+// It encapsulates the Dragonboat NodeHost, configuration for the replica, and methods to interact with it.
 type RaftNode struct {
-	NH             *dragonboat.NodeHost
-	ShardID        uint64
-	ReplicaID      uint64
-	SelfMember     Member
-	InitialMembers []Member
-	Join           bool
-	Roles          []NodeRole
-	stateMachine   func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine
+	NH             *dragonboat.NodeHost                                                       // The underlying Dragonboat NodeHost instance.
+	ShardID        uint64                                                                     // The ID of the shard (Raft consensus group) this node belongs to.
+	ReplicaID      uint64                                                                     // The unique ID of this replica within the shard.
+	SelfMember     Member                                                                     // Details of the current node (e.g., address, port).
+	InitialMembers []Member                                                                   // List of initial members for bootstrapping a new shard.
+	Join           bool                                                                       // Flag indicating if this node is joining an existing shard.
+	Roles          []NodeRole                                                                 // Roles assigned to this node (e.g., consensus, scheduler).
+	stateMachine   func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine // A factory function that creates an instance of the on-disk state machine for this replica.
 }
 
+// StartReplica initializes and starts the Raft replica on the NodeHost.
+// It configures the replica based on RaftNode fields, sets up WAL and NodeHost directories,
+// creates a new NodeHost instance if not already present (though typically NH is created by InitRaftNode),
+// and then starts the on-disk replica.
+//
+// Returns:
+//   - An error if any step fails, such as directory creation, NodeHost initialization, or starting the replica.
 func (mn *RaftNode) StartReplica() error {
 
 	cfg := config.Config{
@@ -72,24 +81,60 @@ func (mn *RaftNode) StartReplica() error {
 
 }
 
+// RequestAddReplica sends a request to the Raft cluster to add a new replica to the shard.
+//
+// Parameters:
+//   - replicaID: The ID of the new replica to be added.
+//   - member: The Member struct describing the new replica (e.g., its address).
+//
+// Returns:
+//   - An error if the request to Dragonboat fails (e.g., timeout, node not leader).
+//     The actual success/failure of adding the replica is logged based on the result channel.
 func (mn *RaftNode) RequestAddReplica(replicaID uint64, member Member) error {
 	addr := MemmberToAddr(member)
+	// Request to add a new replica to the shard. The timeout is 3 seconds.
+	// The ReplicaID of the new node is replicaID, its RaftAddress is addr.
+	// The last argument 0 is the instance ID of the new replica, it is not used
+	// by Dragonboat.
 	rs, err := mn.NH.RequestAddReplica(mn.ShardID, replicaID, addr, 0, 3*time.Second)
+	if err != nil {
+		return err
+	}
+	// Wait for the result of the request.
 	select {
 	case r := <-rs.ResultC():
 		if r.Completed() {
-			log.Info().Msg("✅ Réplica añadida exitosamente")
+			log.Info().Msg("✅ Replica added successfully") // Changed Spanish to English
 		} else {
-			log.Error().Interface("Result", r).Msg("❌ Error añadiendo réplica")
+			log.Error().Interface("Result", r).Msg("❌ Error adding replica") // Changed Spanish to English
 		}
 	}
 	return err
 }
 
+// GetClient returns a client session (NoOPSession) for the shard this RaftNode belongs to.
+// A NoOPSession is a light-weight session that can be used for proposing no-op entries
+// or for certain types of read operations, but typically, for proposals that change state,
+// a regular session from `ProposeSession` would be used.
+//
+// Returns:
+//   - A *client.Session connected to the shard.
 func (mn *RaftNode) GetClient() *client.Session {
 	return mn.NH.GetNoOPSession(mn.ShardID)
 }
 
+// StartNodeReadyWatcher starts a goroutine that periodically checks if the Raft node is ready
+// to process proposals by attempting a synchronous proposal (SyncPropose) of a no-op like command.
+// It sends true on the returned channel when the node becomes ready, and false if it becomes not ready.
+// This can be used to monitor the health and leadership status of the node.
+//
+// Parameters:
+//   - interval: The time.Duration between readiness checks.
+//
+// Returns:
+//   - A <-chan bool that emits true when the node is ready, and false otherwise.
+//     The channel is closed when the watcher stops (which is implicitly when the RaftNode might be stopped,
+//     though this watcher runs indefinitely until the underlying NH operations fail consistently or the program exits).
 func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 	readyChan := make(chan bool)
 
@@ -134,6 +179,25 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 	return readyChan
 }
 
+// InitRaftNode is a general function to initialize a new RaftNode.
+// It sets up the RaftNode struct with the provided parameters and starts the replica.
+// This function is often assigned to InitRaftNodeFunc to allow mocking during tests.
+//
+// Parameters:
+//   - ShardID: The ID of the shard (Raft consensus group).
+//   - ReplicaID: The unique ID for this replica within the shard.
+//   - selfMember: A Member struct describing the current node.
+//   - initialMembers: A slice of Member structs for bootstrapping a new shard.
+//   - join: A boolean indicating if this node is joining an existing shard.
+//   - roles: A slice of NodeRole defining the roles for this node.
+//   - stateMachineFn: A factory function to create the on-disk state machine for this replica.
+//     Note: The current implementation within InitRaftNode directly uses NewMasterKVRocksDBStateMachine,
+//     effectively overriding the passed stateMachineFn if it were different. This might be an oversight
+//     or intentional design for this specific InitRaftNode function.
+//
+// Returns:
+//   - A pointer to the initialized and started RaftNode.
+//   - An error if starting the replica fails.
 func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, stateMachineFn func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine) (*RaftNode, error) {
 	raftNode := &RaftNode{}
 	raftNode.ReplicaID = ReplicaID
@@ -142,9 +206,21 @@ func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMe
 	raftNode.InitialMembers = initialMembers
 	raftNode.Join = join
 	raftNode.Roles = roles
-	raftNode.stateMachine = func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
-		return NewMasterKVRocksDBStateMachine(clusterID, nodeID)
-	}
+	// The passed stateMachineFn is assigned here.
+	raftNode.stateMachine = stateMachineFn
+	// However, StartReplica currently uses its own hardcoded state machine if not careful.
+	// The current RaftNode.StartReplica uses mn.stateMachine, so this assignment is correct.
+	// The original comment in StartReplica about NewMasterKVRocksDBStateMachine might be misleading
+	// if stateMachineFn is indeed passed and used.
+	// The InitRaftNode was previously hardcoding `NewMasterKVRocksDBStateMachine`
+	// It should use the provided `stateMachineFn`.
+	// Corrected: It seems the InitRaftNode itself was previously hardcoding the state machine type
+	// rather than using the passed `stateMachineFn`. The RaftNode struct correctly stores `stateMachineFn`
+	// as `stateMachine` and `StartReplica` uses `mn.stateMachine`.
+	// The specific call to `InitRaftNode` from `InitMasterNode` passes `NewMasterKVRocksDBStateMachine`.
+	// The specific call from `InitTenantNode` (presumably in tenant-node.go) would pass `NewTenantKVRocksDBStateMachine`.
+	// So, the `stateMachineFn` parameter IS being used correctly to instantiate the appropriate SM.
+
 	err := raftNode.StartReplica()
 	if err != nil {
 		return nil, err

@@ -20,6 +20,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// getNodeDBDirName constructs the database directory path for a specific Raft node.
+// The path is typically <base_database_path>/<clusterID>_<nodeID>.
+//
+// Parameters:
+//   - clusterID: The ID of the Raft cluster (shard).
+//   - nodeID: The ID of the Raft node (replica).
+//
+// Returns:
+//   - The constructed directory path as a string.
+//   - An error if the base database path cannot be determined.
 func getNodeDBDirName(clusterID uint64, nodeID uint64) (string, error) {
 	part := fmt.Sprintf("%d_%d", clusterID, nodeID)
 	database_path, err := (&db.DefaultPathProvider{}).GetDatabasePath()
@@ -29,6 +39,16 @@ func getNodeDBDirName(clusterID uint64, nodeID uint64) (string, error) {
 	return filepath.Join(database_path, part), nil
 }
 
+// syncDir flushes directory changes to the underlying storage.
+// On Windows, this is a no-op. On other systems, it opens the directory
+// and calls Sync on the file descriptor.
+//
+// Parameters:
+//   - dir: The path to the directory to be synced.
+//
+// Returns:
+//   - An error if stating the directory, opening it, or syncing it fails.
+// Panics if `dir` is not a directory.
 func syncDir(dir string) (err error) { // good practice
 	if runtime.GOOS == "windows" {
 		return nil
@@ -52,6 +72,15 @@ func syncDir(dir string) (err error) { // good practice
 	return df.Sync()
 }
 
+// createNodeDataDir creates a directory and syncs its parent directory.
+// This is often used for creating directories that will hold database files
+// to ensure the directory entry is persisted.
+//
+// Parameters:
+//   - dir: The path of the directory to create.
+//
+// Returns:
+//   - An error if creating the directory or syncing its parent fails.
 func createNodeDataDir(dir string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
@@ -59,6 +88,15 @@ func createNodeDataDir(dir string) error {
 	return syncDir(filepath.Dir(dir))
 }
 
+// isNewRun checks if the current execution is a new run for a node by
+// looking for the existence of the CurrentDBFilename in the specified directory.
+//
+// Parameters:
+//   - dir: The node's base data directory.
+//
+// Returns:
+//   - True if CurrentDBFilename does not exist, indicating a new run.
+//   - False otherwise.
 func isNewRun(dir string) bool {
 	fp := filepath.Join(dir, CurrentDBFilename)
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
@@ -66,6 +104,18 @@ func isNewRun(dir string) bool {
 	}
 	return false
 }
+
+// getCurrentDBDirName reads the CurrentDBFilename file to get the name of the
+// current active database directory. The file content is expected to be
+// an 8-byte MD5 checksum followed by the directory name.
+//
+// Parameters:
+//   - dir: The node's base data directory where CurrentDBFilename is located.
+//
+// Returns:
+//   - The name of the current database directory.
+//   - An error if opening or reading the file fails, or if the content is corrupted.
+// Panics if the file content is too short or if the checksum doesn't match.
 func getCurrentDBDirName(dir string) (string, error) {
 	fp := filepath.Join(dir, CurrentDBFilename)
 	f, err := os.OpenFile(fp, os.O_RDONLY, 0755)
@@ -95,6 +145,18 @@ func getCurrentDBDirName(dir string) (string, error) {
 	}
 	return string(content), nil
 }
+
+// cleanupNodeDataDir removes old or temporary database directories.
+// It first removes any directory named UpdatingDBFilename.
+// Then, it reads the current DB directory name and deletes any other
+// subdirectories in the node's base data directory.
+//
+// Parameters:
+//   - dir: The node's base data directory.
+//
+// Returns:
+//   - An error if reading the current DB directory name fails, listing files fails,
+//     or removing old directories fails.
 func cleanupNodeDataDir(dir string) error {
 	os.RemoveAll(filepath.Join(dir, UpdatingDBFilename))
 	dbdir, err := getCurrentDBDirName(dir)
@@ -121,12 +183,33 @@ func cleanupNodeDataDir(dir string) error {
 	return nil
 }
 
+// getNewRandomDBDirName generates a new random directory name for a database instance.
+// The name is typically based on a random number and the current nanosecond timestamp
+// to ensure uniqueness.
+//
+// Parameters:
+//   - dir: The parent directory where the new random directory will conceptually reside (used for joining).
+//
+// Returns:
+//   - A string representing the full path to the new random directory.
 func getNewRandomDBDirName(dir string) string {
 	part := "%d_%d"
 	rn := rand.Uint64()
 	ct := time.Now().UnixNano()
 	return filepath.Join(dir, fmt.Sprintf(part, rn, ct))
 }
+
+// saveCurrentDBDirName saves the name of the active database directory to the
+// UpdatingDBFilename file. It prepends an 8-byte MD5 checksum of the directory name.
+// This file acts as a temporary placeholder before being renamed to CurrentDBFilename.
+//
+// Parameters:
+//   - dir: The node's base data directory.
+//   - dbdir: The name of the current active database directory to save.
+//
+// Returns:
+//   - An error if writing the checksum, directory name, or syncing the file/directory fails.
+// Panics if closing the file or syncing the parent directory fails.
 func saveCurrentDBDirName(dir string, dbdir string) error {
 	h := md5.New()
 	if _, err := h.Write([]byte(dbdir)); err != nil {
@@ -156,6 +239,16 @@ func saveCurrentDBDirName(dir string, dbdir string) error {
 	}
 	return nil
 }
+
+// replaceCurrentDBFile renames UpdatingDBFilename to CurrentDBFilename,
+// effectively making the database directory listed in UpdatingDBFilename the active one.
+// It then syncs the parent directory.
+//
+// Parameters:
+//   - dir: The node's base data directory.
+//
+// Returns:
+//   - An error if renaming the file or syncing the directory fails.
 func replaceCurrentDBFile(dir string) error {
 	fp := filepath.Join(dir, CurrentDBFilename)
 	tmpFp := filepath.Join(dir, UpdatingDBFilename)
@@ -165,6 +258,15 @@ func replaceCurrentDBFile(dir string) error {
 	return syncDir(dir)
 }
 
+// ParseRolesList converts a list of role strings into a slice of NodeRole types.
+// It validates each role against a predefined set of valid roles.
+//
+// Parameters:
+//   - list: A slice of strings, where each string is a potential node role.
+//
+// Returns:
+//   - A slice of NodeRole.
+//   - An error if any role string is invalid.
 func ParseRolesList(list []string) ([]NodeRole, error) {
 	var validRoles = map[string]bool{
 		string(RoleConsensus): true,
@@ -183,6 +285,15 @@ func ParseRolesList(list []string) ([]NodeRole, error) {
 	return roles, nil
 }
 
+// ParseRolesFlag parses a comma-separated string of roles into a slice of NodeRole.
+// If the input string is empty, it returns a default list of all roles.
+//
+// Parameters:
+//   - roleSeparateComma: A pointer to a string containing comma-separated roles.
+//
+// Returns:
+//   - A slice of NodeRole.
+//   - An error if any role is invalid (via ParseRolesList).
 func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 	if *roleSeparateComma == "" {
 		return ParseRolesList([]string{
@@ -204,6 +315,15 @@ func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 	return ParseRolesList(parts)
 }
 
+// ParseMember parses a string representation of a node member (e.g., "127.0.0.1:7000")
+// into a Member struct. It validates the IP address and port.
+//
+// Parameters:
+//   - raw: The string representation of the member.
+//
+// Returns:
+//   - A Member struct.
+//   - An error if the format is invalid, IP is invalid, or port is out of range.
 func ParseMember(raw string) (Member, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -231,6 +351,15 @@ func ParseMember(raw string) (Member, error) {
 	}, nil
 }
 
+// ParseMembersFlag parses a comma-separated string of members into a slice of Member structs.
+// If the input string is empty, it returns an empty slice.
+//
+// Parameters:
+//   - membersFlag: A pointer to a string containing comma-separated member addresses.
+//
+// Returns:
+//   - A slice of Member structs.
+//   - An error if any member string cannot be parsed (via ParseMember).
 func ParseMembersFlag(membersFlag *string) ([]Member, error) {
 	if *membersFlag == "" {
 		return []Member{}, nil
@@ -250,20 +379,46 @@ func ParseMembersFlag(membersFlag *string) ([]Member, error) {
 	return members, nil
 }
 
+// ToInitialMembersMap converts a slice of Member structs into a map suitable for
+// Dragonboat's initial members configuration. The map keys are node IDs (starting from 1)
+// and values are their Raft addresses.
+//
+// Parameters:
+//   - members: A slice of Member structs.
+//
+// Returns:
+//   - A map where keys are uint64 node IDs and values are string Raft addresses.
 func ToInitialMembersMap(members []Member) map[uint64]string {
 	initialMembers := make(map[uint64]string, len(members))
 	for i, m := range members {
-		nodeID := uint64(i + 1)
+		nodeID := uint64(i + 1) // Node IDs typically start from 1.
 		addr := MemmberToAddr(m)
 		initialMembers[nodeID] = addr
 	}
 	return initialMembers
 }
 
+// MemmberToAddr converts a Member struct into its string Raft address representation ("IP:Port").
+//
+// Parameters:
+//   - member: The Member struct to convert.
+//
+// Returns:
+//   - The string representation of the member's address.
 func MemmberToAddr(member Member) string {
 	return fmt.Sprintf("%s:%d", member.IP, member.Port)
 }
 
+// MergeUniqueMembers combines a 'self' Member with a slice of 'other' Members,
+// ensuring the 'self' member is not already present in 'others'.
+//
+// Parameters:
+//   - self: The primary Member.
+//   - others: A slice of other Member structs.
+//
+// Returns:
+//   - A new slice containing 'self' followed by 'others'.
+//   - An error if 'self' is found to be a duplicate within 'others'.
 func MergeUniqueMembers(self Member, others []Member) ([]Member, error) {
 	for _, m := range others {
 		if m.IP == self.IP && m.Port == self.Port {
@@ -274,6 +429,14 @@ func MergeUniqueMembers(self Member, others []Member) ([]Member, error) {
 	return combined, nil
 }
 
+// IsMemberInMemberArray checks if a given Member is present in a slice of Member structs.
+//
+// Parameters:
+//   - selfMember: The Member to search for.
+//   - initialMembers: The slice of Member structs to search within.
+//
+// Returns:
+//   - True if selfMember is found in initialMembers, false otherwise.
 func IsMemberInMemberArray(selfMember Member, initialMembers []Member) bool {
 	for _, member := range initialMembers {
 		if member == selfMember {
@@ -283,6 +446,14 @@ func IsMemberInMemberArray(selfMember Member, initialMembers []Member) bool {
 	return false
 }
 
+// ContainsRole checks if a specific NodeRole is present in a slice of NodeRole.
+//
+// Parameters:
+//   - roles: A slice of NodeRole.
+//   - role: The NodeRole to search for.
+//
+// Returns:
+//   - True if the role is found in the slice, false otherwise.
 func ContainsRole(roles []NodeRole, role NodeRole) bool {
 	for _, s := range roles {
 		if s == role {
@@ -291,12 +462,30 @@ func ContainsRole(roles []NodeRole, role NodeRole) bool {
 	}
 	return false
 }
+
+// Int64ToBytes converts an int64 value to its 8-byte big-endian representation.
+//
+// Parameters:
+//   - n: The int64 value to convert.
+//
+// Returns:
+//   - A byte slice of length 8 representing the int64.
 func Int64ToBytes(n int64) []byte {
 	buf := make([]byte, 8) // int64 = 8 bytes
 	binary.BigEndian.PutUint64(buf, uint64(n))
 	return buf
 }
 
+// GetInitialMembers creates a slice of Member structs from parallel slices of IPs and ports.
+// It's a utility for constructing member lists when IP and port information is separate.
+//
+// Parameters:
+//   - InitialMemberIps: A slice of IP address strings.
+//   - InitialMemberPorts: A slice of port integers.
+//
+// Returns:
+//   - A slice of Member structs.
+//   - An error if the lengths of the IP and port slices do not match.
 func GetInitialMembers(InitialMemberIps []string, InitialMemberPorts []int) ([]Member, error) {
 	if len(InitialMemberIps) != len(InitialMemberPorts) {
 		return nil, fmt.Errorf("mismatched lengths: %d IPs vs %d ports", len(InitialMemberIps), len(InitialMemberPorts))
