@@ -124,29 +124,22 @@ func (mn *RaftNode) GetClient() *client.Session {
 	return mn.NH.GetNoOPSession(mn.ShardID)
 }
 
-func (mn *RaftNode) Write(comands []Command) (statemachine.Result, error) {
+func (mn *RaftNode) Write(ctx context.Context, comands []Command) (statemachine.Result, error) {
 	cs := mn.GetClient()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-
 	data, err := json.Marshal(comands)
 	if err != nil {
 		return statemachine.Result{}, err
 	}
 	result, err := mn.NH.SyncPropose(ctx, cs, data)
-	cancel()
-
 	return result, err
 }
 
-func (mn *RaftNode) Read(cmd RK_Command) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-
+func (mn *RaftNode) Read(ctx context.Context, cmd RK_Command) (interface{}, error) {
 	data, err := json.Marshal(cmd)
 	if err != nil {
 		return statemachine.Result{}, err
 	}
 	result, err := mn.NH.SyncRead(ctx, mn.ShardID, data)
-	cancel()
 	return result, err
 }
 
