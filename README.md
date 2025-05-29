@@ -12,8 +12,7 @@ The application can be configured using the following environment variables. Ple
 | Variable                 | Description                                                                                                | Possible Values                      | Default Value        |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------- |
 | `LOGGER_FORMAT`          | Defines the log output format. `pretty` is recommended for development, `json` for production environments.  | `pretty`, `json`                     | `pretty` (assumed)   |
-| `DEADALUS_ENV`           | Specifies the application environment. Affects logging levels and potentially other behaviors.             | `development`, `production`, `staging` | `development` (assumed) |
-| `DB_NAME`                | The name of the database to be used.                                                                       | string                               | `daedalus_db` (example) |
+| `ENV`           | Specifies the application environment. Affects logging levels and potentially other behaviors.             | `development`, `production`, `staging` | `development` (assumed) |
 | `DEFAULT_ROOT_USER`      | The username for the default root user, created on initial bootstrap if not present.                       | string                               | `root` (example)     |
 | `DEFAULT_ROOT_PASSWORD`  | The password for the default root user.                                                                    | string                               | (none, should be set)|
 | `PORT`                   | The network port on which the main application services might listen (specific usage depends on config).   | integer (e.g., `8080`)               | (none, configurable) |

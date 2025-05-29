@@ -10,7 +10,7 @@ import (
 )
 
 // ValidateEnvVar checks critical environment variables for the application.
-// It ensures that `DEADALUS_ENV` (or its equivalent `constants.EnvVarEnvKey`) is set to one of
+// It ensures that `ENV` (or its equivalent `constants.EnvVarEnvKey`) is set to one of
 // "development", "staging", or "production". If not set, it defaults to "development".
 // It also ensures that `OTEL_ACTIVED` (or `constants.EnvVarOtelActived`) is set to "true" or "false".
 // If not set, it defaults to "true" (enabling OpenTelemetry).
@@ -21,7 +21,7 @@ import (
 //   - An error if any of the validated environment variables have an invalid value.
 //   - nil if all validated environment variables are valid or successfully defaulted.
 func ValidateEnvVar() error {
-	// Validate DEADALUS_ENV (constants.EnvVarEnvKey)
+	// Validate ENV (constants.EnvVarEnvKey)
 	env := os.Getenv(constants.EnvVarEnvKey)
 	if env == "" {
 		env = string(constants.DEVELOPMENT) // Default to "development"
@@ -37,7 +37,7 @@ func ValidateEnvVar() error {
 	default:
 		log.Error().
 			Str(constants.EnvVarEnvKey, env).
-			Msg("Invalid DEADALUS_ENV value")
+			Msg("Invalid ENV value")
 		return fmt.Errorf("invalid %s value: %s. Must be one of: %s, %s, %s",
 			constants.EnvVarEnvKey, env, constants.DEVELOPMENT, constants.STAGING, constants.PRODUCTION)
 	}

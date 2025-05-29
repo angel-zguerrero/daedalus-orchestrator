@@ -19,27 +19,28 @@ import (
 //  1. Logging: Configures zerolog for application-wide logging.
 //     - Sets the time field format to Unix timestamp.
 //     - Enables console-friendly output (pretty print) if LOGGER_FORMAT is "pretty" or not set.
-//     - Sets the global log level based on the DEADALUS_ENV environment variable (ErrorLevel for "production", DebugLevel otherwise).
+//     - Sets the global log level based on the ENV environment variable (ErrorLevel for "production", DebugLevel otherwise).
 //     - Sets a custom logger factory for Dragonboat internal logging.
 //  2. Telemetry: Initializes OpenTelemetry for tracing and metrics.
 //     - Configuration is driven by environment variables:
-//       - DEADALUS_ENV: Sets the environment (e.g., production, development).
-//       - OTEL_ACTIVED: Enables or disables OpenTelemetry ("true" to activate).
-//       - OTEL_ENDPOINT: Specifies the OpenTelemetry collector endpoint.
-//       - OTEL_TRACER_SERVICE_NAME: Defines the service name for traces.
+//     - ENV: Sets the environment (e.g., production, development).
+//     - OTEL_ACTIVED: Enables or disables OpenTelemetry ("true" to activate).
+//     - OTEL_ENDPOINT: Specifies the OpenTelemetry collector endpoint.
+//     - OTEL_TRACER_SERVICE_NAME: Defines the service name for traces.
 //     - A tracer provider is initialized and its shutdown is deferred.
 //  3. Dragonboat Node: Sets up the local Dragonboat node for distributed consensus.
 //     - Parses the current node's address (SelfMemberAddr from global configuration).
 //     - Parses the list of initial members for the cluster (InitialMembers from global configuration).
 //     - Parses the roles assigned to this node (Roles from global configuration).
 //     - Performs validation checks based on whether the node is joining an existing cluster or creating a new one,
-//       ensuring that necessary flags like --replica and --initial-members are provided.
+//     ensuring that necessary flags like --replica and --initial-members are provided.
 //     - Initializes the Dragonboat MasterNode.
 //     - Starts a goroutine to monitor and log the node's readiness for consensus.
 //
 // Additionally, the function contains commented-out sections for:
-//  - Database Initialization: Code for initializing a RocksDB instance (commented out).
-//  - gRPC Server: Code for starting a gRPC server (commented out).
+//   - Database Initialization: Code for initializing a RocksDB instance (commented out).
+//   - gRPC Server: Code for starting a gRPC server (commented out).
+//
 // These components might be integrated in future versions of the application.
 func Run() {
 

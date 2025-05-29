@@ -32,8 +32,8 @@ const ConfigDefaultRootPassword = "default_root_password"
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
-// Note: The application internally often refers to "DEADALUS_ENV", ensure consistency or map this appropriately.
-const EnvVarEnvKey = "ENV" // Consider changing to "DEADALUS_ENV" for clarity if that's the actual external expectation.
+// Note: The application internally often refers to "ENV", ensure consistency or map this appropriately.
+const EnvVarEnvKey = "ENV" // Consider changing to "ENV" for clarity if that's the actual external expectation.
 
 // EnvVarConfigPath is the environment variable name for the configuration file path.
 const EnvVarConfigPath = "CONFIG_PATH"

@@ -32,7 +32,7 @@ type PathProvider interface {
 
 // DefaultPathProvider is the default implementation of PathProvider.
 // It determines the database path based on the environment:
-// - In development (DEADALUS_ENV is "development" or not set), it uses a subdirectory in the user's home directory (`~/.daedalus/data`).
+// - In development (ENV is "development" or not set), it uses a subdirectory in the user's home directory (`~/.daedalus/data`).
 // - In other environments (e.g., production), it uses `/var/lib/daedalus/data` and attempts to create it if it doesn't exist.
 type DefaultPathProvider struct{}
 
