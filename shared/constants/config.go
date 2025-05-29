@@ -68,7 +68,7 @@ const EnvVarTTLInternalError = "TTL_INTERNAL_ERROR"
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
-const EnvVarOtelActived = "OTEL_ACTIVE"
+const EnvVarOtelActived = "OTEL_ACTIVED"
 
 // EnvVarOtelEndpoint is the environment variable name for the OpenTelemetry collector endpoint (e.g., "localhost:4317").
 const EnvVarOtelEndpoint = "OTEL_ENDPOINT"

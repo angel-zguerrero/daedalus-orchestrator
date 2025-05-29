@@ -40,7 +40,7 @@ Environment Variables:
   JOIN                         Set to "true" if the node is joining an existing cluster.
   CONNECTOR_PORT               Port for the connector service.
   TTL_INTERNAL_ERROR           TTL for internal error caching in seconds.
-  OTEL_ACTIVE                  Set to "true" or "false" to enable/disable OpenTelemetry.
+  OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
 

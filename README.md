@@ -16,7 +16,7 @@ The application can be configured using the following environment variables. Ple
 | `DEFAULT_ROOT_USER`      | The username for the default root user, created on initial bootstrap if not present.                       | string                               | `root` (example)     |
 | `DEFAULT_ROOT_PASSWORD`  | The password for the default root user.                                                                    | string                               | (none, should be set)|
 | `PORT`                   | The network port on which the main application services might listen (specific usage depends on config).   | integer (e.g., `8080`)               | (none, configurable) |
-| `OTEL_ACTIVE`            | Enables or disables OpenTelemetry tracing.                                                                 | `true`, `false`                      | `false` (assumed)    |
+| `OTEL_ACTIVED`            | Enables or disables OpenTelemetry tracing.                                                                 | `true`, `false`                      | `false` (assumed)    |
 | `OTEL_ENDPOINT`          | The endpoint (host:port) for the OpenTelemetry collector.                                                  | string (e.g., `localhost:4317`)      | `localhost:4317`     |
 | `OTEL_TRACER_SERVICE_NAME` | The service name used for OpenTelemetry traces.                                                            | string                               | `deadalus-server`    |
 

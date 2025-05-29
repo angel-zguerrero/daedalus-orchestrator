@@ -21,7 +21,7 @@ func TestENVValidator_OtelActived_Invalid(t *testing.T) {
 	t.Setenv(constants.EnvVarOtelActived, "invalid")
 	err := utils.ValidateEnvVar()
 	require.Error(t, err)
-	assert.EqualError(t, err, "invalid OTEL_ACTIVE value: invalid. Must be one of: true, false")
+	assert.EqualError(t, err, "invalid OTEL_ACTIVED value: invalid. Must be one of: true, false")
 }
 
 func TestENVValidator_ENV_ValidProduction(t *testing.T) {
@@ -32,7 +32,7 @@ func TestENVValidator_ENV_ValidProduction(t *testing.T) {
 
 func TestENVValidator_ENV_DefaultsToDevelopmentWhenEmpty(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, "")
-	// Also ensure OTEL_ACTIVE is valid or empty to not interfere
+	// Also ensure OTEL_ACTIVED is valid or empty to not interfere
 	t.Setenv(constants.EnvVarOtelActived, constants.OTEL_ACTIVE_TRUE)
 	err := utils.ValidateEnvVar()
 	assert.NoError(t, err)
@@ -40,7 +40,7 @@ func TestENVValidator_ENV_DefaultsToDevelopmentWhenEmpty(t *testing.T) {
 }
 
 func TestENVValidator_OTEL_ACTIVE_DefaultsToTrueWhenEmpty(t *testing.T) {
-	// Set a valid ENV var to isolate the test to OTEL_ACTIVE
+	// Set a valid ENV var to isolate the test to OTEL_ACTIVED
 	t.Setenv(constants.EnvVarEnvKey, string(constants.DEVELOPMENT))
 	t.Setenv(constants.EnvVarOtelActived, "")
 	err := utils.ValidateEnvVar()
