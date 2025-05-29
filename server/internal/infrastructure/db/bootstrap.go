@@ -9,6 +9,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// BootstrapRootUser ensures the default root user exists in the KVStore.
+// If the root user (as defined by `config.DefaultRootUser` and `config.DefaultRootPassword`)
+// does not exist, it will be created.
+//
+// Parameters:
+//   - kvStore: The KVStore implementation where user data is stored.
+//   - config: The application configuration containing the default root user credentials.
+//
+// Returns:
+//   - An error if any operation fails (e.g., accessing the KVStore, missing credentials),
+//     or nil if the root user exists or is successfully created.
 func BootstrapRootUser(kvStore KVStore, config config.Config) error {
 	root, err := GetDefaultRootUserRoot(kvStore)
 	if err != nil {
