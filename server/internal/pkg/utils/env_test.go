@@ -21,7 +21,7 @@ func TestENVValidator_OtelActived_Invalid(t *testing.T) {
 	t.Setenv(constants.EnvVarOtelActived, "invalid")
 	err := utils.ValidateEnvVar()
 	require.Error(t, err)
-	assert.EqualError(t, err, "invalid OtelActived value: invalid. Must be one of: true, false")
+	assert.EqualError(t, err, "invalid OTEL_ACTIVE value: invalid. Must be one of: true, false")
 }
 
 func TestENVValidator_ENV_ValidProduction(t *testing.T) {
