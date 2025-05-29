@@ -12,6 +12,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// comprehensiveHelpMessage is a detailed help message that describes the application's
+// usage, available command-line flags, environment variables, configuration file format,
+// and the precedence of configuration sources. It is displayed when the --help flag is used.
 const comprehensiveHelpMessage = `
 Usage: ./server [flags]
 
@@ -65,15 +68,42 @@ Precedence of Configuration:
   If a setting is specified in multiple places, the value from the source with higher precedence will be used.
 `
 
+// ConfigFilePathFlag defines the --config command-line flag for specifying the configuration file path.
 var ConfigFilePathFlag = flag.String("config", "", "Path to the application configuration file. This flag takes precedence over the CONFIG_PATH environment variable.")
+
+// RoleFlag defines the --role command-line flag for specifying node roles.
 var RoleFlag = flag.String("role", "", "Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.")
+
+// InitialMembersFlag defines the --initial-members command-line flag for specifying initial cluster members.
 var InitialMembersFlag = flag.String("initial-members", "", "Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.")
+
+// SelfMemberAddrFlag defines the --self-member-addr command-line flag for specifying the node's own Raft address.
 var SelfMemberAddrFlag = flag.String("self-member-addr", "", "The network address (in ip:port format) that this node will use for communication with other members in the cluster.")
+
+// JoinFlag defines the --join command-line flag to indicate if the node should join an existing cluster.
 var JoinFlag = flag.Bool("join", false, "Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.")
+
+// ReplicaIDFlag defines the --replica command-line flag for specifying the node's replica ID.
 var ReplicaIDFlag = flag.Uint64("replica", 0, "Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.")
+
+// ConnectorPortFlag defines the --connector-port command-line flag for specifying the connector service port.
 var ConnectorPortFlag = flag.Int("connector-port", 0, "The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.")
+
+// HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
 
+// LoadDefaultConfiguration loads the application configuration from various sources
+// and populates the GlobalConfiguration variable.
+// The loading order of precedence is:
+// 1. Command-line flags (highest precedence)
+// 2. Environment variables
+// 3. Configuration file (lowest precedence)
+// If the --help flag is set, it prints a comprehensive help message and exits.
+// Default values are applied for some settings if they are not provided by any source.
+//
+// Returns:
+//   - An error if loading the configuration from a file fails, or if parsing
+//     values from environment variables fails. Returns nil on successful configuration loading.
 func LoadDefaultConfiguration() error {
 	flag.Parse() // Parse command-line flags first
 
@@ -212,6 +242,17 @@ func LoadDefaultConfiguration() error {
 	return nil
 }
 
+// LoadConfigFromPath reads a configuration file from the given path, parses its key-value pairs,
+// and converts them into a Config struct.
+// Lines starting with '#' are treated as comments and ignored.
+// Empty lines are also ignored. Each line should be in 'key=value' format.
+//
+// Parameters:
+//   - path: The file system path to the configuration file.
+//
+// Returns:
+//   - A pointer to a Config struct populated from the file.
+//   - An error if opening the file, reading it, or parsing its content fails.
 func LoadConfigFromPath(path string) (*Config, error) {
 	configMap := make(map[string]string)
 
@@ -246,8 +287,17 @@ func LoadConfigFromPath(path string) (*Config, error) {
 	return ConfigFromMapToConfig(*config), scanner.Err()
 }
 
-func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
-	cfg := &ConfigFromMap{}
+// mapToConfig converts a map of string key-value pairs (typically parsed from a config file)
+// into an unexported configFromMap struct. It handles type conversions for specific keys.
+//
+// Parameters:
+//   - data: A map[string]string containing configuration key-value pairs.
+//
+// Returns:
+//   - A pointer to a populated configFromMap struct.
+//   - An error if parsing any known key into its target type fails (e.g., string to int or bool).
+func mapToConfig(data map[string]string) (*configFromMap, error) {
+	cfg := &configFromMap{}
 
 	for k, v := range data {
 		switch k {
