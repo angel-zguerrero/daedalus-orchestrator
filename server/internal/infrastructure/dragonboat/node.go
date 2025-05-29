@@ -5,6 +5,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"time"
@@ -19,13 +20,13 @@ import (
 // RaftNode represents a single node (replica) participating in a Dragonboat Raft consensus group (shard).
 // It encapsulates the Dragonboat NodeHost, configuration for the replica, and methods to interact with it.
 type RaftNode struct {
-	NH             *dragonboat.NodeHost                                                       // The underlying Dragonboat NodeHost instance.
-	ShardID        uint64                                                                     // The ID of the shard (Raft consensus group) this node belongs to.
-	ReplicaID      uint64                                                                     // The unique ID of this replica within the shard.
-	SelfMember     Member                                                                     // Details of the current node (e.g., address, port).
-	InitialMembers []Member                                                                   // List of initial members for bootstrapping a new shard.
-	Join           bool                                                                       // Flag indicating if this node is joining an existing shard.
-	Roles          []NodeRole                                                                 // Roles assigned to this node (e.g., consensus, scheduler).
+	NH             *dragonboat.NodeHost                                                   // The underlying Dragonboat NodeHost instance.
+	ShardID        uint64                                                                 // The ID of the shard (Raft consensus group) this node belongs to.
+	ReplicaID      uint64                                                                 // The unique ID of this replica within the shard.
+	SelfMember     Member                                                                 // Details of the current node (e.g., address, port).
+	InitialMembers []Member                                                               // List of initial members for bootstrapping a new shard.
+	Join           bool                                                                   // Flag indicating if this node is joining an existing shard.
+	Roles          []NodeRole                                                             // Roles assigned to this node (e.g., consensus, scheduler).
 	stateMachine   func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine // A factory function that creates an instance of the on-disk state machine for this replica.
 }
 
@@ -121,6 +122,32 @@ func (mn *RaftNode) RequestAddReplica(replicaID uint64, member Member) error {
 //   - A *client.Session connected to the shard.
 func (mn *RaftNode) GetClient() *client.Session {
 	return mn.NH.GetNoOPSession(mn.ShardID)
+}
+
+func (mn *RaftNode) Write(comands []Command) (statemachine.Result, error) {
+	cs := mn.GetClient()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+	data, err := json.Marshal(comands)
+	if err != nil {
+		return statemachine.Result{}, err
+	}
+	result, err := mn.NH.SyncPropose(ctx, cs, data)
+	cancel()
+
+	return result, err
+}
+
+func (mn *RaftNode) Read(cmd RK_Command) (interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+	data, err := json.Marshal(cmd)
+	if err != nil {
+		return statemachine.Result{}, err
+	}
+	result, err := mn.NH.SyncRead(ctx, mn.ShardID, data)
+	cancel()
+	return result, err
 }
 
 // StartNodeReadyWatcher starts a goroutine that periodically checks if the Raft node is ready
