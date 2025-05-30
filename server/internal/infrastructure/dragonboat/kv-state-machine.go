@@ -32,7 +32,7 @@ type KVRocksDBStateMachineImpl interface {
 	// Update processes a slice of statemachine entries and applies them to the given RocksDB write batch.
 	// It should decode the commands from the entries and translate them into batch operations.
 	// It returns a slice of processed Command objects (which might be different from input if errors occurred) and any error.
-	Update(ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error)
+	Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]Command, error)
 	// Lookup processes a query and is expected to return an RK_Command (Read Key Command)
 	// that can be used by the base state machine to perform the actual read from RocksDB.
 	// The input `key` is generic and its interpretation is up to the implementation.
@@ -196,8 +196,8 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	defer s.mu.Unlock()
 
 	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
-	batch := grocksdb.NewWriteBatch()
-	defer batch.Destroy()
+	batch := db.NewWriteBatch()
+
 	commands, err := s.stateMachineImpl.Update(ents, batch)
 
 	if err != nil {
@@ -321,7 +321,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 				if cfh == nil {
 					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
 				}
-				batch.PutCF(cfh, []byte(wCmd.Key), wCmd.Value)
+				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value)
 			case PutOpTTL:
 				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
@@ -341,23 +341,23 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
 					if err == nil {
 						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, oldTTLMillis, wCmd.Key)
-						batch.DeleteCF(cfh, []byte(oldTTLIndexKey))
+						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
 					}
 				}
 
-				batch.PutCF(cfh, []byte(ttlRealKey), wCmd.Value)
+				batch.Put(wCmd.ColumnFamilyName, ttlRealKey, wCmd.Value)
 
 				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, ttlMillis, wCmd.Key)
-				batch.PutCF(cfh, []byte(newTTLIndexKey), nil)
+				batch.Put(wCmd.ColumnFamilyName, newTTLIndexKey, nil)
 
-				batch.PutCF(cfh, []byte(ttlExpireIndexKey), []byte(strconv.FormatInt(ttlMillis, 10)))
+				batch.Put(wCmd.ColumnFamilyName, ttlExpireIndexKey, []byte(strconv.FormatInt(ttlMillis, 10)))
 
 			case DeleteOp:
 				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
 					return nil, fmt.Errorf("Column Family not found %s", wCmd.ColumnFamilyName)
 				}
-				batch.DeleteCF(cfh, []byte(wCmd.Key))
+				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			case DeleteOpTTL:
 				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
 				if cfh == nil {
@@ -374,13 +374,13 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
 					if err == nil {
 						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, oldTTLMillis, wCmd.Key)
-						batch.DeleteCF(cfh, []byte(oldTTLIndexKey))
+						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
 					}
 				}
 
 				ttlRealKey := fmt.Sprintf("%s%s", prefixData, wCmd.Key)
-				batch.DeleteCF(cfh, []byte(ttlRealKey))
-				batch.DeleteCF(cfh, []byte(ttlExpireIndexKey))
+				batch.Delete(wCmd.ColumnFamilyName, ttlRealKey)
+				batch.Delete(wCmd.ColumnFamilyName, ttlExpireIndexKey)
 			default:
 				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
 
@@ -413,7 +413,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
-	batch.PutCF(rocks_kv_store.ColumnFamilyHandles[db.MetaFC], []byte(AppliedIndexKey), appliedIndex)
+	batch.Put(db.MetaFC, AppliedIndexKey, appliedIndex)
 
 	if err := rocks_kv_store.Write(batch); err != nil {
 		return nil, err

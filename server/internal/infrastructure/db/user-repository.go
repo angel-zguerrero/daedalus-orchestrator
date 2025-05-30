@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/linxGnu/grocksdb"
 	"golang.org/x/crypto/bcrypt"
 
 	constants "deadalus-orch/shared/constants"
@@ -122,9 +121,6 @@ func GetDefaultRootUserRoot(kvStore KVStore) (*models.CreateUser, error) {
 //   - An error if password hashing fails, JSON marshaling fails, or the batch Write operation on the KVStore fails.
 //     Returns nil on success.
 func PutDefaultRootUserRoot(kvStore KVStore, input models.CreateUser) error {
-	wo := grocksdb.NewDefaultWriteOptions()
-	defer wo.Destroy()
-
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -146,11 +142,11 @@ func PutDefaultRootUserRoot(kvStore KVStore, input models.CreateUser) error {
 		return err
 	}
 
-	batch := grocksdb.NewWriteBatch()
-	defer batch.Destroy()
-	batch.Put([]byte(constants.DefaultRootUserRootKey), defaultUserData)
+	batch := NewWriteBatch()
+	batch.Put(AdminFC, constants.DefaultRootUserRootKey, defaultUserData)
+
 	userKey := fmt.Sprintf("user:%s", input.Username)
-	batch.Put([]byte(userKey), userData)
+	batch.Put(AdminFC, userKey, userData)
 
 	if err := kvStore.Write(batch); err != nil {
 		return err
@@ -188,11 +184,10 @@ func DeleteUser(kvStore KVStore, username string) error {
 		}
 	}
 
-	batch := grocksdb.NewWriteBatch()
-	defer batch.Destroy()
+	batch := NewWriteBatch()
 
 	userKey := fmt.Sprintf("user:%s", username)
-	batch.Delete([]byte(userKey))
+	batch.Delete(AdminFC, userKey)
 
 	if err := kvStore.Write(batch); err != nil {
 		return err

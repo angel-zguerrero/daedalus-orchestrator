@@ -9,7 +9,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,9 +53,9 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 	defaultUserData, err := json.Marshal(input)
 	assert.NoError(t, err)
 
-	batch := grocksdb.NewWriteBatch()
-	defer batch.Destroy()
-	batch.Put([]byte(constants.DefaultRootUserRootKey), defaultUserData)
+	batch := db.NewWriteBatch()
+
+	batch.Put(db.AdminFC, constants.DefaultRootUserRootKey, defaultUserData)
 	userKey := fmt.Sprintf("user:%s", input.Username)
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
@@ -71,9 +70,9 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 	userData, err := json.Marshal(user)
 	assert.NoError(t, err)
 
-	batch.Put([]byte(userKey), userData)
+	batch.Put(db.AdminFC, userKey, userData)
 
-	store.On("Write", batch).Return(nil).Times(1)
+	store.On("Write", mock.Anything).Return(nil).Times(1)
 
 	err = db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)

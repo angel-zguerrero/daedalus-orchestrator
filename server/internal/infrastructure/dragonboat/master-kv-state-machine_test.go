@@ -708,7 +708,7 @@ type failingImpl struct {
 	dragonboat.KVRocksDBStateMachineImpl
 }
 
-func (f *failingImpl) Update(ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]dragonboat.Command, error) {
+func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.Command, error) {
 	return nil, errors.New("simulated update error")
 }
 func (f *failingImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {

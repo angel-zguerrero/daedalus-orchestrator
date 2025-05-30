@@ -1,12 +1,40 @@
 package db
 
+type X struct {
+	CF    string
+	Key   string
+	Value []byte
+	Type  string
+}
+
 // WriteBatch represents a batch of write operations to be applied atomically.
 // The concrete implementation of this interface will depend on the underlying database system.
-type WriteBatch interface {
-	// AddPut adds a Put operation to the batch.
-	// Put(columnFamily string, key string, value []byte)
-	// AddDelete adds a Delete operation to the batch.
-	// Delete(columnFamily string, key string)
+type WriteBatch struct {
+	Data []X
+}
+
+func NewWriteBatch() *WriteBatch {
+	return &WriteBatch{Data: make([]X, 0)}
+}
+
+func (wb *WriteBatch) Put(columnFamily string, key string, value []byte) {
+	wb.Data = append(wb.Data, X{
+		CF:    columnFamily,
+		Key:   key,
+		Value: value,
+		Type:  "put",
+	})
+}
+func (wb *WriteBatch) Delete(columnFamily string, key string) {
+	wb.Data = append(wb.Data, X{
+		CF:   columnFamily,
+		Key:  key,
+		Type: "delete",
+	})
+}
+
+func (wb *WriteBatch) Count() int {
+	return len(wb.Data)
 }
 
 // KVStore is an interface for a key-value store.
@@ -38,7 +66,11 @@ type KVStore interface {
 	//   - batch: A WriteBatch object containing the operations to apply.
 	// Returns:
 	//   - An error if any occurred during the operation.
-	Write(batch interface{}) error // TODO: Use a more specific type like WriteBatch if possible
+	Write(batch *WriteBatch) error // TODO: Use a more specific type like WriteBatch if possible
+
+	SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error)
+
+	Exists(cfName, key string) (bool, error)
 
 	// DumpAll retrieves all key-value pairs from the store.
 	// The format of the returned data (interface{}) is implementation-specific.

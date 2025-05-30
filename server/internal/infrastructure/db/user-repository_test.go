@@ -19,6 +19,8 @@ import (
 
 type MockKVStore struct {
 	mock.Mock
+	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle // Map of regular column family names to their handles.
+	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
 }
 
 func (m *MockKVStore) Get(AdminFC, key string) ([]byte, error) {
@@ -30,12 +32,20 @@ func (m *MockKVStore) Get(AdminFC, key string) ([]byte, error) {
 	return s, args.Error(1)
 }
 
+func (r *MockKVStore) Exists(columnFamily, key string) (bool, error) {
+	val, err := r.Get(columnFamily, key)
+	if err != nil {
+		return false, err
+	}
+	return val != nil, nil
+}
+
 func (m *MockKVStore) Put(AdminFC, key string, value []byte) error {
 	args := m.Called(AdminFC, key, value)
 	return args.Error(0)
 }
 
-func (m *MockKVStore) Write(batch interface{}) error {
+func (m *MockKVStore) Write(batch *db.WriteBatch) error {
 	args := m.Called(batch)
 	return args.Error(0)
 }
@@ -63,6 +73,17 @@ func (r *MockKVStore) Flush() error {
 
 func (r *MockKVStore) Close() error {
 	return nil
+}
+
+func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]db.KeyValuePair, string, error) {
+	args := m.Called(cfName, pattern, cursor, limit)
+	var s []db.KeyValuePair
+	if tmp := args.Get(0); tmp != nil {
+		fmt.Println("--->tmp")
+		fmt.Println(tmp)
+		s = tmp.([]db.KeyValuePair)
+	}
+	return s, "", args.Error(2)
 }
 
 func TestPutUser_Success(t *testing.T) {
@@ -263,8 +284,8 @@ func TestDeleteUser_NoRootUserDefined(t *testing.T) {
 
 	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Once()
 
-	store.On("Write", mock.AnythingOfType("*grocksdb.WriteBatch")).Run(func(args mock.Arguments) {
-		batch := args.Get(0).(*grocksdb.WriteBatch)
+	store.On("Write", mock.AnythingOfType("*db.WriteBatch")).Run(func(args mock.Arguments) {
+		batch := args.Get(0).(*db.WriteBatch)
 		assert.Equal(t, 1, batch.Count(), "WriteBatch should have one operation (the delete)")
 
 	}).Return(nil).Once()

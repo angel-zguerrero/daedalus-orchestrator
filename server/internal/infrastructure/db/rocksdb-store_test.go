@@ -82,27 +82,30 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	opts.SetCreateIfMissing(true)
 	opts.SetCreateIfMissingColumnFamilies(true)
 
-	goOp := grocksdb.NewDefaultOptions()
+	cfOpts := grocksdb.NewDefaultOptions()
 
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
 	require.NoError(t, err)
 	defer rocks.Close()
 
 	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
 	require.NoError(t, err)
 
-	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	columnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
 	for index, name := range columnFamilyNames {
-		ColumnFamilyHandles[name] = cfHs[index]
+		columnFamilyHandles[name] = cfHs[index]
 	}
 
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: ColumnFamilyHandles}
+	store := &db.RocksdbStore{
+		DB:                     rocks,
+		ColumnFamilyHandles:    columnFamilyHandles,
+		TTLColumnFamilyHandles: make(map[string]*grocksdb.ColumnFamilyHandle),
+	}
 
-	batch := grocksdb.NewWriteBatch()
-	defer batch.Destroy()
-
-	batch.PutCF(ColumnFamilyHandles[TestFC], []byte("a"), []byte("valueA"))
-	batch.PutCF(ColumnFamilyHandles[TestFC], []byte("b"), []byte("valueB"))
+	// Usar nueva estructura WriteBatch
+	batch := db.NewWriteBatch()
+	batch.Put(TestFC, "a", []byte("valueA"))
+	batch.Put(TestFC, "b", []byte("valueB"))
 
 	err = store.Write(batch)
 	require.NoError(t, err)

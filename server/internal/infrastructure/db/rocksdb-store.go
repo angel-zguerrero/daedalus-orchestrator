@@ -12,7 +12,7 @@ import (
 // It holds a reference to the RocksDB database instance and maps of column family handles
 // for both regular and TTL (Time-To-Live) column families.
 type RocksdbStore struct {
-	*grocksdb.DB                                          // Embedded RocksDB database instance.
+	*grocksdb.DB                                                   // Embedded RocksDB database instance.
 	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle // Map of regular column family names to their handles.
 	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
 }
@@ -49,6 +49,14 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 		return data, nil
 	}
 	return nil, nil
+}
+
+func (r *RocksdbStore) exists(columnFamily, key string) (bool, error) {
+	val, err := r.Get(columnFamily, key)
+	if err != nil {
+		return false, err
+	}
+	return val != nil, nil
 }
 
 // SearchByPatternPaginatedKV searches for key-value pairs in a specified column family
@@ -189,15 +197,33 @@ func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {
 //
 // Returns:
 //   - An error if the provided batch is not of the correct type or if any RocksDB error occurs during the write operation.
-func (r *RocksdbStore) Write(batch interface{}) error {
+func (r *RocksdbStore) Write(batch *WriteBatch) error {
+	rocksBatch := grocksdb.NewWriteBatch()
+	defer rocksBatch.Destroy()
+
+	for _, op := range batch.Data {
+		cf, ok := r.ColumnFamilyHandles[op.CF]
+		if !ok {
+			cf, ok = r.TTLColumnFamilyHandles[op.CF]
+			if !ok {
+				return fmt.Errorf("column family %s not found", op.CF)
+			}
+		}
+
+		switch op.Type {
+		case "put":
+			rocksBatch.PutCF(cf, []byte(op.Key), op.Value)
+		case "delete":
+			rocksBatch.DeleteCF(cf, []byte(op.Key))
+		default:
+			return fmt.Errorf("unsupported operation type: %s", op.Type)
+		}
+	}
 
 	wo := grocksdb.NewDefaultWriteOptions()
 	defer wo.Destroy()
-	batch_, ok := batch.(*grocksdb.WriteBatch)
-	if !ok {
-		return fmt.Errorf("invalid batch type")
-	}
-	return r.DB.Write(wo, batch_)
+
+	return r.DB.Write(wo, rocksBatch)
 }
 
 // DumpAll retrieves all key-value pairs from all column families (both regular and TTL) in the database.

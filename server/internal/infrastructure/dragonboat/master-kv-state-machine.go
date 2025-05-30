@@ -67,7 +67,7 @@ func (r *MasterKVBaseRocksDBStateMachine) Lookup(query interface{}) (RK_Command,
 // Returns:
 //   - A slice of decoded Command objects.
 //   - An error if GOB decoding fails for any entry.
-func (r *MasterKVBaseRocksDBStateMachine) Update(ents []statemachine.Entry, batch *grocksdb.WriteBatch) ([]Command, error) {
+func (r *MasterKVBaseRocksDBStateMachine) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]Command, error) {
 	commands := make([]Command, len(ents))
 
 	for i, ent := range ents {
