@@ -47,27 +47,29 @@ func newRocksdbStore(t *testing.T) *db.RocksdbStore {
 
 func newTestRepository(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
-	return db.NewRepository[testEntity](store, TestFC, "test_schema")
+	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
+	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
 func TestRepository_PutAndGet(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
-	entity := testEntity{ID: "123", Name: "Alice"}
+	entity := testEntity{ID: "----", Name: "Alice"}
 
-	err = repo.Create(entity)
+	id, err := repo.Create(&entity)
 	require.NoError(t, err)
+	assert.Equal(t, id, "123")
 
 	found, err := repo.FindByField("ID", "123")
 	require.NoError(t, err)
 	require.NotNil(t, found)
-	assert.Equal(t, entity.ID, found.ID)
+	assert.Equal(t, "123", found.ID)
 	assert.Equal(t, entity.Name, found.Name)
 
 	found, err = repo.FindByField("Name", "Alice")
 	require.NoError(t, err)
 	require.NotNil(t, found)
-	assert.Equal(t, entity.ID, found.ID)
+	assert.Equal(t, "123", found.ID)
 	assert.Equal(t, entity.Name, found.Name)
 }
 
@@ -84,19 +86,21 @@ func TestRepository_WriteBatch(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
 
-	a := testEntity{ID: "a", Name: "Alpha"}
-	b := testEntity{ID: "b", Name: "Beta"}
+	a := testEntity{ID: "---", Name: "Alpha"}
+	b := testEntity{ID: "---", Name: "Beta"}
 
-	err = repo.Create(a)
+	id, err := repo.Create(&a)
+	assert.Equal(t, id, "123")
 	require.NoError(t, err)
-	err = repo.Create(b)
+	id, err = repo.Create(&b)
 	require.NoError(t, err)
+	assert.Equal(t, id, "456")
 
-	resA, err := repo.FindByField("ID", "a")
+	resA, err := repo.FindByField("ID", "123")
 	require.NoError(t, err)
 	assert.Equal(t, a.Name, resA.Name)
 
-	resB, err := repo.FindByField("ID", "b")
+	resB, err := repo.FindByField("ID", "456")
 	require.NoError(t, err)
 	assert.Equal(t, b.Name, resB.Name)
 }
@@ -106,7 +110,9 @@ func TestRepository_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	require.NoError(t, err)
 
 	entity := testEntity{ID: "user:123:name", Name: "Alice"}
-	require.NoError(t, repo.Create(entity))
+	id, err := repo.Create(&entity)
+	assert.Equal(t, id, "123")
+	require.NoError(t, err)
 
 	results, err := repo.Find("Name=Alice")
 	require.NoError(t, err)

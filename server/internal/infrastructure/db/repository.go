@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
+type IDGeneratorFactory interface {
+	GenerateID() string
+}
 type ORMEntity interface {
 	TableName() string
 }
@@ -27,8 +32,9 @@ type TableDefinition struct {
 }
 
 type Repository[T ORMEntity] struct {
-	definition *TableDefinition
-	kvStore    KVStore
+	definition         *TableDefinition
+	kvStore            KVStore
+	idGeneratorFactory IDGeneratorFactory
 }
 
 func (r *Repository[T]) Find(filter string) ([]T, error) {
@@ -123,38 +129,31 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	return &result, err
 }
 
-func (r *Repository[T]) Create(entity T) error {
+func (r *Repository[T]) Create(entity *T) (string, error) {
+	id := r.idGeneratorFactory.GenerateID()
 	val := reflect.ValueOf(entity)
-	t := reflect.TypeOf(entity)
-
-	var id string
-
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		def, exists := r.definition.Fields[field.Name]
-		if !exists {
-			continue
-		}
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	for fieldName, def := range r.definition.Fields {
 		if def.Primary {
-			id = fmt.Sprintf("%v", val.Field(i).Interface())
+			field := val.FieldByName(fieldName)
+			if field.IsValid() && field.CanSet() && field.Kind() == reflect.String {
+				field.SetString(id)
+			}
 			break
 		}
 	}
-
-	if id == "" {
-		return fmt.Errorf("missing primary key value for %s", r.definition.Name)
-	}
-
 	for fieldName, def := range r.definition.Fields {
 		if def.Unique {
 			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
 			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
 			exists, err := r.kvStore.Exists(r.definition.ColumnFamily, idxKey)
 			if err != nil {
-				return err
+				return "", err
 			}
 			if exists {
-				return fmt.Errorf("duplicate unique field: %s = %s", fieldName, fieldValue)
+				return "", fmt.Errorf("duplicate unique field: %s = %s", fieldName, fieldValue)
 			}
 		}
 	}
@@ -163,24 +162,30 @@ func (r *Repository[T]) Create(entity T) error {
 		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
 		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
 		if err := r.kvStore.Put(r.definition.ColumnFamily, idxKey, []byte(id)); err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 	dataBytes, err := json.Marshal(entity)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err := r.kvStore.Put(r.definition.ColumnFamily, dataKey, dataBytes); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return id, nil
 }
 
-func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema string) (*Repository[T], error) {
+type DefaultIDGeneratorFactory struct{}
+
+func (idG *DefaultIDGeneratorFactory) GenerateID() string {
+	return strings.ReplaceAll(uuid.New().String(), "-", "")
+}
+
+func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema string, idGeneratorFactory IDGeneratorFactory) (*Repository[T], error) {
 	t := reflect.TypeOf(new(T)).Elem()
 
 	var tableName string
@@ -231,5 +236,5 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 		return nil, fmt.Errorf("no primaryKey field defined in model %s", table.Name)
 	}
 
-	return &Repository[T]{definition: table, kvStore: kvStore}, nil
+	return &Repository[T]{definition: table, kvStore: kvStore, idGeneratorFactory: idGeneratorFactory}, nil
 }

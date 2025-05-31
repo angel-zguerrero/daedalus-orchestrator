@@ -3,10 +3,36 @@ package db_test
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/json"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+type TestIDGeneratorFactory struct {
+	ids   []string
+	index int
+	mu    sync.Mutex
+}
+
+func NewTestIDGeneratorFactory(ids []string) *TestIDGeneratorFactory {
+	return &TestIDGeneratorFactory{
+		ids: ids,
+	}
+}
+
+func (g *TestIDGeneratorFactory) GenerateID() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if len(g.ids) == 0 {
+		return ""
+	}
+
+	id := g.ids[g.index]
+	g.index = (g.index + 1) % len(g.ids) // avance circular
+	return id
+}
 
 type User struct {
 	ID   string `orm:"primaryKey"`
@@ -25,7 +51,9 @@ func TestRepository_Create_Success(t *testing.T) {
 		Name: "Alice",
 	}
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
 	data, _ := json.Marshal(user)
@@ -38,8 +66,9 @@ func TestRepository_Create_Success(t *testing.T) {
 	mockStore.On("Put", "cf1", nameFieldKey, []byte("123")).Return(nil)
 	mockStore.On("Put", "cf1", dataKey, data).Return(nil)
 
-	err = repo.Create(user)
+	id, err := repo.Create(&user)
 	assert.NoError(t, err)
+	assert.Equal(t, id, "123")
 
 	mockStore.AssertExpectations(t)
 }
@@ -48,17 +77,19 @@ func TestRepository_Create_DuplicateUnique(t *testing.T) {
 	mockStore := new(MockKVStore)
 
 	user := User{
-		ID:   "123",
+		ID:   "----",
 		Name: "Alice",
 	}
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
 	indexKey := "admin:users:idx:Name:Alice:123"
 	mockStore.On("Get", "cf1", indexKey).Return([]byte("123"), nil)
 
-	err = repo.Create(user)
+	_, err = repo.Create(&user)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field")
 }
@@ -74,15 +105,16 @@ func (NoPrimary) TableName() string {
 func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
 	mockStore := new(MockKVStore)
 
-	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", "admin", iGF)
 	assert.EqualError(t, err, "no primaryKey field defined in model nopk")
 
 }
 
 func TestRepository_FindByField_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
-
-	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
 	indexKey := "admin:users:idx:Name:Alice:*"
@@ -111,15 +143,17 @@ func (Invalid) TableName() string {
 
 func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 
-	_, err := db.NewRepository[Invalid](mockStore, "cf1", "admin")
+	_, err := db.NewRepository[Invalid](mockStore, "cf1", "admin", iGF)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no primaryKey field defined")
 }
 
 func TestRepository_Find_AND(t *testing.T) {
 	mockStore := new(MockKVStore)
-	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
 	user := User{ID: "123", Name: "Alice"}
@@ -140,7 +174,8 @@ func TestRepository_Find_AND(t *testing.T) {
 
 func TestRepository_Find_OR(t *testing.T) {
 	mockStore := new(MockKVStore)
-	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
 	user1 := User{ID: "123", Name: "Alice"}
@@ -164,7 +199,8 @@ func TestRepository_Find_OR(t *testing.T) {
 
 func TestRepository_Find_SpecialCharacters(t *testing.T) {
 	mockStore := new(MockKVStore)
-	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
 	user := User{ID: "999", Name: "foo:bar"}
@@ -183,7 +219,8 @@ func TestRepository_Find_SpecialCharacters(t *testing.T) {
 
 func TestRepository_Find_NoMatch(t *testing.T) {
 	mockStore := new(MockKVStore)
-	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
 	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Ghost:*", "", 1000).
