@@ -30,10 +30,12 @@ func TestRepository_Create_Success(t *testing.T) {
 
 	data, _ := json.Marshal(user)
 	dataKey := "admin:users:data:123"
-	indexKey := "admin:users:idx:Name:Alice:123"
+	nameFieldKey := "admin:users:idx:Name:Alice:123"
+	indexKey := "admin:users:idx:ID:123:123"
 
-	mockStore.On("Get", "cf1", indexKey).Return(nil, nil)
+	mockStore.On("Get", "cf1", nameFieldKey).Return(nil, nil)
 	mockStore.On("Put", "cf1", indexKey, []byte("123")).Return(nil)
+	mockStore.On("Put", "cf1", nameFieldKey, []byte("123")).Return(nil)
 	mockStore.On("Put", "cf1", dataKey, data).Return(nil)
 
 	err = repo.Create(user)
@@ -113,4 +115,81 @@ func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 	_, err := db.NewRepository[Invalid](mockStore, "cf1", "admin")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no primaryKey field defined")
+}
+
+func TestRepository_Find_AND(t *testing.T) {
+	mockStore := new(MockKVStore)
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	assert.NoError(t, err)
+
+	user := User{ID: "123", Name: "Alice"}
+	data, _ := json.Marshal(user)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1000).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Alice:*", "", 1000).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	mockStore.On("Get", "cf1", "admin:users:data:123").
+		Return(data, nil)
+
+	result, err := repo.Find("ID=123&Name=Alice")
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.Equal(t, &user, &result[0])
+}
+
+func TestRepository_Find_OR(t *testing.T) {
+	mockStore := new(MockKVStore)
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	assert.NoError(t, err)
+
+	user1 := User{ID: "123", Name: "Alice"}
+	user2 := User{ID: "456", Name: "Bob"}
+	data1, _ := json.Marshal(user1)
+	data2, _ := json.Marshal(user2)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Alice:*", "", 1000).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Bob:*", "", 1000).
+		Return([]db.KeyValuePair{{Value: []byte("456")}}, "", nil)
+	mockStore.On("Get", "cf1", "admin:users:data:123").
+		Return(data1, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:456").
+		Return(data2, nil)
+
+	result, err := repo.Find("Name=Alice|Name=Bob")
+	assert.NoError(t, err)
+	assert.Len(t, result, 2)
+}
+
+func TestRepository_Find_SpecialCharacters(t *testing.T) {
+	mockStore := new(MockKVStore)
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	assert.NoError(t, err)
+
+	user := User{ID: "999", Name: "foo:bar"}
+	data, _ := json.Marshal(user)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:foo:bar:*", "", 1000).
+		Return([]db.KeyValuePair{{Value: []byte("999")}}, "", nil)
+	mockStore.On("Get", "cf1", "admin:users:data:999").
+		Return(data, nil)
+
+	result, err := repo.Find("Name=foo:bar")
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.Equal(t, &user, &result[0])
+}
+
+func TestRepository_Find_NoMatch(t *testing.T) {
+	mockStore := new(MockKVStore)
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin")
+	assert.NoError(t, err)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Ghost:*", "", 1000).
+		Return(nil, "", nil)
+
+	result, err := repo.Find("Name=Ghost")
+	assert.NoError(t, err)
+	assert.Len(t, result, 0)
 }

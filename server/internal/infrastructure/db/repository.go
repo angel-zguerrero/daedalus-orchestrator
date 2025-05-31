@@ -31,6 +31,80 @@ type Repository[T ORMEntity] struct {
 	kvStore    KVStore
 }
 
+func (r *Repository[T]) Find(filter string) ([]T, error) {
+	filter = strings.TrimSpace(filter)
+	if filter == "" {
+		return nil, fmt.Errorf("filter string is empty")
+	}
+
+	orConditions := strings.Split(filter, "|")
+	orResults := map[string]bool{}
+	var matchedIDs []string
+
+	for _, orCond := range orConditions {
+		orCond = strings.TrimSpace(orCond)
+		andConditions := strings.Split(orCond, "&")
+
+		var andMatchedIDs map[string]bool
+		for i, andCond := range andConditions {
+			andCond = strings.TrimSpace(andCond)
+			parts := strings.SplitN(andCond, "=", 2)
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid condition: %s", andCond)
+			}
+			field := strings.TrimSpace(parts[0])
+			value := strings.Trim(strings.TrimSpace(parts[1]), "'")
+
+			searchKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
+			idxBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, searchKey, "", 1000)
+			if err != nil {
+				return nil, err
+			}
+
+			ids := make(map[string]bool)
+			for _, item := range idxBytes {
+				ids[string(item.Value)] = true
+			}
+
+			if i == 0 {
+				andMatchedIDs = ids
+			} else {
+				for id := range andMatchedIDs {
+					if !ids[id] {
+						delete(andMatchedIDs, id)
+					}
+				}
+			}
+		}
+
+		for id := range andMatchedIDs {
+			orResults[id] = true
+		}
+	}
+
+	for id := range orResults {
+		matchedIDs = append(matchedIDs, id)
+	}
+
+	var results []T
+	for _, id := range matchedIDs {
+		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
+		dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey)
+		if err != nil {
+			return nil, err
+		}
+
+		var result T
+		err = json.Unmarshal(dataBytes, &result)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
 func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	searchKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
 	idBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, searchKey, "", 1)
@@ -85,13 +159,11 @@ func (r *Repository[T]) Create(entity T) error {
 		}
 	}
 
-	for fieldName, def := range r.definition.Fields {
+	for fieldName, _ := range r.definition.Fields {
 		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
-		if def.Unique {
-			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
-			if err := r.kvStore.Put(r.definition.ColumnFamily, idxKey, []byte(id)); err != nil {
-				return err
-			}
+		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
+		if err := r.kvStore.Put(r.definition.ColumnFamily, idxKey, []byte(id)); err != nil {
+			return err
 		}
 	}
 

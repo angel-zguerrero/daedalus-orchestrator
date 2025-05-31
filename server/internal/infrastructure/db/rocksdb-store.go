@@ -51,7 +51,7 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	return nil, nil
 }
 
-func (r *RocksdbStore) exists(columnFamily, key string) (bool, error) {
+func (r *RocksdbStore) Exists(columnFamily, key string) (bool, error) {
 	val, err := r.Get(columnFamily, key)
 	if err != nil {
 		return false, err

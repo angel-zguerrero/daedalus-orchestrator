@@ -79,8 +79,6 @@ func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string,
 	args := m.Called(cfName, pattern, cursor, limit)
 	var s []db.KeyValuePair
 	if tmp := args.Get(0); tmp != nil {
-		fmt.Println("--->tmp")
-		fmt.Println(tmp)
 		s = tmp.([]db.KeyValuePair)
 	}
 	return s, "", args.Error(2)
