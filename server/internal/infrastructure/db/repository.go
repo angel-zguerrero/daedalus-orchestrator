@@ -220,8 +220,14 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 			case rule == "unique":
 				def.Unique = true
 			case rule == "primaryKey":
+				if field.Type.Kind() != reflect.String {
+					return nil, fmt.Errorf("field 'ID' must be of type string")
+				}
 				def.Primary = true
 				hasPrimaryKey = true
+				if field.Name != "ID" {
+					hasPrimaryKey = false
+				}
 			case strings.HasPrefix(rule, "maxLength="):
 				var max int
 				fmt.Sscanf(rule, "maxLength=%d", &max)
@@ -233,7 +239,7 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 	}
 
 	if !hasPrimaryKey {
-		return nil, fmt.Errorf("no primaryKey field defined in model %s", table.Name)
+		return nil, fmt.Errorf("struct %s must have a string field named 'ID' with `orm:primaryKey`", t.Name())
 	}
 
 	return &Repository[T]{definition: table, kvStore: kvStore, idGeneratorFactory: idGeneratorFactory}, nil

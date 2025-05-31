@@ -107,7 +107,7 @@ func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", "admin", iGF)
-	assert.EqualError(t, err, "no primaryKey field defined in model nopk")
+	assert.EqualError(t, err, "struct NoPrimary must have a string field named 'ID' with `orm:primaryKey`")
 
 }
 
@@ -147,7 +147,7 @@ func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 
 	_, err := db.NewRepository[Invalid](mockStore, "cf1", "admin", iGF)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no primaryKey field defined")
+	assert.Contains(t, err.Error(), "struct Invalid must have a string field named 'ID' with `orm:primaryKey`")
 }
 
 func TestRepository_Find_AND(t *testing.T) {
