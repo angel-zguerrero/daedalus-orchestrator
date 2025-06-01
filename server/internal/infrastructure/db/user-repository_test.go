@@ -34,7 +34,7 @@ func (m *MockKVStore) Get(AdminFC, key string) ([]byte, error) {
 
 func (m *MockKVStore) Delete(AdminFC, key string) error {
 	args := m.Called(AdminFC, key)
-	return args.Error(1)
+	return args.Error(0)
 }
 
 func (r *MockKVStore) Exists(columnFamily, key string) (bool, error) {

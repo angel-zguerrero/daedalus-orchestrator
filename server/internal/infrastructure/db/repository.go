@@ -180,7 +180,100 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 }
 
 func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
-	changed := true
+	var zero T
+	t := reflect.TypeOf(zero)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// Buscar campo primary
+	var primaryFieldName string
+	for name, def := range r.definition.Fields {
+		if def.Primary {
+			primaryFieldName = name
+			break
+		}
+	}
+	if primaryFieldName == "" {
+		return false, fmt.Errorf("no primary key defined")
+	}
+
+	fmt.Println("aqui se hace el primer search")
+	fmt.Println("aqui se hace el primer GET")
+	current, err := r.FindByField(primaryFieldName, id)
+	if err != nil {
+		return false, err
+	}
+	if current == nil {
+		return false, nil // no se encontró, no hay cambios
+	}
+
+	changed := false
+	currentVal := reflect.ValueOf(current).Elem()
+	newVal := reflect.ValueOf(entity).Elem()
+
+	for fieldName, def := range r.definition.Fields {
+		if def.Primary {
+			continue // no se permite cambiar el campo primario
+		}
+
+		curField := currentVal.FieldByName(fieldName)
+		newField := newVal.FieldByName(fieldName)
+
+		if !curField.IsValid() || !newField.IsValid() {
+			continue
+		}
+
+		oldValue := fmt.Sprintf("%v", curField.Interface())
+		newValue := fmt.Sprintf("%v", newField.Interface())
+
+		if oldValue != newValue {
+			// Si es unique, validar que el nuevo valor no exista ya
+			if def.Unique {
+				idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, fieldName, newValue)
+				fmt.Println("aqui se hace el segundo search")
+				existing, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, idxKey, "", 1)
+				if err != nil {
+					return false, err
+				}
+				if len(existing) > 0 && string(existing[0].Value) != id {
+					return false, fmt.Errorf("duplicate unique field: %s = %s", fieldName, newValue)
+				}
+			}
+
+			// Eliminar índice viejo
+			oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
+			fmt.Println("El delete del viejo aqui ", oldValue)
+			if err := r.kvStore.Delete(r.definition.ColumnFamily, oldIdxKey); err != nil {
+				return false, err
+			}
+
+			// Crear nuevo índice
+			newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue, id)
+			fmt.Println("El Put del nuevo aqui ", newValue)
+			if err := r.kvStore.Put(r.definition.ColumnFamily, newIdxKey, []byte(id)); err != nil {
+				return false, err
+			}
+
+			// Aplicar el cambio al struct actual
+			curField.Set(newField)
+			changed = true
+		}
+	}
+
+	if changed {
+		// Guardar objeto actualizado
+		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
+		dataBytes, err := json.Marshal(current)
+		if err != nil {
+			return false, err
+		}
+		fmt.Println("Guardando aqui el nuevo objeto ", current)
+		if err := r.kvStore.Put(r.definition.ColumnFamily, dataKey, dataBytes); err != nil {
+			return false, err
+		}
+	}
+
 	return changed, nil
 }
 

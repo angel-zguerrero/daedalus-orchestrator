@@ -230,3 +230,60 @@ func TestRepository_Find_NoMatch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result, 0)
 }
+
+func TestRepository_Update_Success(t *testing.T) {
+	mockStore := new(MockKVStore)
+
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	originalUser := User{ID: "123", Name: "Alice"}
+	updatedUser := User{ID: "123", Name: "Bob"}
+
+	oldIndexKey := "admin:users:idx:Name:Alice:123"
+	newIndexKey := "admin:users:idx:Name:Bob:123"
+	dataKey := "admin:users:data:123"
+
+	originalData, _ := json.Marshal(originalUser)
+	updatedData, _ := json.Marshal(updatedUser)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Bob:*", "", 1).
+		Return([]db.KeyValuePair{}, "", nil)
+
+	mockStore.On("Get", "cf1", dataKey).Return(originalData, nil)
+
+	mockStore.On("Delete", "cf1", oldIndexKey).Return(nil)
+
+	mockStore.On("Put", "cf1", newIndexKey, []byte("123")).Return(nil)
+
+	mockStore.On("Put", "cf1", dataKey, updatedData).Return(nil)
+
+	changed, err := repo.Update("123", &updatedUser)
+	assert.NoError(t, err)
+	assert.Equal(t, changed, true)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Update_Nonexistent(t *testing.T) {
+	mockStore := new(MockKVStore)
+
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	user := User{ID: "999", Name: "Ghost"}
+	dataKey := "admin:users:data:999"
+
+	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:999:*", "", 1).
+		Return([]db.KeyValuePair{}, "", nil)
+
+	changed, err := repo.Update("999", &user)
+	assert.NoError(t, err)
+	assert.Equal(t, changed, false)
+}

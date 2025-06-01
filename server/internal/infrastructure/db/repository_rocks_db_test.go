@@ -120,3 +120,81 @@ func TestRepository_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	assert.Equal(t, entity.ID, results[0].ID)
 	assert.Equal(t, entity.Name, results[0].Name)
 }
+
+func TestRepository_Update_SimpleFieldChange(t *testing.T) {
+	repo, err := newTestRepository(t)
+	require.NoError(t, err)
+
+	// Create original entity
+	entity := testEntity{ID: "---", Name: "Alice"}
+	id, err := repo.Create(&entity)
+	require.NoError(t, err)
+	assert.Equal(t, "123", id)
+
+	// Change Name
+	entity.Name = "Alice Smith"
+	updated, err := repo.Update("123", &entity)
+	require.NoError(t, err)
+	assert.True(t, updated)
+
+	// Verify updated value
+	res, err := repo.FindByField("ID", "123")
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, "Alice Smith", res.Name)
+}
+
+func TestRepository_Update_UniqueIndexChange(t *testing.T) {
+	repo, err := newTestRepository(t)
+	require.NoError(t, err)
+
+	entity := testEntity{ID: "---", Name: "Alice"}
+	_, err = repo.Create(&entity)
+	require.NoError(t, err)
+
+	entity.Name = "Bob"
+	updated, err := repo.Update("123", &entity)
+	require.NoError(t, err)
+	assert.True(t, updated)
+
+	// Should no longer be found by old index
+	old, err := repo.FindByField("Name", "Alice")
+	require.NoError(t, err)
+	assert.Nil(t, old)
+
+	// Should now be found by new index
+	newFound, err := repo.FindByField("Name", "Bob")
+	require.NoError(t, err)
+	require.NotNil(t, newFound)
+	assert.Equal(t, "123", newFound.ID)
+}
+
+func TestRepository_Update_IndexCollisionShouldFail(t *testing.T) {
+	repo, err := newTestRepository(t)
+	require.NoError(t, err)
+
+	// Create two users with different names
+	a := testEntity{ID: "---", Name: "Alice"}
+	b := testEntity{ID: "---", Name: "Bob"}
+
+	_, err = repo.Create(&a)
+	require.NoError(t, err)
+	_, err = repo.Create(&b)
+	require.NoError(t, err)
+
+	// Try to rename Alice to "Bob" → should fail (unique collision)
+	a.Name = "Bob"
+	updated, err := repo.Update("123", &a)
+	assert.Error(t, err)
+	assert.False(t, updated)
+}
+
+func TestRepository_Update_NotFound(t *testing.T) {
+	repo, err := newTestRepository(t)
+	require.NoError(t, err)
+
+	entity := testEntity{ID: "999", Name: "Zoe"}
+	ok, err := repo.Update("999", &entity)
+	require.NoError(t, err)
+	assert.False(t, ok)
+}
