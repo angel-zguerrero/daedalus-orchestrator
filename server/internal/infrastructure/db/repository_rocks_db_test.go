@@ -198,3 +198,43 @@ func TestRepository_Update_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ok)
 }
+
+func TestRepository_Delete_Success_RocksDB(t *testing.T) {
+	repo, err := newTestRepository(t)
+	require.NoError(t, err)
+
+	// Crear entidad
+	entity := testEntity{ID: "---", Name: "Charlie"}
+	id, err := repo.Create(&entity)
+	require.NoError(t, err)
+	assert.Equal(t, "123", id)
+
+	// Asegurar que se puede encontrar
+	found, err := repo.FindByField("ID", "123")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+
+	// Eliminar entidad
+	deleted, err := repo.Delete("123")
+	require.NoError(t, err)
+	assert.True(t, deleted)
+
+	// Verificar que ya no se encuentra
+	found, err = repo.FindByField("ID", "123")
+	require.NoError(t, err)
+	assert.Nil(t, found)
+
+	// Verificar que el índice único también se eliminó
+	found, err = repo.FindByField("Name", "Charlie")
+	require.NoError(t, err)
+	assert.Nil(t, found)
+}
+
+func TestRepository_Delete_NotFound_RocksDB(t *testing.T) {
+	repo, err := newTestRepository(t)
+	require.NoError(t, err)
+
+	deleted, err := repo.Delete("nonexistent-id")
+	require.NoError(t, err)
+	assert.False(t, deleted)
+}

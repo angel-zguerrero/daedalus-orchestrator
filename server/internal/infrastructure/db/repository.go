@@ -277,6 +277,47 @@ func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
 	return changed, nil
 }
 
+func (r *Repository[T]) Delete(id string) (bool, error) {
+	var primaryFieldName string
+	for name, def := range r.definition.Fields {
+		if def.Primary {
+			primaryFieldName = name
+			break
+		}
+	}
+	if primaryFieldName == "" {
+		return false, fmt.Errorf("no primary key defined")
+	}
+
+	entity, err := r.FindByField(primaryFieldName, id)
+	if err != nil {
+		return false, err
+	}
+	if entity == nil {
+		return false, nil
+	}
+
+	val := reflect.ValueOf(entity)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	for fieldName := range r.definition.Fields {
+		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
+		if err := r.kvStore.Delete(r.definition.ColumnFamily, idxKey); err != nil {
+			return false, fmt.Errorf("error deleting index key %s: %w", idxKey, err)
+		}
+	}
+
+	dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
+	if err := r.kvStore.Delete(r.definition.ColumnFamily, dataKey); err != nil {
+		return false, fmt.Errorf("error deleting data key %s: %w", dataKey, err)
+	}
+
+	return true, nil
+}
+
 type DefaultIDGeneratorFactory struct{}
 
 func (idG *DefaultIDGeneratorFactory) GenerateID() string {

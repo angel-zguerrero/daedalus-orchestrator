@@ -287,3 +287,64 @@ func TestRepository_Update_Nonexistent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, changed, false)
 }
+func TestRepository_Delete_Success(t *testing.T) {
+	mockStore := new(MockKVStore)
+
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	user := User{ID: "123", Name: "Alice"}
+	dataKey := "admin:users:data:123"
+	indexKey := "admin:users:idx:Name:Alice:123"
+	pkIndexKey := "admin:users:idx:ID:123:123"
+	data, _ := json.Marshal(user)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+
+	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
+
+	mockStore.On("Delete", "cf1", indexKey).Return(nil)
+	mockStore.On("Delete", "cf1", pkIndexKey).Return(nil)
+	mockStore.On("Delete", "cf1", dataKey).Return(nil)
+
+	deleted, err := repo.Delete("123")
+	assert.Equal(t, deleted, true)
+	assert.NoError(t, err)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Delete_NotFound(t *testing.T) {
+	mockStore := new(MockKVStore)
+
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
+		Return([]db.KeyValuePair{}, "", nil)
+
+	deleted, err := repo.Delete("123")
+	assert.Equal(t, deleted, false)
+	assert.NoError(t, err)
+}
+func TestRepository_Delete_CorruptedData(t *testing.T) {
+	mockStore := new(MockKVStore)
+
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	dataKey := "admin:users:data:123"
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+
+	mockStore.On("Get", "cf1", dataKey).Return([]byte("not a valid json"), nil)
+
+	deleted, err := repo.Delete("123")
+	assert.Equal(t, deleted, false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid character")
+}
