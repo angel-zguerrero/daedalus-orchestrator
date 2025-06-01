@@ -179,6 +179,11 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 	return id, nil
 }
 
+func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
+	changed := true
+	return changed, nil
+}
+
 type DefaultIDGeneratorFactory struct{}
 
 func (idG *DefaultIDGeneratorFactory) GenerateID() string {

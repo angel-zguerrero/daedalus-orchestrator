@@ -51,6 +51,24 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	return nil, nil
 }
 
+func (r *RocksdbStore) Delete(columnFamily, key string) error {
+	cf, ok := r.ColumnFamilyHandles[columnFamily]
+	if !ok {
+		cf, ok = r.TTLColumnFamilyHandles[columnFamily]
+		if !ok {
+			return fmt.Errorf("column family %s not found", columnFamily)
+		}
+	}
+	r.DB.GetColumnFamilyMetadata()
+	wo := grocksdb.NewDefaultWriteOptions()
+	defer wo.Destroy()
+	err := r.DB.DeleteCF(wo, cf, []byte(key))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *RocksdbStore) Exists(columnFamily, key string) (bool, error) {
 	val, err := r.Get(columnFamily, key)
 	if err != nil {

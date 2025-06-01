@@ -32,6 +32,11 @@ func (m *MockKVStore) Get(AdminFC, key string) ([]byte, error) {
 	return s, args.Error(1)
 }
 
+func (m *MockKVStore) Delete(AdminFC, key string) error {
+	args := m.Called(AdminFC, key)
+	return args.Error(1)
+}
+
 func (r *MockKVStore) Exists(columnFamily, key string) (bool, error) {
 	val, err := r.Get(columnFamily, key)
 	if err != nil {

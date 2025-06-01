@@ -240,3 +240,119 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }
+
+func TestRocksdbStore_Delete_ExistingKey(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+
+	cfOpts := grocksdb.NewDefaultOptions()
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle)
+	for i, name := range []string{DefaultFC, TestFC} {
+		cfMap[name] = cfHs[i]
+	}
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+
+	key := "delete-key"
+	value := []byte("to-delete")
+
+	require.NoError(t, store.Put(TestFC, key, value))
+
+	// Delete the key
+	require.NoError(t, store.Delete(TestFC, key))
+
+	// Verify it's deleted
+	result, err := store.Get(TestFC, key)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestRocksdbStore_Delete_NonExistentKey(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+
+	cfOpts := grocksdb.NewDefaultOptions()
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle)
+	for i, name := range []string{DefaultFC, TestFC} {
+		cfMap[name] = cfHs[i]
+	}
+
+	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+
+	// Try deleting a key that doesn't exist
+	err = store.Delete(TestFC, "nonexistent")
+	assert.NoError(t, err)
+}
+
+func TestRocksdbStore_Delete_InvalidColumnFamily(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+
+	cfOpts := grocksdb.NewDefaultOptions()
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC}, []*grocksdb.Options{cfOpts})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	store := &db.RocksdbStore{
+		DB:                     rocks,
+		ColumnFamilyHandles:    map[string]*grocksdb.ColumnFamilyHandle{"default": cfHs[0]},
+		TTLColumnFamilyHandles: map[string]*grocksdb.ColumnFamilyHandle{}, // no test_fc
+	}
+
+	// Attempt to delete using a non-existent column family
+	err = store.Delete("nonexistent_cf", "key")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "column family")
+}
+
+func TestRocksdbStore_Delete_TTLColumnFamily(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+
+	cfOpts := grocksdb.NewDefaultOptions()
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+	require.NoError(t, err)
+	defer rocks.Close()
+
+	ttlCFMap := make(map[string]*grocksdb.ColumnFamilyHandle)
+	ttlCFMap[TestFC] = cfHs[1]
+
+	store := &db.RocksdbStore{
+		DB:                     rocks,
+		ColumnFamilyHandles:    map[string]*grocksdb.ColumnFamilyHandle{},
+		TTLColumnFamilyHandles: ttlCFMap,
+	}
+
+	key := "ttl-key"
+	value := []byte("ttl-value")
+
+	require.NoError(t, store.Put(TestFC, key, value))
+
+	// Delete the key from TTL column family
+	require.NoError(t, store.Delete(TestFC, key))
+
+	// Ensure it's deleted
+	result, err := store.Get(TestFC, key)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}

@@ -50,6 +50,8 @@ type KVStore interface {
 	//   - An error if any occurred during the operation.
 	Get(columnFamily string, key string) ([]byte, error)
 
+	Delete(columnFamily string, key string) error
+
 	// Put stores a key-value pair into a specific column family.
 	// If the key already exists, its value will be overwritten.
 	// Parameters:
