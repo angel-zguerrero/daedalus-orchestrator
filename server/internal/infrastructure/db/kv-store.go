@@ -13,10 +13,12 @@ type WriteBatch struct {
 	Data []X
 }
 
+// NewWriteBatch creates and returns a new WriteBatch.
 func NewWriteBatch() *WriteBatch {
 	return &WriteBatch{Data: make([]X, 0)}
 }
 
+// Put adds a put operation to the batch.
 func (wb *WriteBatch) Put(columnFamily string, key string, value []byte) {
 	wb.Data = append(wb.Data, X{
 		CF:    columnFamily,
@@ -25,6 +27,8 @@ func (wb *WriteBatch) Put(columnFamily string, key string, value []byte) {
 		Type:  "put",
 	})
 }
+
+// Delete adds a delete operation to the batch.
 func (wb *WriteBatch) Delete(columnFamily string, key string) {
 	wb.Data = append(wb.Data, X{
 		CF:   columnFamily,
@@ -33,6 +37,7 @@ func (wb *WriteBatch) Delete(columnFamily string, key string) {
 	})
 }
 
+// Count returns the number of operations currently in the batch.
 func (wb *WriteBatch) Count() int {
 	return len(wb.Data)
 }

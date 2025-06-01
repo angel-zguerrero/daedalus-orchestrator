@@ -98,8 +98,21 @@ func (n *Node) Run() {
 }
 
 // handleMessage processes a message received from another Raft node.
-// It locks the node's state, checks the message term, and then dispatches
-// based on the message type (MsgRequestVote, MsgAppendEntries, MsgVote).
+// It locks the node's state (n.mu) to ensure atomic updates to term, vote, and state.
+//
+// Key actions:
+// 1. Ignores messages with a term older than the node's currentTerm.
+// 2. If message term is newer, node updates its currentTerm, resets its vote,
+//    and transitions to Follower state.
+// 3. Dispatches message to specific handlers (handleRequestVote) based on message Type
+//    (MsgRequestVote, MsgAppendEntries, MsgVote).
+// 4. For MsgAppendEntries (including heartbeats):
+//    - Resets the election timer, as it indicates valid leader communication.
+//    - If the node was a Candidate or a Leader (and the message is not from itself),
+//      it transitions to Follower state.
+// 5. For MsgVote:
+//    - If the node is a Candidate, it increments its vote count.
+//    - If majority votes are received, it transitions to Leader state.
 //
 // Parameters:
 //   - msg: The Message received from another node.
@@ -379,9 +392,21 @@ func (n *Node) resetElectionTimer() {
 }
 
 // startElection initiates a new election process.
-// The node transitions to the Candidate state, increments its term, votes for itself,
-// and sends MsgRequestVote messages to all other known peers.
-// This method must be called with the node's mutex (n.mu) held.
+// This method is typically called when a Follower's election timer expires.
+//
+// Key actions:
+// 1. Acquires node lock (n.mu) for state modification.
+// 2. Checks if the node is already a Leader; if so, it aborts starting a new election
+//    and resets its election timer (as a safeguard).
+// 3. Transitions node state to Candidate.
+// 4. Increments currentTerm.
+// 5. Votes for itself (n.votedFor = n.ID, n.votesReceived = 1).
+// 6. Resets its election timer for the new candidacy period.
+// 7. Sends MsgRequestVote messages to all other peers registered in its Transport layer
+//    for the current TenantID. These messages are sent concurrently.
+//
+// Note: This method must acquire and release the node's mutex (n.mu) as it modifies shared state
+// and is called from the election timer goroutine which does not hold the lock.
 func (n *Node) startElection() {
 	// n.mu.Lock() and defer n.mu.Unlock() are now handled by the caller (runElectionTimer's timer.C case calls this)
 	// This needs to be re-evaluated. If startElection is called from elsewhere, it needs the lock.
@@ -443,8 +468,19 @@ func (n *Node) startElection() {
 }
 
 // becomeLeader transitions the node to the Leader state.
-// It logs the transition and starts sending heartbeats to peers.
-// This method must be called with the node's mutex (n.mu) held.
+// This method is called when a Candidate has received votes from a majority of nodes.
+//
+// Key actions:
+// 1. Checks if the node is already the Leader to prevent redundant actions.
+// 2. Sets node state to Leader.
+// 3. Logs the transition.
+// 4. If a heartbeat goroutine was somehow active (e.g., from a rapid state change),
+//    it's cancelled before starting a new one.
+// 5. Calls startHeartbeat() to begin sending AppendEntries (heartbeats) to peers,
+//    asserting its leadership and preventing new elections.
+//
+// Note: This method must be called with the node's mutex (n.mu) held, as it modifies n.State
+// and calls startHeartbeat which also expects the lock or is called by a lock-holding method.
 func (n *Node) becomeLeader() {
 	if n.State == Leader { // Already leader, perhaps from a redundant majority signal.
 		return
@@ -462,9 +498,21 @@ func (n *Node) becomeLeader() {
 }
 
 // becomeFollower transitions the node to the Follower state.
-// It cancels any ongoing heartbeat if it was a leader, resets its vote,
-// and resets the election timer.
-// This method must be called with the node's mutex (n.mu) held.
+// This can happen due to several reasons:
+// - Discovering a current leader (e.g., receiving an AppendEntries from a valid leader).
+// - Discovering a new term (e.g., receiving a message with a higher term).
+// - An election ending without the node becoming leader.
+//
+// Key actions:
+// 1. Checks if already a Follower with a reset vote; if so, primarily ensures election timer is reset.
+// 2. Logs the transition.
+// 3. If the node was previously a Leader, it cancels its heartbeat goroutine.
+// 4. Sets node state to Follower.
+// 5. Resets n.votedFor to "" (hasn't voted in the current context/term as follower).
+// 6. Resets n.votesReceived to 0.
+// 7. Resets the election timer, as Followers need to time out and start elections if they don't hear from a leader.
+//
+// Note: This method must be called with the node's mutex (n.mu) held.
 func (n *Node) becomeFollower() {
 	if n.State == Follower && n.votedFor == "" { // Already a follower and vote is reset (e.g. new term)
 		// Still need to reset election timer if this was triggered by a message.
@@ -485,10 +533,22 @@ func (n *Node) becomeFollower() {
 	n.resetElectionTimer()   // Start/reset election timer as a follower.
 }
 
-// startHeartbeat initiates a goroutine that periodically sends heartbeat messages (empty AppendEntries)
-// to all peers to maintain leadership. This is only called when a node becomes a leader.
-// The heartbeat goroutine stops if the node's state changes from Leader or if the node's main context is done.
-// This method must be called with the node's mutex (n.mu) held or by a method that holds it (like becomeLeader).
+// startHeartbeat initiates a goroutine that periodically sends heartbeat messages
+// (empty AppendEntries RPCs) to all other peers. This is a Leader-specific behavior.
+//
+// Key actions:
+// 1. Creates a new context (hbCtx) for the heartbeat goroutine, derived from the node's main context (n.ctx).
+//    A cancel function (hbCancel) for this context is stored in n.heartbeatCancel,
+//    allowing the heartbeats to be stopped if the node steps down from Leadership.
+// 2. Logs the initiation of heartbeats.
+// 3. The goroutine uses a time.Ticker for periodic execution (e.g., every 50ms).
+// 4. In each tick, it first checks (with n.mu locked) if the node is still the Leader.
+//    If not, the goroutine exits. This is a crucial check to stop heartbeats if state changes.
+// 5. Sends an AppendEntries message (acting as a heartbeat) to each peer concurrently.
+//    The message includes the Leader's currentTerm.
+//
+// Note: This method is typically called by becomeLeader() which holds n.mu.
+// The heartbeat goroutine itself acquires n.mu when checking n.State.
 func (n *Node) startHeartbeat() {
 	// Create a new context for this heartbeat instance, derived from the node's main context.
 	hbCtx, hbCancel := context.WithCancel(n.ctx)
