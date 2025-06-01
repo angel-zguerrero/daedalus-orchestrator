@@ -124,6 +124,17 @@ func (mn *RaftNode) GetClient() *client.Session {
 	return mn.NH.GetNoOPSession(mn.ShardID)
 }
 
+// Write proposes a batch of commands to the Raft log.
+// It marshals the commands into JSON and uses SyncPropose to apply them.
+// This is a synchronous operation that waits for the proposal to be committed or to fail.
+//
+// Parameters:
+//   - ctx: The context for the synchronous proposal.
+//   - commands: A slice of Command objects to be written.
+//
+// Returns:
+//   - The result of the proposal from the state machine.
+//   - An error if marshaling fails or if SyncPropose encounters an error.
 func (mn *RaftNode) Write(ctx context.Context, comands []Command) (statemachine.Result, error) {
 	cs := mn.GetClient()
 	data, err := json.Marshal(comands)
@@ -134,6 +145,17 @@ func (mn *RaftNode) Write(ctx context.Context, comands []Command) (statemachine.
 	return result, err
 }
 
+// Read performs a linearizable read from the Raft state machine.
+// It marshals the read command (RK_Command) into JSON and uses SyncRead.
+// This is a synchronous operation that waits for the read to be processed or to fail.
+//
+// Parameters:
+//   - ctx: The context for the synchronous read.
+//   - cmd: The RK_Command describing the read operation.
+//
+// Returns:
+//   - The result of the read operation from the state machine.
+//   - An error if marshaling fails or if SyncRead encounters an error.
 func (mn *RaftNode) Read(ctx context.Context, cmd RK_Command) (interface{}, error) {
 	data, err := json.Marshal(cmd)
 	if err != nil {
