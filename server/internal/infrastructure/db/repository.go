@@ -392,7 +392,7 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 	for fieldName, def := range r.definition.Fields {
 		if def.Unique {
 			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
-			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
+			idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
 			exists, err := r.kvStore.Exists(r.definition.ColumnFamily, idxKey)
 			if err != nil {
 				return "", err
@@ -403,11 +403,18 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 		}
 	}
 
-	for fieldName, _ := range r.definition.Fields {
+	for fieldName, def := range r.definition.Fields {
 		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
 		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
 		if err := r.kvStore.Put(r.definition.ColumnFamily, idxKey, []byte(id)); err != nil {
 			return "", err
+		}
+		if def.Unique {
+			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+			idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+			if err := r.kvStore.Put(r.definition.ColumnFamily, idxKey, []byte(id)); err != nil {
+				return "", err
+			}
 		}
 	}
 

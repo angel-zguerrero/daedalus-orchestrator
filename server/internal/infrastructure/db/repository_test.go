@@ -59,12 +59,14 @@ func TestRepository_Create_Success(t *testing.T) {
 	data, _ := json.Marshal(user)
 	dataKey := "admin:users:data:123"
 	nameFieldKey := "admin:users:idx:Name:Alice:123"
+	uNameFieldKey := "admin:users:idx-u:Name:Alice"
 	indexKey := "admin:users:idx:ID:123:123"
 
-	mockStore.On("Get", "cf1", nameFieldKey).Return(nil, nil)
+	mockStore.On("Get", "cf1", uNameFieldKey).Return(nil, nil)
 	mockStore.On("Put", "cf1", indexKey, []byte("123")).Return(nil)
 	mockStore.On("Put", "cf1", nameFieldKey, []byte("123")).Return(nil)
 	mockStore.On("Put", "cf1", dataKey, data).Return(nil)
+	mockStore.On("Put", "cf1", uNameFieldKey, []byte("123")).Return(nil)
 
 	id, err := repo.Create(&user)
 	assert.NoError(t, err)
@@ -86,8 +88,8 @@ func TestRepository_Create_DuplicateUnique(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	indexKey := "admin:users:idx:Name:Alice:123"
-	mockStore.On("Get", "cf1", indexKey).Return([]byte("123"), nil)
+	uIndexKey := "admin:users:idx-u:Name:Alice"
+	mockStore.On("Get", "cf1", uIndexKey).Return([]byte("123"), nil)
 
 	_, err = repo.Create(&user)
 	assert.Error(t, err)
