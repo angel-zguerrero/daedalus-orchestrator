@@ -119,13 +119,12 @@ func TestRepository_FindByField_Success(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	indexKey := "admin:users:idx:Name:Alice:*"
+	uIndexKey := "admin:users:idx-u:Name:Alice"
 	dataKey := "admin:users:data:123"
 	user := User{ID: "123", Name: "Alice"}
 	data, _ := json.Marshal(user)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", indexKey, "", 1).
-		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	mockStore.On("Get", "cf1", uIndexKey).Return([]byte("123"), nil)
 	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
 
 	result, err := repo.FindByField("Name", "Alice")
@@ -254,9 +253,6 @@ func TestRepository_Update_Success(t *testing.T) {
 	originalData, _ := json.Marshal(originalUser)
 	updatedData, _ := json.Marshal(updatedUser)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
-		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-
 	mockStore.On("Get", "cf1", newUIndexKey).Return([]byte{}, nil)
 
 	mockStore.On("Delete", "cf1", oldUIndexKey).Return(nil)
@@ -289,8 +285,6 @@ func TestRepository_Update_Nonexistent(t *testing.T) {
 	dataKey := "admin:users:data:999"
 
 	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:999:*", "", 1).
-		Return([]db.KeyValuePair{}, "", nil)
 
 	changed, err := repo.Update("999", &user)
 	assert.NoError(t, err)
@@ -309,9 +303,6 @@ func TestRepository_Delete_Success(t *testing.T) {
 	uIndexKey := "admin:users:idx-u:Name:Alice"
 	pkIndexKey := "admin:users:idx:ID:123:123"
 	data, _ := json.Marshal(user)
-
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
-		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 
 	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
 
@@ -334,8 +325,8 @@ func TestRepository_Delete_NotFound(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
-		Return([]db.KeyValuePair{}, "", nil)
+	dataKey := "admin:users:data:123"
+	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
 
 	deleted, err := repo.Delete("123")
 	assert.Equal(t, deleted, false)
