@@ -267,7 +267,7 @@ func TestRepository_Update_Success(t *testing.T) {
 
 	mockStore.On("Put", "cf1", dataKey, updatedData).Return(nil)
 
-	changed, err := repo.Update("123", &updatedUser)
+	changed, err := repo.Update(&updatedUser)
 	assert.NoError(t, err)
 	assert.Equal(t, changed, true)
 
@@ -286,7 +286,7 @@ func TestRepository_Update_Nonexistent(t *testing.T) {
 
 	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
 
-	changed, err := repo.Update("999", &user)
+	changed, err := repo.Update(&user)
 	assert.NoError(t, err)
 	assert.Equal(t, changed, false)
 }

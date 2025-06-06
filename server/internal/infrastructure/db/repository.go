@@ -449,7 +449,7 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 	return id, nil
 }
 
-func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
+func (r *Repository[T]) Update(entity *T) (bool, error) {
 	var zero T
 	t := reflect.TypeOf(zero)
 	if t.Kind() == reflect.Ptr {
@@ -467,7 +467,8 @@ func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
 	if primaryFieldName == "" {
 		return false, fmt.Errorf("no primary key defined")
 	}
-
+	entityVal := reflect.ValueOf(entity).Elem()
+	id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
 	current, err := r.FindByField(primaryFieldName, id)
 	if err != nil {
 		return false, err

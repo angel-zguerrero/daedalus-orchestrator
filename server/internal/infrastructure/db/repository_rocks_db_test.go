@@ -136,14 +136,14 @@ func TestRepository_Update_SimpleFieldChange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create original entity
-	entity := testEntity{ID: "---", Name: "Alice"}
+	entity := testEntity{ID: "123", Name: "Alice"}
 	id, err := repo.Create(&entity)
 	require.NoError(t, err)
 	assert.Equal(t, "123", id)
 
 	// Change Name
 	entity.Name = "Alice Smith"
-	updated, err := repo.Update("123", &entity)
+	updated, err := repo.Update(&entity)
 	require.NoError(t, err)
 	assert.True(t, updated)
 
@@ -158,12 +158,12 @@ func TestRepository_Update_UniqueIndexChange(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
 
-	entity := testEntity{ID: "---", Name: "Alice"}
+	entity := testEntity{ID: "123", Name: "Alice"}
 	_, err = repo.Create(&entity)
 	require.NoError(t, err)
 
 	entity.Name = "Bob"
-	updated, err := repo.Update("123", &entity)
+	updated, err := repo.Update(&entity)
 	require.NoError(t, err)
 	assert.True(t, updated)
 
@@ -184,7 +184,7 @@ func TestRepository_Update_IndexCollisionShouldFail(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create two users with different names
-	a := testEntity{ID: "---", Name: "Alice"}
+	a := testEntity{ID: "123", Name: "Alice"}
 	b := testEntity{ID: "---", Name: "Bob"}
 
 	_, err = repo.Create(&a)
@@ -194,7 +194,7 @@ func TestRepository_Update_IndexCollisionShouldFail(t *testing.T) {
 
 	// Try to rename Alice to "Bob" → should fail (unique collision)
 	a.Name = "Bob"
-	updated, err := repo.Update("123", &a)
+	updated, err := repo.Update(&a)
 	assert.Error(t, err)
 	assert.False(t, updated)
 }
@@ -204,7 +204,7 @@ func TestRepository_Update_NotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	entity := testEntity{ID: "999", Name: "Zoe"}
-	ok, err := repo.Update("999", &entity)
+	ok, err := repo.Update(&entity)
 	require.NoError(t, err)
 	assert.False(t, ok)
 }
