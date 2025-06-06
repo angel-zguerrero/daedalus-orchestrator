@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -43,155 +44,280 @@ type FindResult[T any] struct {
 	Entities []T
 	Cursor   string
 }
+type tokenType int
+
+const (
+	tokUnknown tokenType = iota
+	tokLParen
+	tokRParen
+	tokOperator
+	tokCondition
+)
+
+type token struct {
+	typ tokenType
+	val string
+}
+
+var operatorPrecedence = map[string]int{
+	"|": 1,
+	"&": 2,
+}
+
+func tokenize(input string) ([]token, error) {
+	tokens := []token{}
+	buffer := ""
+	depth := 0
+	flush := func() {
+		if strings.TrimSpace(buffer) != "" {
+			tokens = append(tokens, token{typ: tokCondition, val: strings.TrimSpace(buffer)})
+			buffer = ""
+		}
+	}
+	for i := 0; i < len(input); i++ {
+		c := input[i]
+		switch c {
+		case '(':
+			flush()
+			tokens = append(tokens, token{typ: tokLParen, val: "("})
+			depth++
+		case ')':
+			flush()
+			tokens = append(tokens, token{typ: tokRParen, val: ")"})
+			depth--
+		case '&', '|':
+			flush()
+			tokens = append(tokens, token{typ: tokOperator, val: string(c)})
+		default:
+			buffer += string(c)
+		}
+	}
+	flush()
+	if depth != 0 {
+		return nil, errors.New("mismatched parentheses")
+	}
+	return tokens, nil
+}
+
+type exprNode struct {
+	op      string // "&" or "|" or "COND"
+	left    *exprNode
+	right   *exprNode
+	condStr string
+}
+
+func parse(tokens []token) (*exprNode, error) {
+	output := []*exprNode{}
+	ops := []token{}
+	popOp := func() error {
+		if len(ops) == 0 {
+			return errors.New("invalid expression")
+		}
+		op := ops[len(ops)-1]
+		ops = ops[:len(ops)-1]
+		if len(output) < 2 {
+			return errors.New("invalid expression tree")
+		}
+		right := output[len(output)-1]
+		left := output[len(output)-2]
+		output = output[:len(output)-2]
+		n := &exprNode{op: op.val, left: left, right: right}
+		output = append(output, n)
+		return nil
+	}
+	for _, tok := range tokens {
+		switch tok.typ {
+		case tokCondition:
+			output = append(output, &exprNode{op: "COND", condStr: tok.val})
+		case tokOperator:
+			for len(ops) > 0 && ops[len(ops)-1].typ == tokOperator &&
+				operatorPrecedence[ops[len(ops)-1].val] >= operatorPrecedence[tok.val] {
+				if err := popOp(); err != nil {
+					return nil, err
+				}
+			}
+			ops = append(ops, tok)
+		case tokLParen:
+			ops = append(ops, tok)
+		case tokRParen:
+			for len(ops) > 0 && ops[len(ops)-1].typ != tokLParen {
+				if err := popOp(); err != nil {
+					return nil, err
+				}
+			}
+			if len(ops) == 0 || ops[len(ops)-1].typ != tokLParen {
+				return nil, errors.New("mismatched parentheses")
+			}
+			ops = ops[:len(ops)-1] // pop (
+		default:
+			return nil, fmt.Errorf("unexpected token: %v", tok)
+		}
+	}
+	for len(ops) > 0 {
+		if err := popOp(); err != nil {
+			return nil, err
+		}
+	}
+	if len(output) != 1 {
+		return nil, errors.New("expression reduced to multiple roots")
+	}
+	return output[0], nil
+}
+func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]bool, error) {
+	conditionRegex := regexp.MustCompile(`(?i)^([\w.]+)\s*(=|!=|<=|>=|<|>|LIKE|BETWEEN)\s*(.+)$`)
+	parts := conditionRegex.FindStringSubmatch(strings.TrimSpace(condStr))
+	if len(parts) != 4 {
+		return nil, fmt.Errorf("invalid condition: %s", condStr)
+	}
+
+	field := strings.TrimSpace(parts[1])
+	operator := strings.ToUpper(strings.TrimSpace(parts[2]))
+	value := strings.TrimSpace(strings.Trim(parts[3], "'"))
+
+	allIDs := make(map[string]bool)
+	prefix := fmt.Sprintf("%s:%s:idx:%s:", r.definition.Schema, r.definition.Name, field)
+	cursorInner := ""
+
+	switch operator {
+	case "=":
+		pattern := prefix + value + ":*"
+		for {
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, pattern, cursorInner, limit)
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range items {
+				allIDs[string(item.Value)] = true
+			}
+			if next == "" {
+				break
+			}
+			cursorInner = next
+		}
+	case "LIKE":
+		likeRegex := strings.ReplaceAll(value, "*", ".*")
+		regex, err := regexp.Compile("^" + likeRegex + "$")
+		if err != nil {
+			return nil, fmt.Errorf("invalid LIKE pattern: %s", value)
+		}
+		for {
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range items {
+				parts := strings.Split(string(item.Key), ":")
+				if len(parts) < 5 {
+					continue
+				}
+				indexedVal := parts[4]
+				if regex.MatchString(indexedVal) {
+					allIDs[string(item.Value)] = true
+				}
+			}
+			if next == "" {
+				break
+			}
+			cursorInner = next
+		}
+	case "<", "<=", ">", ">=", "!=", "BETWEEN":
+		for {
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range items {
+				parts := strings.Split(string(item.Key), ":")
+				if len(parts) < 5 {
+					continue
+				}
+				indexedVal := parts[4]
+				include := false
+				switch operator {
+				case "<":
+					include = indexedVal < value
+				case "<=":
+					include = indexedVal <= value
+				case ">":
+					include = indexedVal > value
+				case ">=":
+					include = indexedVal >= value
+				case "!=":
+					include = indexedVal != value
+				case "BETWEEN":
+					bounds := strings.Split(value, "AND")
+					if len(bounds) == 2 {
+						lo := strings.TrimSpace(bounds[0])
+						hi := strings.TrimSpace(bounds[1])
+						include = indexedVal >= lo && indexedVal <= hi
+					}
+				}
+				if include {
+					allIDs[string(item.Value)] = true
+				}
+			}
+			if next == "" {
+				break
+			}
+			cursorInner = next
+		}
+	default:
+		return nil, fmt.Errorf("unsupported operator: %s", operator)
+	}
+
+	return allIDs, nil
+}
+
+func (r *Repository[T]) evalExpr(node *exprNode, limit int) (map[string]bool, error) {
+	if node.op == "COND" {
+		return r.evalCondition(node.condStr, limit)
+	}
+	left, err := r.evalExpr(node.left, limit)
+	if err != nil {
+		return nil, err
+	}
+	right, err := r.evalExpr(node.right, limit)
+	if err != nil {
+		return nil, err
+	}
+	res := map[string]bool{}
+	if node.op == "&" {
+		for k := range left {
+			if right[k] {
+				res[k] = true
+			}
+		}
+	} else if node.op == "|" {
+		for k := range left {
+			res[k] = true
+		}
+		for k := range right {
+			res[k] = true
+		}
+	} else {
+		return nil, fmt.Errorf("unsupported operator: %s", node.op)
+	}
+	return res, nil
+}
 
 func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResult[T], error) {
-	filter = strings.TrimSpace(filter)
-	if filter == "" {
-		return nil, fmt.Errorf("filter string is empty")
+	tokens, err := tokenize(filter)
+	if err != nil {
+		return nil, err
 	}
-
-	invalidOpRegex := regexp.MustCompile(`[<>=!]{2,}`)
-	if invalidOpRegex.MatchString(filter) && !strings.Contains(filter, "!=") && !strings.Contains(filter, "<=") && !strings.Contains(filter, ">=") {
-		return nil, fmt.Errorf("invalid or malformed filter expression: %s", filter)
+	tree, err := parse(tokens)
+	if err != nil {
+		return nil, err
 	}
-
-	var conditionRegex = regexp.MustCompile(`(?i)^(\w+)\s*(=|!=|<=|>=|<|>|LIKE|BETWEEN)\s*(.+)$`)
-
-	orConditions := strings.Split(filter, "|")
-	orResults := map[string]bool{}
+	idMap, err := r.evalExpr(tree, limit)
+	if err != nil {
+		return nil, err
+	}
 	var matchedIDs []string
-
-	for _, orCond := range orConditions {
-		orCond = strings.TrimSpace(orCond)
-		andConditions := strings.Split(orCond, "&")
-
-		var andMatchedIDs map[string]bool
-		for i, andCond := range andConditions {
-			andCond = strings.TrimSpace(andCond)
-			parts := conditionRegex.FindStringSubmatch(andCond)
-			if len(parts) != 4 {
-				return nil, fmt.Errorf("invalid condition: %s", andCond)
-			}
-
-			field := strings.TrimSpace(parts[1])
-			operator := strings.ToUpper(strings.TrimSpace(parts[2]))
-			value := strings.TrimSpace(strings.Trim(parts[3], "'"))
-
-			allIDs := make(map[string]bool)
-
-			switch operator {
-			case "=":
-				pattern := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
-				cursorInner := ""
-				for {
-					items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, pattern, cursorInner, limit)
-					if err != nil {
-						return nil, err
-					}
-					for _, item := range items {
-						allIDs[string(item.Value)] = true
-					}
-					if next == "" {
-						break
-					}
-					cursorInner = next
-				}
-			case "LIKE":
-				likeRegex := strings.ReplaceAll(value, "*", ".*")
-				regex, err := regexp.Compile("^" + likeRegex + "$")
-				if err != nil {
-					return nil, fmt.Errorf("invalid LIKE pattern: %s", value)
-				}
-				prefix := fmt.Sprintf("%s:%s:idx:%s:", r.definition.Schema, r.definition.Name, field)
-				cursorInner := ""
-				for {
-					items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
-					if err != nil {
-						return nil, err
-					}
-					for _, item := range items {
-						parts := strings.Split(string(item.Key), ":")
-						if len(parts) < 5 {
-							continue
-						}
-						indexedVal := parts[4]
-						if regex.MatchString(indexedVal) {
-							allIDs[string(item.Value)] = true
-						}
-					}
-					if next == "" {
-						break
-					}
-					cursorInner = next
-				}
-			case "<", "<=", ">", ">=", "!=", "BETWEEN":
-				prefix := fmt.Sprintf("%s:%s:idx:%s:", r.definition.Schema, r.definition.Name, field)
-				cursorInner := ""
-				for {
-					items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
-					if err != nil {
-						return nil, err
-					}
-					for _, item := range items {
-						parts := strings.Split(string(item.Key), ":")
-						if len(parts) < 5 {
-							continue
-						}
-						indexedVal := parts[4]
-						include := false
-						switch operator {
-						case "<":
-							include = indexedVal < value
-						case "<=":
-							include = indexedVal <= value
-						case ">":
-							include = indexedVal > value
-						case ">=":
-							include = indexedVal >= value
-						case "!=":
-							include = indexedVal != value
-						case "BETWEEN":
-							bounds := strings.Split(value, "AND")
-							if len(bounds) == 2 {
-								lo := strings.TrimSpace(bounds[0])
-								hi := strings.TrimSpace(bounds[1])
-								include = indexedVal >= lo && indexedVal <= hi
-							}
-						}
-						if include {
-							allIDs[string(item.Value)] = true
-						}
-					}
-					if next == "" {
-						break
-					}
-					cursorInner = next
-				}
-			default:
-				return nil, fmt.Errorf("unsupported operator: %s", operator)
-			}
-
-			if i == 0 {
-				andMatchedIDs = allIDs
-			} else {
-				for id := range andMatchedIDs {
-					if !allIDs[id] {
-						delete(andMatchedIDs, id)
-					}
-				}
-			}
-		}
-		for id := range andMatchedIDs {
-			orResults[id] = true
-		}
-	}
-
-	for id := range orResults {
+	for id := range idMap {
 		matchedIDs = append(matchedIDs, id)
 	}
-
 	sort.Strings(matchedIDs)
-
 	start := 0
 	if cursor != "" {
 		for i, id := range matchedIDs {
@@ -206,7 +332,6 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 		end = len(matchedIDs)
 	}
 	selectedIDs := matchedIDs[start:end]
-
 	var results []T
 	for _, id := range selectedIDs {
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
@@ -221,12 +346,10 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 		}
 		results = append(results, result)
 	}
-
 	var nextCursor string
 	if end < len(matchedIDs) {
 		nextCursor = matchedIDs[end-1]
 	}
-
 	return &FindResult[T]{
 		Entities: results,
 		Cursor:   nextCursor,

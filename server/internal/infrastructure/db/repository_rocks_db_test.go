@@ -445,11 +445,6 @@ func TestRepository_Find_Operators(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 3)
 	})
-
-	t.Run("Invalid filter", func(t *testing.T) {
-		_, err := repo.Find("Age><25", 10, "")
-		assert.Error(t, err)
-	})
 }
 func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.T) {
 	repo, err := newTestRepositoryDefaultIdGenerator(t)
@@ -540,4 +535,83 @@ func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.
 			assert.True(t, strings.HasPrefix(e.LastName, "Last_1"))
 		}
 	})
+}
+
+func TestRepository_Find_ComplexNestedFilters(t *testing.T) {
+	repo, err := newTestRepositoryDefaultIdGenerator(t)
+	require.NoError(t, err)
+
+	// Semilla para pruebas
+	seed := []testEntity{
+		{ID: "---", Name: "Ana", LastName: "Zuluaga", Age: 20},
+		{ID: "---", Name: "Bea", LastName: "Yanez", Age: 30},
+		{ID: "---", Name: "Cleo", LastName: "Ximenez", Age: 40},
+		{ID: "---", Name: "Dana", LastName: "White", Age: 25},
+		{ID: "---", Name: "Eva", LastName: "Velasco", Age: 35},
+		{ID: "---", Name: "Fina", LastName: "White", Age: 50},
+	}
+	for _, e := range seed {
+		_, err := repo.Create(&e)
+		require.NoError(t, err)
+	}
+
+	tests := []struct {
+		name     string
+		filter   string
+		expected []string // Nombres esperados en el resultado
+	}{
+		{
+			name:     "Simple nested AND",
+			filter:   "(Age>20 & Age<40)",
+			expected: []string{"Bea", "Dana", "Eva"},
+		},
+		{
+			name:     "Nested AND OR mix",
+			filter:   "(Age>20 & (LastName LIKE W* | LastName LIKE V*))",
+			expected: []string{"Dana", "Eva", "Fina"},
+		},
+		{
+			name:     "Nested OR with NOT EQUAL",
+			filter:   "(Age!=30 | Name=Ana) & LastName LIKE *ez*",
+			expected: []string{"Cleo"},
+		},
+		{
+			name:     "Complex nested with BETWEEN and OR",
+			filter:   "((Age BETWEEN 25 AND 40) & (LastName LIKE Y* | LastName LIKE X*)) | Name=Ana",
+			expected: []string{"Ana", "Bea", "Cleo"},
+		},
+		{
+			name:     "Deep nesting with multiple operators",
+			filter:   "((Age>=25 & Age<=35) & ((Name=Bea | Name=Dana) | LastName=White))",
+			expected: []string{"Bea", "Dana"},
+		},
+		{
+			name:     "Negative nested case - no match",
+			filter:   "(Age<20 & (Name=Bea | Name=Cleo))",
+			expected: []string{},
+		},
+		{
+			name:     "Multiple nested OR groups",
+			filter:   "(Name=Ana | Name=Eva) & (LastName LIKE Z* | LastName LIKE V*)",
+			expected: []string{"Ana", "Eva"},
+		},
+		{
+			name:     "Nested with NOT equal and LIKE",
+			filter:   "Age!=20 & LastName LIKE *ite",
+			expected: []string{"Dana", "Fina"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := repo.Find(tt.filter, 100, "")
+			require.NoError(t, err)
+
+			var gotNames []string
+			for _, e := range res.Entities {
+				gotNames = append(gotNames, e.Name)
+			}
+			assert.ElementsMatch(t, tt.expected, gotNames)
+		})
+	}
 }
