@@ -166,10 +166,10 @@ func TestRepository_Find_AND(t *testing.T) {
 	mockStore.On("Get", "cf1", "admin:users:data:123").
 		Return(data, nil)
 
-	result, err := repo.Find("ID=123&Name=Alice")
+	result, err := repo.Find("ID=123&Name=Alice", 1000, "")
 	assert.NoError(t, err)
-	assert.Len(t, result, 1)
-	assert.Equal(t, &user, &result[0])
+	assert.Len(t, result.Entities, 1)
+	assert.Equal(t, &user, &result.Entities[0])
 }
 
 func TestRepository_Find_OR(t *testing.T) {
@@ -192,9 +192,9 @@ func TestRepository_Find_OR(t *testing.T) {
 	mockStore.On("Get", "cf1", "admin:users:data:456").
 		Return(data2, nil)
 
-	result, err := repo.Find("Name=Alice|Name=Bob")
+	result, err := repo.Find("Name=Alice|Name=Bob", 1000, "")
 	assert.NoError(t, err)
-	assert.Len(t, result, 2)
+	assert.Len(t, result.Entities, 2)
 }
 
 func TestRepository_Find_SpecialCharacters(t *testing.T) {
@@ -211,10 +211,10 @@ func TestRepository_Find_SpecialCharacters(t *testing.T) {
 	mockStore.On("Get", "cf1", "admin:users:data:999").
 		Return(data, nil)
 
-	result, err := repo.Find("Name=foo:bar")
+	result, err := repo.Find("Name=foo:bar", 1000, "")
 	assert.NoError(t, err)
-	assert.Len(t, result, 1)
-	assert.Equal(t, &user, &result[0])
+	assert.Len(t, result.Entities, 1)
+	assert.Equal(t, &user, &result.Entities[0])
 }
 
 func TestRepository_Find_NoMatch(t *testing.T) {
@@ -226,9 +226,9 @@ func TestRepository_Find_NoMatch(t *testing.T) {
 	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Ghost:*", "", 1000).
 		Return(nil, "", nil)
 
-	result, err := repo.Find("Name=Ghost")
+	result, err := repo.Find("Name=Ghost", 1000, "")
 	assert.NoError(t, err)
-	assert.Len(t, result, 0)
+	assert.Len(t, result.Entities, 0)
 }
 
 func TestRepository_Update_Success(t *testing.T) {

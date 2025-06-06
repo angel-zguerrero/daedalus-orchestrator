@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -37,7 +38,12 @@ type Repository[T ORMEntity] struct {
 	idGeneratorFactory IDGeneratorFactory
 }
 
-func (r *Repository[T]) Find(filter string) ([]T, error) {
+type FindResult[T any] struct {
+	Entities []T
+	Cursor   string
+}
+
+func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResult[T], error) {
 	filter = strings.TrimSpace(filter)
 	if filter == "" {
 		return nil, fmt.Errorf("filter string is empty")
@@ -62,21 +68,36 @@ func (r *Repository[T]) Find(filter string) ([]T, error) {
 			value := strings.Trim(strings.TrimSpace(parts[1]), "'")
 
 			searchKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
-			idxBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, searchKey, "", 1000)
-			if err != nil {
-				return nil, err
-			}
 
-			ids := make(map[string]bool)
-			for _, item := range idxBytes {
-				ids[string(item.Value)] = true
+			allIDs := make(map[string]bool)
+			internalCursor := ""
+			for {
+				idxBytes, nextCursor, err := r.kvStore.SearchByPatternPaginatedKV(
+					r.definition.ColumnFamily,
+					searchKey,
+					internalCursor,
+					limit,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, item := range idxBytes {
+					allIDs[string(item.Value)] = true
+				}
+
+				if nextCursor == "" {
+					break
+				}
+				internalCursor = nextCursor
+
 			}
 
 			if i == 0 {
-				andMatchedIDs = ids
+				andMatchedIDs = allIDs
 			} else {
 				for id := range andMatchedIDs {
-					if !ids[id] {
+					if !allIDs[id] {
 						delete(andMatchedIDs, id)
 					}
 				}
@@ -92,8 +113,25 @@ func (r *Repository[T]) Find(filter string) ([]T, error) {
 		matchedIDs = append(matchedIDs, id)
 	}
 
+	sort.Strings(matchedIDs)
+
+	start := 0
+	if cursor != "" {
+		for i, id := range matchedIDs {
+			if id == cursor {
+				start = i + 1
+				break
+			}
+		}
+	}
+	end := start + limit
+	if end > len(matchedIDs) {
+		end = len(matchedIDs)
+	}
+	selectedIDs := matchedIDs[start:end]
+
 	var results []T
-	for _, id := range matchedIDs {
+	for _, id := range selectedIDs {
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 		dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey)
 		if err != nil {
@@ -108,7 +146,15 @@ func (r *Repository[T]) Find(filter string) ([]T, error) {
 		results = append(results, result)
 	}
 
-	return results, nil
+	var nextCursor string
+	if end < len(matchedIDs) {
+		nextCursor = matchedIDs[end-1]
+	}
+
+	return &FindResult[T]{
+		Entities: results,
+		Cursor:   nextCursor,
+	}, nil
 }
 
 func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
@@ -198,14 +244,12 @@ func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
 		return false, fmt.Errorf("no primary key defined")
 	}
 
-	fmt.Println("aqui se hace el primer search")
-	fmt.Println("aqui se hace el primer GET")
 	current, err := r.FindByField(primaryFieldName, id)
 	if err != nil {
 		return false, err
 	}
 	if current == nil {
-		return false, nil // no se encontró, no hay cambios
+		return false, nil
 	}
 
 	changed := false
@@ -214,7 +258,7 @@ func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
 
 	for fieldName, def := range r.definition.Fields {
 		if def.Primary {
-			continue // no se permite cambiar el campo primario
+			continue
 		}
 
 		curField := currentVal.FieldByName(fieldName)
@@ -228,10 +272,8 @@ func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
 		newValue := fmt.Sprintf("%v", newField.Interface())
 
 		if oldValue != newValue {
-			// Si es unique, validar que el nuevo valor no exista ya
 			if def.Unique {
 				idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, fieldName, newValue)
-				fmt.Println("aqui se hace el segundo search")
 				existing, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, idxKey, "", 1)
 				if err != nil {
 					return false, err
@@ -241,34 +283,28 @@ func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
 				}
 			}
 
-			// Eliminar índice viejo
 			oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
-			fmt.Println("El delete del viejo aqui ", oldValue)
 			if err := r.kvStore.Delete(r.definition.ColumnFamily, oldIdxKey); err != nil {
 				return false, err
 			}
 
-			// Crear nuevo índice
 			newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue, id)
-			fmt.Println("El Put del nuevo aqui ", newValue)
 			if err := r.kvStore.Put(r.definition.ColumnFamily, newIdxKey, []byte(id)); err != nil {
 				return false, err
 			}
 
-			// Aplicar el cambio al struct actual
 			curField.Set(newField)
 			changed = true
 		}
 	}
 
 	if changed {
-		// Guardar objeto actualizado
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 		dataBytes, err := json.Marshal(current)
 		if err != nil {
 			return false, err
 		}
-		fmt.Println("Guardando aqui el nuevo objeto ", current)
+
 		if err := r.kvStore.Put(r.definition.ColumnFamily, dataKey, dataBytes); err != nil {
 			return false, err
 		}

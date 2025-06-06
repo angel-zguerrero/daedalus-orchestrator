@@ -129,3 +129,7 @@ go run . -self-member-addr 127.0.0.1:5001 -initial-members=127.0.0.1:5000,127.0.
 go run . -self-member-addr 127.0.0.1:5002 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 3 -role consensus
 
 go run . -self-member-addr 127.0.0.1:5003 -join true -replica 4 -role connector
+
+Tests:
+
+LOGGER_FORMAT=pretty go test -v  ./... 
