@@ -63,10 +63,14 @@ func TestRepository_Create_Success(t *testing.T) {
 	indexKey := "admin:users:idx:ID:123:123"
 
 	mockStore.On("Get", "cf1", uNameFieldKey).Return(nil, nil)
-	mockStore.On("Put", "cf1", indexKey, []byte("123")).Return(nil)
-	mockStore.On("Put", "cf1", nameFieldKey, []byte("123")).Return(nil)
-	mockStore.On("Put", "cf1", dataKey, data).Return(nil)
-	mockStore.On("Put", "cf1", uNameFieldKey, []byte("123")).Return(nil)
+
+	batch := db.NewWriteBatch()
+	batch.Put("cf1", indexKey, []byte("123"))
+	batch.Put("cf1", nameFieldKey, []byte("123"))
+	batch.Put("cf1", uNameFieldKey, []byte("123"))
+	batch.Put("cf1", dataKey, data)
+
+	mockStore.On("Write", batch).Return(nil)
 
 	id, err := repo.Create(&user)
 	assert.NoError(t, err)

@@ -421,18 +421,16 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 		}
 	}
 
+	batch := NewWriteBatch()
+
 	for fieldName, def := range r.definition.Fields {
 		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
 		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
-		if err := r.kvStore.Put(r.definition.ColumnFamily, idxKey, []byte(id)); err != nil {
-			return "", err
-		}
+		batch.Put(r.definition.ColumnFamily, idxKey, []byte(id))
+
 		if def.Unique {
-			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
-			idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
-			if err := r.kvStore.Put(r.definition.ColumnFamily, idxKey, []byte(id)); err != nil {
-				return "", err
-			}
+			uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+			batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
 		}
 	}
 
@@ -441,8 +439,9 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
 
-	if err := r.kvStore.Put(r.definition.ColumnFamily, dataKey, dataBytes); err != nil {
+	if err := r.kvStore.Write(batch); err != nil {
 		return "", err
 	}
 
