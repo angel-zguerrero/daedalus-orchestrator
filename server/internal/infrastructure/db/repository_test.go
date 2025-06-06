@@ -306,6 +306,7 @@ func TestRepository_Delete_Success(t *testing.T) {
 	user := User{ID: "123", Name: "Alice"}
 	dataKey := "admin:users:data:123"
 	indexKey := "admin:users:idx:Name:Alice:123"
+	uIndexKey := "admin:users:idx-u:Name:Alice"
 	pkIndexKey := "admin:users:idx:ID:123:123"
 	data, _ := json.Marshal(user)
 
@@ -316,6 +317,7 @@ func TestRepository_Delete_Success(t *testing.T) {
 
 	mockStore.On("Delete", "cf1", indexKey).Return(nil)
 	mockStore.On("Delete", "cf1", pkIndexKey).Return(nil)
+	mockStore.On("Delete", "cf1", uIndexKey).Return(nil)
 	mockStore.On("Delete", "cf1", dataKey).Return(nil)
 
 	deleted, err := repo.Delete("123")

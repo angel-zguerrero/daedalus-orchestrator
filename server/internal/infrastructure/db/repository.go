@@ -555,11 +555,17 @@ func (r *Repository[T]) Delete(id string) (bool, error) {
 		val = val.Elem()
 	}
 
-	for fieldName := range r.definition.Fields {
+	for fieldName, def := range r.definition.Fields {
 		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
 		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
 		if err := r.kvStore.Delete(r.definition.ColumnFamily, idxKey); err != nil {
 			return false, fmt.Errorf("error deleting index key %s: %w", idxKey, err)
+		}
+		if def.Unique {
+			idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+			if err := r.kvStore.Delete(r.definition.ColumnFamily, idxUKey); err != nil {
+				return false, fmt.Errorf("error deleting unique index key %s: %w", idxUKey, err)
+			}
 		}
 	}
 
