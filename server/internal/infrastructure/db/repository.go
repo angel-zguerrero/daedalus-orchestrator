@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -49,6 +50,13 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 		return nil, fmt.Errorf("filter string is empty")
 	}
 
+	invalidOpRegex := regexp.MustCompile(`[<>=!]{2,}`)
+	if invalidOpRegex.MatchString(filter) && !strings.Contains(filter, "!=") && !strings.Contains(filter, "<=") && !strings.Contains(filter, ">=") {
+		return nil, fmt.Errorf("invalid or malformed filter expression: %s", filter)
+	}
+
+	var conditionRegex = regexp.MustCompile(`(?i)^(\w+)\s*(=|!=|<=|>=|<|>|LIKE|BETWEEN)\s*(.+)$`)
+
 	orConditions := strings.Split(filter, "|")
 	orResults := map[string]bool{}
 	var matchedIDs []string
@@ -60,37 +68,107 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 		var andMatchedIDs map[string]bool
 		for i, andCond := range andConditions {
 			andCond = strings.TrimSpace(andCond)
-			parts := strings.SplitN(andCond, "=", 2)
-			if len(parts) != 2 {
+			parts := conditionRegex.FindStringSubmatch(andCond)
+			if len(parts) != 4 {
 				return nil, fmt.Errorf("invalid condition: %s", andCond)
 			}
-			field := strings.TrimSpace(parts[0])
-			value := strings.Trim(strings.TrimSpace(parts[1]), "'")
 
-			searchKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
+			field := strings.TrimSpace(parts[1])
+			operator := strings.ToUpper(strings.TrimSpace(parts[2]))
+			value := strings.TrimSpace(strings.Trim(parts[3], "'"))
 
 			allIDs := make(map[string]bool)
-			internalCursor := ""
-			for {
-				idxBytes, nextCursor, err := r.kvStore.SearchByPatternPaginatedKV(
-					r.definition.ColumnFamily,
-					searchKey,
-					internalCursor,
-					limit,
-				)
+
+			switch operator {
+			case "=":
+				pattern := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
+				cursorInner := ""
+				for {
+					items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, pattern, cursorInner, limit)
+					if err != nil {
+						return nil, err
+					}
+					for _, item := range items {
+						allIDs[string(item.Value)] = true
+					}
+					if next == "" {
+						break
+					}
+					cursorInner = next
+				}
+			case "LIKE":
+				likeRegex := strings.ReplaceAll(value, "*", ".*")
+				regex, err := regexp.Compile("^" + likeRegex + "$")
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("invalid LIKE pattern: %s", value)
 				}
-
-				for _, item := range idxBytes {
-					allIDs[string(item.Value)] = true
+				prefix := fmt.Sprintf("%s:%s:idx:%s:", r.definition.Schema, r.definition.Name, field)
+				cursorInner := ""
+				for {
+					items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
+					if err != nil {
+						return nil, err
+					}
+					for _, item := range items {
+						parts := strings.Split(string(item.Key), ":")
+						if len(parts) < 5 {
+							continue
+						}
+						indexedVal := parts[4]
+						if regex.MatchString(indexedVal) {
+							allIDs[string(item.Value)] = true
+						}
+					}
+					if next == "" {
+						break
+					}
+					cursorInner = next
 				}
-
-				if nextCursor == "" {
-					break
+			case "<", "<=", ">", ">=", "!=", "BETWEEN":
+				prefix := fmt.Sprintf("%s:%s:idx:%s:", r.definition.Schema, r.definition.Name, field)
+				cursorInner := ""
+				for {
+					items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
+					if err != nil {
+						return nil, err
+					}
+					for _, item := range items {
+						parts := strings.Split(string(item.Key), ":")
+						if len(parts) < 5 {
+							continue
+						}
+						indexedVal := parts[4]
+						include := false
+						switch operator {
+						case "<":
+							include = indexedVal < value
+						case "<=":
+							include = indexedVal <= value
+						case ">":
+							include = indexedVal > value
+						case ">=":
+							include = indexedVal >= value
+						case "!=":
+							include = indexedVal != value
+						case "BETWEEN":
+							bounds := strings.Split(value, "AND")
+							if len(bounds) == 2 {
+								lo := strings.TrimSpace(bounds[0])
+								hi := strings.TrimSpace(bounds[1])
+								include = indexedVal >= lo && indexedVal <= hi
+							}
+						}
+						if include {
+							allIDs[string(item.Value)] = true
+						}
+					}
+					if next == "" {
+						break
+					}
+					cursorInner = next
 				}
-				internalCursor = nextCursor
-
+			default:
+				return nil, fmt.Errorf("unsupported operator: %s", operator)
 			}
 
 			if i == 0 {
@@ -103,7 +181,6 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 				}
 			}
 		}
-
 		for id := range andMatchedIDs {
 			orResults[id] = true
 		}
@@ -137,7 +214,6 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 		if err != nil {
 			return nil, err
 		}
-
 		var result T
 		err = json.Unmarshal(dataBytes, &result)
 		if err != nil {

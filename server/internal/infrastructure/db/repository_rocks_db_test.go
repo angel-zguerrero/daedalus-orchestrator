@@ -13,8 +13,10 @@ import (
 )
 
 type testEntity struct {
-	ID   string `orm:"primaryKey"`
-	Name string `orm:"unique"`
+	ID       string `orm:"primaryKey"`
+	Name     string `orm:"unique"`
+	LastName string
+	Age      int
 }
 
 func (testEntity) TableName() string {
@@ -351,4 +353,191 @@ func TestRepository_Find_PaginationLoop(t *testing.T) {
 		cursor = page.Cursor
 	}
 	assert.Len(t, found, 50)
+}
+func TestRepository_Find_Operators(t *testing.T) {
+	repo, err := newTestRepositoryDefaultIdGenerator(t)
+	require.NoError(t, err)
+
+	seed := []testEntity{
+		{ID: "---", Name: "Ana", LastName: "Zuluaga", Age: 20},
+		{ID: "---", Name: "Bea", LastName: "Yanez", Age: 30},
+		{ID: "---", Name: "Cleo", LastName: "Ximenez", Age: 40},
+		{ID: "---", Name: "Dana", LastName: "White", Age: 25},
+		{ID: "---", Name: "Eva", LastName: "Velasco", Age: 35},
+	}
+	for _, e := range seed {
+		_, err := repo.Create(&e)
+		require.NoError(t, err)
+	}
+
+	t.Run("Equal operator", func(t *testing.T) {
+		res, err := repo.Find("Age=30", 10, "")
+		require.NoError(t, err)
+		require.Len(t, res.Entities, 1)
+		assert.Equal(t, "Bea", res.Entities[0].Name)
+	})
+
+	t.Run("Not equal operator", func(t *testing.T) {
+		res, err := repo.Find("Age!=30", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 4)
+		for _, e := range res.Entities {
+			assert.NotEqual(t, 30, e.Age)
+		}
+	})
+
+	t.Run("Greater than operator", func(t *testing.T) {
+		res, err := repo.Find("Age>30", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 2)
+		assert.ElementsMatch(t, []string{"Cleo", "Eva"}, []string{res.Entities[0].Name, res.Entities[1].Name})
+	})
+
+	t.Run("Greater than or equal", func(t *testing.T) {
+		res, err := repo.Find("Age>=30", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 3)
+	})
+
+	t.Run("Less than operator", func(t *testing.T) {
+		res, err := repo.Find("Age<30", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 2)
+	})
+
+	t.Run("Less than or equal", func(t *testing.T) {
+		res, err := repo.Find("Age<=25", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 2)
+	})
+
+	t.Run("LIKE operator - prefix", func(t *testing.T) {
+		res, err := repo.Find("LastName LIKE Z*", 10, "")
+		require.NoError(t, err)
+		require.Len(t, res.Entities, 1)
+		assert.Equal(t, "Ana", res.Entities[0].Name)
+	})
+
+	t.Run("LIKE operator - suffix", func(t *testing.T) {
+		res, err := repo.Find("LastName LIKE *nez", 10, "")
+		require.NoError(t, err)
+		require.Len(t, res.Entities, 2)
+		assert.ElementsMatch(t, []string{"Cleo", "Bea"}, []string{res.Entities[0].Name, res.Entities[1].Name})
+	})
+
+	t.Run("LIKE operator - contains", func(t *testing.T) {
+		res, err := repo.Find("LastName LIKE *ela*", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 1)
+		assert.Equal(t, "Eva", res.Entities[0].Name)
+	})
+
+	t.Run("BETWEEN operator", func(t *testing.T) {
+		res, err := repo.Find("Age BETWEEN 25 AND 35", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 3)
+		names := []string{res.Entities[0].Name, res.Entities[1].Name, res.Entities[2].Name}
+		assert.ElementsMatch(t, []string{"Bea", "Dana", "Eva"}, names)
+	})
+
+	t.Run("Combined operators", func(t *testing.T) {
+		res, err := repo.Find("Age>=25 & Age<=35", 10, "")
+		require.NoError(t, err)
+		assert.Len(t, res.Entities, 3)
+	})
+
+	t.Run("Invalid filter", func(t *testing.T) {
+		_, err := repo.Find("Age><25", 10, "")
+		assert.Error(t, err)
+	})
+}
+func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.T) {
+	repo, err := newTestRepositoryDefaultIdGenerator(t)
+	require.NoError(t, err)
+
+	total := 2500
+	names := make(map[string]bool)
+	ages := []int{18, 25, 30, 35, 40, 45, 50}
+	for i := 0; i < total; i++ {
+		name := fmt.Sprintf("User_%04d", i)
+		age := ages[i%len(ages)]
+		entity := testEntity{
+			ID:       "---",
+			Name:     name,
+			LastName: fmt.Sprintf("Last_%04d", i),
+			Age:      age,
+		}
+		_, err := repo.Create(&entity)
+		require.NoError(t, err)
+		names[name] = true
+	}
+
+	t.Run("Simple pagination loop with 100 per page", func(t *testing.T) {
+		cursor := ""
+		found := make(map[string]bool)
+		limit := 100
+
+		for {
+			res, err := repo.Find("Age>=25", limit, cursor)
+			require.NoError(t, err)
+
+			for _, e := range res.Entities {
+				assert.GreaterOrEqual(t, e.Age, 25)
+				assert.False(t, found[e.Name], "Duplicated entity: %s", e.Name)
+				found[e.Name] = true
+			}
+			if res.Cursor == "" {
+				break
+			}
+			cursor = res.Cursor
+		}
+		totalExpected := 2500 * 6 / 7 // 6 edades >= 25 de 7 totales
+		assert.Len(t, found, totalExpected)
+	})
+
+	t.Run("Complex OR filter with pagination", func(t *testing.T) {
+		filter := []string{}
+		for i := 0; i < 50; i++ {
+			filter = append(filter, fmt.Sprintf("Name=User_%04d", i))
+		}
+		filterStr := strings.Join(filter, " | ")
+
+		cursor := ""
+		found := map[string]bool{}
+		limit := 10
+
+		for {
+			res, err := repo.Find(filterStr, limit, cursor)
+			require.NoError(t, err)
+			for _, e := range res.Entities {
+				found[e.Name] = true
+			}
+			if res.Cursor == "" {
+				break
+			}
+			cursor = res.Cursor
+		}
+		assert.Len(t, found, 50)
+	})
+
+	t.Run("AND filter with age and name", func(t *testing.T) {
+		// Name should exist and age should match
+		res, err := repo.Find("Name=User_0001 & Age=25", 10, "")
+		require.NoError(t, err)
+		if len(res.Entities) == 1 {
+			assert.Equal(t, "User_0001", res.Entities[0].Name)
+			assert.Equal(t, 25, res.Entities[0].Age)
+		} else {
+			assert.Empty(t, res.Entities)
+		}
+	})
+
+	t.Run("LIKE operator with many matches", func(t *testing.T) {
+		res, err := repo.Find("LastName LIKE Last_1*", 100, "")
+		require.NoError(t, err)
+		assert.Greater(t, len(res.Entities), 10)
+		for _, e := range res.Entities {
+			assert.True(t, strings.HasPrefix(e.LastName, "Last_1"))
+		}
+	})
 }
