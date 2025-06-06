@@ -245,6 +245,10 @@ func TestRepository_Update_Success(t *testing.T) {
 
 	oldIndexKey := "admin:users:idx:Name:Alice:123"
 	newIndexKey := "admin:users:idx:Name:Bob:123"
+
+	oldUIndexKey := "admin:users:idx-u:Name:Alice"
+	newUIndexKey := "admin:users:idx-u:Name:Bob"
+
 	dataKey := "admin:users:data:123"
 
 	originalData, _ := json.Marshal(originalUser)
@@ -253,8 +257,11 @@ func TestRepository_Update_Success(t *testing.T) {
 	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Bob:*", "", 1).
-		Return([]db.KeyValuePair{}, "", nil)
+	mockStore.On("Get", "cf1", newUIndexKey).Return([]byte{}, nil)
+
+	mockStore.On("Delete", "cf1", oldUIndexKey).Return(nil)
+
+	mockStore.On("Put", "cf1", newUIndexKey, []byte("123")).Return(nil)
 
 	mockStore.On("Get", "cf1", dataKey).Return(originalData, nil)
 

@@ -479,14 +479,25 @@ func (r *Repository[T]) Update(id string, entity *T) (bool, error) {
 
 		if oldValue != newValue {
 			if def.Unique {
-				idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, fieldName, newValue)
-				existing, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, idxKey, "", 1)
+				idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
+				existing, err := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
 				if err != nil {
 					return false, err
 				}
-				if len(existing) > 0 && string(existing[0].Value) != id {
+				if len(existing) > 0 && string(existing) != id {
 					return false, fmt.Errorf("duplicate unique field: %s = %s", fieldName, newValue)
 				}
+
+				oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue)
+				if err := r.kvStore.Delete(r.definition.ColumnFamily, oldUIdxKey); err != nil {
+					return false, err
+				}
+
+				newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
+				if err := r.kvStore.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id)); err != nil {
+					return false, err
+				}
+
 			}
 
 			oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
