@@ -797,3 +797,151 @@ func TestRepository_BulkDelete(t *testing.T) {
 		assert.Nil(t, foundB)
 	})
 }
+func TestRepository_BulkUpdate(t *testing.T) {
+	t.Run("Basic bulk update", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		// Creamos los datos base
+		original := []*testEntity{
+			{ID: "---", Name: "UserA"},
+			{ID: "---", Name: "UserB"},
+			{ID: "---", Name: "UserC"},
+		}
+		ids, err := repo.BulkCreate(original)
+		require.NoError(t, err)
+		require.Len(t, ids, 3)
+
+		// Preparamos la actualización
+		updated := []*testEntity{
+			{ID: ids[0], Name: "UpdatedA"},
+			{ID: ids[1], Name: "UpdatedB"},
+			{ID: ids[2], Name: "UpdatedC"},
+		}
+		result, err := repo.BulkUpdate(updated)
+		require.NoError(t, err)
+		assert.Equal(t, []bool{true, true, true}, result)
+
+		for i, id := range ids {
+			entity, err := repo.FindByField("ID", id)
+			require.NoError(t, err)
+			assert.Equal(t, updated[i].Name, entity.Name)
+		}
+	})
+
+	t.Run("Empty input should return empty result", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		result, err := repo.BulkUpdate([]*testEntity{})
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("Should return false for missing records", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		// Insert uno solo
+		entity := &testEntity{ID: "---", Name: "UserX"}
+		createdID, err := repo.Create(entity)
+		require.NoError(t, err)
+
+		// Uno existe, otro no
+		toUpdate := []*testEntity{
+			{ID: createdID, Name: "UpdatedX"},
+			{ID: "non-existent-id", Name: "ShouldFail"},
+		}
+		result, err := repo.BulkUpdate(toUpdate)
+		require.NoError(t, err)
+		assert.Equal(t, []bool{true, false}, result)
+	})
+
+	t.Run("Update should not insert new if ID not exists", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		toUpdate := []*testEntity{
+			{ID: "ghost-id", Name: "Ghost"},
+		}
+		result, err := repo.BulkUpdate(toUpdate)
+		require.NoError(t, err)
+		assert.Equal(t, []bool{false}, result)
+
+		found, err := repo.FindByField("ID", "ghost-id")
+		require.NoError(t, err)
+		assert.Nil(t, found)
+	})
+
+	t.Run("Can bulk update large batch", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		var original []*testEntity
+		for i := 0; i < 500; i++ {
+			original = append(original, &testEntity{ID: "---", Name: fmt.Sprintf("User_%d", i)})
+		}
+		ids, err := repo.BulkCreate(original)
+		require.NoError(t, err)
+		require.Len(t, ids, 500)
+
+		var updated []*testEntity
+		for i, id := range ids {
+			updated = append(updated, &testEntity{ID: id, Name: fmt.Sprintf("Updated_%d", i)})
+		}
+		result, err := repo.BulkUpdate(updated)
+		require.NoError(t, err)
+		assert.Len(t, result, 500)
+		for i := range result {
+			assert.True(t, result[i], "index %d should be true", i)
+		}
+
+		// Spot check
+		check, err := repo.FindByField("Name", "Updated_42")
+		require.NoError(t, err)
+		assert.NotNil(t, check)
+	})
+
+	t.Run("Duplicate IDs in input should update once", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		entity := &testEntity{ID: "---", Name: "Original"}
+		id, err := repo.Create(entity)
+		require.NoError(t, err)
+
+		// Duplicado el mismo ID dos veces, con valores diferentes
+		toUpdate := []*testEntity{
+			{ID: id, Name: "FirstUpdate"},
+			{ID: id, Name: "SecondUpdate"},
+		}
+		result, err := repo.BulkUpdate(toUpdate)
+		require.NoError(t, err)
+		assert.Equal(t, []bool{true, true}, result)
+
+		final, err := repo.FindByField("ID", id)
+		require.NoError(t, err)
+		assert.Equal(t, "SecondUpdate", final.Name) // el último debe prevalecer
+	})
+
+	t.Run("Nil entries should be skipped or fail gracefully", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		entity := &testEntity{ID: "---", Name: "Valid"}
+		id, err := repo.Create(entity)
+		require.NoError(t, err)
+
+		updates := []*testEntity{
+			nil,
+			{ID: id, Name: "ValidUpdate"},
+		}
+		result, err := repo.BulkUpdate(updates)
+		require.NoError(t, err)
+		assert.Equal(t, []bool{false, true}, result) // nil => false, válido => true
+
+		final, err := repo.FindByField("ID", id)
+		require.NoError(t, err)
+		assert.Equal(t, "ValidUpdate", final.Name)
+	})
+}

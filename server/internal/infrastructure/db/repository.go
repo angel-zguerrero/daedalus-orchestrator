@@ -516,7 +516,11 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 
 	uniqueValuesInBatch := make(map[string]map[string]string)
 
-	for _, entity := range entities {
+	for i, entity := range entities {
+		if entity == nil {
+			results[i] = false
+			continue
+		}
 		entityVal := reflect.ValueOf(entity).Elem()
 		id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
 
@@ -544,6 +548,10 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 	}
 
 	for i, entity := range entities {
+		if entity == nil {
+			results[i] = false
+			continue
+		}
 		entityVal := reflect.ValueOf(entity).Elem()
 		id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
 
@@ -624,6 +632,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 
 	return results, nil
 }
+
 func (r *Repository[T]) Update(entity *T) (bool, error) {
 	results, err := r.BulkUpdate([]*T{entity})
 	if err != nil {
