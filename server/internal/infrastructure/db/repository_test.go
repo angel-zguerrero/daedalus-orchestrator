@@ -528,3 +528,161 @@ func TestRepository_BulkDelete_InvalidData(t *testing.T) {
 
 	mockStore.AssertExpectations(t)
 }
+func TestRepository_BulkUpdate_Success(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	original1 := User{ID: "id1", Name: "Alice"}
+	updated1 := User{ID: "id1", Name: "AliceUpdated"}
+
+	original2 := User{ID: "id2", Name: "Bob"}
+	updated2 := User{ID: "id2", Name: "BobUpdated"}
+
+	// Serializar original data para mockear GET
+	originalData1, _ := json.Marshal(original1)
+	originalData2, _ := json.Marshal(original2)
+
+	// Se mockea GET para los datos originales
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData1, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id2").Return(originalData2, nil)
+
+	// Para las claves únicas nuevas, simular que no existen (para no dar error de duplicados)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated").Return(nil, nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:BobUpdated").Return(nil, nil)
+
+	mockStore.On("Write", mock.Anything).Return(nil)
+
+	results, err := repo.BulkUpdate([]*User{&updated1, &updated2})
+	assert.NoError(t, err)
+	assert.Len(t, results, 2)
+	assert.True(t, results[0])
+	assert.True(t, results[1])
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkUpdate_SomeNonexistent(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	existing := User{ID: "id1", Name: "Alice"}
+	updatedExisting := User{ID: "id1", Name: "AliceUpdated"}
+	nonexistent := User{ID: "id999", Name: "Ghost"}
+
+	originalData, _ := json.Marshal(existing)
+
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id999").Return(nil, nil) // no existe
+
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated").Return(nil, nil)
+
+	mockStore.On("Write", mock.Anything).Return(nil)
+
+	results, err := repo.BulkUpdate([]*User{&updatedExisting, &nonexistent})
+	assert.NoError(t, err)
+	assert.Len(t, results, 2)
+	assert.True(t, results[0])  // id1 actualizado
+	assert.False(t, results[1]) // id999 no existe, no actualizado
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkUpdate_DuplicateUniqueWithinBatch(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	original1 := User{ID: "id1", Name: "Alice"}
+	original2 := User{ID: "id2", Name: "Bob"}
+
+	updated1 := User{ID: "id1", Name: "SameName"} // Cambia a SameName
+	updated2 := User{ID: "id2", Name: "SameName"} // Mismo nombre -> duplicado interno
+
+	originalData1, _ := json.Marshal(original1)
+	originalData2, _ := json.Marshal(original2)
+
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData1, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id2").Return(originalData2, nil)
+
+	// El repositorio debería detectar el duplicado dentro del batch sin llamar al store para el índice uName
+
+	results, err := repo.BulkUpdate([]*User{&updated1, &updated2})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique field")
+	assert.Nil(t, results)
+}
+
+func TestRepository_BulkUpdate_DuplicateUniqueExisting(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	original1 := User{ID: "id1", Name: "Alice"}
+	updated1 := User{ID: "id1", Name: "Bob"} // Cambia a "Bob"
+
+	originalData1, _ := json.Marshal(original1)
+
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData1, nil)
+	// Simulamos que el índice único ya apunta a otro ID distinto al que actualizamos
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Bob").Return([]byte("otherID"), nil)
+
+	results, err := repo.BulkUpdate([]*User{&updated1})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique field")
+	assert.Nil(t, results)
+}
+
+func TestRepository_BulkUpdate_WriteError(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	original := User{ID: "id1", Name: "Alice"}
+	updated := User{ID: "id1", Name: "AliceUpdated"}
+
+	originalData, _ := json.Marshal(original)
+
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData, nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated").Return(nil, nil)
+
+	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
+
+	results, err := repo.BulkUpdate([]*User{&updated})
+	assert.Error(t, err)
+	assert.Nil(t, results)
+}
+
+func TestRepository_BulkUpdate_InvalidData(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	// Simula que data original almacenada está corrupta (no json válido)
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return([]byte("not json"), nil)
+
+	updated := User{ID: "id1", Name: "AliceUpdated"}
+
+	results, err := repo.BulkUpdate([]*User{&updated})
+	assert.Error(t, err)
+	assert.Nil(t, results)
+}
+
+func TestRepository_BulkUpdate_EmptyInput(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	results, err := repo.BulkUpdate([]*User{})
+	assert.NoError(t, err)
+	assert.NotNil(t, results)
+	assert.Len(t, results, 0)
+}

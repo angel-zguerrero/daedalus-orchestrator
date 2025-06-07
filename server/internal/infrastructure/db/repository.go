@@ -514,6 +514,35 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 	results := make([]bool, len(entities))
 	batch := NewWriteBatch()
 
+	uniqueValuesInBatch := make(map[string]map[string]string)
+
+	for _, entity := range entities {
+		entityVal := reflect.ValueOf(entity).Elem()
+		id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
+
+		for fieldName, def := range r.definition.Fields {
+			if def.Primary || !def.Unique {
+				continue
+			}
+
+			field := entityVal.FieldByName(fieldName)
+			if !field.IsValid() {
+				continue
+			}
+
+			value := fmt.Sprintf("%v", field.Interface())
+
+			if _, ok := uniqueValuesInBatch[fieldName]; !ok {
+				uniqueValuesInBatch[fieldName] = make(map[string]string)
+			}
+
+			if existingID, exists := uniqueValuesInBatch[fieldName][value]; exists && existingID != id {
+				return nil, fmt.Errorf("duplicate unique field in batch: %s = %s", fieldName, value)
+			}
+			uniqueValuesInBatch[fieldName][value] = id
+		}
+	}
+
 	for i, entity := range entities {
 		entityVal := reflect.ValueOf(entity).Elem()
 		id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
@@ -581,7 +610,6 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 			if err != nil {
 				return nil, err
 			}
-
 			batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
 		}
 
