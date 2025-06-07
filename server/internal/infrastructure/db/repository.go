@@ -299,7 +299,6 @@ func (r *Repository[T]) evalExpr(node *exprNode, limit int) (map[string]bool, er
 	}
 	return res, nil
 }
-
 func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResult[T], error) {
 	tokens, err := tokenize(filter)
 	if err != nil {
@@ -355,7 +354,6 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 		Cursor:   nextCursor,
 	}, nil
 }
-
 func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	def := r.definition.Fields[field]
 	var dataKey string
@@ -488,7 +486,6 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 
 	return ids, nil
 }
-
 func (r *Repository[T]) Create(entity *T) (string, error) {
 	ids, err := r.BulkCreate([]*T{entity})
 	if err != nil {
@@ -496,8 +493,7 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 	}
 	return ids[0], nil
 }
-
-func (r *Repository[T]) Update(entity *T) (bool, error) {
+func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 	var zero T
 	t := reflect.TypeOf(zero)
 	if t.Kind() == reflect.Ptr {
@@ -512,87 +508,101 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 		}
 	}
 	if primaryFieldName == "" {
-		return false, fmt.Errorf("no primary key defined")
+		return nil, fmt.Errorf("no primary key defined")
 	}
 
-	entityVal := reflect.ValueOf(entity).Elem()
-	id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
+	results := make([]bool, len(entities))
+	batch := NewWriteBatch()
 
-	current, err := r.FindByField(primaryFieldName, id)
+	for i, entity := range entities {
+		entityVal := reflect.ValueOf(entity).Elem()
+		id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
+
+		current, err := r.FindByField(primaryFieldName, id)
+		if err != nil {
+			return nil, err
+		}
+		if current == nil {
+			results[i] = false
+			continue
+		}
+
+		changed := false
+		currentVal := reflect.ValueOf(current).Elem()
+		newVal := reflect.ValueOf(entity).Elem()
+
+		for fieldName, def := range r.definition.Fields {
+			if def.Primary {
+				continue
+			}
+
+			curField := currentVal.FieldByName(fieldName)
+			newField := newVal.FieldByName(fieldName)
+
+			if !curField.IsValid() || !newField.IsValid() {
+				continue
+			}
+
+			oldValue := fmt.Sprintf("%v", curField.Interface())
+			newValue := fmt.Sprintf("%v", newField.Interface())
+
+			if oldValue != newValue {
+				if def.Unique {
+					idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
+					existing, err := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
+					if err != nil {
+						return nil, err
+					}
+					if len(existing) > 0 && string(existing) != id {
+						return nil, fmt.Errorf("duplicate unique field: %s = %s", fieldName, newValue)
+					}
+
+					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue)
+					batch.Delete(r.definition.ColumnFamily, oldUIdxKey)
+
+					newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
+					batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
+				}
+
+				oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
+				batch.Delete(r.definition.ColumnFamily, oldIdxKey)
+
+				newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue, id)
+				batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id))
+
+				curField.Set(newField)
+				changed = true
+			}
+		}
+
+		if changed {
+			dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
+			dataBytes, err := json.Marshal(current)
+			if err != nil {
+				return nil, err
+			}
+
+			batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+		}
+
+		results[i] = changed
+	}
+
+	if batch.Count() > 0 {
+		if err := r.kvStore.Write(batch); err != nil {
+			return nil, err
+		}
+	}
+
+	return results, nil
+}
+func (r *Repository[T]) Update(entity *T) (bool, error) {
+	results, err := r.BulkUpdate([]*T{entity})
 	if err != nil {
 		return false, err
 	}
-	if current == nil {
-		return false, nil
-	}
-
-	changed := false
-	currentVal := reflect.ValueOf(current).Elem()
-	newVal := reflect.ValueOf(entity).Elem()
-
-	batch := NewWriteBatch()
-
-	for fieldName, def := range r.definition.Fields {
-		if def.Primary {
-			continue
-		}
-
-		curField := currentVal.FieldByName(fieldName)
-		newField := newVal.FieldByName(fieldName)
-
-		if !curField.IsValid() || !newField.IsValid() {
-			continue
-		}
-
-		oldValue := fmt.Sprintf("%v", curField.Interface())
-		newValue := fmt.Sprintf("%v", newField.Interface())
-
-		if oldValue != newValue {
-			if def.Unique {
-				idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
-				existing, err := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
-				if err != nil {
-					return false, err
-				}
-				if len(existing) > 0 && string(existing) != id {
-					return false, fmt.Errorf("duplicate unique field: %s = %s", fieldName, newValue)
-				}
-
-				oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue)
-				batch.Delete(r.definition.ColumnFamily, oldUIdxKey)
-
-				newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
-				batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
-			}
-
-			oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
-			batch.Delete(r.definition.ColumnFamily, oldIdxKey)
-
-			newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue, id)
-			batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id))
-
-			curField.Set(newField)
-			changed = true
-		}
-	}
-
-	if changed {
-		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-		dataBytes, err := json.Marshal(current)
-		if err != nil {
-			return false, err
-		}
-
-		batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
-
-		if err := r.kvStore.Write(batch); err != nil {
-			return false, err
-		}
-	}
-
-	return changed, nil
+	return results[0], nil
 }
-
 func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 	var primaryFieldName string
 	for name, def := range r.definition.Fields {
@@ -648,7 +658,6 @@ func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 
 	return results, nil
 }
-
 func (r *Repository[T]) Delete(id string) (bool, error) {
 	results, err := r.BulkDelete([]string{id})
 	if err != nil {
