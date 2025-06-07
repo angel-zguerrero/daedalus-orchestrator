@@ -73,7 +73,9 @@ func TestRepository_Create_Success(t *testing.T) {
 	batch.Put("cf1", uNameFieldKey, []byte("123"))
 	batch.Put("cf1", dataKey, data)
 
-	mockStore.On("Write", batch).Return(nil)
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	})).Return(nil)
 
 	id, err := repo.Create(&user)
 	assert.NoError(t, err)
@@ -261,18 +263,19 @@ func TestRepository_Update_Success(t *testing.T) {
 	updatedData, _ := json.Marshal(updatedUser)
 
 	mockStore.On("Get", "cf1", newUIndexKey).Return([]byte{}, nil)
-
-	mockStore.On("Delete", "cf1", oldUIndexKey).Return(nil)
-
-	mockStore.On("Put", "cf1", newUIndexKey, []byte("123")).Return(nil)
-
 	mockStore.On("Get", "cf1", dataKey).Return(originalData, nil)
 
-	mockStore.On("Delete", "cf1", oldIndexKey).Return(nil)
+	batch := db.NewWriteBatch()
+	batch.Delete("cf1", oldUIndexKey)
+	batch.Put("cf1", newUIndexKey, []byte("123"))
+	batch.Delete("cf1", oldIndexKey)
 
-	mockStore.On("Put", "cf1", newIndexKey, []byte("123")).Return(nil)
+	batch.Put("cf1", newIndexKey, []byte("123"))
+	batch.Put("cf1", dataKey, updatedData)
 
-	mockStore.On("Put", "cf1", dataKey, updatedData).Return(nil)
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	})).Return(nil)
 
 	changed, err := repo.Update(&updatedUser)
 	assert.NoError(t, err)

@@ -504,7 +504,6 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 		t = t.Elem()
 	}
 
-	// Buscar campo primary
 	var primaryFieldName string
 	for name, def := range r.definition.Fields {
 		if def.Primary {
@@ -515,8 +514,10 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 	if primaryFieldName == "" {
 		return false, fmt.Errorf("no primary key defined")
 	}
+
 	entityVal := reflect.ValueOf(entity).Elem()
 	id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
+
 	current, err := r.FindByField(primaryFieldName, id)
 	if err != nil {
 		return false, err
@@ -528,6 +529,8 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 	changed := false
 	currentVal := reflect.ValueOf(current).Elem()
 	newVal := reflect.ValueOf(entity).Elem()
+
+	batch := NewWriteBatch()
 
 	for fieldName, def := range r.definition.Fields {
 		if def.Primary {
@@ -556,26 +559,17 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 				}
 
 				oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue)
-				if err := r.kvStore.Delete(r.definition.ColumnFamily, oldUIdxKey); err != nil {
-					return false, err
-				}
+				batch.Delete(r.definition.ColumnFamily, oldUIdxKey)
 
 				newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
-				if err := r.kvStore.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id)); err != nil {
-					return false, err
-				}
-
+				batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
 			}
 
 			oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
-			if err := r.kvStore.Delete(r.definition.ColumnFamily, oldIdxKey); err != nil {
-				return false, err
-			}
+			batch.Delete(r.definition.ColumnFamily, oldIdxKey)
 
 			newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue, id)
-			if err := r.kvStore.Put(r.definition.ColumnFamily, newIdxKey, []byte(id)); err != nil {
-				return false, err
-			}
+			batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id))
 
 			curField.Set(newField)
 			changed = true
@@ -589,7 +583,9 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 			return false, err
 		}
 
-		if err := r.kvStore.Put(r.definition.ColumnFamily, dataKey, dataBytes); err != nil {
+		batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+
+		if err := r.kvStore.Write(batch); err != nil {
 			return false, err
 		}
 	}
