@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type TestIDGeneratorFactory struct {
@@ -440,4 +441,87 @@ func TestRepository_BulkCreate_WriteError(t *testing.T) {
 	_, err = repo.BulkCreate(users)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "write failed")
+}
+func TestRepository_BulkDelete_Success(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	users := []*User{
+		{ID: "id1", Name: "Alice"},
+		{ID: "id2", Name: "Bob"},
+	}
+
+	for _, u := range users {
+		data, _ := json.Marshal(u)
+		mockStore.On("Get", "cf1", "admin:users:data:"+u.ID).Return(data, nil)
+	}
+
+	batch := db.NewWriteBatch()
+	batch.Delete("cf1", "admin:users:idx:Name:Alice:id1")
+	batch.Delete("cf1", "admin:users:idx:Name:Bob:id2")
+	batch.Delete("cf1", "admin:users:idx:ID:id1:id1")
+	batch.Delete("cf1", "admin:users:idx:ID:id2:id2")
+	batch.Delete("cf1", "admin:users:idx-u:Name:Alice")
+	batch.Delete("cf1", "admin:users:idx-u:Name:Bob")
+	batch.Delete("cf1", "admin:users:data:id1")
+	batch.Delete("cf1", "admin:users:data:id2")
+
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	})).Return(nil)
+
+	deleted, err := repo.BulkDelete([]string{"id1", "id2"})
+	assert.NoError(t, err)
+	require.Len(t, deleted, 2)
+	assert.True(t, deleted[0])
+	assert.True(t, deleted[1])
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkDelete_Partial(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	user := &User{ID: "id1", Name: "Alice"}
+	data, _ := json.Marshal(user)
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(data, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id2").Return(nil, nil)
+
+	batch := db.NewWriteBatch()
+	batch.Delete("cf1", "admin:users:idx:Name:Alice:id1")
+	batch.Delete("cf1", "admin:users:idx:ID:id1:id1")
+	batch.Delete("cf1", "admin:users:idx-u:Name:Alice")
+	batch.Delete("cf1", "admin:users:data:id1")
+
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	})).Return(nil)
+
+	deleted, err := repo.BulkDelete([]string{"id1", "id2"})
+	assert.NoError(t, err)
+	require.Len(t, deleted, 2)
+	assert.True(t, deleted[0])
+	assert.False(t, deleted[1])
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkDelete_InvalidData(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	mockStore.On("Get", "cf1", "admin:users:data:id1").Return([]byte("invalid json"), nil)
+
+	deleted, err := repo.BulkDelete([]string{"id1"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid character")
+
+	require.Len(t, deleted, 0)
+
+	mockStore.AssertExpectations(t)
 }
