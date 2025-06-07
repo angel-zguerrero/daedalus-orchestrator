@@ -64,6 +64,13 @@ var operatorPrecedence = map[string]int{
 	"&": 2,
 }
 
+type exprNode struct {
+	op      string // "&" or "|" or "COND"
+	left    *exprNode
+	right   *exprNode
+	condStr string
+}
+
 func tokenize(input string) ([]token, error) {
 	tokens := []token{}
 	buffer := ""
@@ -98,14 +105,6 @@ func tokenize(input string) ([]token, error) {
 	}
 	return tokens, nil
 }
-
-type exprNode struct {
-	op      string // "&" or "|" or "COND"
-	left    *exprNode
-	right   *exprNode
-	condStr string
-}
-
 func parse(tokens []token) (*exprNode, error) {
 	output := []*exprNode{}
 	ops := []token{}
@@ -267,7 +266,6 @@ func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]boo
 
 	return allIDs, nil
 }
-
 func (r *Repository[T]) evalExpr(node *exprNode, limit int) (map[string]bool, error) {
 	if node.op == "COND" {
 		return r.evalCondition(node.condStr, limit)
@@ -632,7 +630,6 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 
 	return results, nil
 }
-
 func (r *Repository[T]) Update(entity *T) (bool, error) {
 	results, err := r.BulkUpdate([]*T{entity})
 	if err != nil {
@@ -708,7 +705,6 @@ type DefaultIDGeneratorFactory struct{}
 func (idG *DefaultIDGeneratorFactory) GenerateID() string {
 	return strings.ReplaceAll(uuid.New().String(), "-", "")
 }
-
 func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema string, idGeneratorFactory IDGeneratorFactory) (*Repository[T], error) {
 	t := reflect.TypeOf(new(T)).Elem()
 
