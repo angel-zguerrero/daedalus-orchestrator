@@ -622,23 +622,25 @@ func (r *Repository[T]) Delete(id string) (bool, error) {
 		val = val.Elem()
 	}
 
+	batch := NewWriteBatch()
+
 	for fieldName, def := range r.definition.Fields {
 		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+
 		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
-		if err := r.kvStore.Delete(r.definition.ColumnFamily, idxKey); err != nil {
-			return false, fmt.Errorf("error deleting index key %s: %w", idxKey, err)
-		}
+		batch.Delete(r.definition.ColumnFamily, idxKey)
+
 		if def.Unique {
 			idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
-			if err := r.kvStore.Delete(r.definition.ColumnFamily, idxUKey); err != nil {
-				return false, fmt.Errorf("error deleting unique index key %s: %w", idxUKey, err)
-			}
+			batch.Delete(r.definition.ColumnFamily, idxUKey)
 		}
 	}
 
 	dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-	if err := r.kvStore.Delete(r.definition.ColumnFamily, dataKey); err != nil {
-		return false, fmt.Errorf("error deleting data key %s: %w", dataKey, err)
+	batch.Delete(r.definition.ColumnFamily, dataKey)
+
+	if err := r.kvStore.Write(batch); err != nil {
+		return false, fmt.Errorf("error applying delete batch: %w", err)
 	}
 
 	return true, nil

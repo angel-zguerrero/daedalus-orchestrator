@@ -312,10 +312,16 @@ func TestRepository_Delete_Success(t *testing.T) {
 
 	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
 
-	mockStore.On("Delete", "cf1", indexKey).Return(nil)
-	mockStore.On("Delete", "cf1", pkIndexKey).Return(nil)
-	mockStore.On("Delete", "cf1", uIndexKey).Return(nil)
-	mockStore.On("Delete", "cf1", dataKey).Return(nil)
+	batch := db.NewWriteBatch()
+
+	batch.Delete("cf1", indexKey)
+	batch.Delete("cf1", pkIndexKey)
+	batch.Delete("cf1", uIndexKey)
+	batch.Delete("cf1", dataKey)
+
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	})).Return(nil)
 
 	deleted, err := repo.Delete("123")
 	assert.Equal(t, deleted, true)
