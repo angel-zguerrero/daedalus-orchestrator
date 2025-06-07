@@ -1,3 +1,6 @@
+// Package db provides a generic repository implementation for interacting with a key-value store.
+// It supports operations like Create, Update, Delete, Find, and FindByField.
+// The repository also includes logic for tokenizing and parsing filter expressions.
 package db
 
 import (
@@ -12,37 +15,60 @@ import (
 	"github.com/google/uuid"
 )
 
+// IDGeneratorFactory defines the interface for generating unique IDs.
 type IDGeneratorFactory interface {
+	// GenerateID creates a new unique ID.
 	GenerateID() string
 }
+
+// ORMEntity defines the interface that entities managed by the repository must implement.
 type ORMEntity interface {
+	// TableName returns the name of the table corresponding to the entity.
 	TableName() string
 }
 
+// FieldDefinition describes the properties of a field in an entity.
 type FieldDefinition struct {
-	Name      string
-	Type      string
-	Unique    bool
-	Primary   bool
+	// Name is the name of the field.
+	Name string
+	// Type is the data type of the field (e.g., "string", "int").
+	Type string
+	// Unique indicates whether the field must have unique values across all entities.
+	Unique bool
+	// Primary indicates whether the field is the primary key for the entity.
+	Primary bool
+	// MaxLength specifies the maximum length for string fields. It's nil if not applicable.
 	MaxLength *int
 }
 
+// TableDefinition describes the schema of a table in the key-value store.
 type TableDefinition struct {
+	// ColumnFamily is the name of the column family where the table data is stored.
 	ColumnFamily string
-	Schema       string
-	Name         string
-	Fields       map[string]FieldDefinition
+	// Schema is the namespace or schema name for the table.
+	Schema string
+	// Name is the name of the table.
+	Name string
+	// Fields is a map of field names to their definitions.
+	Fields map[string]FieldDefinition
 }
 
+// Repository provides a generic implementation for interacting with a key-value store.
+// T is the type of the entity being managed, and it must implement the ORMEntity interface.
 type Repository[T ORMEntity] struct {
 	definition         *TableDefinition
 	kvStore            KVStore
 	idGeneratorFactory IDGeneratorFactory
 }
 
+// FindResult represents the result of a Find operation.
+// T is the type of the entities returned.
 type FindResult[T any] struct {
+	// Entities is a slice of entities that match the filter criteria.
 	Entities []T
-	Cursor   string
+	// Cursor is a token that can be used to retrieve the next page of results.
+	// It's an empty string if there are no more results.
+	Cursor string
 }
 type tokenType int
 
@@ -297,6 +323,26 @@ func (r *Repository[T]) evalExpr(node *exprNode, limit int) (map[string]bool, er
 	}
 	return res, nil
 }
+
+// Find retrieves entities from the repository based on a filter expression.
+// It supports pagination using a cursor.
+//
+// The filter syntax is as follows:
+//   - Conditions are specified as `field operator value`.
+//   - Supported operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `LIKE`, `BETWEEN`.
+//   - String values in conditions should be enclosed in single quotes (e.g., `name = 'John Doe'`).
+//   - Conditions can be combined using `&` (AND) and `|` (OR) operators.
+//   - Parentheses `()` can be used to group conditions.
+//   - Example: `(field1 = 'value1' & field2 LIKE 'pattern*') | field3 BETWEEN 'start' AND 'end'`
+//
+// Parameters:
+//   - filter: The filter string to apply.
+//   - limit: The maximum number of entities to return.
+//   - cursor: A cursor token for pagination. Pass an empty string for the first page.
+//
+// Returns:
+//   - A pointer to a FindResult struct containing the matched entities and the next cursor.
+//   - An error if the operation fails.
 func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResult[T], error) {
 	tokens, err := tokenize(filter)
 	if err != nil {
@@ -352,6 +398,17 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 		Cursor:   nextCursor,
 	}, nil
 }
+
+// FindByField retrieves a single entity by the value of a specific field.
+// This method is typically used for fields that are indexed or have unique constraints.
+//
+// Parameters:
+//   - field: The name of the field to search by.
+//   - value: The value of the field to match.
+//
+// Returns:
+//   - A pointer to the matched entity, or nil if no entity is found.
+//   - An error if the operation fails.
 func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	def := r.definition.Fields[field]
 	var dataKey string
@@ -387,6 +444,17 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	err = json.Unmarshal(dataBytes, &result)
 	return &result, err
 }
+
+// BulkCreate creates multiple entities in the repository in a single batch operation.
+// It assigns a new unique ID to each entity and sets the primary key field.
+// It also validates unique constraints across the batch and against existing data.
+//
+// Parameters:
+//   - entities: A slice of pointers to the entities to create.
+//
+// Returns:
+//   - A slice of strings containing the IDs of the newly created entities.
+//   - An error if the operation fails (e.g., due to a unique constraint violation).
 func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 	var ids []string
 	batch := NewWriteBatch()
@@ -484,6 +552,16 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 
 	return ids, nil
 }
+
+// Create creates a single entity in the repository.
+// It's a convenience wrapper around BulkCreate.
+//
+// Parameters:
+//   - entity: A pointer to the entity to create.
+//
+// Returns:
+//   - The ID of the newly created entity.
+//   - An error if the operation fails.
 func (r *Repository[T]) Create(entity *T) (string, error) {
 	ids, err := r.BulkCreate([]*T{entity})
 	if err != nil {
@@ -491,6 +569,18 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 	}
 	return ids[0], nil
 }
+
+// BulkUpdate updates multiple entities in the repository in a single batch operation.
+// It identifies entities by their primary key.
+// For each entity, it compares the current values with the new values and updates only the changed fields.
+// It handles updates to indexed and unique fields accordingly.
+//
+// Parameters:
+//   - entities: A slice of pointers to the entities to update. The primary key field must be populated.
+//
+// Returns:
+//   - A slice of booleans indicating whether each corresponding entity was updated.
+//   - An error if the operation fails (e.g., due to a unique constraint violation).
 func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 	var zero T
 	t := reflect.TypeOf(zero)
@@ -630,6 +720,16 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 
 	return results, nil
 }
+
+// Update updates a single entity in the repository.
+// It's a convenience wrapper around BulkUpdate.
+//
+// Parameters:
+//   - entity: A pointer to the entity to update. The primary key field must be populated.
+//
+// Returns:
+//   - A boolean indicating whether the entity was updated.
+//   - An error if the operation fails.
 func (r *Repository[T]) Update(entity *T) (bool, error) {
 	results, err := r.BulkUpdate([]*T{entity})
 	if err != nil {
@@ -637,6 +737,16 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 	}
 	return results[0], nil
 }
+
+// BulkDelete deletes multiple entities from the repository by their IDs in a single batch operation.
+// It removes the entity data and all associated index entries.
+//
+// Parameters:
+//   - ids: A slice of strings containing the IDs of the entities to delete.
+//
+// Returns:
+//   - A slice of booleans indicating whether each corresponding entity was found and deleted.
+//   - An error if the operation fails.
 func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 	var primaryFieldName string
 	for name, def := range r.definition.Fields {
@@ -692,6 +802,16 @@ func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 
 	return results, nil
 }
+
+// Delete deletes a single entity from the repository by its ID.
+// It's a convenience wrapper around BulkDelete.
+//
+// Parameters:
+//   - id: The ID of the entity to delete.
+//
+// Returns:
+//   - A boolean indicating whether the entity was found and deleted.
+//   - An error if the operation fails.
 func (r *Repository[T]) Delete(id string) (bool, error) {
 	results, err := r.BulkDelete([]string{id})
 	if err != nil {
@@ -700,11 +820,32 @@ func (r *Repository[T]) Delete(id string) (bool, error) {
 	return results[0], nil
 }
 
+// DefaultIDGeneratorFactory is a default implementation of IDGeneratorFactory
+// that uses UUIDs to generate IDs.
 type DefaultIDGeneratorFactory struct{}
 
+// GenerateID creates a new unique ID using UUID v4.
+// It removes hyphens from the UUID string.
 func (idG *DefaultIDGeneratorFactory) GenerateID() string {
 	return strings.ReplaceAll(uuid.New().String(), "-", "")
 }
+
+// NewRepository creates a new instance of the Repository.
+// It inspects the type T to determine the table schema, including field definitions,
+// primary key, and unique constraints based on struct tags.
+//
+// The struct T must have a field named 'ID' of type string with the tag `orm:"primaryKey"`.
+// Other fields can have tags like `orm:"unique"` or `orm:"maxLength=N"`.
+//
+// Parameters:
+//   - kvStore: An instance of KVStore to interact with the underlying key-value database.
+//   - ColumnFamily: The name of the column family to use for this repository.
+//   - schema: The schema or namespace for the tables managed by this repository.
+//   - idGeneratorFactory: A factory for generating unique IDs for new entities.
+//
+// Returns:
+//   - A pointer to the initialized Repository.
+//   - An error if the repository initialization fails (e.g., due to invalid struct tags or schema).
 func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema string, idGeneratorFactory IDGeneratorFactory) (*Repository[T], error) {
 	t := reflect.TypeOf(new(T)).Elem()
 
