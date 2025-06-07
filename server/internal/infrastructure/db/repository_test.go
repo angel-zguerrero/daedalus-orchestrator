@@ -343,6 +343,7 @@ func TestRepository_Delete_NotFound(t *testing.T) {
 	deleted, err := repo.Delete("123")
 	assert.Equal(t, deleted, false)
 	assert.NoError(t, err)
+	mockStore.AssertExpectations(t)
 }
 func TestRepository_Delete_CorruptedData(t *testing.T) {
 	mockStore := new(MockKVStore)
@@ -352,8 +353,6 @@ func TestRepository_Delete_CorruptedData(t *testing.T) {
 	assert.NoError(t, err)
 
 	dataKey := "admin:users:data:123"
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1).
-		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 
 	mockStore.On("Get", "cf1", dataKey).Return([]byte("not a valid json"), nil)
 
@@ -361,6 +360,7 @@ func TestRepository_Delete_CorruptedData(t *testing.T) {
 	assert.Equal(t, deleted, false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid character")
+	mockStore.AssertExpectations(t)
 }
 
 func TestRepository_BulkCreate_Success(t *testing.T) {

@@ -597,7 +597,7 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 	return changed, nil
 }
 
-func (r *Repository[T]) Delete(id string) (bool, error) {
+func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 	var primaryFieldName string
 	for name, def := range r.definition.Fields {
 		if def.Primary {
@@ -606,44 +606,59 @@ func (r *Repository[T]) Delete(id string) (bool, error) {
 		}
 	}
 	if primaryFieldName == "" {
-		return false, fmt.Errorf("no primary key defined")
+		return nil, fmt.Errorf("no primary key defined")
 	}
 
-	entity, err := r.FindByField(primaryFieldName, id)
-	if err != nil {
-		return false, err
-	}
-	if entity == nil {
-		return false, nil
-	}
-
-	val := reflect.ValueOf(entity)
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
-
+	results := make([]bool, len(ids))
 	batch := NewWriteBatch()
 
-	for fieldName, def := range r.definition.Fields {
-		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+	for i, id := range ids {
+		entity, err := r.FindByField(primaryFieldName, id)
+		if err != nil {
+			return nil, fmt.Errorf("error finding entity with id %s: %w", id, err)
+		}
+		if entity == nil {
+			results[i] = false
+			continue
+		}
+		results[i] = true
 
-		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
-		batch.Delete(r.definition.ColumnFamily, idxKey)
+		val := reflect.ValueOf(entity)
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
 
-		if def.Unique {
-			idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
-			batch.Delete(r.definition.ColumnFamily, idxUKey)
+		for fieldName, def := range r.definition.Fields {
+			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+
+			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
+			batch.Delete(r.definition.ColumnFamily, idxKey)
+
+			if def.Unique {
+				idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+				batch.Delete(r.definition.ColumnFamily, idxUKey)
+			}
+		}
+
+		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
+		batch.Delete(r.definition.ColumnFamily, dataKey)
+	}
+
+	if batch.Count() > 0 {
+		if err := r.kvStore.Write(batch); err != nil {
+			return nil, fmt.Errorf("error applying bulk delete batch: %w", err)
 		}
 	}
 
-	dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-	batch.Delete(r.definition.ColumnFamily, dataKey)
+	return results, nil
+}
 
-	if err := r.kvStore.Write(batch); err != nil {
-		return false, fmt.Errorf("error applying delete batch: %w", err)
+func (r *Repository[T]) Delete(id string) (bool, error) {
+	results, err := r.BulkDelete([]string{id})
+	if err != nil {
+		return false, err
 	}
-
-	return true, nil
+	return results[0], nil
 }
 
 type DefaultIDGeneratorFactory struct{}
