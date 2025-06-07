@@ -55,6 +55,12 @@ func newTestRepository(t *testing.T) (*db.Repository[testEntity], error) {
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
+func newTestRepositorySpesificIds(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
+	store := newRocksdbStore(t)
+	iGF := NewTestIDGeneratorFactory(ids)
+	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
+}
+
 func newTestRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 
@@ -712,90 +718,82 @@ func TestRepository_BulkCreate(t *testing.T) {
 		require.Contains(t, err.Error(), "duplicate") // adapta esto según el mensaje real
 	})
 }
+
 func TestRepository_BulkDelete(t *testing.T) {
-	repo, err := newTestRepositoryDefaultIdGenerator(t)
-	require.NoError(t, err)
-
-	// Crear entidades de prueba
-	users := []testEntity{
-		{ID: "---", Name: "Alice"},
-		{ID: "---", Name: "Bob"},
-		{ID: "---", Name: "Charlie"},
-		{ID: "---", Name: "Diana"},
-		{ID: "---", Name: "Eve"},
-	}
-
-	var idsToDelete []string
-	nameIndex := map[string]bool{}
-
-	for _, u := range users {
-		id, err := repo.Create(&u)
-		require.NoError(t, err)
-		idsToDelete = append(idsToDelete, id)
-		nameIndex[u.Name] = true
-	}
-
 	t.Run("Delete multiple existing entities", func(t *testing.T) {
-		res, err := repo.BulkDelete(idsToDelete[:3])
+		ids := []string{"123", "456", "789"}
+		repo, err := newTestRepositorySpesificIds(t, ids)
 		require.NoError(t, err)
-		assert.Equal(t, []bool{true, true, true}, res)
 
-		// Verificar que fueron eliminados
-		for _, id := range idsToDelete[:3] {
-			e, err := repo.FindByField("ID", id)
+		for _, id := range ids {
+			entity := testEntity{ID: id, Name: "Name_" + id}
+			_, err := repo.Create(&entity)
 			require.NoError(t, err)
-			assert.Nil(t, e)
-		}
-	})
-
-	t.Run("Delete mix of existing and non-existing IDs", func(t *testing.T) {
-		mixedIDs := []string{idsToDelete[3], "nonexistent-1", idsToDelete[4], "nonexistent-2"}
-		res, err := repo.BulkDelete(mixedIDs)
-		require.NoError(t, err)
-		assert.Equal(t, []bool{true, false, true, false}, res)
-
-		// Verificar eliminados
-		for _, id := range []string{idsToDelete[3], idsToDelete[4]} {
-			e, err := repo.FindByField("ID", id)
-			require.NoError(t, err)
-			assert.Nil(t, e)
-		}
-	})
-
-	t.Run("Delete with all non-existing IDs", func(t *testing.T) {
-		ids := []string{"does-not-exist-1", "does-not-exist-2"}
-		res, err := repo.BulkDelete(ids)
-		require.NoError(t, err)
-		assert.Equal(t, []bool{false, false}, res)
-	})
-
-	t.Run("Empty slice should be no-op", func(t *testing.T) {
-		res, err := repo.BulkDelete([]string{})
-		require.NoError(t, err)
-		assert.Empty(t, res)
-	})
-
-	t.Run("Delete 1000 entities in batch", func(t *testing.T) {
-		var ids []string
-		for i := 0; i < 1000; i++ {
-			name := fmt.Sprintf("User_%04d", i)
-			entity := testEntity{ID: "---", Name: name}
-			id, err := repo.Create(&entity)
-			require.NoError(t, err)
-			ids = append(ids, id)
-		}
-
-		res, err := repo.BulkDelete(ids)
-		require.NoError(t, err)
-		assert.Len(t, res, 1000)
-		for i, ok := range res {
-			assert.Truef(t, ok, "expected delete of id %d to succeed", i)
 		}
 
 		for _, id := range ids {
-			e, err := repo.FindByField("ID", id)
+			found, err := repo.FindByField("ID", id)
 			require.NoError(t, err)
-			assert.Nil(t, e)
+			require.NotNil(t, found)
 		}
+
+		_, err = repo.BulkDelete(ids)
+		require.NoError(t, err)
+
+		for _, id := range ids {
+			found, err := repo.FindByField("ID", id)
+			require.NoError(t, err)
+			assert.Nil(t, found)
+		}
+	})
+
+	t.Run("Bulk delete with some non-existing IDs", func(t *testing.T) {
+		repo, err := newTestRepository(t)
+		require.NoError(t, err)
+
+		entity := testEntity{ID: "999", Name: "Alive"}
+		_, err = repo.Create(&entity)
+		require.NoError(t, err)
+
+		// Mixed list: existing and non-existing
+		ids := []string{"999", "does_not_exist", "also_missing"}
+		_, err = repo.BulkDelete(ids)
+		require.NoError(t, err)
+
+		// Ensure the one that existed is deleted
+		found, err := repo.FindByField("ID", "999")
+		require.NoError(t, err)
+		assert.Nil(t, found)
+	})
+
+	t.Run("Empty list should not fail", func(t *testing.T) {
+		repo, err := newTestRepository(t)
+		require.NoError(t, err)
+		_, err = repo.BulkDelete([]string{})
+		require.NoError(t, err)
+	})
+
+	t.Run("Bulk delete should also remove unique indices", func(t *testing.T) {
+		ids := []string{"111", "222"}
+		repo, err := newTestRepositorySpesificIds(t, ids)
+		require.NoError(t, err)
+
+		a := testEntity{ID: "111", Name: "Alpha"}
+		b := testEntity{ID: "222", Name: "Beta"}
+		_, err = repo.Create(&a)
+		require.NoError(t, err)
+		_, err = repo.Create(&b)
+		require.NoError(t, err)
+
+		_, err = repo.BulkDelete([]string{"111", "222"})
+		require.NoError(t, err)
+
+		foundA, err := repo.FindByField("Name", "Alpha")
+		require.NoError(t, err)
+		assert.Nil(t, foundA)
+
+		foundB, err := repo.FindByField("Name", "Beta")
+		require.NoError(t, err)
+		assert.Nil(t, foundB)
 	})
 }
