@@ -615,3 +615,100 @@ func TestRepository_Find_ComplexNestedFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestRepository_BulkCreate(t *testing.T) {
+	t.Run("Basic bulk insert", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		entities := []*testEntity{
+			{ID: "---", Name: "UserA"},
+			{ID: "---", Name: "UserB"},
+			{ID: "---", Name: "UserC"},
+		}
+		ids, err := repo.BulkCreate(entities)
+		require.NoError(t, err)
+		assert.Len(t, ids, 3)
+
+		for _, id := range ids {
+			found, err := repo.FindByField("ID", id)
+			require.NoError(t, err)
+			assert.NotNil(t, found)
+		}
+	})
+
+	t.Run("Duplicate unique index should fail", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		first := []*testEntity{
+			{ID: "---", Name: "UniqueName1"},
+			{ID: "---", Name: "UniqueName2"},
+		}
+		_, err = repo.BulkCreate(first)
+		require.NoError(t, err)
+
+		second := []*testEntity{
+			{ID: "---", Name: "UniqueName2"}, // duplicate
+			{ID: "---", Name: "UniqueName3"},
+		}
+		_, err = repo.BulkCreate(second)
+		assert.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate")
+	})
+
+	t.Run("Empty list should return empty result", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		ids, err := repo.BulkCreate([]*testEntity{})
+		require.NoError(t, err)
+		assert.Empty(t, ids)
+	})
+
+	t.Run("Can bulk insert large batch", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		var bulk []*testEntity
+		for i := 0; i < 500; i++ {
+			bulk = append(bulk, &testEntity{ID: "---", Name: fmt.Sprintf("Bulk_%d", i)})
+		}
+		ids, err := repo.BulkCreate(bulk)
+		require.NoError(t, err)
+		assert.Len(t, ids, 500)
+
+		// Spot check
+		found, err := repo.FindByField("Name", "Bulk_42")
+		require.NoError(t, err)
+		require.NotNil(t, found)
+	})
+
+	t.Run("Partially duplicate should fail all", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+		require.NoError(t, err)
+
+		_, err = repo.Create(&testEntity{ID: "---", Name: "ConflictName"})
+
+		conflicting := []*testEntity{
+			{ID: "---", Name: "NewName1"},
+			{ID: "---", Name: "ConflictName"},
+			{ID: "---", Name: "NewName2"},
+		}
+		_, err = repo.BulkCreate(conflicting)
+		assert.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate")
+	})
+	t.Run("should fail when input slice contains duplicate unique index values", func(t *testing.T) {
+		repo, err := newTestRepositoryDefaultIdGenerator(t)
+
+		batch := []*testEntity{
+			{Name: "duplicate-name", Age: 100},
+			{Name: "duplicate-name", Age: 200}, // mismo Name
+		}
+
+		_, err = repo.BulkCreate(batch)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate") // adapta esto según el mensaje real
+	})
+}

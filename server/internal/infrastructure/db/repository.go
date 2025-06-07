@@ -391,61 +391,110 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	err = json.Unmarshal(dataBytes, &result)
 	return &result, err
 }
+func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
+	var ids []string
+	batch := NewWriteBatch()
+	type uniqueCheck struct {
+		Key       string
+		FieldName string
+		Value     string
+	}
+	var uniqueChecks []uniqueCheck
+
+	// Map para detectar duplicados en el batch, clave = campo+valor
+	uniqueInBatch := make(map[string]struct{})
+
+	for _, entity := range entities {
+		id := r.idGeneratorFactory.GenerateID()
+		ids = append(ids, id)
+
+		val := reflect.ValueOf(entity)
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
+
+		// Set primary key field
+		for fieldName, def := range r.definition.Fields {
+			if def.Primary {
+				field := val.FieldByName(fieldName)
+				if field.IsValid() && field.CanSet() && field.Kind() == reflect.String {
+					field.SetString(id)
+				}
+				break
+			}
+		}
+
+		for fieldName, def := range r.definition.Fields {
+			if def.Unique {
+				fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+				uniqueChecks = append(uniqueChecks, uniqueCheck{
+					Key:       uniqueIdxKey,
+					FieldName: fieldName,
+					Value:     fieldValue,
+				})
+
+				// Validación de duplicados en el mismo batch
+				batchKey := fieldName + ":" + fieldValue
+				if _, exists := uniqueInBatch[batchKey]; exists {
+					return nil, fmt.Errorf("duplicate unique field in input batch: %s = %s", fieldName, fieldValue)
+				}
+				uniqueInBatch[batchKey] = struct{}{}
+			}
+		}
+	}
+
+	// Validar duplicados en la base
+	for _, check := range uniqueChecks {
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, check.Key)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			return nil, fmt.Errorf("duplicate unique field: %s = %s", check.FieldName, check.Value)
+		}
+	}
+
+	// Insertar datos y sus índices
+	for i, entity := range entities {
+		val := reflect.ValueOf(entity)
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
+		id := ids[i]
+
+		for fieldName, def := range r.definition.Fields {
+			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
+			batch.Put(r.definition.ColumnFamily, idxKey, []byte(id))
+
+			if def.Unique {
+				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+				batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
+			}
+		}
+
+		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
+		dataBytes, err := json.Marshal(entity)
+		if err != nil {
+			return nil, err
+		}
+		batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+	}
+
+	if err := r.kvStore.Write(batch); err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}
 
 func (r *Repository[T]) Create(entity *T) (string, error) {
-	id := r.idGeneratorFactory.GenerateID()
-	val := reflect.ValueOf(entity)
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
-	for fieldName, def := range r.definition.Fields {
-		if def.Primary {
-			field := val.FieldByName(fieldName)
-			if field.IsValid() && field.CanSet() && field.Kind() == reflect.String {
-				field.SetString(id)
-			}
-			break
-		}
-	}
-	for fieldName, def := range r.definition.Fields {
-		if def.Unique {
-			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
-			idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
-			exists, err := r.kvStore.Exists(r.definition.ColumnFamily, idxKey)
-			if err != nil {
-				return "", err
-			}
-			if exists {
-				return "", fmt.Errorf("duplicate unique field: %s = %s", fieldName, fieldValue)
-			}
-		}
-	}
-
-	batch := NewWriteBatch()
-
-	for fieldName, def := range r.definition.Fields {
-		fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
-		idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
-		batch.Put(r.definition.ColumnFamily, idxKey, []byte(id))
-
-		if def.Unique {
-			uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
-			batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
-		}
-	}
-
-	dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-	dataBytes, err := json.Marshal(entity)
+	ids, err := r.BulkCreate([]*T{entity})
 	if err != nil {
 		return "", err
 	}
-	batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
-
-	if err := r.kvStore.Write(batch); err != nil {
-		return "", err
-	}
-
-	return id, nil
+	return ids[0], nil
 }
 
 func (r *Repository[T]) Update(entity *T) (bool, error) {

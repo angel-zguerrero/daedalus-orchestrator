@@ -3,10 +3,12 @@ package db_test
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 type TestIDGeneratorFactory struct {
@@ -353,4 +355,83 @@ func TestRepository_Delete_CorruptedData(t *testing.T) {
 	assert.Equal(t, deleted, false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid character")
+}
+
+func TestRepository_BulkCreate_Success(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2", "id3"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	users := []*User{
+		{Name: "Alice"},
+		{Name: "Bob"},
+		{Name: "Charlie"},
+	}
+
+	batch := db.NewWriteBatch()
+	for i, u := range users {
+		id := iGF.ids[i]
+		u.ID = id
+		d, _ := json.Marshal(u)
+
+		dataKey := "admin:users:data:" + id
+		nameIdx := "admin:users:idx:Name:" + u.Name + ":" + id
+		uIdx := "admin:users:idx-u:Name:" + u.Name
+		pkIdx := "admin:users:idx:ID:" + id + ":" + id
+
+		mockStore.On("Get", "cf1", uIdx).Return(nil, nil)
+
+		batch.Put("cf1", dataKey, d)
+		batch.Put("cf1", nameIdx, []byte(id))
+		batch.Put("cf1", uIdx, []byte(id))
+		batch.Put("cf1", pkIdx, []byte(id))
+	}
+
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true // ya validamos el contenido arriba
+	})).Return(nil)
+
+	ids, err := repo.BulkCreate(users)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"id1", "id2", "id3"}, ids)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	users := []*User{
+		{Name: "Alice"},
+		{Name: "Alice"}, // duplicado intencional
+	}
+
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Alice").Return(nil, nil).Once()
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Alice").Return([]byte("id1"), nil).Once()
+
+	_, err = repo.BulkCreate(users)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique field")
+}
+
+func TestRepository_BulkCreate_WriteError(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	users := []*User{
+		{Name: "Alice"},
+	}
+
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Alice").Return(nil, nil)
+	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
+
+	_, err = repo.BulkCreate(users)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "write failed")
 }
