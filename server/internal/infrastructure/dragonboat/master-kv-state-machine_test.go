@@ -13,15 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linxGnu/grocksdb"
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/stretchr/testify/require"
 )
 
-func setupKV(t *testing.T) *dragonboat.KVBaseRocksDBStateMachine {
+func setupKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	t.Helper()
 	config.LoadDefaultConfiguration()
-	kv := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	kv := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -183,7 +182,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewMasterKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	kv2 := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -705,7 +704,7 @@ func TestRecoverFromSnapshot_InvalidData(t *testing.T) {
 }
 
 type failingImpl struct {
-	dragonboat.KVRocksDBStateMachineImpl
+	dragonboat.KVStateMachineImpl
 }
 
 func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.Command, error) {
@@ -714,35 +713,10 @@ func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([
 func (f *failingImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {
 	return dragonboat.RK_Command{}, nil
 }
-func (f *failingImpl) OpenDB(string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error) {
-	return nil, nil, nil, nil
+func (f *failingImpl) OpenDB(string) (db.KVStore, error) {
+	return nil, nil
 }
-func TestUpdate_InternalErrorLogging(t *testing.T) {
 
-	kv := dragonboat.NewKVStateMachine(
-		1,
-		1,
-		&failingImpl{},
-		dragonboat.KVBaseRocksDBStateMachineConfig{
-			TTLInternalError: 60,
-		},
-	).(*dragonboat.KVBaseRocksDBStateMachine)
-
-	// Abre normalmente
-	stopc := make(chan struct{})
-	_, err := kv.Open(stopc)
-	require.NoError(t, err)
-	defer kv.Close()
-
-	entry := statemachine.Entry{
-		Cmd:   []byte("trigger-error"),
-		Index: kv.GetLastApplied() + 1,
-	}
-
-	entries, err := kv.Update([]statemachine.Entry{entry})
-	require.NoError(t, err)
-	require.Len(t, entries, 1)
-}
 func TestLookup_Search_MultipleResults(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()

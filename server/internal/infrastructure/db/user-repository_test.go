@@ -80,6 +80,10 @@ func (r *MockKVStore) Close() error {
 	return nil
 }
 
+func (r *MockKVStore) CleanExpiredKeys() error {
+	return nil
+}
+
 func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]db.KeyValuePair, string, error) {
 	args := m.Called(cfName, pattern, cursor, limit)
 	var s []db.KeyValuePair

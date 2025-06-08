@@ -16,13 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTenantKV(t *testing.T) *dragonboat.KVBaseRocksDBStateMachine {
+func setupTenantKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	t.Helper()
 	// Ensure config is loaded as NewTenantKVRocksDBStateMachine might depend on it for paths
 	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup")
 
-	kv := dragonboat.NewTenantKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	kv := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv.Open(stopc)
 	require.NoError(t, err)
@@ -187,7 +187,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	// Also ensure config is loaded for the second instance if it's path dependent
 	err = config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup (kv2)")
-	kv2 := dragonboat.NewTenantKVRocksDBStateMachine(1, 1).(*dragonboat.KVBaseRocksDBStateMachine)
+	kv2 := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -357,7 +357,7 @@ func TestTenantUpdate_PutWithTTL(t *testing.T) {
 			CMD: dragonboat.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
-				ColumnFamilyName: db.MasterEventFC,
+				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
 				Op:               dragonboat.PutOpTTL,
 			},
@@ -431,7 +431,7 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 			CMD: dragonboat.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
-				ColumnFamilyName: db.MasterEventFC,
+				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
 				Op:               dragonboat.PutOpTTL,
 			},
@@ -454,7 +454,7 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 			Op: dragonboat.Write,
 			CMD: dragonboat.WK_Command{
 				Key:              "ttl_key",
-				ColumnFamilyName: db.MasterEventFC,
+				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
 				Op:               dragonboat.DeleteOpTTL,
 			},

@@ -16,64 +16,38 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/rs/zerolog/log"
-
-	"github.com/linxGnu/grocksdb"
 	"github.com/lni/dragonboat/v4/statemachine"
+	"github.com/rs/zerolog/log"
 )
 
-// KVRocksDBStateMachineImpl defines the interface for specific key-value state machine implementations.
-// This allows different underlying storage or command processing logic to be plugged into the base state machine.
-type KVRocksDBStateMachineImpl interface {
-	// OpenDB is responsible for opening the database at the given path.
-	// It should return the database instance, handles for normal column families,
-	// handles for TTL column families, and any error encountered.
-	OpenDB(dbPath string) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error)
-	// Update processes a slice of statemachine entries and applies them to the given RocksDB write batch.
-	// It should decode the commands from the entries and translate them into batch operations.
-	// It returns a slice of processed Command objects (which might be different from input if errors occurred) and any error.
+type KVStateMachineImpl interface {
+	OpenDB(dbPath string) (db.KVStore, error)
+
 	Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]Command, error)
-	// Lookup processes a query and is expected to return an RK_Command (Read Key Command)
-	// that can be used by the base state machine to perform the actual read from RocksDB.
-	// The input `key` is generic and its interpretation is up to the implementation.
+
 	Lookup(key interface{}) (RK_Command, error)
 }
-
-// KVBaseRocksDBStateMachineConfig holds configuration parameters for the KVBaseRocksDBStateMachine.
-type KVBaseRocksDBStateMachineConfig struct {
+type KVBaseStateMachineConfig struct {
 	// TTLInternalError specifies the Time-To-Live (in seconds) for internal error messages stored in the database.
 	TTLInternalError uint64
 }
 
-// KVBaseRocksDBStateMachine is a base implementation of Dragonboat's IOnDiskStateMachine.
-// It uses RocksDB for persistence and relies on a KVRocksDBStateMachineImpl for specific command processing logic.
-// This struct manages the RocksDB lifecycle, snapshotting, recovery, and applying Raft entries.
-type KVBaseRocksDBStateMachine struct {
+type KVBaseStateMachine struct {
 	clusterID uint64 // The ID of the Raft cluster.
 	nodeID    uint64 // The ID of this node in the Raft cluster.
 	// lastApplied is the Raft index of the last entry successfully applied to the state machine.
 	// It's crucial for consistency and recovery.
 	lastApplied      uint64
-	store            unsafe.Pointer                  // Points to a *db.RocksdbStore instance. Used for atomic updates.
-	closed           bool                            // True if the state machine has been closed.
-	aborted          bool                            // True if the state machine has been aborted (not currently used in logic but present).
-	mu               sync.RWMutex                    // Protects access to shared state, especially during Open, Close, Update, and Snapshot operations.
-	stateMachineImpl KVRocksDBStateMachineImpl       // The specific implementation for handling DB opening and command processing.
-	config           KVBaseRocksDBStateMachineConfig // Configuration for the state machine.
+	store            unsafe.Pointer
+	closed           bool                     // True if the state machine has been closed.
+	aborted          bool                     // True if the state machine has been aborted (not currently used in logic but present).
+	mu               sync.RWMutex             // Protects access to shared state, especially during Open, Close, Update, and Snapshot operations.
+	stateMachineImpl KVStateMachineImpl       // The specific implementation for handling DB opening and command processing.
+	config           KVBaseStateMachineConfig // Configuration for the state machine.
 }
 
-// NewKVStateMachine creates a new instance of KVBaseRocksDBStateMachine.
-//
-// Parameters:
-//   - clusterID: The ID of the Raft cluster.
-//   - nodeID: The ID of this node in the Raft cluster.
-//   - stateMachineImpl: An implementation of KVRocksDBStateMachineImpl for custom logic.
-//   - config: Configuration for the state machine.
-//
-// Returns:
-//   - An statemachine.IOnDiskStateMachine ready for use with Dragonboat.
-func NewKVStateMachine(clusterID uint64, nodeID uint64, stateMachineImpl KVRocksDBStateMachineImpl, config KVBaseRocksDBStateMachineConfig) statemachine.IOnDiskStateMachine {
-	return &KVBaseRocksDBStateMachine{
+func NewKVStateMachine(clusterID uint64, nodeID uint64, stateMachineImpl KVStateMachineImpl, config KVBaseStateMachineConfig) statemachine.IOnDiskStateMachine {
+	return &KVBaseStateMachine{
 		clusterID:        clusterID,
 		nodeID:           nodeID,
 		stateMachineImpl: stateMachineImpl,
@@ -82,21 +56,11 @@ func NewKVStateMachine(clusterID uint64, nodeID uint64, stateMachineImpl KVRocks
 }
 
 // GetLastApplied returns the Raft index of the last entry that was successfully applied to the state machine.
-func (s *KVBaseRocksDBStateMachine) GetLastApplied() uint64 {
+func (s *KVBaseStateMachine) GetLastApplied() uint64 {
 	return s.lastApplied
 }
 
-// Open initializes the state machine, primarily by opening the RocksDB database.
-// It determines the database directory, handles potential cleanup from previous runs,
-// and loads the last applied Raft index from the database's metadata.
-//
-// Parameters:
-//   - stopc: A channel that signals when the state machine should stop its operations. (Not directly used in this Open method but part of the interface).
-//
-// Returns:
-//   - The last applied Raft index as recovered from the database.
-//   - An error if any part of the opening process fails (e.g., directory operations, DB opening, reading applied index).
-func (s *KVBaseRocksDBStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
+func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 	dir, err := getNodeDBDirName(s.clusterID, s.nodeID)
 	if err != nil {
 		panic(err)
@@ -128,16 +92,12 @@ func (s *KVBaseRocksDBStateMachine) Open(stopc <-chan struct{}) (uint64, error) 
 			return 0, err
 		}
 	}
-	rocks_db, columnFamilyHandles, ttlColumnFamilyHandles, err := db.OpenMasterDB(dbdir)
+	store, err := s.stateMachineImpl.OpenDB(dbdir)
 	if err != nil {
 		return 0, err
 	}
-	store := &db.RocksdbStore{
-		DB:                     rocks_db,
-		ColumnFamilyHandles:    columnFamilyHandles,
-		TTLColumnFamilyHandles: ttlColumnFamilyHandles,
-	}
-	atomic.SwapPointer(&s.store, unsafe.Pointer(store))
+
+	atomic.SwapPointer(&s.store, unsafe.Pointer(&store))
 	appliedIndex, err := s.queryAppliedIndex(store)
 	if err != nil {
 		panic(err)
@@ -146,17 +106,8 @@ func (s *KVBaseRocksDBStateMachine) Open(stopc <-chan struct{}) (uint64, error) 
 	return appliedIndex, nil
 }
 
-// queryAppliedIndex retrieves the last applied Raft index from the RocksDB store.
-// It reads a specific key (AppliedIndexKey) from a metadata column family (db.MetaFC).
-//
-// Parameters:
-//   - rocks_kv_store: The RocksDB store instance to query.
-//
-// Returns:
-//   - The last applied index as a uint64. Returns 0 if the key is not found (e.g., new database).
-//   - An error if the database read operation fails.
-func (s *KVBaseRocksDBStateMachine) queryAppliedIndex(rocks_kv_store *db.RocksdbStore) (uint64, error) {
-	result, err := rocks_kv_store.Get(db.MetaFC, AppliedIndexKey)
+func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, error) {
+	result, err := kv_store.Get(db.MetaFC, AppliedIndexKey)
 	if err != nil {
 		return 0, err
 	}
@@ -167,22 +118,7 @@ func (s *KVBaseRocksDBStateMachine) queryAppliedIndex(rocks_kv_store *db.Rocksdb
 	return binary.LittleEndian.Uint64(result), nil
 }
 
-// Update applies a series of Raft log entries to the state machine.
-// This is the core method where commands from Raft are processed and persisted.
-// It handles different command types: DDL (Data Definition Language for column families),
-// RW (Read/Write operations), and MCL (Maintenance Control Language).
-// For RW operations, it further distinguishes between Put, PutTTL, Delete, and DeleteTTL.
-// It uses a write batch for atomic updates to RocksDB and stores the last applied index.
-// If the stateMachineImpl.Update returns an error, this method attempts to store
-// that error information as a TTL entry in the MasterEventFC column family.
-//
-// Parameters:
-//   - ents: A slice of statemachine.Entry objects from Dragonboat, each containing a command to apply.
-//
-// Returns:
-//   - The input `ents` slice, with the `Result` field populated for each entry (typically with the size of the command).
-//   - An error if any critical operation fails (e.g., unknown command type, DB write error, CF operation error).
-func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
+func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
 	if s.aborted {
 		panic("update() called after abort set to true")
 	}
@@ -195,7 +131,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
+	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	batch := db.NewWriteBatch()
 
 	commands, err := s.stateMachineImpl.Update(ents, batch)
@@ -244,58 +180,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 			return nil, fmt.Errorf("expected DDL_Command for DLL type, got %T", cmd.CMD)
 		}
 		switch ddlCmd.Op {
-		case Add_CF_Op:
-			cfName := ddlCmd.ColumnFamilyName
-			if cfName == "" {
-				return nil, fmt.Errorf("the family column name cannot be empty")
-			}
 
-			if _, exists := rocks_kv_store.ColumnFamilyHandles[cfName]; !exists {
-				opts := grocksdb.NewDefaultOptions()
-				defer opts.Destroy()
-
-				cfh, err := rocks_kv_store.DB.CreateColumnFamily(opts, cfName)
-				if err != nil {
-					return nil, fmt.Errorf("error creando CF %s: %w", cfName, err)
-				}
-				rocks_kv_store.ColumnFamilyHandles[cfName] = cfh
-			}
-		case Add_TTL_CF_Op:
-			cfName := ddlCmd.ColumnFamilyName
-			if cfName == "" {
-				return nil, fmt.Errorf("the family column name cannot be empty")
-			}
-
-			if _, exists := rocks_kv_store.TTLColumnFamilyHandles[cfName]; !exists {
-				opts := grocksdb.NewDefaultOptions()
-				defer opts.Destroy()
-
-				cfh, err := rocks_kv_store.DB.CreateColumnFamily(opts, cfName)
-				if err != nil {
-					return nil, fmt.Errorf("error creando CF %s: %w", cfName, err)
-				}
-				rocks_kv_store.TTLColumnFamilyHandles[cfName] = cfh
-			}
-		case Remove_CF_Op:
-			cfh := rocks_kv_store.ColumnFamilyHandles[ddlCmd.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %T to Drop process", ddlCmd.ColumnFamilyName)
-			}
-			err := rocks_kv_store.DB.DropColumnFamily(cfh)
-			if err != nil {
-				return nil, err
-			}
-			cfh.Destroy()
-		case Remove_TTL_CF_Op:
-			cfh := rocks_kv_store.TTLColumnFamilyHandles[ddlCmd.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %T to Drop process", ddlCmd.ColumnFamilyName)
-			}
-			err := rocks_kv_store.DB.DropColumnFamily(cfh)
-			if err != nil {
-				return nil, err
-			}
-			cfh.Destroy()
 		}
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
@@ -317,55 +202,38 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 			switch wCmd.Op {
 
 			case PutOp:
-				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
-				if cfh == nil {
-					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
-				}
+
 				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value)
 			case PutOpTTL:
-				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
-				if cfh == nil {
-					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
-				}
-
 				ttlMillis := time.Now().Add(time.Duration(wCmd.TTL) * time.Second).UnixMilli()
 
-				ttlRealKey := fmt.Sprintf("%s%s", prefixData, wCmd.Key)
-				ttlExpireIndexKey := fmt.Sprintf("%s%s", prefixTTLExpire, wCmd.Key)
+				ttlRealKey := fmt.Sprintf("%s%s", db.PrefixData, wCmd.Key)
+				ttlExpireIndexKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, wCmd.Key)
 
-				oldTTLBytes, err := rocks_kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
+				oldTTLBytes, err := kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
 				if err != nil {
 					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
 				}
 				if oldTTLBytes != nil {
 					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
 					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, oldTTLMillis, wCmd.Key)
+						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, oldTTLMillis, wCmd.Key)
 						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
 					}
 				}
 
 				batch.Put(wCmd.ColumnFamilyName, ttlRealKey, wCmd.Value)
 
-				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, ttlMillis, wCmd.Key)
+				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, ttlMillis, wCmd.Key)
 				batch.Put(wCmd.ColumnFamilyName, newTTLIndexKey, nil)
 
 				batch.Put(wCmd.ColumnFamilyName, ttlExpireIndexKey, []byte(strconv.FormatInt(ttlMillis, 10)))
 
 			case DeleteOp:
-				cfh := rocks_kv_store.ColumnFamilyHandles[wCmd.ColumnFamilyName]
-				if cfh == nil {
-					return nil, fmt.Errorf("Column Family not found %s", wCmd.ColumnFamilyName)
-				}
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			case DeleteOpTTL:
-				cfh := rocks_kv_store.TTLColumnFamilyHandles[wCmd.ColumnFamilyName]
-				if cfh == nil {
-					return nil, fmt.Errorf("Column Family not found: %s", wCmd.ColumnFamilyName)
-				}
-
-				ttlExpireIndexKey := fmt.Sprintf("%s%s", prefixTTLExpire, wCmd.Key)
-				oldTTLBytes, err := rocks_kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
+				ttlExpireIndexKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, wCmd.Key)
+				oldTTLBytes, err := kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
 				if err != nil {
 					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
 				}
@@ -373,12 +241,12 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 				if oldTTLBytes != nil {
 					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
 					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", prefixTTLIndex, oldTTLMillis, wCmd.Key)
+						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, oldTTLMillis, wCmd.Key)
 						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
 					}
 				}
 
-				ttlRealKey := fmt.Sprintf("%s%s", prefixData, wCmd.Key)
+				ttlRealKey := fmt.Sprintf("%s%s", db.PrefixData, wCmd.Key)
 				batch.Delete(wCmd.ColumnFamilyName, ttlRealKey)
 				batch.Delete(wCmd.ColumnFamilyName, ttlExpireIndexKey)
 			default:
@@ -399,11 +267,9 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 		}
 		switch mlcCmd.Op {
 		case ClearExpiredTTL:
-			for name, handle := range rocks_kv_store.TTLColumnFamilyHandles {
-				err = cleanExpiredKeys(rocks_kv_store.DB, handle)
-				if err != nil {
-					return nil, fmt.Errorf("error cleaning expired keys for CF %s: %w", name, err)
-				}
+			err = kv_store.CleanExpiredKeys()
+			if err != nil {
+				return nil, err
 			}
 		default:
 			return nil, fmt.Errorf("unknown MCL Operation: %v", mlcCmd.Op)
@@ -415,7 +281,7 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
 	batch.Put(db.MetaFC, AppliedIndexKey, appliedIndex)
 
-	if err := rocks_kv_store.Write(batch); err != nil {
+	if err := kv_store.Write(batch); err != nil {
 		return nil, err
 	}
 
@@ -426,112 +292,11 @@ func (s *KVBaseRocksDBStateMachine) Update(ents []statemachine.Entry) ([]statema
 	return ents, nil
 }
 
-// cleanExpiredKeys iterates through a TTL-enabled column family and removes keys that have expired.
-// It scans keys prefixed with `prefixTTLIndex`, which store `expireAtTimestamp:originalKey`.
-// If `expireAtTimestamp` is in the past, it deletes the `prefixTTLIndex` key,
-// the actual data key (`prefixData:originalKey`), and the reference key (`prefixTTLExpire:originalKey`).
-// It performs deletions in batches (up to `maxDeletions`) to avoid holding locks for too long.
-//
-// Parameters:
-//   - db: The RocksDB instance.
-//   - cf: The column family handle for the TTL-enabled column family to clean.
-//
-// Returns:
-//   - An error if iterator operations or batch write operations fail.
-func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle) error {
-	const maxDeletions = 1000
-	var deleted int64
-
-	readOpts := grocksdb.NewDefaultReadOptions()
-	defer readOpts.Destroy()
-
-	writeOpts := grocksdb.NewDefaultWriteOptions()
-	defer writeOpts.Destroy()
-
-	batch := grocksdb.NewWriteBatch()
-	defer batch.Destroy()
-
-	it := db_instance.NewIteratorCF(readOpts, cf)
-	defer it.Close()
-
-	nowMillis := time.Now().UnixMilli()
-	prefix := []byte(prefixTTLIndex)
-	log.Debug().Msg("-------> prefixTTLIndex")
-	log.Debug().Interface("prefixTTLIndex", prefixTTLIndex).Msg("")
-	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-		key := it.Key()
-		keyBytes := append([]byte(nil), key.Data()...)
-		key.Free()
-
-		keyStr := string(keyBytes)
-		log.Debug().Msg("------>  keyStr")
-		log.Debug().Str("keyStr", keyStr).Msg("")
-		trimmed := strings.TrimPrefix(keyStr, prefixTTLIndex)
-		sepIdx := strings.IndexByte(trimmed, ':')
-		if sepIdx <= 0 || sepIdx >= len(trimmed)-1 {
-			continue
-		}
-
-		expireAtStr := trimmed[:sepIdx]
-		originalKey := trimmed[sepIdx+1:]
-
-		expireAt, err := strconv.ParseInt(expireAtStr, 10, 64)
-		if err != nil {
-			continue
-		}
-
-		if expireAt > nowMillis {
-			break
-		}
-
-		dataKey := []byte(prefixData + originalKey)
-		expireRefKey := []byte(prefixTTLExpire + originalKey)
-
-		ro := grocksdb.NewDefaultReadOptions()
-		defer ro.Destroy()
-
-		batch.DeleteCF(cf, dataKey)
-		batch.DeleteCF(cf, expireRefKey)
-		batch.DeleteCF(cf, keyBytes)
-
-		deleted++
-		if deleted >= maxDeletions {
-			break
-		}
-	}
-
-	if err := it.Err(); err != nil {
-		return fmt.Errorf("iterator error: %w", err)
-	}
-
-	if deleted > 0 {
-		if err := db_instance.Write(writeOpts, batch); err != nil {
-			return fmt.Errorf("failed to write batch for expired keys: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// Lookup performs read-only queries on the state machine.
-// It uses the `stateMachineImpl.Lookup` to get a structured RK_Command, then executes
-// the appropriate read operation (Get, Search, GetOpTTL, SearchTTL) on the RocksDB store.
-// For TTL operations, it checks if the key has expired before returning it.
-// For search operations, it handles pagination.
-//
-// Parameters:
-//   - query: An interface{} representing the query. The concrete type and interpretation
-//     are handled by `stateMachineImpl.Lookup`.
-//
-// Returns:
-//   - The result of the query (e.g., byte slice for Get, PagedResultKV for Search).
-//   - nil if the key is not found or has expired (for TTL gets).
-//   - An error if the database is closed, the column family is not found, or a database read operation fails.
-func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, error) {
+func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
-	if rocks_kv_store != nil {
+	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
+	if kv_store != nil {
 
 		query, err := s.stateMachineImpl.Lookup(query)
 
@@ -543,11 +308,8 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 
 		case GetOp:
 			var data []byte
-			cfh := rocks_kv_store.ColumnFamilyHandles[query.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
-			}
-			data, err = rocks_kv_store.Get(query.ColumnFamilyName, query.Key)
+
+			data, err = kv_store.Get(query.ColumnFamilyName, query.Key)
 			if err != nil {
 				return nil, err
 			}
@@ -555,12 +317,8 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 				return data, err
 			}
 		case Search:
-			cfh := rocks_kv_store.ColumnFamilyHandles[query.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
-			}
 
-			pairs, nextCursor, err := rocks_kv_store.SearchByPatternPaginatedKV(
+			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				query.ColumnFamilyName,
 				query.KeyPatter,
 				query.Cursor,
@@ -580,12 +338,9 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 
 		case GetOpTTL:
 			var data []byte
-			cfh := rocks_kv_store.TTLColumnFamilyHandles[query.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
-			}
-			expireKey := fmt.Sprintf("%s%s", prefixTTLExpire, query.Key)
-			expireBytes, err := rocks_kv_store.Get(query.ColumnFamilyName, expireKey)
+
+			expireKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, query.Key)
+			expireBytes, err := kv_store.Get(query.ColumnFamilyName, expireKey)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read expire key: %w", err)
 			}
@@ -602,8 +357,8 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 				return nil, nil
 			}
 
-			dataKey := fmt.Sprintf("%s%s", prefixData, query.Key)
-			data, err = rocks_kv_store.Get(query.ColumnFamilyName, dataKey)
+			dataKey := fmt.Sprintf("%s%s", db.PrefixData, query.Key)
+			data, err = kv_store.Get(query.ColumnFamilyName, dataKey)
 
 			if err != nil {
 				return nil, err
@@ -612,18 +367,14 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 				return data, err
 			}
 		case SearchTTL:
-			cfh := rocks_kv_store.TTLColumnFamilyHandles[query.ColumnFamilyName]
-			if cfh == nil {
-				return nil, fmt.Errorf("Column Family not found %s", query.ColumnFamilyName)
-			}
 
 			var resultData []db.KeyValuePair
 			cursor := query.Cursor
 			remaining := int(query.Limit)
 
 			for remaining > 0 {
-				keyPatter := fmt.Sprintf("%s%s", prefixData, query.KeyPatter)
-				pairs, nextCursor, err := rocks_kv_store.SearchByPatternPaginatedKV(
+				keyPatter := fmt.Sprintf("%s%s", db.PrefixData, query.KeyPatter)
+				pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 					query.ColumnFamilyName,
 					keyPatter,
 					cursor,
@@ -634,10 +385,10 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 				}
 
 				for _, pair := range pairs {
-					key := strings.TrimPrefix(pair.Key, prefixData)
-					expireKey := fmt.Sprintf("%s%s", prefixTTLExpire, key)
+					key := strings.TrimPrefix(pair.Key, db.PrefixData)
+					expireKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, key)
 
-					expireBytes, err := rocks_kv_store.Get(query.ColumnFamilyName, expireKey)
+					expireBytes, err := kv_store.Get(query.ColumnFamilyName, expireKey)
 					if err != nil || len(expireBytes) == 0 {
 						continue
 					}
@@ -675,52 +426,31 @@ func (s *KVBaseRocksDBStateMachine) Lookup(query interface{}) (interface{}, erro
 	return nil, errors.New("db closed")
 }
 
-// Sync flushes any buffered data in the RocksDB store to disk.
-//
-// Returns:
-//   - An error if the RocksDB Flush operation fails.
-func (s *KVBaseRocksDBStateMachine) Sync() error {
-	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
-	return rocks_kv_store.Flush()
+func (s *KVBaseStateMachine) Sync() error {
+	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
+	return kv_store.Flush()
 }
 
-// PrepareSnapshot is part of the IOnDiskStateMachine interface.
-// In this implementation, it's a no-op as SaveSnapshot directly streams data from RocksDB.
-//
-// Returns:
-//   - nil, nil (no context needed for SaveSnapshot, no error).
-func (s *KVBaseRocksDBStateMachine) PrepareSnapshot() (interface{}, error) {
+func (s *KVBaseStateMachine) PrepareSnapshot() (interface{}, error) {
 	return nil, nil
 }
 
-// SaveSnapshot creates a snapshot of the current state machine data and writes it to the provided io.Writer.
-// It iterates over all key-value pairs in all column families of the RocksDB store
-// and GOB-encodes them into the writer.
-// The snapshot includes the column family name, key, and value for each entry.
-//
-// Parameters:
-//   - ctx: The context returned by PrepareSnapshot (unused in this implementation).
-//   - w: The io.Writer to write the snapshot data to.
-//   - done: A channel that signals if the snapshot operation should be cancelled.
-//
-// Returns:
-//   - An error if the database is closed, iteration fails, GOB encoding fails, or the operation is cancelled.
-func (s *KVBaseRocksDBStateMachine) SaveSnapshot(
+func (s *KVBaseStateMachine) SaveSnapshot(
 	ctx interface{},
 	w io.Writer,
 	done <-chan struct{},
 ) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
+	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 
-	if rocks_kv_store == nil {
+	if kv_store == nil {
 		return errors.New("db closed")
 	}
 
 	enc := gob.NewEncoder(w)
 
-	err := rocks_kv_store.Iterate(func(cfName string, key, value []byte) error {
+	err := kv_store.Iterate(func(cfName string, key, value []byte) error {
 		select {
 		case <-done:
 			return fmt.Errorf("snapshot cancelled")
@@ -747,23 +477,7 @@ func (s *KVBaseRocksDBStateMachine) SaveSnapshot(
 	return nil
 }
 
-// RecoverFromSnapshot restores the state machine's state from a snapshot provided by an io.Reader.
-// It involves the following steps:
-// 1. Creates a new temporary RocksDB instance.
-// 2. Decodes GOB-encoded entries (ColumnFamilyName, Key, Value) from the reader.
-// 3. Puts each entry into the new RocksDB instance.
-// 4. If successful, it replaces the old RocksDB instance with the new one.
-// 5. Updates the current DB directory information and cleans up the old DB directory.
-// 6. Updates the `lastApplied` index based on the recovered data.
-//
-// Parameters:
-//   - r: The io.Reader to read the snapshot data from.
-//   - done: A channel that signals if the recovery operation should be cancelled.
-//
-// Returns:
-//   - An error if the state machine is already closed, directory operations fail, DB opening fails,
-//     GOB decoding fails, putting data into the new DB fails, or the operation is cancelled.
-func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
+func (s *KVBaseStateMachine) RecoverFromSnapshot(
 	r io.Reader,
 	done <-chan struct{},
 ) error {
@@ -794,35 +508,18 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 	// For simplicity, we'll assume a generic OpenMasterDB-like behavior for recovery,
 	// as the snapshot contains all CF data.
 	// A more robust approach might involve the stateMachineImpl itself handling snapshot recovery.
-	rocks_db, columnFamilyHandles, ttlColumnFamilyHandles, err := db.OpenMasterDB(dbdir) // Simplified for now
+	kv_store, err := s.stateMachineImpl.OpenDB(dbdir) // Simplified for now
 	if err != nil {
 		return fmt.Errorf("failed to open new DB for snapshot recovery: %w", err)
-	}
-	rocks_db_store := &db.RocksdbStore{
-		DB:                     rocks_db,
-		ColumnFamilyHandles:    columnFamilyHandles,
-		TTLColumnFamilyHandles: ttlColumnFamilyHandles,
 	}
 
 	dec := gob.NewDecoder(r)
 
-	// Track existing and create new Column Families as they appear in the snapshot
-	// This is a simplified approach. A more robust solution would involve
-	// the stateMachineImpl and potentially specific DDL commands if CFs need
-	// special handling (like TTL properties not directly in the snapshot data).
-	currentCFs := make(map[string]bool)
-	for cfName := range columnFamilyHandles {
-		currentCFs[cfName] = true
-	}
-	for cfName := range ttlColumnFamilyHandles {
-		currentCFs[cfName] = true
-	}
-
 	for {
 		select {
 		case <-done:
-			rocks_db_store.Close() // Clean up the new DB if cancelled
-			os.RemoveAll(dbdir)    // Attempt to remove the temporary DB dir
+			kv_store.Close()    // Clean up the new DB if cancelled
+			os.RemoveAll(dbdir) // Attempt to remove the temporary DB dir
 			return fmt.Errorf("snapshot recovery cancelled")
 		default:
 		}
@@ -837,35 +534,13 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 			if err == io.EOF {
 				break // End of snapshot
 			}
-			rocks_db_store.Close() // Clean up
+			kv_store.Close() // Clean up
 			os.RemoveAll(dbdir)
 			return fmt.Errorf("decode failed: %w", err)
 		}
 
-		// Ensure column family exists in the new DB before putting data
-		if _, ok := currentCFs[entry.CFName]; !ok {
-			// Attempt to create the column family.
-			// This assumes default options. Specific options would require more info from snapshot or config.
-			// Also, it doesn't distinguish between normal and TTL CFs based on snapshot data alone.
-			// This is a simplification; a full solution might need DDL commands in the snapshot
-			// or a pre-defined schema.
-			opts := grocksdb.NewDefaultOptions()
-			// Note: opts should be destroyed, but its lifecycle here is tricky.
-			// Ideally, CF creation is less dynamic or handled by the stateMachineImpl.
-			newCfHandle, createErr := rocks_db_store.DB.CreateColumnFamily(opts, entry.CFName)
-			opts.Destroy()
-			if createErr != nil {
-				rocks_db_store.Close()
-				os.RemoveAll(dbdir)
-				return fmt.Errorf("failed to create column family %s during snapshot recovery: %w", entry.CFName, createErr)
-			}
-			// Assuming it's a normal CF. If it needs to be TTL, that info isn't in this basic entry.
-			rocks_db_store.ColumnFamilyHandles[entry.CFName] = newCfHandle
-			currentCFs[entry.CFName] = true
-		}
-
-		if err := rocks_db_store.Put(entry.CFName, string(entry.Key), entry.Value); err != nil {
-			rocks_db_store.Close()
+		if err := kv_store.Put(entry.CFName, string(entry.Key), entry.Value); err != nil {
+			kv_store.Close()
 			os.RemoveAll(dbdir)
 			return fmt.Errorf("put failed during snapshot recovery for CF %s, Key %s: %w", entry.CFName, string(entry.Key), err)
 		}
@@ -873,21 +548,21 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 
 	// Persist directory changes
 	if err := saveCurrentDBDirName(dir, dbdir); err != nil {
-		rocks_db_store.Close()
+		kv_store.Close()
 		os.RemoveAll(dbdir)
 		return err
 	}
 	if err := replaceCurrentDBFile(dir); err != nil {
-		rocks_db_store.Close()
+		kv_store.Close()
 		os.RemoveAll(dbdir)
 		return err
 	}
 
 	// Update applied index
-	newLastApplied, err := s.queryAppliedIndex(rocks_db_store)
+	newLastApplied, err := s.queryAppliedIndex(kv_store)
 	if err != nil {
 		// This is critical. If we can't read the applied index, the SM is in an inconsistent state.
-		rocks_db_store.Close()
+		kv_store.Close()
 		os.RemoveAll(dbdir)
 		// Attempt to revert to oldDirName if possible, though that's complex and risky here.
 		// For now, panic might be safer than continuing in an unknown state.
@@ -895,11 +570,11 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 	}
 
 	// Atomically swap the store pointer
-	oldStorePtr := atomic.SwapPointer(&s.store, unsafe.Pointer(rocks_db_store))
-	oldKvStore := (*db.RocksdbStore)(oldStorePtr)
+	oldStorePtr := atomic.SwapPointer(&s.store, unsafe.Pointer(&kv_store))
+	oldKvStore := *(*db.KVStore)(oldStorePtr)
 
 	// Close and remove the old database IF it existed and was different
-	if oldKvStore != nil && oldKvStore.DB != rocks_db_store.DB { // Check if it's genuinely an old instance
+	if oldKvStore != nil && oldKvStore != kv_store { // Check if it's genuinely an old instance
 		oldKvStore.Close()
 		if oldDirName != "" && oldDirName != dbdir { // Ensure oldDirName is valid and different
 			parent := filepath.Dir(oldDirName)
@@ -938,19 +613,11 @@ func (s *KVBaseRocksDBStateMachine) RecoverFromSnapshot(
 	return nil
 }
 
-// Close closes the state machine and its underlying RocksDB store.
-// It's protected by a mutex to prevent concurrent close operations or
-// operations on a closed store.
-//
-// Returns:
-//   - An error if any occurs during the closing of the RocksDB store (though typically, RocksDB Close doesn't return errors).
-//
-// Panics if called more than once.
-func (s *KVBaseRocksDBStateMachine) Close() error {
+func (s *KVBaseStateMachine) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rocks_kv_store := (*db.RocksdbStore)(atomic.LoadPointer(&s.store))
-	if rocks_kv_store != nil {
+	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
+	if kv_store != nil {
 		if s.closed {
 			// Already closed, potentially an issue if called multiple times without error.
 			// Depending on strictness, could panic or return an error.
@@ -958,7 +625,7 @@ func (s *KVBaseRocksDBStateMachine) Close() error {
 			panic("close called twice")
 		}
 		s.closed = true
-		return rocks_kv_store.Close()
+		return kv_store.Close()
 	}
 	// If store is nil, it might mean it was never opened or already closed and set to nil.
 	// If s.closed is true here, it means Close was called on an already nil store (which is fine).

@@ -1,12 +1,171 @@
 package db
 
 import (
+	"deadalus-orch/server/internal/pkg/utils"
 	"fmt"
+	"path/filepath"
+	"strconv"
+	"time"
 
 	"strings"
 
 	"github.com/linxGnu/grocksdb"
+	"github.com/rs/zerolog/log"
 )
+
+/*
+
+tmpDir := t.TempDir()
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissingColumnFamilies(true)
+
+	cfOpts := grocksdb.NewDefaultOptions()
+
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+*/
+
+func CreateRocksdbStore(dbPath string,
+	columnFamilyNames []string,
+	ttlColumnFamilyNames []string) (*RocksdbStore, error) {
+	db, cfH, ttCfH, err := OpenRocksDB(dbPath, columnFamilyNames, ttlColumnFamilyNames)
+	if err != nil {
+		return nil, err
+	}
+	currentCFs := make(map[string]bool)
+	for cfName := range cfH {
+		currentCFs[cfName] = true
+	}
+	for cfName := range ttCfH {
+		currentCFs[cfName] = true
+	}
+	return &RocksdbStore{
+		DB:                     db,
+		ColumnFamilyHandles:    cfH,
+		TTLColumnFamilyHandles: ttCfH,
+		currentCFs:             currentCFs,
+	}, nil
+}
+
+// OpenRocksDB opens a RocksDB database at the specified dbPath, creating and/or opening the specified column families.
+// It handles the logic for listing existing column families, merging them with the requested ones,
+// and ensuring default ("default", "meta") column families exist.
+// It also separates handles for normal and TTL column families.
+//
+// Parameters:
+//   - dbPath: The full file system path where the RocksDB database is located or will be created.
+//   - columnFamilyNames: A list of names for regular column families to be opened/created.
+//   - ttlColumnFamilyNames: A list of names for column families that should be treated as TTL column families.
+//     These names must not overlap with columnFamilyNames.
+//
+// Returns:
+//   - A pointer to the opened grocksdb.DB instance.
+//   - A map of normal column family names to their grocksdb.ColumnFamilyHandle.
+//   - A map of TTL column family names to their grocksdb.ColumnFamilyHandle.
+//   - An error if the database cannot be opened, if column family names are duplicated,
+//     or if there's an issue listing or creating column families.
+func OpenRocksDB(
+	dbPath string,
+	columnFamilyNames []string,
+	ttlColumnFamilyNames []string,
+) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error) {
+
+	log.Info().
+		Str("dbPath", dbPath).
+		Msg("🗄️  Opening index db")
+
+	// Validar duplicados dentro de cada lista
+	if utils.HasDuplicates(columnFamilyNames) {
+		return nil, nil, nil, fmt.Errorf("duplicated names in columnFamilyNames")
+	}
+	if utils.HasDuplicates(ttlColumnFamilyNames) {
+		return nil, nil, nil, fmt.Errorf("duplicated names in ttlColumnFamilyNames")
+	}
+
+	nameSet := make(map[string]struct{})
+	for _, name := range columnFamilyNames {
+		nameSet[name] = struct{}{}
+	}
+	for _, name := range ttlColumnFamilyNames {
+		if _, exists := nameSet[name]; exists {
+			return nil, nil, nil, fmt.Errorf("column family name '%s' exists in both normal and TTL sets", name)
+		}
+	}
+
+	opts := grocksdb.NewDefaultOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)
+	opts.SetCreateIfMissingColumnFamilies(true)
+
+	var err error
+	var currentColumnFamilies []string
+	uniqueCF := make(map[string]struct{})
+
+	fmt.Println("antes del if")
+	if exists, _ := utils.DirExists(filepath.Join(dbPath, "CURRENT")); exists {
+		fmt.Println("SIII existe")
+		currentColumnFamilies, err = grocksdb.ListColumnFamilies(opts, dbPath)
+		if err != nil {
+			fmt.Println("Error aqui????", err)
+			return nil, nil, nil, err
+		}
+		for _, cf := range currentColumnFamilies {
+			uniqueCF[cf] = struct{}{}
+		}
+	} else {
+		fmt.Println("no existe ?????")
+	}
+
+	for _, cf := range columnFamilyNames {
+		uniqueCF[cf] = struct{}{}
+	}
+	for _, cf := range ttlColumnFamilyNames {
+		uniqueCF[cf] = struct{}{}
+	}
+
+	var allCFs []string
+	for cf := range uniqueCF {
+		allCFs = append(allCFs, cf)
+	}
+
+	cfSet := make(map[string]struct{}, len(allCFs))
+	for _, name := range allCFs {
+		cfSet[name] = struct{}{}
+	}
+
+	if _, ok := cfSet[DefaultFC]; !ok {
+		allCFs = append(allCFs, DefaultFC)
+	}
+	if _, ok := cfSet[MetaFC]; !ok {
+		allCFs = append(allCFs, MetaFC)
+	}
+
+	cfOpts := make([]*grocksdb.Options, len(allCFs))
+	for i := range allCFs {
+		cfOpts[i] = grocksdb.NewDefaultOptions()
+		defer cfOpts[i].Destroy()
+	}
+	fmt.Println("antes de OpenDbColumnFamilies ", allCFs)
+	db, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, allCFs, cfOpts)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error opening database: %v", err)
+	}
+
+	normalCFHandles := make(map[string]*grocksdb.ColumnFamilyHandle)
+	ttlCFHandles := make(map[string]*grocksdb.ColumnFamilyHandle)
+
+	for i, name := range allCFs {
+		handle := cfHs[i]
+		if utils.Contains(ttlColumnFamilyNames, name) {
+			ttlCFHandles[name] = handle
+		} else {
+			normalCFHandles[name] = handle
+		}
+	}
+
+	return db, normalCFHandles, ttlCFHandles, nil
+}
 
 // RocksdbStore is an implementation of the KVStore interface using RocksDB as the underlying storage engine.
 // It holds a reference to the RocksDB database instance and maps of column family handles
@@ -15,6 +174,7 @@ type RocksdbStore struct {
 	*grocksdb.DB                                                   // Embedded RocksDB database instance.
 	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle // Map of regular column family names to their handles.
 	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
+	currentCFs             map[string]bool
 }
 
 // Get retrieves the value associated with a key from a specific column family.
@@ -195,6 +355,27 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 // Returns:
 //   - An error if the specified column family does not exist or if any other RocksDB error occurs during the put operation.
 func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {
+
+	// Ensure column family exists in the new DB before putting data
+	if _, ok := r.currentCFs[columnFamily]; !ok {
+		// Attempt to create the column family.
+		// This assumes default options. Specific options would require more info from snapshot or config.
+		// Also, it doesn't distinguish between normal and TTL CFs based on snapshot data alone.
+		// This is a simplification; a full solution might need DDL commands in the snapshot
+		// or a pre-defined schema.
+		opts := grocksdb.NewDefaultOptions()
+		// Note: opts should be destroyed, but its lifecycle here is tricky.
+		// Ideally, CF creation is less dynamic or handled by the stateMachineImpl.
+		newCfHandle, createErr := r.DB.CreateColumnFamily(opts, columnFamily)
+		opts.Destroy()
+		if createErr != nil {
+			return createErr
+		}
+		// Assuming it's a normal CF. If it needs to be TTL, that info isn't in this basic entry.
+		r.ColumnFamilyHandles[columnFamily] = newCfHandle
+		r.currentCFs[columnFamily] = true
+	}
+
 	cf, ok := r.ColumnFamilyHandles[columnFamily]
 	if !ok {
 		cf, ok = r.TTLColumnFamilyHandles[columnFamily]
@@ -442,5 +623,102 @@ func (r *RocksdbStore) Flush() error {
 //   - nil (errors during close are typically handled internally by grocksdb or are not recoverable).
 func (r *RocksdbStore) Close() error {
 	r.DB.Close()
+	return nil
+}
+
+func (r *RocksdbStore) CleanExpiredKeys() error {
+	for name, handle := range r.TTLColumnFamilyHandles {
+		err := cleanExpiredKeys(r.DB, handle)
+		if err != nil {
+			return fmt.Errorf("error cleaning expired keys for CF %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// cleanExpiredKeys iterates through a TTL-enabled column family and removes keys that have expired.
+// It scans keys prefixed with `PrefixTTLIndex`, which store `expireAtTimestamp:originalKey`.
+// If `expireAtTimestamp` is in the past, it deletes the `PrefixTTLIndex` key,
+// the actual data key (`PrefixData:originalKey`), and the reference key (`PrefixTTLExpire:originalKey`).
+// It performs deletions in batches (up to `maxDeletions`) to avoid holding locks for too long.
+//
+// Parameters:
+//   - db: The RocksDB instance.
+//   - cf: The column family handle for the TTL-enabled column family to clean.
+//
+// Returns:
+//   - An error if iterator operations or batch write operations fail.
+func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle) error {
+	const maxDeletions = 1000
+	var deleted int64
+
+	readOpts := grocksdb.NewDefaultReadOptions()
+	defer readOpts.Destroy()
+
+	writeOpts := grocksdb.NewDefaultWriteOptions()
+	defer writeOpts.Destroy()
+
+	batch := grocksdb.NewWriteBatch()
+	defer batch.Destroy()
+
+	it := db_instance.NewIteratorCF(readOpts, cf)
+	defer it.Close()
+
+	nowMillis := time.Now().UnixMilli()
+	prefix := []byte(PrefixTTLIndex)
+	log.Debug().Msg("-------> PrefixTTLIndex")
+	log.Debug().Interface("PrefixTTLIndex", PrefixTTLIndex).Msg("")
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		key := it.Key()
+		keyBytes := append([]byte(nil), key.Data()...)
+		key.Free()
+
+		keyStr := string(keyBytes)
+		log.Debug().Msg("------>  keyStr")
+		log.Debug().Str("keyStr", keyStr).Msg("")
+		trimmed := strings.TrimPrefix(keyStr, PrefixTTLIndex)
+		sepIdx := strings.IndexByte(trimmed, ':')
+		if sepIdx <= 0 || sepIdx >= len(trimmed)-1 {
+			continue
+		}
+
+		expireAtStr := trimmed[:sepIdx]
+		originalKey := trimmed[sepIdx+1:]
+
+		expireAt, err := strconv.ParseInt(expireAtStr, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		if expireAt > nowMillis {
+			break
+		}
+
+		dataKey := []byte(PrefixData + originalKey)
+		expireRefKey := []byte(PrefixTTLExpire + originalKey)
+
+		ro := grocksdb.NewDefaultReadOptions()
+		defer ro.Destroy()
+
+		batch.DeleteCF(cf, dataKey)
+		batch.DeleteCF(cf, expireRefKey)
+		batch.DeleteCF(cf, keyBytes)
+
+		deleted++
+		if deleted >= maxDeletions {
+			break
+		}
+	}
+
+	if err := it.Err(); err != nil {
+		return fmt.Errorf("iterator error: %w", err)
+	}
+
+	if deleted > 0 {
+		if err := db_instance.Write(writeOpts, batch); err != nil {
+			return fmt.Errorf("failed to write batch for expired keys: %w", err)
+		}
+	}
+
 	return nil
 }

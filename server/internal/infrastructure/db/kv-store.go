@@ -113,4 +113,6 @@ type KVStore interface {
 	// Returns:
 	//   - An error if any occurred during the closing process.
 	Close() error
+
+	CleanExpiredKeys() error
 }

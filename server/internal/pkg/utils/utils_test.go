@@ -1,6 +1,7 @@
-package db
+package utils_test
 
 import (
+	"deadalus-orch/server/internal/pkg/utils"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,7 @@ func TestHasDuplicates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, hasDuplicates(tt.slice))
+			assert.Equal(t, tt.expected, utils.HasDuplicates(tt.slice))
 		})
 	}
 }
@@ -39,7 +40,7 @@ func TestContains(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, contains(tt.slice, tt.target))
+			assert.Equal(t, tt.expected, utils.Contains(tt.slice, tt.target))
 		})
 	}
 }

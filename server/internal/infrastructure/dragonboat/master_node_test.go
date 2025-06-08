@@ -65,7 +65,7 @@ func TestMasterNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	assert.Equal(t, testJoin, calledWithJoin, "Join flag should match")
 	assert.Equal(t, testRoles, calledWithRoles, "Roles should match")
 
-	expectedStateMachineConstr := reflect.ValueOf(dragonboat.NewMasterKVRocksDBStateMachine)
+	expectedStateMachineConstr := reflect.ValueOf(dragonboat.NewMasterKVStateMachine)
 	actualStateMachineConstr := reflect.ValueOf(calledWithStateMachineConstr)
 	assert.Equal(t, expectedStateMachineConstr.Pointer(), actualStateMachineConstr.Pointer(), "StateMachine constructor should be NewMasterKVRocksDBStateMachine")
 }

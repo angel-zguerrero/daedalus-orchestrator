@@ -23,5 +23,5 @@ var InitRaftNodeFunc = InitRaftNode
 //   - A pointer to the initialized RaftNode for the master shard.
 //   - An error if the Raft node initialization fails.
 func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole) (*RaftNode, error) {
-	return InitRaftNodeFunc(uint64(MasterShardID), ReplicaID, selfMember, initialMembers, join, roles, NewMasterKVRocksDBStateMachine)
+	return InitRaftNodeFunc(uint64(MasterShardID), ReplicaID, selfMember, initialMembers, join, roles, NewMasterKVStateMachine)
 }

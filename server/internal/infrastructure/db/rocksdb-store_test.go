@@ -3,7 +3,6 @@ package db_test
 import (
 	"testing"
 
-	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,26 +14,9 @@ const DefaultFC = "default"
 
 func TestRocksdbStore_PutAndGet(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-
-	goOp := grocksdb.NewDefaultOptions()
-
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
-	require.NoError(t, err)
-
-	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
-	for index, name := range columnFamilyNames {
-		ColumnFamilyHandles[name] = cfHs[index]
-	}
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: ColumnFamilyHandles}
+	defer store.DB.Close()
 
 	key := "key"
 	value := []byte("value")
@@ -49,26 +31,9 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 
 func TestRocksdbStore_Get_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-
-	goOp := grocksdb.NewDefaultOptions()
-
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
-	require.NoError(t, err)
-
-	ColumnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
-	for index, name := range columnFamilyNames {
-		ColumnFamilyHandles[name] = cfHs[index]
-	}
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: ColumnFamilyHandles}
+	defer store.DB.Close()
 
 	result, err := store.Get(TestFC, "nonexistent")
 	require.NoError(t, err)
@@ -77,32 +42,10 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 
 func TestRocksdbStore_WriteBatch(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-
-	cfOpts := grocksdb.NewDefaultOptions()
-
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
+	defer store.DB.Close()
 
-	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
-	require.NoError(t, err)
-
-	columnFamilyHandles := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
-	for index, name := range columnFamilyNames {
-		columnFamilyHandles[name] = cfHs[index]
-	}
-
-	store := &db.RocksdbStore{
-		DB:                     rocks,
-		ColumnFamilyHandles:    columnFamilyHandles,
-		TTLColumnFamilyHandles: make(map[string]*grocksdb.ColumnFamilyHandle),
-	}
-
-	// Usar nueva estructura WriteBatch
 	batch := db.NewWriteBatch()
 	batch.Put(TestFC, "a", []byte("valueA"))
 	batch.Put(TestFC, "b", []byte("valueB"))
@@ -110,12 +53,10 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	err = store.Write(batch)
 	require.NoError(t, err)
 
-	// Verifica clave "a"
 	resultA, err := store.Get(TestFC, "a")
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueA"), resultA)
 
-	// Verifica clave "b"
 	resultB, err := store.Get(TestFC, "b")
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueB"), resultB)
@@ -123,25 +64,9 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 
 func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-	goOp := grocksdb.NewDefaultOptions()
-
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
-	require.NoError(t, err)
-
-	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
-	for i, name := range columnFamilyNames {
-		cfMap[name] = cfHs[i]
-	}
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+	defer store.DB.Close()
 
 	require.NoError(t, store.Put(TestFC, "user:123:name", []byte("Alice")))
 
@@ -152,27 +77,12 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	assert.Equal(t, []byte("Alice"), results[0].Value)
 	assert.Equal(t, "", next)
 }
+
 func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-	goOp := grocksdb.NewDefaultOptions()
-
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
-	require.NoError(t, err)
-
-	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
-	for i, name := range columnFamilyNames {
-		cfMap[name] = cfHs[i]
-	}
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+	defer store.DB.Close()
 
 	require.NoError(t, store.Put(TestFC, "user:1", []byte("a")))
 	require.NoError(t, store.Put(TestFC, "user:2", []byte("b")))
@@ -189,30 +99,14 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T
 		}
 		cursor = next
 	}
-
 	require.Len(t, all, 3)
 }
+
 func TestRocksdbStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-	goOp := grocksdb.NewDefaultOptions()
-
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
-	require.NoError(t, err)
-
-	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
-	for i, name := range columnFamilyNames {
-		cfMap[name] = cfHs[i]
-	}
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+	defer store.DB.Close()
 
 	require.NoError(t, store.Put(TestFC, "product:1", []byte("item")))
 
@@ -224,17 +118,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 
 func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-	goOp := grocksdb.NewDefaultOptions()
-
-	rocks, _, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC}, []*grocksdb.Options{goOp})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: map[string]*grocksdb.ColumnFamilyHandle{}}
+	defer store.DB.Close()
 
 	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", "pattern:*", "", 10)
 	require.Error(t, err)
@@ -243,32 +129,16 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.
 
 func TestRocksdbStore_Delete_ExistingKey(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-
-	cfOpts := grocksdb.NewDefaultOptions()
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle)
-	for i, name := range []string{DefaultFC, TestFC} {
-		cfMap[name] = cfHs[i]
-	}
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
+	defer store.DB.Close()
 
 	key := "delete-key"
 	value := []byte("to-delete")
 
 	require.NoError(t, store.Put(TestFC, key, value))
-
-	// Delete the key
 	require.NoError(t, store.Delete(TestFC, key))
 
-	// Verify it's deleted
 	result, err := store.Get(TestFC, key)
 	require.NoError(t, err)
 	assert.Nil(t, result)
@@ -276,47 +146,20 @@ func TestRocksdbStore_Delete_ExistingKey(t *testing.T) {
 
 func TestRocksdbStore_Delete_NonExistentKey(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-
-	cfOpts := grocksdb.NewDefaultOptions()
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
+	defer store.DB.Close()
 
-	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle)
-	for i, name := range []string{DefaultFC, TestFC} {
-		cfMap[name] = cfHs[i]
-	}
-
-	store := &db.RocksdbStore{DB: rocks, ColumnFamilyHandles: cfMap}
-
-	// Try deleting a key that doesn't exist
 	err = store.Delete(TestFC, "nonexistent")
 	assert.NoError(t, err)
 }
 
 func TestRocksdbStore_Delete_InvalidColumnFamily(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-
-	cfOpts := grocksdb.NewDefaultOptions()
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC}, []*grocksdb.Options{cfOpts})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC}, nil)
 	require.NoError(t, err)
-	defer rocks.Close()
+	defer store.DB.Close()
 
-	store := &db.RocksdbStore{
-		DB:                     rocks,
-		ColumnFamilyHandles:    map[string]*grocksdb.ColumnFamilyHandle{"default": cfHs[0]},
-		TTLColumnFamilyHandles: map[string]*grocksdb.ColumnFamilyHandle{}, // no test_fc
-	}
-
-	// Attempt to delete using a non-existent column family
 	err = store.Delete("nonexistent_cf", "key")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
@@ -324,34 +167,16 @@ func TestRocksdbStore_Delete_InvalidColumnFamily(t *testing.T) {
 
 func TestRocksdbStore_Delete_TTLColumnFamily(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	opts := grocksdb.NewDefaultOptions()
-	opts.SetCreateIfMissing(true)
-	opts.SetCreateIfMissingColumnFamilies(true)
-
-	cfOpts := grocksdb.NewDefaultOptions()
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{cfOpts, cfOpts})
+	store, err := db.CreateRocksdbStore(tmpDir, []string{}, []string{TestFC})
 	require.NoError(t, err)
-	defer rocks.Close()
-
-	ttlCFMap := make(map[string]*grocksdb.ColumnFamilyHandle)
-	ttlCFMap[TestFC] = cfHs[1]
-
-	store := &db.RocksdbStore{
-		DB:                     rocks,
-		ColumnFamilyHandles:    map[string]*grocksdb.ColumnFamilyHandle{},
-		TTLColumnFamilyHandles: ttlCFMap,
-	}
+	defer store.DB.Close()
 
 	key := "ttl-key"
 	value := []byte("ttl-value")
 
 	require.NoError(t, store.Put(TestFC, key, value))
-
-	// Delete the key from TTL column family
 	require.NoError(t, store.Delete(TestFC, key))
 
-	// Ensure it's deleted
 	result, err := store.Get(TestFC, key)
 	require.NoError(t, err)
 	assert.Nil(t, result)
