@@ -13,9 +13,6 @@ import (
 
 // TTL-related key prefixes (local definitions for this subtask)
 const (
-	PrefixTTLIndex    = "_ttlidx:"
-	PrefixData        = "_ttldata:"
-	PrefixTTLExpire   = "_ttlexp:"
 	TTLDefaultSeconds = 3600 // Default TTL: 1 hour
 )
 
@@ -222,7 +219,7 @@ func (ps *PebbleStore) CleanExpiredKeys() error {
 
 		iterOpts := &pebble.IterOptions{
 			LowerBound: ttlIndexScanPrefixBytes,
-			UpperBound: pebble.PrefixRangeEnd(ttlIndexScanPrefixBytes),
+			UpperBound: prefixRangeEnd(ttlIndexScanPrefixBytes),
 		}
 		iter := ps.db.NewIter(iterOpts)
 
@@ -330,7 +327,7 @@ func (ps *PebbleStore) ClearAll() error {
 
 	for cfName, cfPrefix := range allPrefixes {
 		// DeleteRange deletes all keys in the range [start, end), including start, excluding end.
-		err := ps.db.DeleteRange(cfPrefix, pebble.PrefixRangeEnd(cfPrefix), pebble.Sync)
+		err := ps.db.DeleteRange(cfPrefix, prefixRangeEnd(cfPrefix), pebble.Sync)
 		if err != nil {
 			return fmt.Errorf("ClearAll: failed to delete range for cf %s (prefix %s): %w", cfName, string(cfPrefix), err)
 		}
@@ -366,7 +363,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 
 	iterOpts := &pebble.IterOptions{
 		LowerBound: cfPrefix,
-		UpperBound: pebble.PrefixRangeEnd(cfPrefix),
+		UpperBound: prefixRangeEnd(cfPrefix),
 	}
 
 	iter := ps.db.NewIter(iterOpts)
@@ -461,7 +458,7 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 		cfResult := make(map[string][]byte)
 		iterOpts := &pebble.IterOptions{
 			LowerBound: cfPrefix,
-			UpperBound: pebble.PrefixRangeEnd(cfPrefix),
+			UpperBound: prefixRangeEnd(cfPrefix),
 		}
 		iter := ps.db.NewIter(iterOpts)
 
@@ -489,6 +486,7 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 
 	return result, nil
 }
+
 // Get retrieves the value for a key from the specified column family.
 // If columnFamily is empty, it defaults to DefaultFC.
 // For TTL CFs, it retrieves the actual data, not metadata keys.
@@ -625,7 +623,7 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error { // batch.Data is []X
 	defer b.Close() // Ensure batch is closed even if errors occur
 
 	for _, op := range batch.Data { // op is of type X
-		prefixedKey, err := ps.getPrefixedKey(op.CF, op.Key)
+		prefixedKey, _, _, err := ps.getPrefixedKey(op.CF, op.Key)
 		if err != nil {
 			return fmt.Errorf("Write: error getting prefixed key for cf '%s', key '%s': %w", op.CF, op.Key, err)
 		}
@@ -670,7 +668,7 @@ func (ps *PebbleStore) Iterate(fn func(cfName string, key, value []byte) error) 
 	for cfName, cfPrefix := range allPrefixes {
 		iterOpts := &pebble.IterOptions{
 			LowerBound: cfPrefix,
-			UpperBound: pebble.PrefixRangeEnd(cfPrefix),
+			UpperBound: prefixRangeEnd(cfPrefix),
 		}
 		iter := ps.db.NewIter(iterOpts)
 
@@ -683,7 +681,7 @@ func (ps *PebbleStore) Iterate(fn func(cfName string, key, value []byte) error) 
 
 			if err := fn(cfName, keyWithoutPrefix, value); err != nil {
 				iter.Close() // Close iterator before returning error from callback
-				return err // Propagate error from callback
+				return err   // Propagate error from callback
 			}
 		}
 
@@ -693,5 +691,24 @@ func (ps *PebbleStore) Iterate(fn func(cfName string, key, value []byte) error) 
 			return fmt.Errorf("Iterate: iterator error for cf %s: %w", cfName, err)
 		}
 	}
+	return nil
+}
+
+// prefixRangeEnd devuelve el menor []byte que es mayor que todos los posibles prefijos con el mismo comienzo.
+// Por ejemplo, si el prefijo es []byte("abc"), devolverá []byte("abd").
+func prefixRangeEnd(prefix []byte) []byte {
+	if len(prefix) == 0 {
+		// Si el prefijo está vacío, no hay límite superior razonable.
+		return nil
+	}
+	end := make([]byte, len(prefix))
+	copy(end, prefix)
+	for i := len(end) - 1; i >= 0; i-- {
+		if end[i] < 0xFF {
+			end[i]++
+			return end[:i+1]
+		}
+	}
+	// Si todos los bytes eran 0xFF, no hay un límite superior válido.
 	return nil
 }

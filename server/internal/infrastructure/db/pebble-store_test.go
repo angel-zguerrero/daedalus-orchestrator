@@ -9,12 +9,9 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 )
 
-const TestFC = "test_fc"
-const DefaultFC = "default"
-
-func TestRocksdbStore_PutAndGet(t *testing.T) {
+func TestPebbleStore_PutAndGet(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -29,9 +26,9 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 	assert.Equal(t, value, result)
 }
 
-func TestRocksdbStore_Get_NotFound(t *testing.T) {
+func TestPebbleStore_Get_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -40,9 +37,9 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-func TestRocksdbStore_WriteBatch(t *testing.T) {
+func TestPebbleStore_WriteBatch(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -62,9 +59,9 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	assert.Equal(t, []byte("valueB"), resultB)
 }
 
-func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
+func TestPebbleStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -78,9 +75,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	assert.Equal(t, "", next)
 }
 
-func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T) {
+func TestPebbleStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -102,9 +99,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T
 	require.Len(t, all, 3)
 }
 
-func TestRocksdbStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
+func TestPebbleStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -116,9 +113,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	require.Equal(t, "", next)
 }
 
-func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.T) {
+func TestPebbleStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -127,9 +124,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.
 	require.Contains(t, err.Error(), "column family")
 }
 
-func TestRocksdbStore_Delete_ExistingKey(t *testing.T) {
+func TestPebbleStore_Delete_ExistingKey(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -144,9 +141,9 @@ func TestRocksdbStore_Delete_ExistingKey(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-func TestRocksdbStore_Delete_NonExistentKey(t *testing.T) {
+func TestPebbleStore_Delete_NonExistentKey(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC, TestFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -154,9 +151,9 @@ func TestRocksdbStore_Delete_NonExistentKey(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRocksdbStore_Delete_InvalidColumnFamily(t *testing.T) {
+func TestPebbleStore_Delete_InvalidColumnFamily(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{DefaultFC}, nil)
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC}, nil)
 	require.NoError(t, err)
 	defer store.Close()
 
@@ -165,9 +162,9 @@ func TestRocksdbStore_Delete_InvalidColumnFamily(t *testing.T) {
 	require.Contains(t, err.Error(), "column family")
 }
 
-func TestRocksdbStore_Delete_TTLColumnFamily(t *testing.T) {
+func TestPebbleStore_Delete_TTLColumnFamily(t *testing.T) {
 	tmpDir := t.TempDir()
-	store, err := db.CreateRocksdbStore(tmpDir, []string{}, []string{TestFC})
+	store, err := db.CreatePebbleStore(tmpDir, []string{}, []string{TestFC})
 	require.NoError(t, err)
 	defer store.Close()
 
