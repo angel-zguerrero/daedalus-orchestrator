@@ -130,7 +130,7 @@ func (ps *PebbleStore) getPrefixedKey(cfName string, key string) (rawKey []byte,
 	cfPrefixBytes = prefix
 	if isTTL {
 		// e.g., "myTTLCF:" + "_ttldata:" + "actualKey"
-		combinedDataPrefix := bytes.Join([][]byte{prefix, []byte(PrefixData)}, nil)
+		combinedDataPrefix := bytes.Join([][]byte{prefix, []byte("")}, nil)
 		return append(combinedDataPrefix, []byte(key)...), true, cfPrefixBytes, nil
 	}
 
@@ -177,8 +177,8 @@ func (ps *PebbleStore) Put(columnFamily, key string, value []byte) error {
 
 	// Construct keys for TTL:
 	// actualCfPrefix is like "myTTLCF:"
-	// Data key: actualCfPrefix + PrefixData + key
-	dataKey := append(actualCfPrefix, []byte(PrefixData)...)
+	// Data key: actualCfPrefix + key
+	dataKey := append(actualCfPrefix, []byte("")...)
 	dataKey = append(dataKey, []byte(key)...)
 
 	// Index key: actualCfPrefix + PrefixTTLIndex + expiryMillis + ":" + key
@@ -399,7 +399,6 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		// Trim prefix to get the actual key string for pattern matching
 		keyBytesWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix)
 		keyStr := string(keyBytesWithoutPrefix)
-
 		matches := false
 		if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") { // Contains
 			if len(pattern) == 1 { // just "*"
@@ -558,8 +557,8 @@ func (ps *PebbleStore) Delete(columnFamily, key string) error {
 		defer closer.Close() // Important: call closer only if err is nil
 	}
 
-	// Data key: actualCfPrefix + PrefixData + key
-	dataKey := append(actualCfPrefix, []byte(PrefixData)...)
+	// Data key: actualCfPrefix + key
+	dataKey := append(actualCfPrefix, []byte("")...)
 	dataKey = append(dataKey, []byte(key)...)
 	if err := b.Delete(dataKey, nil); err != nil {
 		return fmt.Errorf("Delete: failed to add data key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)

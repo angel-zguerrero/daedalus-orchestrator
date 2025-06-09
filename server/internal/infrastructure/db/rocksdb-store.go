@@ -661,16 +661,13 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle)
 
 	nowMillis := time.Now().UnixMilli()
 	prefix := []byte(PrefixTTLIndex)
-	log.Debug().Msg("-------> PrefixTTLIndex")
-	log.Debug().Interface("PrefixTTLIndex", PrefixTTLIndex).Msg("")
+
 	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 		key := it.Key()
 		keyBytes := append([]byte(nil), key.Data()...)
 		key.Free()
 
 		keyStr := string(keyBytes)
-		log.Debug().Msg("------>  keyStr")
-		log.Debug().Str("keyStr", keyStr).Msg("")
 		trimmed := strings.TrimPrefix(keyStr, PrefixTTLIndex)
 		sepIdx := strings.IndexByte(trimmed, ':')
 		if sepIdx <= 0 || sepIdx >= len(trimmed)-1 {
