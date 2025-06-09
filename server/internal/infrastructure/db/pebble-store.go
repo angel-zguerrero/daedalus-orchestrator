@@ -2,8 +2,10 @@ package db
 
 import (
 	"bytes"
+	"deadalus-orch/server/internal/pkg/utils"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +31,11 @@ type PebbleStore struct {
 // but it should be compatible with the new getPrefixedKey logic if DefaultFC is handled correctly in it)
 func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamilyNames []string) (*PebbleStore, error) {
 	opts := pebble.Options{}
+	dbPath = filepath.Join(dbPath, "pebble")
+	err := utils.EnsureDirExists(dbPath)
+	if err != nil {
+		return nil, err
+	}
 	db, err := pebble.Open(dbPath, &opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open pebble database at %s: %w", dbPath, err)

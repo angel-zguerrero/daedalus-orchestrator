@@ -29,6 +29,11 @@ tmpDir := t.TempDir()
 func CreateRocksdbStore(dbPath string,
 	columnFamilyNames []string,
 	ttlColumnFamilyNames []string) (*RocksdbStore, error) {
+	dbPath = filepath.Join(dbPath, "rocksdb")
+	err := utils.EnsureDirExists(dbPath)
+	if err != nil {
+		return nil, err
+	}
 	db, cfH, ttCfH, err := OpenRocksDB(dbPath, columnFamilyNames, ttlColumnFamilyNames)
 	if err != nil {
 		return nil, err
