@@ -29,6 +29,12 @@ const ConfigDefaultRootUser = "default_root_user"
 // ConfigDefaultRootPassword is the key for the default root password setting in the configuration file.
 const ConfigDefaultRootPassword = "default_root_password"
 
+// ConfigMasterDBEngineKey is the key for the master database engine setting in the configuration file.
+const ConfigMasterDBEngineKey = "master_db_engine"
+
+// ConfigTenantDBEngineKey is the key for the tenant database engine setting in the configuration file.
+const ConfigTenantDBEngineKey = "tenant_db_engine"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -65,6 +71,12 @@ const EnvVarConnectorPort = "CONNECTOR_PORT"
 // EnvVarTTLInternalError is the environment variable name for the TTL for internal errors (in seconds).
 const EnvVarTTLInternalError = "TTL_INTERNAL_ERROR"
 
+// EnvVarMasterDBEngine is the environment variable name for the master database engine.
+const EnvVarMasterDBEngine = "MASTER_DB_ENGINE"
+
+// EnvVarTenantDBEngine is the environment variable name for the tenant database engine.
+const EnvVarTenantDBEngine = "TENANT_DB_ENGINE"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -97,3 +109,11 @@ const (
 	// OTEL_ACTIVE_FALSE represents the "false" string value for disabling OpenTelemetry.
 	OTEL_ACTIVE_FALSE string = "false"
 )
+
+// Command-line flag names. These constants define the names of command-line flags used for configuration.
+
+// MasterDBEngineFlagName is the command-line flag name for the master database engine.
+const MasterDBEngineFlagName = "master-db-engine"
+
+// TenantDBEngineFlagName is the command-line flag name for the tenant database engine.
+const TenantDBEngineFlagName = "tenant-db-engine"
