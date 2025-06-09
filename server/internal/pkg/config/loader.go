@@ -27,8 +27,8 @@ Available Flags:
   --replica			 Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.
   --role			 Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.
   --self-member-addr The network address (in ip:port format) that this node will use for communication with other members in the cluster.
-  --master-db-engine         The database engine for the master database (e.g., "pebble", "sqlite"). Defaults to "pebble".
-  --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "sqlite"). Defaults to "pebble".
+  --master-db-engine         The database engine for the master database (e.g., "pebble", "rocksdb"). Defaults to "pebble".
+  --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "rocksdb"). Defaults to "pebble".
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -96,10 +96,10 @@ var ReplicaIDFlag = flag.Uint64("replica", 0, "Unique identifier (positive integ
 var ConnectorPortFlag = flag.Int("connector-port", 0, "The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.")
 
 // MasterDBEngineFlag defines the --master-db-engine command-line flag for specifying the master database engine.
-var MasterDBEngineFlag = flag.String(constants.MasterDBEngineFlagName, "", "The database engine for the master database (e.g., \"pebble\", \"sqlite\").")
+var MasterDBEngineFlag = flag.String(constants.MasterDBEngineFlagName, "", "The database engine for the master database (e.g., \"pebble\", \"rocksdb\").")
 
 // TenantDBEngineFlag defines the --tenant-db-engine command-line flag for specifying the tenant database engine.
-var TenantDBEngineFlag = flag.String(constants.TenantDBEngineFlagName, "", "The database engine for tenant databases (e.g., \"pebble\", \"sqlite\").")
+var TenantDBEngineFlag = flag.String(constants.TenantDBEngineFlagName, "", "The database engine for tenant databases (e.g., \"pebble\", \"rocksdb\").")
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")

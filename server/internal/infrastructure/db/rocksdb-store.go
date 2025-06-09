@@ -102,19 +102,14 @@ func OpenRocksDB(
 	var currentColumnFamilies []string
 	uniqueCF := make(map[string]struct{})
 
-	fmt.Println("antes del if")
 	if exists, _ := utils.DirExists(filepath.Join(dbPath, "CURRENT")); exists {
-		fmt.Println("SIII existe")
 		currentColumnFamilies, err = grocksdb.ListColumnFamilies(opts, dbPath)
 		if err != nil {
-			fmt.Println("Error aqui????", err)
 			return nil, nil, nil, err
 		}
 		for _, cf := range currentColumnFamilies {
 			uniqueCF[cf] = struct{}{}
 		}
-	} else {
-		fmt.Println("no existe ?????")
 	}
 
 	for _, cf := range columnFamilyNames {
