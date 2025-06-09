@@ -5,6 +5,8 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/shared/constants"
 	"encoding/binary"
 	"encoding/gob"
 	"errors"
@@ -16,15 +18,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOne(t *testing.T) {
-
-	//dragonboat.Init(101, 1, "3435")
-	//dragonboat.Init(101, 2, "3436")
-
-	//time.Sleep(10 * time.Second)
+func setupKV(t *testing.T, engine string) *dragonboat.KVBaseStateMachine {
+	t.Helper()
+	t.Setenv(constants.EnvVarMasterDBEngine, engine)
+	config.LoadDefaultConfiguration()
+	kv := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine)
+	stopc := make(chan struct{})
+	_, err := kv.Open(stopc)
+	require.NoError(t, err)
+	return kv
 }
-func TestOpen_Close(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Open_Close(t *testing.T) {
+	kv := setupKV(t, "pebble")
 
 	err := kv.Close()
 	require.NoError(t, err)
@@ -34,8 +39,8 @@ func TestOpen_Close(t *testing.T) {
 	})
 }
 
-func TestUpdate_SingleEntry(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_SingleEntry(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -65,8 +70,8 @@ func TestUpdate_SingleEntry(t *testing.T) {
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 }
 
-func TestUpdate_AfterClose_Panics(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_AfterClose_Panics(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	_ = kv.Close()
 
 	require.Panics(t, func() {
@@ -74,8 +79,8 @@ func TestUpdate_AfterClose_Panics(t *testing.T) {
 	})
 }
 
-func TestLookup_ExistingKey(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Lookup_ExistingKey(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -110,8 +115,8 @@ func TestLookup_ExistingKey(t *testing.T) {
 	require.Equal(t, []byte("lookup_value"), val)
 }
 
-func TestLookup_NonExistingKey(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Lookup_NonExistingKey(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	query := dragonboat.RK_Command{
@@ -123,24 +128,24 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	require.Nil(t, val)
 }
 
-func TestLookup_InvalidType(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Lookup_InvalidType(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	_, err := kv.Lookup(0)
 	require.Error(t, err)
 }
 
-func TestSync(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Sync(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	err := kv.Sync()
 	require.NoError(t, err)
 }
 
-func TestSaveSnapshotAndRecover(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
+	kv := setupKV(t, "pebble")
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
@@ -200,8 +205,8 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
 
-func TestSaveSnapshot_Cancelled(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_SaveSnapshot_Cancelled(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	done := make(chan struct{})
@@ -212,8 +217,8 @@ func TestSaveSnapshot_Cancelled(t *testing.T) {
 	require.Contains(t, err.Error(), "snapshot cancelled")
 }
 
-func TestRecoverSnapshot_Cancelled(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_RecoverSnapshot_Cancelled(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	r, w := io.Pipe()
@@ -229,8 +234,8 @@ func TestRecoverSnapshot_Cancelled(t *testing.T) {
 	require.Contains(t, err.Error(), "snapshot recovery cancelled")
 }
 
-func TestUpdate_AddColumnFamily(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_AddColumnFamily(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -253,8 +258,8 @@ func TestUpdate_AddColumnFamily(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 }
-func TestUpdate_DropColumnFamily(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_DropColumnFamily(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
@@ -300,8 +305,8 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 }
 
-func TestRead_SingleEntryIntoUpdate(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Read_SingleEntryIntoUpdate(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -329,8 +334,8 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, result)
 }
-func TestUpdate_PutWithTTL(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_PutWithTTL(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -357,8 +362,8 @@ func TestUpdate_PutWithTTL(t *testing.T) {
 	_, err := kv.Update([]statemachine.Entry{entry})
 	require.NoError(t, err)
 }
-func TestUpdate_DropTTLColumnFamily(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_DropTTLColumnFamily(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
@@ -403,8 +408,8 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 }
 
-func TestUpdate_DeleteWithTTL(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_DeleteWithTTL(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -454,8 +459,8 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	_, err = kv.Update([]statemachine.Entry{entry})
 	require.NoError(t, err)
 }
-func TestPutTTLStoresWithExpiration(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_PutTTLStoresWithExpiration(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -488,8 +493,8 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 	require.Equal(t, []byte("ttl_test_value"), val)
 }
 
-func TestTTLExpirationRemovesKey(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_TTLExpirationRemovesKey(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	key := "expiring_key"
@@ -526,8 +531,8 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 	require.Nil(t, val)
 }
 
-func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	key := "delete_ttl_key"
@@ -580,8 +585,8 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 	require.Nil(t, val)
 }
 
-func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	key := "expiredKey"
@@ -600,7 +605,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 			},
 		},
 	}
-	data := encodeCommandR(t, cmd)
+	data := encodeCommand(t, cmd)
 
 	entry := statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
 
@@ -617,7 +622,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 			Op: dragonboat.ClearExpiredTTL,
 		},
 	}
-	data = encodeCommandR(t, clearCmd)
+	data = encodeCommand(t, clearCmd)
 	entry = statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
 	_, err = kv.Update([]statemachine.Entry{entry})
 	if err != nil {
@@ -633,7 +638,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
-func encodeCommandR(t *testing.T, cmd dragonboat.Command) []byte {
+func encodeCommand(t *testing.T, cmd dragonboat.Command) []byte {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	if err != nil {
@@ -641,15 +646,15 @@ func encodeCommandR(t *testing.T, cmd dragonboat.Command) []byte {
 	}
 	return buf.Bytes()
 }
-func TestUpdate_UnknownCommandType(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_UnknownCommandType(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	cmd := dragonboat.Command{
 		Type: 999,
 		CMD:  nil,
 	}
-	data := encodeCommandR(t, cmd)
+	data := encodeCommand(t, cmd)
 
 	entry := statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
 	_, err := kv.Update([]statemachine.Entry{entry})
@@ -657,8 +662,8 @@ func TestUpdate_UnknownCommandType(t *testing.T) {
 	require.Contains(t, err.Error(), "unknown command type")
 }
 
-func TestUpdate_UnknownWriteOp(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Update_UnknownWriteOp(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	cmd := dragonboat.Command{
@@ -673,15 +678,15 @@ func TestUpdate_UnknownWriteOp(t *testing.T) {
 			},
 		},
 	}
-	data := encodeCommandR(t, cmd)
+	data := encodeCommand(t, cmd)
 	entry := statemachine.Entry{Cmd: data, Index: kv.GetLastApplied() + 1}
 
 	_, err := kv.Update([]statemachine.Entry{entry})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown W Operation")
 }
-func TestRecoverFromSnapshot_InvalidData(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_RecoverFromSnapshot_InvalidData(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	data := []byte("not-a-valid-gob")
@@ -692,22 +697,22 @@ func TestRecoverFromSnapshot_InvalidData(t *testing.T) {
 	require.Contains(t, err.Error(), "decode failed")
 }
 
-type failingRocksdbImpl struct {
+type failingImpl struct {
 	dragonboat.KVStateMachineImpl
 }
 
-func (f *failingRocksdbImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.Command, error) {
+func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.Command, error) {
 	return nil, errors.New("simulated update error")
 }
-func (f *failingRocksdbImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {
+func (f *failingImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {
 	return dragonboat.RK_Command{}, nil
 }
-func (f *failingRocksdbImpl) OpenDB(string) (db.KVStore, error) {
+func (f *failingImpl) OpenDB(string) (db.KVStore, error) {
 	return nil, nil
 }
 
-func TestLookup_Search_MultipleResults(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	// Insert some entries
@@ -723,7 +728,7 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 			Type: dragonboat.RW,
 			CMD:  dragonboat.RWK_Command{Op: dragonboat.Write, CMD: entry},
 		}
-		data := encodeCommandR(t, cmd)
+		data := encodeCommand(t, cmd)
 		_, err := kv.Update([]statemachine.Entry{{Cmd: data, Index: kv.GetLastApplied() + 1}})
 		require.NoError(t, err)
 	}
@@ -743,8 +748,8 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 	require.Len(t, paged.Data, 3)
 }
 
-func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
+	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	// Insert 3 TTL entries: one expired, two valid
@@ -753,9 +758,9 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 		value string
 		ttl   int
 	}{
-		{"k:1", "v1", 1}, // expired
-		{"k:2", "v2", 30},
-		{"k:3", "v3", 30},
+		{"k1", "v1", 1}, // expired
+		{"k2", "v2", 30},
+		{"k3", "v3", 30},
 	}
 
 	for _, e := range entries {
@@ -773,14 +778,14 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 			},
 		}
 
-		data := encodeCommandR(t, cmd)
+		data := encodeCommand(t, cmd)
 		_, err := kv.Update([]statemachine.Entry{{Cmd: data, Index: kv.GetLastApplied() + 1}})
 		require.NoError(t, err)
 	}
 	time.Sleep(2 * time.Second)
 
 	query := dragonboat.RK_Command{
-		KeyPatter:        "k:*",
+		KeyPatter:        "k*",
 		ColumnFamilyName: db.MasterEventFC,
 		Cursor:           "",
 		Limit:            10,

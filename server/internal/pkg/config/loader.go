@@ -27,6 +27,8 @@ Available Flags:
   --replica			 Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.
   --role			 Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.
   --self-member-addr The network address (in ip:port format) that this node will use for communication with other members in the cluster.
+  --master-db-engine         The database engine for the master database (e.g., "pebble", "rocksdb"). Defaults to "pebble".
+  --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "rocksdb"). Defaults to "pebble".
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -40,6 +42,8 @@ Environment Variables:
   JOIN                         Set to "true" if the node is joining an existing cluster.
   CONNECTOR_PORT               Port for the connector service.
   TTL_INTERNAL_ERROR           TTL for internal error caching in seconds.
+  MASTER_DB_ENGINE             The database engine for the master database.
+  TENANT_DB_ENGINE             The database engine for tenant databases.
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -58,6 +62,8 @@ Configuration File:
     initial_members
     join
     ttl_internal_error
+    master_db_engine
+    tenant_db_engine
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -88,6 +94,12 @@ var ReplicaIDFlag = flag.Uint64("replica", 0, "Unique identifier (positive integ
 
 // ConnectorPortFlag defines the --connector-port command-line flag for specifying the connector service port.
 var ConnectorPortFlag = flag.Int("connector-port", 0, "The network port on which the connector service will listen for external client connections. Overrides the 'connector_port' value from the configuration file and the CONNECTOR_PORT environment variable.")
+
+// MasterDBEngineFlag defines the --master-db-engine command-line flag for specifying the master database engine.
+var MasterDBEngineFlag = flag.String(constants.MasterDBEngineFlagName, "", "The database engine for the master database (e.g., \"pebble\", \"rocksdb\").")
+
+// TenantDBEngineFlag defines the --tenant-db-engine command-line flag for specifying the tenant database engine.
+var TenantDBEngineFlag = flag.String(constants.TenantDBEngineFlagName, "", "The database engine for tenant databases (e.g., \"pebble\", \"rocksdb\").")
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
@@ -129,8 +141,7 @@ func LoadDefaultConfiguration() error {
 			log.Info().
 				Str("path", configFilePath).
 				Msg("✅ Using config file")
-			cfg, err := LoadConfigFromPath(configFilePath)
-			config = cfg
+			cfgFromFile, err := LoadConfigFromPath(configFilePath) // Changed variable name to avoid conflict
 			if err != nil {
 				log.Error().
 					Str("path", configFilePath).
@@ -138,6 +149,7 @@ func LoadDefaultConfiguration() error {
 					Msg("⚠️ Failed to load config file")
 				return err
 			}
+			config = cfgFromFile // Assign to the main config object
 		} else {
 			log.Error().
 				Str("path", configFilePath).
@@ -147,6 +159,7 @@ func LoadDefaultConfiguration() error {
 		}
 	}
 
+	// Environment variables override config file
 	if envVal := os.Getenv(constants.EnvVarReplicaId); envVal != "" {
 		replicaID, err := strconv.ParseUint(envVal, 10, 64)
 		if err != nil {
@@ -199,14 +212,15 @@ func LoadDefaultConfiguration() error {
 		config.DefaultRootPassword = os.Getenv(constants.EnvVarDefaultRootPassword)
 	}
 
-	if config.DefaultRootUser == "" {
-		config.DefaultRootUser = "admin"
+	if envVal := os.Getenv(constants.EnvVarMasterDBEngine); envVal != "" {
+		config.MasterDBEngine = envVal
 	}
 
-	if config.DefaultRootPassword == "" {
-		config.DefaultRootPassword = "admin"
+	if envVal := os.Getenv(constants.EnvVarTenantDBEngine); envVal != "" {
+		config.TenantDBEngine = envVal
 	}
-	/* overwrite using flags */
+
+	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
 	}
@@ -230,6 +244,29 @@ func LoadDefaultConfiguration() error {
 		config.ConnectorPort = *ConnectorPortFlag
 	}
 
+	if *MasterDBEngineFlag != "" {
+		config.MasterDBEngine = *MasterDBEngineFlag
+	}
+
+	if *TenantDBEngineFlag != "" {
+		config.TenantDBEngine = *TenantDBEngineFlag
+	}
+
+	// Apply defaults if values are not set by any source
+	if config.DefaultRootUser == "" {
+		config.DefaultRootUser = "admin"
+	}
+	if config.DefaultRootPassword == "" {
+		config.DefaultRootPassword = "admin"
+	}
+	if config.MasterDBEngine == "" {
+		config.MasterDBEngine = "pebble"
+	}
+	if config.TenantDBEngine == "" {
+		config.TenantDBEngine = "pebble"
+	}
+
+	// Specific default logic for cluster setup
 	if !config.Join && config.SelfMemberAddr == "" && config.InitialMembers == "" && config.ReplicaID == 0 {
 		if config.SelfMemberAddr == "" {
 			config.SelfMemberAddr = "127.0.0.1:7001"
@@ -343,6 +380,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.ttl_internal_error = ttl
+
+		case constants.ConfigMasterDBEngineKey:
+			cfg.master_db_engine = v
+
+		case constants.ConfigTenantDBEngineKey:
+			cfg.tenant_db_engine = v
 		}
 	}
 

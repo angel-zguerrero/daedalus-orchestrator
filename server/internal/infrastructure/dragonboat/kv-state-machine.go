@@ -304,6 +304,10 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 			return nil, errors.New("lookup returned valid result when DiskKV is already closed")
 		}
 
+		if err != nil {
+			return nil, err
+		}
+
 		switch query.Op {
 
 		case GetOp:
@@ -367,7 +371,6 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 				return data, err
 			}
 		case SearchTTL:
-
 			var resultData []db.KeyValuePair
 			cursor := query.Cursor
 			remaining := int(query.Limit)

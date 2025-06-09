@@ -102,19 +102,14 @@ func OpenRocksDB(
 	var currentColumnFamilies []string
 	uniqueCF := make(map[string]struct{})
 
-	fmt.Println("antes del if")
 	if exists, _ := utils.DirExists(filepath.Join(dbPath, "CURRENT")); exists {
-		fmt.Println("SIII existe")
 		currentColumnFamilies, err = grocksdb.ListColumnFamilies(opts, dbPath)
 		if err != nil {
-			fmt.Println("Error aqui????", err)
 			return nil, nil, nil, err
 		}
 		for _, cf := range currentColumnFamilies {
 			uniqueCF[cf] = struct{}{}
 		}
-	} else {
-		fmt.Println("no existe ?????")
 	}
 
 	for _, cf := range columnFamilyNames {
@@ -666,16 +661,13 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle)
 
 	nowMillis := time.Now().UnixMilli()
 	prefix := []byte(PrefixTTLIndex)
-	log.Debug().Msg("-------> PrefixTTLIndex")
-	log.Debug().Interface("PrefixTTLIndex", PrefixTTLIndex).Msg("")
+
 	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 		key := it.Key()
 		keyBytes := append([]byte(nil), key.Data()...)
 		key.Free()
 
 		keyStr := string(keyBytes)
-		log.Debug().Msg("------>  keyStr")
-		log.Debug().Str("keyStr", keyStr).Msg("")
 		trimmed := strings.TrimPrefix(keyStr, PrefixTTLIndex)
 		sepIdx := strings.IndexByte(trimmed, ':')
 		if sepIdx <= 0 || sepIdx >= len(trimmed)-1 {

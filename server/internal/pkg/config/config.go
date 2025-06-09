@@ -26,6 +26,10 @@ type Config struct {
 	DefaultRootUser string
 	// DefaultRootPassword is the password for the default administrative user.
 	DefaultRootPassword string
+	// MasterDBEngine specifies the database engine for the master database.
+	MasterDBEngine string
+	// TenantDBEngine specifies the database engine for tenant databases.
+	TenantDBEngine string
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
@@ -41,6 +45,8 @@ type ConfigFromMap struct {
 	ttl_internal_error    uint64
 	default_root_user     string
 	default_root_password string
+	master_db_engine      string
+	tenant_db_engine      string
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -62,6 +68,8 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		TTLInternalError:    configFromMapInstance.ttl_internal_error,
 		DefaultRootUser:     configFromMapInstance.default_root_user,
 		DefaultRootPassword: configFromMapInstance.default_root_password,
+		MasterDBEngine:      configFromMapInstance.master_db_engine,
+		TenantDBEngine:      configFromMapInstance.tenant_db_engine,
 	}
 	return c
 }
