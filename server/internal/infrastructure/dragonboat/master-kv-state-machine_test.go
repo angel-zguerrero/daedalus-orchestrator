@@ -754,7 +754,7 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 	require.Len(t, paged.Data, 3)
 }
 
-func _TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
+func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	kv := setupKV(t)
 	defer kv.Close()
 
