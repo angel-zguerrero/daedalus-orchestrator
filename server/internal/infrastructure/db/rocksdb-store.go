@@ -146,7 +146,6 @@ func OpenRocksDB(
 		cfOpts[i] = grocksdb.NewDefaultOptions()
 		defer cfOpts[i].Destroy()
 	}
-	fmt.Println("antes de OpenDbColumnFamilies ", allCFs)
 	db, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, allCFs, cfOpts)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error opening database: %v", err)
@@ -189,26 +188,70 @@ type RocksdbStore struct {
 //   - nil if the key is not found.
 //   - An error if the specified column family does not exist or if any other RocksDB error occurs.
 func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
-	cf, ok := r.ColumnFamilyHandles[columnFamily]
-	if !ok {
-		cf, ok = r.TTLColumnFamilyHandles[columnFamily]
-		if !ok {
-			return nil, fmt.Errorf("column family %s not found", columnFamily)
-		}
+	cf, isTTL, err := r.resolveColumnFamily(columnFamily)
+	if err != nil {
+		return nil, err
 	}
-	r.DB.GetColumnFamilyMetadata()
+
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
+
+	if !isTTL {
+		return r.getValue(cf, ro, key)
+	}
+
+	// TTL logic
+	if expired, err := r.isTTLKeyExpired(cf, ro, key); err != nil || expired {
+		return nil, err
+	}
+
+	return r.getValue(cf, ro, fmt.Sprintf("%s%s", PrefixData, key))
+}
+
+// resolveColumnFamily returns the column family handle and whether it's TTL
+func (r *RocksdbStore) resolveColumnFamily(columnFamily string) (*grocksdb.ColumnFamilyHandle, bool, error) {
+	if cf, ok := r.ColumnFamilyHandles[columnFamily]; ok {
+		return cf, false, nil
+	}
+	if cf, ok := r.TTLColumnFamilyHandles[columnFamily]; ok {
+		return cf, true, nil
+	}
+	return nil, false, fmt.Errorf("column family %s not found", columnFamily)
+}
+
+// getValue safely retrieves and copies data for a given key
+func (r *RocksdbStore) getValue(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, key string) ([]byte, error) {
 	slice, err := r.DB.GetCF(ro, cf, []byte(key))
 	if err != nil {
 		return nil, err
 	}
 	defer slice.Free()
-	if slice.Exists() {
-		data := append([]byte(nil), slice.Data()...)
-		return data, nil
+
+	if !slice.Exists() {
+		return nil, nil
 	}
-	return nil, nil
+	return append([]byte(nil), slice.Data()...), nil
+}
+
+// isTTLKeyExpired checks if the TTL key is expired
+func (r *RocksdbStore) isTTLKeyExpired(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, key string) (bool, error) {
+	expireKey := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
+	slice, err := r.DB.GetCF(ro, cf, []byte(expireKey))
+	if err != nil {
+		return false, err
+	}
+	defer slice.Free()
+
+	if !slice.Exists() {
+		return true, nil
+	}
+
+	expireAt, err := strconv.ParseInt(string(slice.Data()), 10, 64)
+	if err != nil {
+		return false, fmt.Errorf("invalid expire timestamp: %w", err)
+	}
+
+	return time.Now().UnixMilli() > expireAt, nil
 }
 
 func (r *RocksdbStore) Delete(columnFamily, key string) error {

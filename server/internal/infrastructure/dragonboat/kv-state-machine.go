@@ -343,27 +343,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 		case GetOpTTL:
 			var data []byte
 
-			expireKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, query.Key)
-			expireBytes, err := kv_store.Get(query.ColumnFamilyName, expireKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read expire key: %w", err)
-			}
-			if len(expireBytes) == 0 {
-				return nil, nil
-			}
-
-			expireAt, err := strconv.ParseInt(string(expireBytes), 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid expire timestamp: %w", err)
-			}
-
-			if time.Now().UnixMilli() > expireAt {
-				return nil, nil
-			}
-
-			dataKey := fmt.Sprintf("%s%s", db.PrefixData, query.Key)
-			data, err = kv_store.Get(query.ColumnFamilyName, dataKey)
-
+			data, err = kv_store.Get(query.ColumnFamilyName, query.Key)
 			if err != nil {
 				return nil, err
 			}
@@ -389,15 +369,11 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 
 				for _, pair := range pairs {
 					key := strings.TrimPrefix(pair.Key, db.PrefixData)
-					expireKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, key)
-
-					expireBytes, err := kv_store.Get(query.ColumnFamilyName, expireKey)
-					if err != nil || len(expireBytes) == 0 {
-						continue
+					value, err := kv_store.Get(query.ColumnFamilyName, key)
+					if err != nil {
+						return nil, err
 					}
-
-					expireAt, err := strconv.ParseInt(string(expireBytes), 10, 64)
-					if err != nil || time.Now().UnixMilli() > expireAt {
+					if value == nil {
 						continue
 					}
 
