@@ -232,23 +232,9 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			case DeleteOp:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			case DeleteOpTTL:
-				ttlExpireIndexKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, wCmd.Key)
-				oldTTLBytes, err := kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
-				if err != nil {
-					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
+				if err := kv_store.Delete(wCmd.ColumnFamilyName, wCmd.Key); err != nil {
+					return nil, err
 				}
-
-				if oldTTLBytes != nil {
-					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
-					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, oldTTLMillis, wCmd.Key)
-						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
-					}
-				}
-
-				ttlRealKey := fmt.Sprintf("%s%s", db.PrefixData, wCmd.Key)
-				batch.Delete(wCmd.ColumnFamilyName, ttlRealKey)
-				batch.Delete(wCmd.ColumnFamilyName, ttlExpireIndexKey)
 			default:
 				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
 

@@ -601,7 +601,7 @@ func (ps *PebbleStore) Delete(columnFamily, key string) error {
 	}
 
 	// Data key: actualCfPrefix + key
-	dataKey := append(actualCfPrefix, []byte("")...)
+	dataKey := append(actualCfPrefix, []byte(PrefixData)...)
 	dataKey = append(dataKey, []byte(key)...)
 	if err := b.Delete(dataKey, nil); err != nil {
 		return fmt.Errorf("Delete: failed to add data key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)

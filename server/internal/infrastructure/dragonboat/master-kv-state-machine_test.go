@@ -5,6 +5,8 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/shared/constants"
 	"encoding/binary"
 	"encoding/gob"
 	"errors"
@@ -23,8 +25,18 @@ func TestOne(t *testing.T) {
 
 	//time.Sleep(10 * time.Second)
 }
+func setupKVMaster(t *testing.T, engine string) *dragonboat.KVBaseStateMachine {
+	t.Helper()
+	t.Setenv(constants.EnvVarMasterDBEngine, engine)
+	config.LoadDefaultConfiguration()
+	kv := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine)
+	stopc := make(chan struct{})
+	_, err := kv.Open(stopc)
+	require.NoError(t, err)
+	return kv
+}
 func TestOpen_Close(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 
 	err := kv.Close()
 	require.NoError(t, err)
@@ -35,7 +47,7 @@ func TestOpen_Close(t *testing.T) {
 }
 
 func TestUpdate_SingleEntry(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -66,7 +78,7 @@ func TestUpdate_SingleEntry(t *testing.T) {
 }
 
 func TestUpdate_AfterClose_Panics(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	_ = kv.Close()
 
 	require.Panics(t, func() {
@@ -75,7 +87,7 @@ func TestUpdate_AfterClose_Panics(t *testing.T) {
 }
 
 func TestLookup_ExistingKey(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -111,7 +123,7 @@ func TestLookup_ExistingKey(t *testing.T) {
 }
 
 func TestLookup_NonExistingKey(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	query := dragonboat.RK_Command{
@@ -124,7 +136,7 @@ func TestLookup_NonExistingKey(t *testing.T) {
 }
 
 func TestLookup_InvalidType(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	_, err := kv.Lookup(0)
@@ -132,7 +144,7 @@ func TestLookup_InvalidType(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	err := kv.Sync()
@@ -140,7 +152,7 @@ func TestSync(t *testing.T) {
 }
 
 func TestSaveSnapshotAndRecover(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
@@ -201,7 +213,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 }
 
 func TestSaveSnapshot_Cancelled(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	done := make(chan struct{})
@@ -213,7 +225,7 @@ func TestSaveSnapshot_Cancelled(t *testing.T) {
 }
 
 func TestRecoverSnapshot_Cancelled(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	r, w := io.Pipe()
@@ -230,7 +242,7 @@ func TestRecoverSnapshot_Cancelled(t *testing.T) {
 }
 
 func TestUpdate_AddColumnFamily(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -254,7 +266,7 @@ func TestUpdate_AddColumnFamily(t *testing.T) {
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 }
 func TestUpdate_DropColumnFamily(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
@@ -301,7 +313,7 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 }
 
 func TestRead_SingleEntryIntoUpdate(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -330,7 +342,7 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.Nil(t, result)
 }
 func TestUpdate_PutWithTTL(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -358,7 +370,7 @@ func TestUpdate_PutWithTTL(t *testing.T) {
 	require.NoError(t, err)
 }
 func TestUpdate_DropTTLColumnFamily(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
@@ -404,7 +416,7 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 }
 
 func TestUpdate_DeleteWithTTL(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -455,7 +467,7 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 }
 func TestPutTTLStoresWithExpiration(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
@@ -489,7 +501,7 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 }
 
 func TestTTLExpirationRemovesKey(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	key := "expiring_key"
@@ -527,7 +539,7 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 }
 
 func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	key := "delete_ttl_key"
@@ -581,7 +593,7 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 }
 
 func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	key := "expiredKey"
@@ -642,7 +654,7 @@ func encodeCommandR(t *testing.T, cmd dragonboat.Command) []byte {
 	return buf.Bytes()
 }
 func TestUpdate_UnknownCommandType(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	cmd := dragonboat.Command{
@@ -658,7 +670,7 @@ func TestUpdate_UnknownCommandType(t *testing.T) {
 }
 
 func TestUpdate_UnknownWriteOp(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	cmd := dragonboat.Command{
@@ -681,7 +693,7 @@ func TestUpdate_UnknownWriteOp(t *testing.T) {
 	require.Contains(t, err.Error(), "unknown W Operation")
 }
 func TestRecoverFromSnapshot_InvalidData(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	data := []byte("not-a-valid-gob")
@@ -707,7 +719,7 @@ func (f *failingRocksdbImpl) OpenDB(string) (db.KVStore, error) {
 }
 
 func TestLookup_Search_MultipleResults(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	// Insert some entries
@@ -744,7 +756,7 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 }
 
 func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
-	kv := setupKV(t, "rocksdb")
+	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	// Insert 3 TTL entries: one expired, two valid
