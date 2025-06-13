@@ -208,9 +208,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			case DeleteOp:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			case DeleteOpTTL:
-				if err := kv_store.Delete(wCmd.ColumnFamilyName, wCmd.Key); err != nil {
-					return nil, err
-				}
+				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			default:
 				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
 

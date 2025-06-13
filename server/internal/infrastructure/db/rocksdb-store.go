@@ -291,18 +291,12 @@ func (r *RocksdbStore) Delete(columnFamily, key string) error {
 			oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
 			if err == nil {
 				oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, oldTTLMillis, key)
-				fmt.Println("oldTTLIndexKey")
-				fmt.Println(oldTTLIndexKey)
 				rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
 			}
 		}
 
 		ttlRealKey := fmt.Sprintf("%s%s", PrefixData, key)
-		fmt.Println("ttlRealKey")
-		fmt.Println(ttlRealKey)
 		rocksBatch.DeleteCF(cf, []byte(ttlRealKey))
-		fmt.Println("ttlExpireIndexKey")
-		fmt.Println(ttlExpireIndexKey)
 		rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
 		wo := grocksdb.NewDefaultWriteOptions()
 		defer wo.Destroy()
@@ -540,6 +534,26 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 		case "delete":
 			if !isTTL {
 				rocksBatch.DeleteCF(cf, []byte(op.Key))
+			} else {
+				ro := grocksdb.NewDefaultReadOptions()
+				defer ro.Destroy()
+				ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)
+				oldTTLBytes, err := r.getValue(cf, ro, ttlExpireIndexKey)
+				if err != nil {
+					return err
+				}
+
+				if oldTTLBytes != nil {
+					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+					if err == nil {
+						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, oldTTLMillis, op.Key)
+						rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
+					}
+				}
+
+				ttlRealKey := fmt.Sprintf("%s%s", PrefixData, op.Key)
+				rocksBatch.DeleteCF(cf, []byte(ttlRealKey))
+				rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
 			}
 		default:
 			return fmt.Errorf("unsupported operation type: %s", op.Type)
