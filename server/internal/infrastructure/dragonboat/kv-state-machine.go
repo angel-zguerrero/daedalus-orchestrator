@@ -204,9 +204,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value)
 			case PutOpTTL:
-				if err := kv_store.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL); err != nil {
-					return nil, err
-				}
+				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL)
 			case DeleteOp:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			case DeleteOpTTL:

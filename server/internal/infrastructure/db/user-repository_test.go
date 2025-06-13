@@ -60,6 +60,11 @@ func (m *MockKVStore) Write(batch *db.WriteBatch) error {
 	return args.Error(0)
 }
 
+func (m *MockKVStore) WriteRaw(batch *db.WriteBatch) error {
+	args := m.Called(batch)
+	return args.Error(0)
+}
+
 func (m *MockKVStore) DumpAll() (interface{}, error) {
 	args := m.Called()
 	var s []byte

@@ -5,6 +5,7 @@ type X struct {
 	Key   string
 	Value []byte
 	Type  string
+	TTL   int
 }
 
 // WriteBatch represents a batch of write operations to be applied atomically.
@@ -25,6 +26,16 @@ func (wb *WriteBatch) Put(columnFamily string, key string, value []byte) {
 		Key:   key,
 		Value: value,
 		Type:  "put",
+	})
+}
+
+func (wb *WriteBatch) PutTTl(columnFamily string, key string, value []byte, ttl int) {
+	wb.Data = append(wb.Data, X{
+		CF:    columnFamily,
+		Key:   key,
+		Value: value,
+		Type:  "put",
+		TTL:   ttl,
 	})
 }
 
@@ -76,6 +87,8 @@ type KVStore interface {
 	// Returns:
 	//   - An error if any occurred during the operation.
 	Write(batch *WriteBatch) error // TODO: Use a more specific type like WriteBatch if possible
+
+	WriteRaw(batch *WriteBatch) error
 
 	SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error)
 
