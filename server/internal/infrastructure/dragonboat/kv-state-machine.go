@@ -161,7 +161,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	for i, cmd := range commands {
 		switch cmd.Type {
-		case DLL_FC:
+		case DDL_FC:
 			dllFCEntries = append(dllFCEntries, i)
 		case RW:
 			rwEntries = append(rwEntries, i)
@@ -284,7 +284,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				query.ColumnFamilyName,
-				query.KeyPatter,
+				query.KeyPattern,
 				query.Cursor,
 				int(query.Limit),
 			)
@@ -316,7 +316,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 			remaining := int(query.Limit)
 
 			for remaining > 0 {
-				keyPatter := fmt.Sprintf("%s%s", db.PrefixData, query.KeyPatter)
+				keyPatter := fmt.Sprintf("%s%s", db.PrefixData, query.KeyPattern)
 				pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 					query.ColumnFamilyName,
 					keyPatter,

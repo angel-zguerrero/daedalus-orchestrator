@@ -247,7 +247,7 @@ func TestUpdate_AddColumnFamily(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
-		Type: dragonboat.DLL_FC,
+		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "new_cf",
 			Op:               dragonboat.Add_CF_Op,
@@ -271,7 +271,7 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	{
 		var buf bytes.Buffer
 		cmd := dragonboat.Command{
-			Type: dragonboat.DLL_FC,
+			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
@@ -292,7 +292,7 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
-		Type: dragonboat.DLL_FC,
+		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 
 			ColumnFamilyName: "to_delete_cf",
@@ -375,7 +375,7 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	{
 		var buf bytes.Buffer
 		cmd := dragonboat.Command{
-			Type: dragonboat.DLL_FC,
+			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
@@ -396,7 +396,7 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
-		Type: dragonboat.DLL_FC,
+		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
 			Op:               dragonboat.Remove_TTL_CF_Op,
@@ -742,7 +742,7 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 
 	// Search with pattern "user:"
 	query := dragonboat.RK_Command{
-		KeyPatter:        "user:*",
+		KeyPattern:       "user:*",
 		ColumnFamilyName: db.DefaultFC,
 		Cursor:           "",
 		Limit:            10,
@@ -792,7 +792,7 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	query := dragonboat.RK_Command{
-		KeyPatter:        "k:*",
+		KeyPattern:       "k:*",
 		ColumnFamilyName: db.MasterEventFC,
 		Cursor:           "",
 		Limit:            10,
