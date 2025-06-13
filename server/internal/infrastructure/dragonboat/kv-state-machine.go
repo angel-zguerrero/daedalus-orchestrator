@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -205,30 +204,9 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value)
 			case PutOpTTL:
-				ttlMillis := time.Now().Add(time.Duration(wCmd.TTL) * time.Second).UnixMilli()
-
-				ttlRealKey := fmt.Sprintf("%s%s", db.PrefixData, wCmd.Key)
-				ttlExpireIndexKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, wCmd.Key)
-
-				oldTTLBytes, err := kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
-				if err != nil {
-					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
+				if err := kv_store.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL); err != nil {
+					return nil, err
 				}
-				if oldTTLBytes != nil {
-					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
-					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, oldTTLMillis, wCmd.Key)
-						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
-					}
-				}
-
-				batch.Put(wCmd.ColumnFamilyName, ttlRealKey, wCmd.Value)
-
-				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, ttlMillis, wCmd.Key)
-				batch.Put(wCmd.ColumnFamilyName, newTTLIndexKey, nil)
-
-				batch.Put(wCmd.ColumnFamilyName, ttlExpireIndexKey, []byte(strconv.FormatInt(ttlMillis, 10)))
-
 			case DeleteOp:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			case DeleteOpTTL:
@@ -504,7 +482,7 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 			return fmt.Errorf("decode failed: %w", err)
 		}
 
-		if err := kv_store.Put(entry.CFName, string(entry.Key), entry.Value); err != nil {
+		if err := kv_store.PutRaw(entry.CFName, string(entry.Key), entry.Value); err != nil {
 			kv_store.Close()
 			os.RemoveAll(dbdir)
 			return fmt.Errorf("put failed during snapshot recovery for CF %s, Key %s: %w", entry.CFName, string(entry.Key), err)

@@ -45,7 +45,12 @@ func (r *MockKVStore) Exists(columnFamily, key string) (bool, error) {
 	return val != nil, nil
 }
 
-func (m *MockKVStore) Put(AdminFC, key string, value []byte) error {
+func (m *MockKVStore) Put(AdminFC, key string, value []byte, ttl int) error {
+	args := m.Called(AdminFC, key, value, ttl)
+	return args.Error(0)
+}
+
+func (m *MockKVStore) PutRaw(AdminFC, key string, value []byte) error {
 	args := m.Called(AdminFC, key, value)
 	return args.Error(0)
 }
@@ -98,7 +103,7 @@ func TestPutUser_Success(t *testing.T) {
 
 	user := models.CreateUser{Username: "foo", Email: "foo@mail.com", Password: "1234"}
 
-	mockStore.On("Put", db.AdminFC, "user:foo", mock.Anything).Return(nil)
+	mockStore.On("Put", db.AdminFC, "user:foo", mock.Anything, 0).Return(nil)
 
 	err := db.PutUser(mockStore, user)
 	assert.NoError(t, err)
@@ -231,7 +236,7 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 	}
 	userKey := fmt.Sprintf("user:%s", userInput.Username)
 
-	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8")).Return(errors.New("kv put failed")).Once()
+	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8"), 0).Return(errors.New("kv put failed")).Once()
 
 	err := db.PutUser(store, userInput)
 

@@ -65,7 +65,9 @@ type KVStore interface {
 	//   - value: The value to store as a byte slice.
 	// Returns:
 	//   - An error if any occurred during the operation.
-	Put(columnFamily string, key string, value []byte) error
+	Put(columnFamily string, key string, value []byte, ttl int) error
+
+	PutRaw(columnFamily string, key string, value []byte) error
 
 	// Write applies a batch of operations (e.g., Puts, Deletes) atomically.
 	// The exact type of `batch` depends on the KVStore implementation.

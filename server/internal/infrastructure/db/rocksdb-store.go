@@ -208,6 +208,18 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	return r.getValue(cf, ro, fmt.Sprintf("%s%s", PrefixData, key))
 }
 
+func (r *RocksdbStore) GetRaw(columnFamily, key string) ([]byte, error) {
+	cf, _, err := r.resolveColumnFamily(columnFamily)
+	if err != nil {
+		return nil, err
+	}
+
+	ro := grocksdb.NewDefaultReadOptions()
+	defer ro.Destroy()
+
+	return r.getValue(cf, ro, key)
+}
+
 // resolveColumnFamily returns the column family handle and whether it's TTL
 func (r *RocksdbStore) resolveColumnFamily(columnFamily string) (*grocksdb.ColumnFamilyHandle, bool, error) {
 	if cf, ok := r.ColumnFamilyHandles[columnFamily]; ok {
@@ -424,28 +436,50 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 //
 // Returns:
 //   - An error if the specified column family does not exist or if any other RocksDB error occurs during the put operation.
-func (r *RocksdbStore) Put(columnFamily, key string, value []byte) error {
-
-	// Ensure column family exists in the new DB before putting data
-	if _, ok := r.currentCFs[columnFamily]; !ok {
-		// Attempt to create the column family.
-		// This assumes default options. Specific options would require more info from snapshot or config.
-		// Also, it doesn't distinguish between normal and TTL CFs based on snapshot data alone.
-		// This is a simplification; a full solution might need DDL commands in the snapshot
-		// or a pre-defined schema.
-		opts := grocksdb.NewDefaultOptions()
-		// Note: opts should be destroyed, but its lifecycle here is tricky.
-		// Ideally, CF creation is less dynamic or handled by the stateMachineImpl.
-		newCfHandle, createErr := r.DB.CreateColumnFamily(opts, columnFamily)
-		opts.Destroy()
-		if createErr != nil {
-			return createErr
-		}
-		// Assuming it's a normal CF. If it needs to be TTL, that info isn't in this basic entry.
-		r.ColumnFamilyHandles[columnFamily] = newCfHandle
-		r.currentCFs[columnFamily] = true
+func (r *RocksdbStore) Put(columnFamily, key string, value []byte, ttl int) error {
+	cf, isTTL, err := r.resolveColumnFamily(columnFamily)
+	if err != nil {
+		return err
 	}
+	if !isTTL {
+		wo := grocksdb.NewDefaultWriteOptions()
+		defer wo.Destroy()
+		return r.DB.PutCF(wo, cf, []byte(key), value)
+	} else {
+		rocksBatch := grocksdb.NewWriteBatch()
+		defer rocksBatch.Destroy()
 
+		wo := grocksdb.NewDefaultWriteOptions()
+		defer wo.Destroy()
+
+		ttlMillis := time.Now().Add(time.Duration(ttl) * time.Second).UnixMilli()
+
+		ttlRealKey := fmt.Sprintf("%s%s", PrefixData, key)
+		ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
+
+		oldTTLBytes, err := r.GetRaw(columnFamily, ttlExpireIndexKey)
+		if err != nil {
+			return err
+		}
+		if oldTTLBytes != nil {
+			oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+			if err == nil {
+				oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, oldTTLMillis, key)
+				rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
+			}
+		}
+
+		rocksBatch.PutCF(cf, []byte(ttlRealKey), value)
+
+		newTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, ttlMillis, key)
+		rocksBatch.PutCF(cf, []byte(newTTLIndexKey), nil)
+
+		rocksBatch.PutCF(cf, []byte(ttlExpireIndexKey), []byte(strconv.FormatInt(ttlMillis, 10)))
+		return r.DB.Write(wo, rocksBatch)
+	}
+}
+
+func (r *RocksdbStore) PutRaw(columnFamily string, key string, value []byte) error {
 	cf, ok := r.ColumnFamilyHandles[columnFamily]
 	if !ok {
 		cf, ok = r.TTLColumnFamilyHandles[columnFamily]

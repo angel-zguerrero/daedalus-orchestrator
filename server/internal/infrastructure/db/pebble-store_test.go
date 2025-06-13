@@ -18,7 +18,7 @@ func TestPebbleStore_PutAndGet(t *testing.T) {
 	key := "key"
 	value := []byte("value")
 
-	err = store.Put(TestFC, key, value)
+	err = store.Put(TestFC, key, value, 0)
 	require.NoError(t, err)
 
 	result, err := store.Get(TestFC, key)
@@ -65,7 +65,7 @@ func TestPebbleStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 
-	require.NoError(t, store.Put(TestFC, "user:123:name", []byte("Alice")))
+	require.NoError(t, store.Put(TestFC, "user:123:name", []byte("Alice"), 0))
 
 	results, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:123:*", "", 10)
 	require.NoError(t, err)
@@ -81,9 +81,9 @@ func TestPebbleStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T)
 	require.NoError(t, err)
 	defer store.Close()
 
-	require.NoError(t, store.Put(TestFC, "user:1", []byte("a")))
-	require.NoError(t, store.Put(TestFC, "user:2", []byte("b")))
-	require.NoError(t, store.Put(TestFC, "user:3", []byte("c")))
+	require.NoError(t, store.Put(TestFC, "user:1", []byte("a"), 0))
+	require.NoError(t, store.Put(TestFC, "user:2", []byte("b"), 0))
+	require.NoError(t, store.Put(TestFC, "user:3", []byte("c"), 0))
 
 	var all []db.KeyValuePair
 	cursor := ""
@@ -105,7 +105,7 @@ func TestPebbleStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 
-	require.NoError(t, store.Put(TestFC, "product:1", []byte("item")))
+	require.NoError(t, store.Put(TestFC, "product:1", []byte("item"), 0))
 
 	results, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:*", "", 10)
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestPebbleStore_Delete_ExistingKey(t *testing.T) {
 	key := "delete-key"
 	value := []byte("to-delete")
 
-	require.NoError(t, store.Put(TestFC, key, value))
+	require.NoError(t, store.Put(TestFC, key, value, 0))
 	require.NoError(t, store.Delete(TestFC, key))
 
 	result, err := store.Get(TestFC, key)
@@ -171,7 +171,7 @@ func TestPebbleStore_Delete_TTLColumnFamily(t *testing.T) {
 	key := "ttl-key"
 	value := []byte("ttl-value")
 
-	require.NoError(t, store.Put(TestFC, key, value))
+	require.NoError(t, store.Put(TestFC, key, value, 0))
 	require.NoError(t, store.Delete(TestFC, key))
 
 	result, err := store.Get(TestFC, key)

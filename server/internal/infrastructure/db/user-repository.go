@@ -40,7 +40,7 @@ func PutUser(kvStore KVStore, input models.CreateUser) error {
 	}
 
 	key := "user:" + input.Username
-	err = kvStore.Put(AdminFC, key, userData)
+	err = kvStore.Put(AdminFC, key, userData, 0)
 	return err
 }
 
