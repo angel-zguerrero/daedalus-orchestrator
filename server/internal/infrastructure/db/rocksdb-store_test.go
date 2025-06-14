@@ -75,7 +75,7 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Equal(t, "user:123:name", results[0].Key)
 	assert.Equal(t, []byte("Alice"), results[0].Value)
-	assert.Equal(t, "", next)
+	assert.Equal(t, "user:123:name", next)
 }
 
 func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T) {

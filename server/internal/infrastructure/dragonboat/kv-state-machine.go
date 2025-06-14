@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -292,13 +291,11 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 				return nil, err
 			}
 
-			if len(pairs) > 0 {
-				result := &PagedResultKV{
-					Data:       pairs, // Data ahora es []KeyValuePair
-					NextCursor: []byte(nextCursor),
-				}
-				return result, nil
+			result := &PagedResultKV{
+				Data:       pairs, // Data ahora es []KeyValuePair
+				NextCursor: []byte(nextCursor),
 			}
+			return result, nil
 
 		case GetOpTTL:
 			var data []byte
@@ -311,52 +308,21 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 				return data, err
 			}
 		case SearchTTL:
-			var resultData []db.KeyValuePair
-			cursor := query.Cursor
-			remaining := int(query.Limit)
-
-			for remaining > 0 {
-				keyPatter := fmt.Sprintf("%s%s", db.PrefixData, query.KeyPattern)
-				pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
-					query.ColumnFamilyName,
-					keyPatter,
-					cursor,
-					remaining*2,
-				)
-				if err != nil {
-					return nil, err
-				}
-
-				for _, pair := range pairs {
-					key := strings.TrimPrefix(pair.Key, db.PrefixData)
-					value, err := kv_store.Get(query.ColumnFamilyName, key)
-					if err != nil {
-						return nil, err
-					}
-					if value == nil {
-						continue
-					}
-
-					resultData = append(resultData, pair)
-					remaining--
-
-					if remaining == 0 {
-						cursor = nextCursor
-						break
-					}
-				}
-
-				if nextCursor == "" {
-					cursor = ""
-					break
-				}
-				cursor = nextCursor
+			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
+				query.ColumnFamilyName,
+				query.KeyPattern,
+				query.Cursor,
+				int(query.Limit),
+			)
+			if err != nil {
+				return nil, err
 			}
 
-			return &PagedResultKV{
-				Data:       resultData,
-				NextCursor: []byte(cursor),
-			}, nil
+			result := &PagedResultKV{
+				Data:       pairs, // Data ahora es []KeyValuePair
+				NextCursor: []byte(nextCursor),
+			}
+			return result, nil
 
 		}
 

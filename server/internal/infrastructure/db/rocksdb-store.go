@@ -333,15 +333,16 @@ func (r *RocksdbStore) Exists(columnFamily, key string) (bool, error) {
 //   - A string representing the next cursor (the key of the last item returned), or an empty string if no more results.
 //   - An error if the column family is not found or if an iterator error occurs.
 func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error) {
+
 	var results []KeyValuePair
 	var nextCursor string
+	cf, isTTL, err := r.resolveColumnFamily(cfName)
+	if err != nil {
+		return nil, "", err
+	}
 
-	cf, ok := r.ColumnFamilyHandles[cfName]
-	if !ok {
-		cf, ok = r.TTLColumnFamilyHandles[cfName]
-		if !ok {
-			return nil, "", fmt.Errorf("column family %s not found", cfName)
-		}
+	if isTTL {
+		pattern = fmt.Sprintf("%s%s", PrefixData, pattern)
 	}
 
 	readOpts := grocksdb.NewDefaultReadOptions()
@@ -366,35 +367,40 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		}
 	}
 
-	count := 0
 	for ; iter.Valid(); iter.Next() {
 		key := iter.Key()
 		keyStr := string(key.Data())
 		key.Free()
 
+		// Pattern check
+		match := false
 		if usePrefixMatch {
-			if !strings.HasPrefix(keyStr, prefix) {
+			match = strings.HasPrefix(keyStr, prefix)
+			if !match {
 				break
 			}
 		} else {
-			// fallback to contains/endswith if not prefix pattern
 			switch {
 			case strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*"):
-				if !strings.Contains(keyStr, strings.Trim(pattern, "*")) {
-					continue
-				}
+				match = strings.Contains(keyStr, strings.Trim(pattern, "*"))
 			case strings.HasPrefix(pattern, "*"):
-				if !strings.HasSuffix(keyStr, strings.TrimPrefix(pattern, "*")) {
-					continue
-				}
+				match = strings.HasSuffix(keyStr, strings.TrimPrefix(pattern, "*"))
 			case strings.HasSuffix(pattern, "*"):
-				if !strings.HasPrefix(keyStr, strings.TrimSuffix(pattern, "*")) {
-					continue
-				}
+				match = strings.HasPrefix(keyStr, strings.TrimSuffix(pattern, "*"))
 			default:
-				if keyStr != pattern {
-					continue
-				}
+				match = (keyStr == pattern)
+			}
+		}
+		if !match {
+			continue
+		}
+
+		// TTL check
+		if isTTL {
+			if expired, err := r.isTTLKeyExpired(cf, readOpts, strings.TrimPrefix(keyStr, PrefixData)); err != nil {
+				return nil, "", err
+			} else if expired {
+				continue
 			}
 		}
 
@@ -405,9 +411,8 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		})
 		val.Free()
 
-		count++
-		if count == limit {
-			nextCursor = keyStr
+		nextCursor = keyStr
+		if len(results) >= limit {
 			break
 		}
 	}
@@ -525,7 +530,6 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 						rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
 					}
 				}
-
 				rocksBatch.PutCF(cf, []byte(ttlRealKey), op.Value)
 				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, ttlMillis, op.Key)
 				rocksBatch.PutCF(cf, []byte(newTTLIndexKey), nil)

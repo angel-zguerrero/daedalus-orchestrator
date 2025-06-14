@@ -419,21 +419,21 @@ func (ps *PebbleStore) ClearAll() error {
 // - "*contains*": contains match
 func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error) {
 	var cfPrefix []byte
-	var ok bool
+	var isTTL bool
 
 	resolvedCfName := cfName
 	if resolvedCfName == "" {
 		resolvedCfName = DefaultFC
 	}
 
-	cfPrefix, ok = ps.cfPrefixes[resolvedCfName]
-	if !ok {
-		cfPrefix, ok = ps.ttlCfPrefixes[resolvedCfName]
-		if !ok {
-			// This check is technically redundant if CreatePebbleStore guarantees DefaultFC,
-			// but good for robustness if cfName was something else that wasn't found.
-			return nil, "", fmt.Errorf("column family %s not found", resolvedCfName)
-		}
+	if prefix, ok := ps.cfPrefixes[resolvedCfName]; ok {
+		cfPrefix = prefix
+		isTTL = false
+	} else if prefix, ok := ps.ttlCfPrefixes[resolvedCfName]; ok {
+		cfPrefix = prefix
+		isTTL = true
+	} else {
+		return nil, "", fmt.Errorf("column family %s not found", resolvedCfName)
 	}
 
 	iterOpts := &pebble.IterOptions{
@@ -448,19 +448,13 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 	var nextCursor string
 	count := 0
 
-	// Handle cursor
+	// Manejo de cursor
 	if cursor != "" {
-		// Cursor must be prefixed just like any other key to seek correctly within the CF space
 		cursorBytes := []byte(cursor)
-		startKey := make([]byte, len(cfPrefix)+len(cursorBytes))
-		copy(startKey, cfPrefix)
-		copy(startKey[len(cfPrefix):], cursorBytes)
+		startKey := append(cfPrefix, cursorBytes...)
 
 		if iter.SeekGE(startKey) {
-			// If the cursor key itself is found, we need to start from the *next* key.
-			// Check if the found key is exactly the cursor key.
-			currentRawKey := iter.Key()
-			if bytes.Equal(currentRawKey, startKey) {
+			if bytes.Equal(iter.Key(), startKey) {
 				iter.Next()
 			}
 		}
@@ -468,31 +462,56 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		iter.First()
 	}
 
-	for ; iter.Valid() && count < limit; iter.Next() {
-		rawKey := iter.Key() // This is the full key including cfPrefix
+	for ; iter.Valid(); iter.Next() {
+		if count >= limit {
+			break
+		}
 
-		// Trim prefix to get the actual key string for pattern matching
-		keyBytesWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix)
-		keyStr := string(keyBytesWithoutPrefix)
+		rawKey := iter.Key()
+		keyWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix)
+		keyStr := string(keyWithoutPrefix)
+
+		// Si es TTL, validar expiración
+		if isTTL {
+			// Solo considerar claves con prefijo de datos reales
+			if !bytes.HasPrefix(rawKey, append(cfPrefix, []byte(PrefixData)...)) {
+				continue
+			}
+			actualKey := string(bytes.TrimPrefix(rawKey, append(cfPrefix, []byte(PrefixData)...)))
+			expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+			expireKey = append(expireKey, []byte(actualKey)...)
+
+			expired, err := ps.isTTLKeyExpired(expireKey)
+			if err != nil {
+				return nil, "", fmt.Errorf("SearchByPatternPaginatedKV TTL check error: %w", err)
+			}
+			if expired {
+				continue
+			}
+			keyStr = actualKey // mostrar sin el prefijo "_ttldata:"
+		}
+
+		// Filtrado por patrón
 		matches := false
-		if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") { // Contains
-			if len(pattern) == 1 { // just "*"
+		switch {
+		case strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*"):
+			if len(pattern) == 1 {
 				matches = true
 			} else {
 				matches = strings.Contains(keyStr, strings.Trim(pattern, "*"))
 			}
-		} else if strings.HasSuffix(pattern, "*") { // Prefix
+		case strings.HasSuffix(pattern, "*"):
 			matches = strings.HasPrefix(keyStr, strings.TrimSuffix(pattern, "*"))
-		} else if strings.HasPrefix(pattern, "*") { // Suffix
+		case strings.HasPrefix(pattern, "*"):
 			matches = strings.HasSuffix(keyStr, strings.TrimPrefix(pattern, "*"))
-		} else { // Exact
+		default:
 			matches = (keyStr == pattern)
 		}
 
 		if matches {
-			// Copy value: Pebble's value is only valid until next Iter call or Close.
 			val := make([]byte, len(iter.Value()))
 			copy(val, iter.Value())
+
 			results = append(results, KeyValuePair{Key: keyStr, Value: val})
 			nextCursor = keyStr
 			count++
@@ -503,8 +522,6 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		return nil, "", fmt.Errorf("iterator error in SearchByPatternPaginatedKV: %w", err)
 	}
 
-	// If we found 'limit' items and there might be more, nextCursor is valid.
-	// If we found less than 'limit' items, it means we reached the end, so no next cursor.
 	if count < limit {
 		nextCursor = ""
 	}
