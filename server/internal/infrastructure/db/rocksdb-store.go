@@ -205,7 +205,7 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 		return nil, err
 	}
 
-	return r.getValue(cf, ro, fmt.Sprintf("%s%s", PrefixData, key))
+	return r.getValue(cf, ro, key)
 }
 
 func (r *RocksdbStore) GetRaw(columnFamily, key string) ([]byte, error) {
@@ -295,8 +295,8 @@ func (r *RocksdbStore) Delete(columnFamily, key string) error {
 			}
 		}
 
-		ttlRealKey := fmt.Sprintf("%s%s", PrefixData, key)
-		rocksBatch.DeleteCF(cf, []byte(ttlRealKey))
+		dataKey := key
+		rocksBatch.DeleteCF(cf, []byte(dataKey))
 		rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
 		wo := grocksdb.NewDefaultWriteOptions()
 		defer wo.Destroy()
@@ -339,10 +339,6 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 	cf, isTTL, err := r.resolveColumnFamily(cfName)
 	if err != nil {
 		return nil, "", err
-	}
-
-	if isTTL {
-		pattern = fmt.Sprintf("%s%s", PrefixData, pattern)
 	}
 
 	readOpts := grocksdb.NewDefaultReadOptions()
@@ -397,7 +393,7 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 
 		// TTL check
 		if isTTL {
-			if expired, err := r.isTTLKeyExpired(cf, readOpts, strings.TrimPrefix(keyStr, PrefixData)); err != nil {
+			if expired, err := r.isTTLKeyExpired(cf, readOpts, keyStr); err != nil {
 				return nil, "", err
 			} else if expired {
 				continue
@@ -453,7 +449,7 @@ func (r *RocksdbStore) Put(columnFamily, key string, value []byte, ttl int) erro
 
 		ttlMillis := time.Now().Add(time.Duration(ttl) * time.Second).UnixMilli()
 
-		ttlRealKey := fmt.Sprintf("%s%s", PrefixData, key)
+		dataKey := key
 		ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
 
 		oldTTLBytes, err := r.GetRaw(columnFamily, ttlExpireIndexKey)
@@ -468,7 +464,7 @@ func (r *RocksdbStore) Put(columnFamily, key string, value []byte, ttl int) erro
 			}
 		}
 
-		rocksBatch.PutCF(cf, []byte(ttlRealKey), value)
+		rocksBatch.PutCF(cf, []byte(dataKey), value)
 
 		newTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, ttlMillis, key)
 		rocksBatch.PutCF(cf, []byte(newTTLIndexKey), nil)
@@ -516,7 +512,7 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 			} else {
 				ttlMillis := time.Now().Add(time.Duration(op.TTL) * time.Second).UnixMilli()
 
-				ttlRealKey := fmt.Sprintf("%s%s", PrefixData, op.Key)
+				dataKey := op.Key
 				ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)
 
 				oldTTLBytes, err := r.GetRaw(op.CF, ttlExpireIndexKey)
@@ -530,7 +526,7 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 						rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
 					}
 				}
-				rocksBatch.PutCF(cf, []byte(ttlRealKey), op.Value)
+				rocksBatch.PutCF(cf, []byte(dataKey), op.Value)
 				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, ttlMillis, op.Key)
 				rocksBatch.PutCF(cf, []byte(newTTLIndexKey), nil)
 				rocksBatch.PutCF(cf, []byte(ttlExpireIndexKey), []byte(strconv.FormatInt(ttlMillis, 10)))
@@ -555,8 +551,8 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 					}
 				}
 
-				ttlRealKey := fmt.Sprintf("%s%s", PrefixData, op.Key)
-				rocksBatch.DeleteCF(cf, []byte(ttlRealKey))
+				dataKey := op.Key
+				rocksBatch.DeleteCF(cf, []byte(dataKey))
 				rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
 			}
 		default:
@@ -865,7 +861,7 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle)
 			break
 		}
 
-		dataKey := []byte(PrefixData + originalKey)
+		dataKey := []byte(originalKey)
 		expireRefKey := []byte(PrefixTTLExpire + originalKey)
 
 		ro := grocksdb.NewDefaultReadOptions()

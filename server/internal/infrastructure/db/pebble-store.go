@@ -137,7 +137,7 @@ func (ps *PebbleStore) getPrefixedKey(cfName string, key string) (rawKey []byte,
 	cfPrefixBytes = prefix
 	if isTTL {
 		// e.g., "myTTLCF:" + "_ttldata:" + "actualKey"
-		combinedDataPrefix := bytes.Join([][]byte{prefix, []byte(PrefixData)}, nil)
+		combinedDataPrefix := prefix
 		return append(combinedDataPrefix, []byte(key)...), true, cfPrefixBytes, nil
 	}
 
@@ -327,7 +327,7 @@ func (ps *PebbleStore) CleanExpiredKeys() error {
 
 				// Construct the full prefixed keys for data, expire-ref, and the index itself
 				// Data key: actualCfPrefix + PrefixData + originalKeyStr
-				prefixedDataKey := append(actualCfPrefix, []byte(PrefixData)...)
+				prefixedDataKey := actualCfPrefix
 				prefixedDataKey = append(prefixedDataKey, []byte(originalKeyStr)...)
 
 				// Expire ref key: actualCfPrefix + PrefixTTLExpire + originalKeyStr
@@ -474,10 +474,10 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		// Si es TTL, validar expiración
 		if isTTL {
 			// Solo considerar claves con prefijo de datos reales
-			if !bytes.HasPrefix(rawKey, append(cfPrefix, []byte(PrefixData)...)) {
+			if !bytes.HasPrefix(rawKey, cfPrefix) {
 				continue
 			}
-			actualKey := string(bytes.TrimPrefix(rawKey, append(cfPrefix, []byte(PrefixData)...)))
+			actualKey := string(bytes.TrimPrefix(rawKey, cfPrefix))
 			expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
 			expireKey = append(expireKey, []byte(actualKey)...)
 
@@ -679,7 +679,7 @@ func (ps *PebbleStore) Delete(columnFamily, key string) error {
 	}
 
 	// Data key: actualCfPrefix + key
-	dataKey := append(actualCfPrefix, []byte(PrefixData)...)
+	dataKey := actualCfPrefix
 	dataKey = append(dataKey, []byte(key)...)
 	if err := b.Delete(dataKey, nil); err != nil {
 		return fmt.Errorf("Delete: failed to add data key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
