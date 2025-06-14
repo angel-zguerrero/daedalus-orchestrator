@@ -137,6 +137,53 @@ func (ps *PebbleStore) getPrefixedKey(cfName string, key string) (rawKey []byte,
 	cfPrefixBytes = prefix
 	if isTTL {
 		// e.g., "myTTLCF:" + "_ttldata:" + "actualKey"
+		combinedDataPrefix := bytes.Join([][]byte{prefix, []byte(PrefixData)}, nil)
+		return append(combinedDataPrefix, []byte(key)...), true, cfPrefixBytes, nil
+	}
+
+	// Normal CF: "myCF:" + "actualKey"
+	return append(prefix, []byte(key)...), false, cfPrefixBytes, nil
+}
+
+// getPrefixedKey constructs the actual key to be stored/retrieved in Pebble.
+// It prepends the appropriate column family prefix to the given key string.
+// For TTL column families, it targets the actual data entry (e.g., by appending PrefixData).
+func (ps *PebbleStore) getPrefixedKeyOld(cfName string, key string) (rawKey []byte, isTTLResolved bool, cfPrefixBytes []byte, err error) {
+	var prefix []byte
+	var exists bool
+	isTTL := false
+
+	resolvedCfName := cfName
+	if resolvedCfName == "" {
+		resolvedCfName = DefaultFC
+	}
+
+	// Check TTL CFs first
+	prefix, exists = ps.ttlCfPrefixes[resolvedCfName]
+	if exists {
+		isTTL = true
+	} else {
+		// Then normal CFs
+		prefix, exists = ps.cfPrefixes[resolvedCfName]
+	}
+
+	if !exists {
+		// If still not found, and original cfName was empty or DefaultFC,
+		// it implies DefaultFC itself is not in cfPrefixes map (problem from CreatePebbleStore)
+		if resolvedCfName == DefaultFC {
+			return nil, false, nil, fmt.Errorf("default column family '%s' prefix not found - store misconfiguration", DefaultFC)
+		}
+		// Otherwise, the specified cfName is unknown
+		return nil, false, nil, fmt.Errorf("column family '%s' not found", resolvedCfName)
+	}
+
+	// For TTL, the "data key" path includes PrefixData.
+	// For normal CFs, it's just prefix + key.
+	// The returned cfPrefixBytes is the raw prefix for the CF (e.g., "mycf:")
+	// The returned rawKey is the fully constructed key for data access.
+	cfPrefixBytes = prefix
+	if isTTL {
+		// e.g., "myTTLCF:" + "_ttldata:" + "actualKey"
 		combinedDataPrefix := bytes.Join([][]byte{prefix, []byte("")}, nil)
 		return append(combinedDataPrefix, []byte(key)...), true, cfPrefixBytes, nil
 	}
@@ -148,7 +195,71 @@ func (ps *PebbleStore) getPrefixedKey(cfName string, key string) (rawKey []byte,
 // Put stores the key-value pair in the specified column family.
 // If columnFamily is empty, it defaults to DefaultFC.
 // Handles TTL logic for TTL-enabled column families.
-func (ps *PebbleStore) Put(columnFamily, key string, value []byte) error {
+func (ps *PebbleStore) Put(columnFamily, key string, value []byte, ttl int) error {
+	dataKey, isTTL, cfPrefix, err := ps.getPrefixedKey(columnFamily, key)
+	if err != nil {
+		return fmt.Errorf("Put: %w", err)
+	}
+	if !isTTL {
+		// No TTL, escritura directa
+		err := ps.db.Set(dataKey, value, pebble.Sync)
+		if err != nil {
+			return fmt.Errorf("Put: failed to set key '%s' in CF '%s': %w", key, columnFamily, err)
+		}
+		return nil
+	}
+
+	// TTL: borrar índice antiguo si existe y escribir batch completo
+	ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+	ttlExpireKey = append(ttlExpireKey, []byte(key)...)
+
+	oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
+	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
+		return fmt.Errorf("Put: failed to get old TTL expiry for key '%s': %w", key, err)
+	}
+	var oldTTLMillis int64
+	if err == nil {
+		defer closer.Close()
+		oldTTLMillis, _ = strconv.ParseInt(string(oldTTLBytes), 10, 64)
+	}
+
+	newTTLMillis := time.Now().Add(time.Duration(ttl) * time.Second).UnixMilli()
+
+	ttlIndexKeyOld := []byte{}
+	if oldTTLMillis > 0 {
+		ttlIndexKeyOld = []byte(fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, oldTTLMillis, key))
+	}
+	ttlIndexKeyNew := []byte(fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, newTTLMillis, key))
+
+	batch := ps.db.NewBatch()
+	defer batch.Close()
+
+	if oldTTLMillis > 0 {
+		_ = batch.Delete(ttlIndexKeyOld, nil) // ignorar error si no existía
+	}
+
+	// Claves:
+	// - Data: cfPrefix + _ttldata: + key
+	// - Expire: cfPrefix + _ttlexpire: + key
+	// - Index: cfPrefix + _ttlidx: + expiryTimestamp + ":" + key
+	if err := batch.Set(dataKey, value, nil); err != nil {
+		return fmt.Errorf("Put: failed to set data key: %w", err)
+	}
+	if err := batch.Set(ttlExpireKey, []byte(strconv.FormatInt(newTTLMillis, 10)), nil); err != nil {
+		return fmt.Errorf("Put: failed to set expire key: %w", err)
+	}
+	if err := batch.Set(ttlIndexKeyNew, nil, nil); err != nil {
+		return fmt.Errorf("Put: failed to set ttl index key: %w", err)
+	}
+
+	if err := batch.Commit(pebble.Sync); err != nil {
+		return fmt.Errorf("Put: failed to commit TTL batch: %w", err)
+	}
+
+	return nil
+}
+
+func (ps *PebbleStore) PutRaw(columnFamily string, key string, value []byte) error {
 	// getPrefixedKey now returns more info, but for non-TTL Put, we only need the final key for standard set.
 	// However, Put needs to differentiate TTL CFs to implement the multi-key write logic.
 
@@ -157,59 +268,16 @@ func (ps *PebbleStore) Put(columnFamily, key string, value []byte) error {
 		resolvedCfName = DefaultFC
 	}
 
-	actualCfPrefix, isTTL := ps.ttlCfPrefixes[resolvedCfName]
-	if !isTTL {
-		var isNormal bool
-		actualCfPrefix, isNormal = ps.cfPrefixes[resolvedCfName]
-		if !isNormal {
-			// This implies resolvedCfName (even if DefaultFC) was not found in cfPrefixes.
-			// This should be caught by CreatePebbleStore ensuring DefaultFC exists.
-			return fmt.Errorf("Put: column family %s not found and DefaultFC misconfigured", resolvedCfName)
-		}
-		// Standard Put for non-TTL CFs
-		// actualCfPrefix is like "mycf:", key is "mykey" -> prefixedKey is "mycf:mykey"
-		prefixedKey := append(actualCfPrefix, []byte(key)...)
-		err := ps.db.Set(prefixedKey, value, pebble.Sync)
-		if err != nil {
-			return fmt.Errorf("Put: failed to set key '%s' in non-TTL cf '%s': %w", key, resolvedCfName, err)
-		}
-		return nil
-	}
+	actualCfPrefix, _ := ps.ttlCfPrefixes[resolvedCfName]
 
-	// Handle TTL Column Family
-	b := ps.db.NewBatch()
-	defer b.Close()
+	actualCfPrefix, _ = ps.cfPrefixes[resolvedCfName]
 
-	expiryMillis := time.Now().UnixMilli() + (TTLDefaultSeconds * 1000)
-
-	// Construct keys for TTL:
-	// actualCfPrefix is like "myTTLCF:"
-	// Data key: actualCfPrefix + key
-	dataKey := append(actualCfPrefix, []byte("")...)
-	dataKey = append(dataKey, []byte(key)...)
-
-	// Index key: actualCfPrefix + PrefixTTLIndex + expiryMillis + ":" + key
-	indexKeyStr := fmt.Sprintf("%s%s%d:%s", string(actualCfPrefix), PrefixTTLIndex, expiryMillis, key)
-	indexKey := []byte(indexKeyStr)
-
-	// Expire reference key: actualCfPrefix + PrefixTTLExpire + key
-	expireRefKey := append(actualCfPrefix, []byte(PrefixTTLExpire)...)
-	expireRefKey = append(expireRefKey, []byte(key)...)
-
-	// Write to batch
-	if err := b.Set(dataKey, value, nil); err != nil { // nil for options means NoSync for batch
-		return fmt.Errorf("Put: failed to add data key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
-	}
-	if err := b.Set(indexKey, []byte{}, nil); err != nil { // Empty value for index
-		return fmt.Errorf("Put: failed to add index key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
-	}
-	if err := b.Set(expireRefKey, []byte(strconv.FormatInt(expiryMillis, 10)), nil); err != nil {
-		return fmt.Errorf("Put: failed to add expire ref key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
-	}
-
-	// Commit batch
-	if err := b.Commit(pebble.Sync); err != nil {
-		return fmt.Errorf("Put: failed to commit batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
+	// Standard Put for non-TTL CFs
+	// actualCfPrefix is like "mycf:", key is "mykey" -> prefixedKey is "mycf:mykey"
+	prefixedKey := append(actualCfPrefix, []byte(key)...)
+	err := ps.db.Set(prefixedKey, value, pebble.Sync)
+	if err != nil {
+		return fmt.Errorf("Put: failed to set key '%s' in non-TTL cf '%s': %w", key, resolvedCfName, err)
 	}
 	return nil
 }
@@ -351,21 +419,21 @@ func (ps *PebbleStore) ClearAll() error {
 // - "*contains*": contains match
 func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error) {
 	var cfPrefix []byte
-	var ok bool
+	var isTTL bool
 
 	resolvedCfName := cfName
 	if resolvedCfName == "" {
 		resolvedCfName = DefaultFC
 	}
 
-	cfPrefix, ok = ps.cfPrefixes[resolvedCfName]
-	if !ok {
-		cfPrefix, ok = ps.ttlCfPrefixes[resolvedCfName]
-		if !ok {
-			// This check is technically redundant if CreatePebbleStore guarantees DefaultFC,
-			// but good for robustness if cfName was something else that wasn't found.
-			return nil, "", fmt.Errorf("column family %s not found", resolvedCfName)
-		}
+	if prefix, ok := ps.cfPrefixes[resolvedCfName]; ok {
+		cfPrefix = prefix
+		isTTL = false
+	} else if prefix, ok := ps.ttlCfPrefixes[resolvedCfName]; ok {
+		cfPrefix = prefix
+		isTTL = true
+	} else {
+		return nil, "", fmt.Errorf("column family %s not found", resolvedCfName)
 	}
 
 	iterOpts := &pebble.IterOptions{
@@ -380,19 +448,13 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 	var nextCursor string
 	count := 0
 
-	// Handle cursor
+	// Manejo de cursor
 	if cursor != "" {
-		// Cursor must be prefixed just like any other key to seek correctly within the CF space
 		cursorBytes := []byte(cursor)
-		startKey := make([]byte, len(cfPrefix)+len(cursorBytes))
-		copy(startKey, cfPrefix)
-		copy(startKey[len(cfPrefix):], cursorBytes)
+		startKey := append(cfPrefix, cursorBytes...)
 
 		if iter.SeekGE(startKey) {
-			// If the cursor key itself is found, we need to start from the *next* key.
-			// Check if the found key is exactly the cursor key.
-			currentRawKey := iter.Key()
-			if bytes.Equal(currentRawKey, startKey) {
+			if bytes.Equal(iter.Key(), startKey) {
 				iter.Next()
 			}
 		}
@@ -400,31 +462,56 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		iter.First()
 	}
 
-	for ; iter.Valid() && count < limit; iter.Next() {
-		rawKey := iter.Key() // This is the full key including cfPrefix
+	for ; iter.Valid(); iter.Next() {
+		if count >= limit {
+			break
+		}
 
-		// Trim prefix to get the actual key string for pattern matching
-		keyBytesWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix)
-		keyStr := string(keyBytesWithoutPrefix)
+		rawKey := iter.Key()
+		keyWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix)
+		keyStr := string(keyWithoutPrefix)
+
+		// Si es TTL, validar expiración
+		if isTTL {
+			// Solo considerar claves con prefijo de datos reales
+			if !bytes.HasPrefix(rawKey, append(cfPrefix, []byte(PrefixData)...)) {
+				continue
+			}
+			actualKey := string(bytes.TrimPrefix(rawKey, append(cfPrefix, []byte(PrefixData)...)))
+			expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+			expireKey = append(expireKey, []byte(actualKey)...)
+
+			expired, err := ps.isTTLKeyExpired(expireKey)
+			if err != nil {
+				return nil, "", fmt.Errorf("SearchByPatternPaginatedKV TTL check error: %w", err)
+			}
+			if expired {
+				continue
+			}
+			keyStr = actualKey // mostrar sin el prefijo "_ttldata:"
+		}
+
+		// Filtrado por patrón
 		matches := false
-		if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") { // Contains
-			if len(pattern) == 1 { // just "*"
+		switch {
+		case strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*"):
+			if len(pattern) == 1 {
 				matches = true
 			} else {
 				matches = strings.Contains(keyStr, strings.Trim(pattern, "*"))
 			}
-		} else if strings.HasSuffix(pattern, "*") { // Prefix
+		case strings.HasSuffix(pattern, "*"):
 			matches = strings.HasPrefix(keyStr, strings.TrimSuffix(pattern, "*"))
-		} else if strings.HasPrefix(pattern, "*") { // Suffix
+		case strings.HasPrefix(pattern, "*"):
 			matches = strings.HasSuffix(keyStr, strings.TrimPrefix(pattern, "*"))
-		} else { // Exact
+		default:
 			matches = (keyStr == pattern)
 		}
 
 		if matches {
-			// Copy value: Pebble's value is only valid until next Iter call or Close.
 			val := make([]byte, len(iter.Value()))
 			copy(val, iter.Value())
+
 			results = append(results, KeyValuePair{Key: keyStr, Value: val})
 			nextCursor = keyStr
 			count++
@@ -435,8 +522,6 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 		return nil, "", fmt.Errorf("iterator error in SearchByPatternPaginatedKV: %w", err)
 	}
 
-	// If we found 'limit' items and there might be more, nextCursor is valid.
-	// If we found less than 'limit' items, it means we reached the end, so no next cursor.
 	if count < limit {
 		nextCursor = ""
 	}
@@ -498,25 +583,54 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 // For TTL CFs, it retrieves the actual data, not metadata keys.
 // Returns nil, nil if the key is not found.
 func (ps *PebbleStore) Get(columnFamily, key string) ([]byte, error) {
-	// getPrefixedKey now correctly targets the data entry in both normal and TTL CFs.
-	actualKeyToGet, _, _, err := ps.getPrefixedKey(columnFamily, key)
+	dataKey, isTTL, cfPrefix, err := ps.getPrefixedKey(columnFamily, key)
+
 	if err != nil {
 		return nil, fmt.Errorf("Get: %w", err)
 	}
 
-	value, closer, err := ps.db.Get(actualKeyToGet)
+	if isTTL {
+		// Construye la clave de expiración: cfPrefix + PrefixTTLExpire + key
+		expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+		expireKey = append(expireKey, []byte(key)...)
+		expired, err := ps.isTTLKeyExpired(expireKey)
+
+		if err != nil || expired {
+			return nil, err
+		}
+	}
+
+	value, closer, err := ps.db.Get(dataKey)
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
-			return nil, nil // Key not found, return nil, nil as per requirement
+			return nil, nil
 		}
 		return nil, fmt.Errorf("Get: failed to get key %s in cf %s: %w", key, columnFamily, err)
 	}
 	defer closer.Close()
 
-	// Copy the value, as it's only valid until closer.Close() is called.
+	// Copia defensiva del valor
 	valueCopy := make([]byte, len(value))
 	copy(valueCopy, value)
 	return valueCopy, nil
+}
+
+func (ps *PebbleStore) isTTLKeyExpired(expireKey []byte) (bool, error) {
+	value, closer, err := ps.db.Get(expireKey)
+	if err != nil {
+		if errors.Is(err, pebble.ErrNotFound) {
+			return true, nil
+		}
+		return false, fmt.Errorf("isTTLKeyExpired: error getting expireKey: %w", err)
+	}
+	defer closer.Close()
+
+	expireAt, err := strconv.ParseInt(string(value), 10, 64)
+	if err != nil {
+		return false, fmt.Errorf("isTTLKeyExpired: invalid timestamp: %w", err)
+	}
+
+	return time.Now().UnixMilli() > expireAt, nil
 }
 
 // Delete removes a key-value pair from the specified column family.
@@ -565,7 +679,7 @@ func (ps *PebbleStore) Delete(columnFamily, key string) error {
 	}
 
 	// Data key: actualCfPrefix + key
-	dataKey := append(actualCfPrefix, []byte("")...)
+	dataKey := append(actualCfPrefix, []byte(PrefixData)...)
 	dataKey = append(dataKey, []byte(key)...)
 	if err := b.Delete(dataKey, nil); err != nil {
 		return fmt.Errorf("Delete: failed to add data key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
@@ -620,7 +734,109 @@ func (ps *PebbleStore) Close() error {
 
 // Write performs a batch of operations (Put/Delete) atomically.
 // Assumes WriteBatch and X are defined in the same package (e.g. kv-store.go)
-func (ps *PebbleStore) Write(batch *WriteBatch) error { // batch.Data is []X
+func (ps *PebbleStore) Write(batch *WriteBatch) error {
+	if batch == nil || len(batch.Data) == 0 {
+		return nil
+	}
+
+	b := ps.db.NewBatch()
+	defer b.Close()
+
+	nowMillis := time.Now().UnixMilli()
+
+	for _, op := range batch.Data {
+		dataKey, isTTL, cfPrefix, err := ps.getPrefixedKey(op.CF, op.Key)
+		if err != nil {
+			return fmt.Errorf("Write: error getting prefixed key for cf '%s', key '%s': %w", op.CF, op.Key, err)
+		}
+
+		switch op.Type {
+		case "put":
+			if !isTTL {
+				if err := b.Set(dataKey, op.Value, nil); err != nil {
+					return fmt.Errorf("Write: failed to add put for key '%s': %w", op.Key, err)
+				}
+			} else {
+				newTTLMillis := nowMillis + int64(op.TTL)*1000
+
+				ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+				ttlExpireKey = append(ttlExpireKey, []byte(op.Key)...)
+
+				oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
+				if err != nil && !errors.Is(err, pebble.ErrNotFound) {
+					return fmt.Errorf("Write: failed to get old TTL for key '%s': %w", op.Key, err)
+				}
+				var oldTTLMillis int64
+				if err == nil {
+					defer closer.Close()
+					oldTTLMillis, _ = strconv.ParseInt(string(oldTTLBytes), 10, 64)
+				}
+
+				if oldTTLMillis > 0 {
+					oldIndexKey := fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, oldTTLMillis, op.Key)
+					if err := b.Delete([]byte(oldIndexKey), nil); err != nil {
+						return fmt.Errorf("Write: failed to delete old TTL index key: %w", err)
+					}
+				}
+
+				newIndexKey := fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, newTTLMillis, op.Key)
+
+				if err := b.Set(dataKey, op.Value, nil); err != nil {
+					return fmt.Errorf("Write: failed to set data key: %w", err)
+				}
+				if err := b.Set(ttlExpireKey, []byte(strconv.FormatInt(newTTLMillis, 10)), nil); err != nil {
+					return fmt.Errorf("Write: failed to set TTL expire key: %w", err)
+				}
+				if err := b.Set([]byte(newIndexKey), nil, nil); err != nil {
+					return fmt.Errorf("Write: failed to set TTL index key: %w", err)
+				}
+			}
+
+		case "delete":
+			if !isTTL {
+				if err := b.Delete(dataKey, nil); err != nil {
+					return fmt.Errorf("Write: failed to delete key '%s': %w", op.Key, err)
+				}
+			} else {
+				ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+				ttlExpireKey = append(ttlExpireKey, []byte(op.Key)...)
+
+				oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
+				if err != nil && !errors.Is(err, pebble.ErrNotFound) {
+					return fmt.Errorf("Write: failed to get TTL expire key for delete: %w", err)
+				}
+				if err == nil {
+					defer closer.Close()
+					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+					if err == nil {
+						oldIndexKey := fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, oldTTLMillis, op.Key)
+						if err := b.Delete([]byte(oldIndexKey), nil); err != nil {
+							return fmt.Errorf("Write: failed to delete TTL index key: %w", err)
+						}
+					}
+				}
+
+				if err := b.Delete(dataKey, nil); err != nil {
+					return fmt.Errorf("Write: failed to delete data key: %w", err)
+				}
+				if err := b.Delete(ttlExpireKey, nil); err != nil {
+					return fmt.Errorf("Write: failed to delete expire key: %w", err)
+				}
+			}
+
+		default:
+			return fmt.Errorf("Write: unsupported operation type '%s'", op.Type)
+		}
+	}
+
+	if err := b.Commit(pebble.Sync); err != nil {
+		return fmt.Errorf("Write: failed to commit batch: %w", err)
+	}
+
+	return nil
+}
+
+func (ps *PebbleStore) WriteRaw(batch *WriteBatch) error { // batch.Data is []X
 	if batch == nil || len(batch.Data) == 0 {
 		return nil // Nothing to do
 	}
@@ -629,7 +845,7 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error { // batch.Data is []X
 	defer b.Close() // Ensure batch is closed even if errors occur
 
 	for _, op := range batch.Data { // op is of type X
-		prefixedKey, _, _, err := ps.getPrefixedKey(op.CF, op.Key)
+		prefixedKey, _, _, err := ps.getPrefixedKeyOld(op.CF, op.Key)
 		if err != nil {
 			return fmt.Errorf("Write: error getting prefixed key for cf '%s', key '%s': %w", op.CF, op.Key, err)
 		}

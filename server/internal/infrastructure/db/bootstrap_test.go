@@ -108,7 +108,7 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 
 	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
 	store.On("Get", db.AdminFC, "user:admin").Return(nil, nil).Once()
-	store.On("Put", db.AdminFC, "user:admin", mock.AnythingOfType("[]uint8")).Return(nil).Once()
+	store.On("Put", db.AdminFC, "user:admin", mock.AnythingOfType("[]uint8"), 0).Return(nil).Once()
 
 	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
@@ -220,7 +220,7 @@ func TestBootstrapRootUser_PutUserFails(t *testing.T) {
 	userKey := fmt.Sprintf("user:%s", cfg.DefaultRootUser)
 	store.On("Get", db.AdminFC, userKey).Return(nil, nil).Once() // User not found in main list
 
-	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8")).Return(errors.New("put failed")).Once()
+	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8"), 0).Return(errors.New("put failed")).Once()
 
 	err = db.BootstrapRootUser(store, cfg)
 

@@ -251,7 +251,7 @@ func TestTenantUpdate_AddColumnFamily(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
-		Type: dragonboat.DLL_FC,
+		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "new_cf",
 			Op:               dragonboat.Add_CF_Op,
@@ -275,7 +275,7 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	{
 		var buf bytes.Buffer
 		cmd := dragonboat.Command{
-			Type: dragonboat.DLL_FC,
+			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
@@ -296,7 +296,7 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
-		Type: dragonboat.DLL_FC,
+		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 
 			ColumnFamilyName: "to_delete_cf",
@@ -379,7 +379,7 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	{
 		var buf bytes.Buffer
 		cmd := dragonboat.Command{
-			Type: dragonboat.DLL_FC,
+			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
@@ -400,7 +400,7 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 
 	var buf bytes.Buffer
 	cmd := dragonboat.Command{
-		Type: dragonboat.DLL_FC,
+		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
 			Op:               dragonboat.Remove_TTL_CF_Op,

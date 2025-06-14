@@ -9,8 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -162,7 +160,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	for i, cmd := range commands {
 		switch cmd.Type {
-		case DLL_FC:
+		case DDL_FC:
 			dllFCEntries = append(dllFCEntries, i)
 		case RW:
 			rwEntries = append(rwEntries, i)
@@ -205,50 +203,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value)
 			case PutOpTTL:
-				ttlMillis := time.Now().Add(time.Duration(wCmd.TTL) * time.Second).UnixMilli()
-
-				ttlRealKey := fmt.Sprintf("%s%s", db.PrefixData, wCmd.Key)
-				ttlExpireIndexKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, wCmd.Key)
-
-				oldTTLBytes, err := kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
-				if err != nil {
-					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
-				}
-				if oldTTLBytes != nil {
-					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
-					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, oldTTLMillis, wCmd.Key)
-						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
-					}
-				}
-
-				batch.Put(wCmd.ColumnFamilyName, ttlRealKey, wCmd.Value)
-
-				newTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, ttlMillis, wCmd.Key)
-				batch.Put(wCmd.ColumnFamilyName, newTTLIndexKey, nil)
-
-				batch.Put(wCmd.ColumnFamilyName, ttlExpireIndexKey, []byte(strconv.FormatInt(ttlMillis, 10)))
-
+				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL)
 			case DeleteOp:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			case DeleteOpTTL:
-				ttlExpireIndexKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, wCmd.Key)
-				oldTTLBytes, err := kv_store.Get(wCmd.ColumnFamilyName, ttlExpireIndexKey)
-				if err != nil {
-					return nil, fmt.Errorf("error reading previous TTL for key %s: %w", wCmd.Key, err)
-				}
-
-				if oldTTLBytes != nil {
-					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
-					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", db.PrefixTTLIndex, oldTTLMillis, wCmd.Key)
-						batch.Delete(wCmd.ColumnFamilyName, oldTTLIndexKey)
-					}
-				}
-
-				ttlRealKey := fmt.Sprintf("%s%s", db.PrefixData, wCmd.Key)
-				batch.Delete(wCmd.ColumnFamilyName, ttlRealKey)
-				batch.Delete(wCmd.ColumnFamilyName, ttlExpireIndexKey)
+				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
 			default:
 				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
 
@@ -324,7 +283,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				query.ColumnFamilyName,
-				query.KeyPatter,
+				query.KeyPattern,
 				query.Cursor,
 				int(query.Limit),
 			)
@@ -332,38 +291,16 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 				return nil, err
 			}
 
-			if len(pairs) > 0 {
-				result := &PagedResultKV{
-					Data:       pairs, // Data ahora es []KeyValuePair
-					NextCursor: []byte(nextCursor),
-				}
-				return result, nil
+			result := &PagedResultKV{
+				Data:       pairs, // Data ahora es []KeyValuePair
+				NextCursor: []byte(nextCursor),
 			}
+			return result, nil
 
 		case GetOpTTL:
 			var data []byte
 
-			expireKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, query.Key)
-			expireBytes, err := kv_store.Get(query.ColumnFamilyName, expireKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read expire key: %w", err)
-			}
-			if len(expireBytes) == 0 {
-				return nil, nil
-			}
-
-			expireAt, err := strconv.ParseInt(string(expireBytes), 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid expire timestamp: %w", err)
-			}
-
-			if time.Now().UnixMilli() > expireAt {
-				return nil, nil
-			}
-
-			dataKey := fmt.Sprintf("%s%s", db.PrefixData, query.Key)
-			data, err = kv_store.Get(query.ColumnFamilyName, dataKey)
-
+			data, err = kv_store.Get(query.ColumnFamilyName, query.Key)
 			if err != nil {
 				return nil, err
 			}
@@ -371,56 +308,21 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 				return data, err
 			}
 		case SearchTTL:
-			var resultData []db.KeyValuePair
-			cursor := query.Cursor
-			remaining := int(query.Limit)
-
-			for remaining > 0 {
-				keyPatter := fmt.Sprintf("%s%s", db.PrefixData, query.KeyPatter)
-				pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
-					query.ColumnFamilyName,
-					keyPatter,
-					cursor,
-					remaining*2,
-				)
-				if err != nil {
-					return nil, err
-				}
-
-				for _, pair := range pairs {
-					key := strings.TrimPrefix(pair.Key, db.PrefixData)
-					expireKey := fmt.Sprintf("%s%s", db.PrefixTTLExpire, key)
-
-					expireBytes, err := kv_store.Get(query.ColumnFamilyName, expireKey)
-					if err != nil || len(expireBytes) == 0 {
-						continue
-					}
-
-					expireAt, err := strconv.ParseInt(string(expireBytes), 10, 64)
-					if err != nil || time.Now().UnixMilli() > expireAt {
-						continue
-					}
-
-					resultData = append(resultData, pair)
-					remaining--
-
-					if remaining == 0 {
-						cursor = nextCursor
-						break
-					}
-				}
-
-				if nextCursor == "" {
-					cursor = ""
-					break
-				}
-				cursor = nextCursor
+			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
+				query.ColumnFamilyName,
+				query.KeyPattern,
+				query.Cursor,
+				int(query.Limit),
+			)
+			if err != nil {
+				return nil, err
 			}
 
-			return &PagedResultKV{
-				Data:       resultData,
-				NextCursor: []byte(cursor),
-			}, nil
+			result := &PagedResultKV{
+				Data:       pairs, // Data ahora es []KeyValuePair
+				NextCursor: []byte(nextCursor),
+			}
+			return result, nil
 
 		}
 
@@ -542,7 +444,7 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 			return fmt.Errorf("decode failed: %w", err)
 		}
 
-		if err := kv_store.Put(entry.CFName, string(entry.Key), entry.Value); err != nil {
+		if err := kv_store.PutRaw(entry.CFName, string(entry.Key), entry.Value); err != nil {
 			kv_store.Close()
 			os.RemoveAll(dbdir)
 			return fmt.Errorf("put failed during snapshot recovery for CF %s, Key %s: %w", entry.CFName, string(entry.Key), err)

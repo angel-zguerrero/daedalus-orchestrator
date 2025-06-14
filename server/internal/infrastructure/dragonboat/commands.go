@@ -73,7 +73,7 @@ type WK_Command struct {
 // RK_Command (Read Key Command) defines the structure for commands that read a single key or search keys.
 type RK_Command struct {
 	Key              string // The specific key to read (used with GetOp, GetOpTTL).
-	KeyPatter        string // The pattern to search for (used with Search, SearchTTL). Note: Typo "KeyPatter" in original, should be "KeyPattern".
+	KeyPattern       string // The pattern to search for (used with Search, SearchTTL).
 	Cursor           string // The cursor for paginated search results.
 	Limit            int64  // The maximum number of results for paginated search.
 	ColumnFamilyName string // The name of the column family to operate on.
@@ -125,8 +125,8 @@ type Command_Type int
 const (
 	// RW indicates a Read/Write command, further detailed by RWK_Command.
 	RW Command_Type = iota
-	// DLL_FC indicates a Data Definition Language command for Column Families, detailed by DDL_Command. (Note: Typo "DLL_FC", likely intended "DDL_FC")
-	DLL_FC
+	// DDL_FC indicates a Data Definition Language command for Column Families, detailed by DDL_Command.
+	DDL_FC
 	// MCL indicates a Maintenance Control Language command, detailed by MCLK_Command.
 	MCL
 )
