@@ -12,6 +12,8 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 )
 
+const TemporalFC = "temporal_fc"
+
 type testEntity struct {
 	ID       string `orm:"primary-key"`
 	Name     string `orm:"unique"`
@@ -30,22 +32,31 @@ func newRocksdbStore(t *testing.T) *db.RocksdbStore {
 	opts.SetCreateIfMissingColumnFamilies(true)
 	goOp := grocksdb.NewDefaultOptions()
 
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC}, []*grocksdb.Options{goOp, goOp})
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC, TemporalFC}, []*grocksdb.Options{goOp, goOp, goOp})
 	require.NoError(t, err)
 	t.Cleanup(func() { rocks.Close() })
 
 	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
 	require.NoError(t, err)
 
-	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames))
+	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames)-1)
 	for i, name := range columnFamilyNames {
-		cfMap[name] = cfHs[i]
+		if name != TemporalFC {
+			cfMap[name] = cfHs[i]
+		}
+	}
+
+	ttlCFMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames)-2)
+	for i, name := range columnFamilyNames {
+		if name == TemporalFC {
+			ttlCFMap[name] = cfHs[i]
+		}
 	}
 
 	return &db.RocksdbStore{
 		DB:                     rocks,
 		ColumnFamilyHandles:    cfMap,
-		TTLColumnFamilyHandles: make(map[string]*grocksdb.ColumnFamilyHandle),
+		TTLColumnFamilyHandles: ttlCFMap,
 	}
 }
 
@@ -55,16 +66,34 @@ func newTestRepository(t *testing.T) (*db.Repository[testEntity], error) {
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
+func newTestTTLRepository(t *testing.T) (*db.Repository[testEntity], error) {
+	store := newRocksdbStore(t)
+	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
+	return db.NewRepository[testEntity](store, TemporalFC, "test_schema", iGF)
+}
+
 func newTestRepositorySpesificIds(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory(ids)
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
+func newTestTTLRepositorySpesificIds(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
+	store := newRocksdbStore(t)
+	iGF := NewTestIDGeneratorFactory(ids)
+	return db.NewRepository[testEntity](store, TemporalFC, "test_schema", iGF)
+}
+
 func newTestRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", &db.DefaultIDGeneratorFactory{})
+}
+
+func newTestTTLRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntity], error) {
+	store := newRocksdbStore(t)
+
+	return db.NewRepository[testEntity](store, TemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 }
 
 func TestRepository_PutAndGet(t *testing.T) {
