@@ -39,6 +39,8 @@ type FieldDefinition struct {
 	Primary bool
 	// MaxLength specifies the maximum length for string fields. It's nil if not applicable.
 	MaxLength *int
+
+	TTL bool
 }
 
 // TableDefinition describes the schema of a table in the key-value store.
@@ -196,6 +198,13 @@ func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]boo
 	}
 
 	field := strings.TrimSpace(parts[1])
+	def := r.definition.Fields[field]
+	if def == (FieldDefinition{}) {
+		return nil, fmt.Errorf("Unknown field %s", field)
+	}
+	if def.TTL {
+		return nil, fmt.Errorf("TTL columns are not supported in query operations")
+	}
 	operator := strings.ToUpper(strings.TrimSpace(parts[2]))
 	value := strings.TrimSpace(strings.Trim(parts[3], "'"))
 
@@ -411,6 +420,12 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 //   - An error if the operation fails.
 func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	def := r.definition.Fields[field]
+	if def == (FieldDefinition{}) {
+		return nil, fmt.Errorf("Unknown field %s", field)
+	}
+	if def.TTL {
+		return nil, fmt.Errorf("TTL columns are not supported in query operations")
+	}
 	var dataKey string
 	if def.Unique {
 		searchKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, field, value)
@@ -527,14 +542,31 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 		}
 		id := ids[i]
 
+		hasTTL, ttl, err := r.checkForTTL(val)
+		if err != nil {
+			return nil, err
+		}
+
 		for fieldName, def := range r.definition.Fields {
+			if def.TTL {
+				continue
+			}
 			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
 			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
-			batch.Put(r.definition.ColumnFamily, idxKey, []byte(id))
+			if hasTTL {
+				batch.PutTTl(r.definition.ColumnFamily, idxKey, []byte(id), ttl)
+			} else {
+				batch.Put(r.definition.ColumnFamily, idxKey, []byte(id))
+			}
 
 			if def.Unique {
 				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
-				batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
+
+				if hasTTL {
+					batch.PutTTl(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), ttl)
+				} else {
+					batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
+				}
 			}
 		}
 
@@ -543,7 +575,11 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+		if hasTTL {
+			batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl)
+		} else {
+			batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+		}
 	}
 
 	if err := r.kvStore.Write(batch); err != nil {
@@ -551,6 +587,33 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 	}
 
 	return ids, nil
+}
+
+func (r *Repository[T]) checkForTTL(val reflect.Value) (bool, int, error) {
+	hasTTL := false
+	ttl := 0
+
+	for fieldName, field := range r.definition.Fields {
+		if field.TTL {
+			rawValue := val.FieldByName(fieldName)
+			if !rawValue.IsValid() {
+				return false, 0, fmt.Errorf("invalid field name for TTL: %s", fieldName)
+			}
+
+			switch rawValue.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				ttl = int(rawValue.Int())
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				ttl = int(rawValue.Uint())
+			default:
+				return false, 0, fmt.Errorf("TTL field '%s' must be of integer type", fieldName)
+			}
+
+			hasTTL = true
+			break
+		}
+	}
+	return hasTTL, ttl, nil
 }
 
 // Create creates a single entity in the repository.
@@ -656,8 +719,16 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 		currentVal := reflect.ValueOf(current).Elem()
 		newVal := reflect.ValueOf(entity).Elem()
 
+		hasTTL, ttl, err := r.checkForTTL(entityVal)
+		if err != nil {
+			return nil, err
+		}
+
 		for fieldName, def := range r.definition.Fields {
 			if def.Primary {
+				continue
+			}
+			if def.TTL {
 				continue
 			}
 
@@ -686,14 +757,23 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 					batch.Delete(r.definition.ColumnFamily, oldUIdxKey)
 
 					newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
-					batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
+					if hasTTL {
+						batch.PutTTl(r.definition.ColumnFamily, newUIdxKey, []byte(id), ttl)
+					} else {
+						batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
+					}
 				}
 
 				oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
 				batch.Delete(r.definition.ColumnFamily, oldIdxKey)
 
 				newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue, id)
-				batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id))
+
+				if hasTTL {
+					batch.PutTTl(r.definition.ColumnFamily, newIdxKey, []byte(id), ttl)
+				} else {
+					batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id))
+				}
 
 				curField.Set(newField)
 				changed = true
@@ -706,7 +786,11 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 			if err != nil {
 				return nil, err
 			}
-			batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+			if hasTTL {
+				batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl)
+			} else {
+				batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+			}
 		}
 
 		results[i] = changed
@@ -834,8 +918,8 @@ func (idG *DefaultIDGeneratorFactory) GenerateID() string {
 // It inspects the type T to determine the table schema, including field definitions,
 // primary key, and unique constraints based on struct tags.
 //
-// The struct T must have a field named 'ID' of type string with the tag `orm:"primaryKey"`.
-// Other fields can have tags like `orm:"unique"` or `orm:"maxLength=N"`.
+// The struct T must have a field named 'ID' of type string with the tag `orm:"primary-key"`.
+// Other fields can have tags like `orm:"unique"` or `orm:"max-length=N"`.
 //
 // Parameters:
 //   - kvStore: An instance of KVStore to interact with the underlying key-value database.
@@ -865,6 +949,7 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 	}
 
 	hasPrimaryKey := false
+	hasBadNameForTTL := false
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
@@ -880,7 +965,7 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 			switch {
 			case rule == "unique":
 				def.Unique = true
-			case rule == "primaryKey":
+			case rule == "primary-key":
 				if field.Type.Kind() != reflect.String {
 					return nil, fmt.Errorf("field 'ID' must be of type string")
 				}
@@ -889,9 +974,17 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 				if field.Name != "ID" {
 					hasPrimaryKey = false
 				}
-			case strings.HasPrefix(rule, "maxLength="):
+			case rule == "ttl":
+				if field.Type.Kind() != reflect.Int {
+					return nil, fmt.Errorf("field 'TTL' must be of type int")
+				}
+				def.TTL = true
+				if field.Name != "TTL" {
+					hasBadNameForTTL = true
+				}
+			case strings.HasPrefix(rule, "max-length="):
 				var max int
-				fmt.Sscanf(rule, "maxLength=%d", &max)
+				fmt.Sscanf(rule, "max-length=%d", &max)
 				def.MaxLength = &max
 			}
 		}
@@ -900,7 +993,10 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 	}
 
 	if !hasPrimaryKey {
-		return nil, fmt.Errorf("struct %s must have a string field named 'ID' with `orm:primaryKey`", t.Name())
+		return nil, fmt.Errorf("struct %s must have a string field named 'ID' with `orm:primary-key`", t.Name())
+	}
+	if hasBadNameForTTL {
+		return nil, fmt.Errorf("struct %s has an invalid field name for the TTL field; it must be named 'TTL' and tagged with `orm:\"ttl\"`", t.Name())
 	}
 
 	return &Repository[T]{definition: table, kvStore: kvStore, idGeneratorFactory: idGeneratorFactory}, nil

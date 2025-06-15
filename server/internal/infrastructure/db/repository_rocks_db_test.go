@@ -13,7 +13,7 @@ import (
 )
 
 type testEntity struct {
-	ID       string `orm:"primaryKey"`
+	ID       string `orm:"primary-key"`
 	Name     string `orm:"unique"`
 	LastName string
 	Age      int

@@ -38,7 +38,7 @@ func (g *TestIDGeneratorFactory) GenerateID() string {
 }
 
 type User struct {
-	ID   string `orm:"primaryKey"`
+	ID   string `orm:"primary-key"`
 	Name string `orm:"unique"`
 }
 
@@ -118,7 +118,7 @@ func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", "admin", iGF)
-	assert.EqualError(t, err, "struct NoPrimary must have a string field named 'ID' with `orm:primaryKey`")
+	assert.EqualError(t, err, "struct NoPrimary must have a string field named 'ID' with `orm:primary-key`")
 
 }
 
@@ -143,6 +143,86 @@ func TestRepository_FindByField_Success(t *testing.T) {
 	mockStore.AssertExpectations(t)
 }
 
+func TestRepository_FindByField_Unknown_Field_Name(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	_, err = repo.FindByField("x", "Alice")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Unknown field x")
+}
+
+func TestRepository_Find_AND_Unknown_Field_Name(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1000).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+
+	_, err = repo.Find("ID=123&X=Alice", 1000, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Unknown field X")
+	mockStore.AssertExpectations(t)
+}
+
+type TempEntity struct {
+	ID    string `orm:"primary-key"`
+	Token string `orm:"unique"`
+	TTL   int    `orm:"ttl"`
+}
+
+func (TempEntity) TableName() string {
+	return "temporal_entities"
+}
+
+func TestRepository_FindByField_Invalid_Use_For_TTL_Query(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	_, err = repo.FindByField("TTL", "111")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "TTL columns are not supported in query operations")
+}
+
+func TestRepository_Find_AND_Invalid_Use_For_TTL_Query(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:temporal_entities:idx:ID:123:*", "", 1000).
+		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+
+	_, err = repo.Find("ID=123&TTL=22", 1000, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "TTL columns are not supported in query operation")
+	mockStore.AssertExpectations(t)
+}
+
+type InvalidTempEntity struct {
+	ID    string `orm:"primary-key"`
+	Token string `orm:"unique"`
+	ttl   int    `orm:"ttl"`
+}
+
+func (InvalidTempEntity) TableName() string {
+	return "invalid_temporal_entities"
+}
+
+func TestRepository_FindByField_Invalid_TTL_Field_name(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	_, err := db.NewRepository[InvalidTempEntity](mockStore, "cf1", "admin", iGF)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "struct InvalidTempEntity has an invalid field name for the TTL field; it must be named 'TTL' and tagged with")
+}
+
 type Invalid struct {
 	Name string `orm:"unique"`
 }
@@ -157,7 +237,7 @@ func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 
 	_, err := db.NewRepository[Invalid](mockStore, "cf1", "admin", iGF)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "struct Invalid must have a string field named 'ID' with `orm:primaryKey`")
+	assert.Contains(t, err.Error(), "struct Invalid must have a string field named 'ID' with `orm:primary-key`")
 }
 
 func TestRepository_Find_AND(t *testing.T) {
