@@ -12,6 +12,7 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/shared/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type MockKVStore struct {
@@ -267,4 +268,109 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "kv put failed")
 	mockStore.AssertExpectations(t)
+}
+
+func TestLoginUser(t *testing.T) {
+	mockStore := new(MockKVStore)
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
+
+	userEmail := "test@example.com"
+	userUsername := "testuser"
+	correctPassword := "password123"
+	incorrectPassword := "wrongpassword"
+	userID := "user123"
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(correctPassword), bcrypt.DefaultCost)
+
+	user := models.User{
+		ID:           userID,
+		Username:     userUsername,
+		Email:        userEmail,
+		PasswordHash: string(hashedPassword),
+	}
+	userData, _ := json.Marshal(user)
+
+	t.Run("LoginWithEmail_CorrectPassword_Success", func(t *testing.T) {
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userEmail).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+
+		found, err := repo.Login(userEmail, correctPassword)
+		assert.NoError(t, err)
+		assert.True(t, found)
+		mockStore.AssertExpectations(t)
+	})
+
+	t.Run("LoginWithUsername_CorrectPassword_Success", func(t *testing.T) {
+		// Mock email lookup to return nil, then username lookup to return the user
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userUsername).Return(nil, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+userUsername).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+
+		found, err := repo.Login(userUsername, correctPassword)
+		assert.NoError(t, err)
+		assert.True(t, found)
+		mockStore.AssertExpectations(t)
+	})
+
+	t.Run("LoginWithEmail_IncorrectPassword_Failure", func(t *testing.T) {
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userEmail).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+
+		found, err := repo.Login(userEmail, incorrectPassword)
+		assert.NoError(t, err) // bcrypt.ErrMismatchedHashAndPassword is not an "error" for Login logic, it's a valid outcome
+		assert.False(t, found)
+		mockStore.AssertExpectations(t)
+	})
+
+	t.Run("LoginWithUsername_IncorrectPassword_Failure", func(t *testing.T) {
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userUsername).Return(nil, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+userUsername).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+
+		found, err := repo.Login(userUsername, incorrectPassword)
+		assert.NoError(t, err) // bcrypt.ErrMismatchedHashAndPassword is not an "error" for Login logic
+		assert.False(t, found)
+		mockStore.AssertExpectations(t)
+	})
+
+	t.Run("Login_UserNotFound_Failure", func(t *testing.T) {
+		unknownIdentifier := "unknown@example.com"
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+unknownIdentifier).Return(nil, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+unknownIdentifier).Return(nil, nil).Once()
+
+		found, err := repo.Login(unknownIdentifier, "anypassword")
+		assert.NoError(t, err)
+		assert.False(t, found)
+		mockStore.AssertExpectations(t)
+	})
+
+	t.Run("Login_ErrorOnEmailLookup", func(t *testing.T) {
+		errorIdentifier := "error@example.com"
+		expectedError := errors.New("db error on email lookup")
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+errorIdentifier).Return(nil, expectedError).Once()
+
+		found, err := repo.Login(errorIdentifier, "anypassword")
+		assert.Error(t, err)
+		assert.Equal(t, expectedError, err)
+		assert.False(t, found)
+		mockStore.AssertExpectations(t)
+	})
+
+	t.Run("Login_ErrorOnUsernameLookup", func(t *testing.T) {
+		errorIdentifier := "erroruser"
+		expectedError := errors.New("db error on username lookup")
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+errorIdentifier).Return(nil, nil).Once() // Email lookup fine, returns nil
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+errorIdentifier).Return(nil, expectedError).Once()
+
+		found, err := repo.Login(errorIdentifier, "anypassword")
+		assert.Error(t, err)
+		assert.Equal(t, expectedError, err)
+		assert.False(t, found)
+		mockStore.AssertExpectations(t)
+	})
+
+	// Test case for bcrypt error other than ErrMismatchedHashAndPassword (though hard to simulate without specific bcrypt internals)
+	// For now, the existing error handling in Login method should cover general errors from bcrypt.CompareHashAndPassword
 }
