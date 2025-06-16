@@ -1001,3 +1001,15 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 
 	return &Repository[T]{definition: table, kvStore: kvStore, idGeneratorFactory: idGeneratorFactory}, nil
 }
+
+func NewRepositoryWithBatch[T ORMEntity](kvStore KVStore, ColumnFamily, schema string, idGeneratorFactory IDGeneratorFactory, batch *WriteBatch) (*Repository[T], error) {
+	repo, err := NewRepository[T](kvStore, ColumnFamily, schema, idGeneratorFactory)
+	if err != nil {
+		return nil, err
+	}
+	repo.kvStore = &DelegatedKVStore{
+		base:  kvStore,
+		batch: batch,
+	}
+	return repo, nil
+}
