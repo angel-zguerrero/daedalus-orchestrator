@@ -5,22 +5,104 @@ import (
 	"deadalus-orch/shared/models"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"testing"
 
+	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
-
-	constants "deadalus-orch/shared/constants"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"deadalus-orch/server/internal/pkg/config"
 )
+
+type MockKVStoreBootstrap struct {
+	mock.Mock
+	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle // Map of regular column family names to their handles.
+	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
+}
+
+func (m *MockKVStoreBootstrap) Get(AdminFC, key string) ([]byte, error) {
+	args := m.Called(AdminFC, key)
+	var s []byte
+	if tmp := args.Get(0); tmp != nil {
+		s = tmp.([]byte)
+	}
+	return s, args.Error(1)
+}
+
+func (m *MockKVStoreBootstrap) Delete(AdminFC, key string) error {
+	args := m.Called(AdminFC, key)
+	return args.Error(0)
+}
+
+func (r *MockKVStoreBootstrap) Exists(columnFamily, key string) (bool, error) {
+	val, err := r.Get(columnFamily, key)
+	if err != nil {
+		return false, err
+	}
+	return val != nil, nil
+}
+
+func (m *MockKVStoreBootstrap) Put(AdminFC, key string, value []byte, ttl int) error {
+	args := m.Called(AdminFC, key, value, ttl)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreBootstrap) PutRaw(AdminFC, key string, value []byte) error {
+	args := m.Called(AdminFC, key, value)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreBootstrap) Write(batch *db.WriteBatch) error {
+	args := m.Called(batch)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreBootstrap) WriteRaw(batch *db.WriteBatch) error {
+	args := m.Called(batch)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreBootstrap) DumpAll() (interface{}, error) {
+	args := m.Called()
+	var s []byte
+	if tmp := args.Get(0); tmp != nil {
+		s = tmp.([]byte)
+	}
+	return s, args.Error(1)
+}
+
+func (r *MockKVStoreBootstrap) Iterate(fn func(cfName string, key, value []byte) error) error {
+	return nil
+}
+
+func (r *MockKVStoreBootstrap) ClearAll() error {
+	return nil
+}
+
+func (r *MockKVStoreBootstrap) Flush() error {
+	return nil
+}
+
+func (r *MockKVStoreBootstrap) Close() error {
+	return nil
+}
+
+func (r *MockKVStoreBootstrap) CleanExpiredKeys() error {
+	return nil
+}
+
+func (m *MockKVStoreBootstrap) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]db.KeyValuePair, string, error) {
+	args := m.Called(cfName, pattern, cursor, limit)
+	var s []db.KeyValuePair
+	if tmp := args.Get(0); tmp != nil {
+		s = tmp.([]db.KeyValuePair)
+	}
+	return s, "", args.Error(2)
+}
 
 func TestMain(m *testing.M) {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -37,86 +119,77 @@ func marshal(t *testing.T, v interface{}) []byte {
 }
 
 func Test_CreatesRootIfMissing(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Times(1)
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil).Times(2)
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com").Return(nil, nil).Times(1)
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return(nil, nil).Times(1)
 
-	input := models.CreateUser{
-		Username: config.DefaultRootUser,
-		Email:    "noemail@daedalus.com",
-		Password: config.DefaultRootPassword,
-	}
-	defaultUserData, err := json.Marshal(input)
 	assert.NoError(t, err)
-
-	batch := db.NewWriteBatch()
-
-	batch.Put(db.AdminFC, constants.DefaultRootUserRootKey, defaultUserData)
-	userKey := fmt.Sprintf("user:%s", input.Username)
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
-	assert.NoError(t, err)
-
-	user := models.User{
-		Username:     input.Username,
-		Email:        input.Email,
-		PasswordHash: string(hash),
-	}
-
-	userData, err := json.Marshal(user)
-	assert.NoError(t, err)
-
-	batch.Put(db.AdminFC, userKey, userData)
 
 	store.On("Write", mock.Anything).Return(nil).Times(1)
 
-	err = db.BootstrapRootUser(store, config)
+	err = db.BootstrapRootUser(*repo, config)
+	assert.NoError(t, err)
+	err = uow.Commit()
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
 
 func Test_ErrorGettingRoot(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, errors.New("boom")).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", errors.New("boom")).Times(1)
 
-	err := db.BootstrapRootUser(store, config)
+	err = db.BootstrapRootUser(*repo, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get default root")
+
 	store.AssertExpectations(t)
 }
 
 func Test_PutsRootIfMissingInUsers(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
 		DefaultRootPassword: "123456",
 	}
-	root := models.CreateUser{
-		Username: "admin",
-		Password: "123456",
-		Email:    "x@x.com",
-	}
+	store.On("Write", mock.Anything).Return(nil).Times(1)
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com").Return(nil, nil).Once()
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
-	store.On("Get", db.AdminFC, "user:admin").Return(nil, nil).Once()
-	store.On("Put", db.AdminFC, "user:admin", mock.AnythingOfType("[]uint8"), 0).Return(nil).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Times(2)
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(2)
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return(nil, nil).Times(1)
 
-	err := db.BootstrapRootUser(store, config)
+	err = db.BootstrapRootUser(*repo, config)
+	assert.NoError(t, err)
+	err = uow.Commit()
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
 
 func Test_SkipsIfUserExists(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
 		DefaultRootPassword: "123456",
@@ -128,103 +201,96 @@ func Test_SkipsIfUserExists(t *testing.T) {
 		Email:        "x@x.com",
 	}
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
-	store.On("Get", db.AdminFC, "user:admin").Return([]byte(marshal(t, root)), nil).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123").Return([]byte(marshal(t, root)), nil).Once()
+	store.On("Write", mock.Anything).Return(nil).Times(1)
+	err = db.BootstrapRootUser(*repo, config)
+	assert.NoError(t, err)
+	err = uow.Commit()
 
-	err := db.BootstrapRootUser(store, config)
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
 
 func Test_ErrorFetchingUser(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
 		DefaultRootPassword: "123456",
 	}
-	root := models.User{Username: "admin"}
+	//root := models.User{Username: "admin"}
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte(marshal(t, root)), nil).Once()
-	store.On("Get", db.AdminFC, "user:admin").Return(nil, errors.New("read error")).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, errors.New("read error")).Once()
 
-	err := db.BootstrapRootUser(store, config)
+	err = db.BootstrapRootUser(*repo, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "read error")
 	store.AssertExpectations(t)
 }
 
 func Test_ErrorPutsRoot(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Times(1)
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil)
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com").Return(nil, nil).Times(1)
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return(nil, nil).Times(1)
+
 	store.On("Write", mock.Anything).Return(errors.New("write fail")).Once()
 
-	err := db.BootstrapRootUser(store, config)
+	err = db.BootstrapRootUser(*repo, config)
+	assert.NoError(t, err)
+
+	err = uow.Commit()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "write fail")
 	store.AssertExpectations(t)
 }
 
 func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	cfg := config.Config{
 		DefaultRootUser:     "", // Missing user
 		DefaultRootPassword: "testpass",
 	}
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Maybe() // May or may not be called if config check happens first
-
-	err := db.BootstrapRootUser(store, cfg)
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil).Times(1)
+	err = db.BootstrapRootUser(*repo, cfg)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing default root user/password")
+
 	store.AssertExpectations(t)
 }
 
 func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
-	store := new(MockKVStore)
+	store := new(MockKVStoreBootstrap)
+	uow := db.NewUnitOfWork(store)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 	cfg := config.Config{
 		DefaultRootUser:     "testuser",
 		DefaultRootPassword: "",
 	}
 
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Maybe()
-
-	err := db.BootstrapRootUser(store, cfg)
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil).Times(1)
+	err = db.BootstrapRootUser(*repo, cfg)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing default root user/password")
-	store.AssertExpectations(t)
-}
-
-func TestBootstrapRootUser_PutUserFails(t *testing.T) {
-	store := new(MockKVStore)
-	cfg := config.Config{
-		DefaultRootUser:     "admin",
-		DefaultRootPassword: "password123",
-	}
-
-	rootRecord := models.CreateUser{
-		Username: cfg.DefaultRootUser,
-		Password: cfg.DefaultRootPassword,
-		Email:    "noemail@daedalus.com",
-	}
-	rootRecordData, err := json.Marshal(rootRecord)
-	require.NoError(t, err)
-
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(rootRecordData, nil).Once()
-	userKey := fmt.Sprintf("user:%s", cfg.DefaultRootUser)
-	store.On("Get", db.AdminFC, userKey).Return(nil, nil).Once() // User not found in main list
-
-	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8"), 0).Return(errors.New("put failed")).Once()
-
-	err = db.BootstrapRootUser(store, cfg)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "put failed")
 	store.AssertExpectations(t)
 }

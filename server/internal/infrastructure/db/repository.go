@@ -431,7 +431,7 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 		searchKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, field, value)
 		idBytes, err := r.kvStore.Get(r.definition.ColumnFamily, searchKey)
 		if err != nil || idBytes == nil || len(idBytes) == 0 {
-			return nil, nil
+			return nil, err
 		}
 
 		dataKey = fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, string(idBytes))
@@ -441,7 +441,7 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 		searchKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
 		idBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, searchKey, "", 1)
 		if err != nil || idBytes == nil || len(idBytes) == 0 {
-			return nil, nil
+			return nil, err
 		}
 
 		dataKey = fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, string(idBytes[0].Value))

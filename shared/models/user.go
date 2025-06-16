@@ -3,13 +3,20 @@ package models
 // User represents a user account in the system.
 // It typically stores information retrieved from the database.
 type User struct {
+	ID string `orm:"primary-key"`
 	// Username is the unique identifier for the user.
-	Username string
+	Username string `orm:"unique"`
 	// Email is the user's email address.
-	Email string
+	Email string `orm:"unique"`
 	// PasswordHash is the hashed version of the user's password.
 	// Storing plain text passwords is a security risk, so only the hash should be stored.
 	PasswordHash string
+
+	IsRootUser bool
+}
+
+func (User) TableName() string {
+	return "users"
 }
 
 // CreateUser is a struct used for capturing user input when creating a new user.
@@ -23,4 +30,6 @@ type CreateUser struct {
 	// Password is the plain text password provided by the user during account creation.
 	// This should be processed (hashed) and not stored directly.
 	Password string
+
+	IsRootUser bool
 }

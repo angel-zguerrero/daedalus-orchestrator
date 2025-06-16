@@ -20,8 +20,8 @@ import (
 // Returns:
 //   - An error if any operation fails (e.g., accessing the KVStore, missing credentials),
 //     or nil if the root user exists or is successfully created.
-func BootstrapRootUser(kvStore KVStore, config config.Config) error {
-	root, err := GetDefaultRootUserRoot(kvStore)
+func BootstrapRootUser(userRepository UserRepository, config config.Config) error {
+	root, err := userRepository.GetUserRoot()
 	if err != nil {
 		return fmt.Errorf("failed to get default root: %v", err)
 	}
@@ -38,20 +38,13 @@ func BootstrapRootUser(kvStore KVStore, config config.Config) error {
 			Str("username", username).
 			Msg("🧑‍💻 Creating default root user")
 
-		return PutDefaultRootUserRoot(kvStore, models.CreateUser{
-			Username: username,
-			Email:    "noemail@daedalus.com",
-			Password: password,
+		_, err = userRepository.CreateUser(models.CreateUser{
+			Username:   username,
+			Email:      "noemail@daedalus.com",
+			Password:   password,
+			IsRootUser: true,
 		})
-	}
-
-	existing, err := GetUser(kvStore, root.Username)
-	if err != nil {
 		return err
-	}
-
-	if existing == nil {
-		return PutUser(kvStore, *root)
 	}
 
 	log.Info().

@@ -3,17 +3,14 @@ package db_test
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"testing"
 
 	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/shared/constants"
 	"deadalus-orch/shared/models"
 )
 
@@ -105,210 +102,169 @@ func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string,
 
 func TestPutUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
+	assert.NoError(t, err)
 
 	user := models.CreateUser{Username: "foo", Email: "foo@mail.com", Password: "1234"}
 
-	mockStore.On("Put", db.AdminFC, "user:foo", mock.Anything, 0).Return(nil)
+	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:foo").Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:foo@mail.com").Return(nil, nil).Times(1)
+	mockStore.On("Write", mock.Anything).Return(nil).Times(1)
 
-	err := db.PutUser(mockStore, user)
+	id, err := repo.CreateUser(user)
+	assert.NoError(t, err)
+	err = uow.Commit()
+	assert.NotNil(t, id)
 	assert.NoError(t, err)
 	mockStore.AssertExpectations(t)
 }
 
 func TestGetUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
 
 	u := models.User{Username: "foo", Email: "bar"}
 	data, _ := json.Marshal(u)
 
-	mockStore.On("Get", db.AdminFC, "user:foo").Return(data, nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:foo").Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(data, nil)
 
-	user, err := db.GetUser(mockStore, "foo")
+	user, err := repo.GetUserByUsername("foo")
 	assert.NoError(t, err)
 	assert.Equal(t, "foo", user.Username)
+	mockStore.AssertExpectations(t)
 }
 
 func TestGetUser_NotFound(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockStore.On("Get", db.AdminFC, "user:bar").Return(nil, nil)
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bar").Return(nil, nil)
 
-	user, err := db.GetUser(mockStore, "bar")
+	user, err := repo.GetUserByUsername("bar")
 	assert.NoError(t, err)
 	assert.Nil(t, user)
+	mockStore.AssertExpectations(t)
 }
 
 func TestGetUser_ErrorOnGet(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockStore.On("Get", db.AdminFC, "user:x").Return(nil, errors.New("get failed"))
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
 
-	user, err := db.GetUser(mockStore, "x")
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return(nil, errors.New("get failed"))
+	user, err := repo.GetUserByUsername("x")
 	assert.Error(t, err)
 	assert.Nil(t, user)
+	mockStore.AssertExpectations(t)
 }
 
 func TestGetUser_UnmarshalError(t *testing.T) {
 	mockStore := new(MockKVStore)
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
 
-	mockStore.On("Get", db.AdminFC, "user:x").Return([]byte("invalid-json"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return([]byte("invalid-json"), nil)
 
-	user, err := db.GetUser(mockStore, "x")
+	user, err := repo.GetUserByUsername("x")
 	assert.Error(t, err)
-	assert.Nil(t, user)
-}
-
-func TestPutDefaultRootUserRoot_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
-	mockStore.On("Write", mock.Anything).Return(nil)
-
-	input := models.CreateUser{Username: "admin", Email: "root@mail.com", Password: "pass"}
-	err := db.PutDefaultRootUserRoot(mockStore, input)
-	assert.NoError(t, err)
-}
-
-func TestPutDefaultRootUserRoot_WriteError(t *testing.T) {
-	mockStore := new(MockKVStore)
-	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
-
-	input := models.CreateUser{Username: "admin", Email: "x", Password: "x"}
-	err := db.PutDefaultRootUserRoot(mockStore, input)
-	assert.Error(t, err)
-}
-
-func TestGetDefaultRootUserRoot_UnmarshalError(t *testing.T) {
-	mockStore := new(MockKVStore)
-	mockStore.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte("bad-json"), nil)
-
-	root, err := db.GetDefaultRootUserRoot(mockStore)
-	assert.Error(t, err)
-	assert.Nil(t, root)
+	assert.Empty(t, user)
+	mockStore.AssertExpectations(t)
 }
 
 func TestDeleteUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
-	root := models.User{Username: "other"}
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
+	root := models.User{Username: "other", ID: "123"}
 	rootData, _ := json.Marshal(root)
 
-	mockStore.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(rootData, nil)
-	mockStore.On("Write", mock.Anything).Return(nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bob").Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(rootData, nil)
 
-	err := db.DeleteUser(mockStore, "bob")
+	result, err := repo.DeleteUser("bob")
+	assert.Equal(t, true, result)
 	assert.NoError(t, err)
+	mockStore.AssertExpectations(t)
 }
 
 func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 	mockStore := new(MockKVStore)
-	root := models.User{Username: "admin"}
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
+	root := models.User{Username: "admin", ID: "123", IsRootUser: true}
 	rootData, _ := json.Marshal(root)
-	mockStore.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(rootData, nil)
-
-	err := db.DeleteUser(mockStore, "admin")
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(rootData, nil)
+	_, err = repo.DeleteUser("admin")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot delete root user")
+	mockStore.AssertExpectations(t)
 }
 
 func TestDeleteUser_GetError(t *testing.T) {
 	mockStore := new(MockKVStore)
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
 	mockStore.On("Get", db.AdminFC, mock.Anything).Return(nil, errors.New("get failed"))
 
-	err := db.DeleteUser(mockStore, "someone")
+	_, err = repo.DeleteUser("someone")
 	assert.Error(t, err)
+	mockStore.AssertExpectations(t)
 }
 
 func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	mockStore.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return([]byte("bad"), nil)
-
-	err := db.DeleteUser(mockStore, "x")
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return([]byte("invalid-json"), nil)
+	_, err = repo.DeleteUser("x")
 	assert.Error(t, err)
+	mockStore.AssertExpectations(t)
 }
 
 func TestDeleteUser_WriteError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	root := models.User{Username: "root"}
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
+	root := models.User{Username: "user", ID: "123"}
 	rootData, _ := json.Marshal(root)
-	mockStore.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(rootData, nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:user").Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(rootData, nil)
+
 	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
 
-	err := db.DeleteUser(mockStore, "user")
+	_, err = repo.DeleteUser("user")
+	assert.NoError(t, err)
+	err = uow.Commit()
 	assert.Error(t, err)
+	mockStore.AssertExpectations(t)
 }
 func TestPutUser_KVStorePutError(t *testing.T) {
-	store := new(MockKVStore)
+	mockStore := new(MockKVStore)
+	uow := db.NewUnitOfWork(mockStore)
+	repo, err := db.NewUserRepository(uow)
 	userInput := models.CreateUser{
 		Username: "testuser",
 		Password: "password123",
 		Email:    "test@example.com",
 	}
-	userKey := fmt.Sprintf("user:%s", userInput.Username)
 
-	store.On("Put", db.AdminFC, userKey, mock.AnythingOfType("[]uint8"), 0).Return(errors.New("kv put failed")).Once()
+	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:testuser").Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:test@example.com").Return(nil, nil).Times(1)
+	mockStore.On("Write", mock.Anything).Return(errors.New("kv put failed")).Times(1)
 
-	err := db.PutUser(store, userInput)
+	_, err = repo.CreateUser(userInput)
 
+	assert.NoError(t, err)
+	err = uow.Commit()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "kv put failed")
-	store.AssertExpectations(t)
-}
-
-func TestGetDefaultRootUserRoot_Success(t *testing.T) {
-	store := new(MockKVStore)
-	expectedUser := models.CreateUser{
-		Username: "admin",
-		Password: "securepassword",
-		Email:    "admin@daedalus.com",
-	}
-	jsonData, err := json.Marshal(expectedUser)
-	require.NoError(t, err)
-
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(jsonData, nil).Once()
-
-	user, err := db.GetDefaultRootUserRoot(store)
-
-	assert.NoError(t, err)
-	require.NotNil(t, user)
-	assert.Equal(t, expectedUser.Username, user.Username)
-	assert.Equal(t, expectedUser.Password, user.Password)
-	assert.Equal(t, expectedUser.Email, user.Email)
-	store.AssertExpectations(t)
-}
-
-func TestGetDefaultRootUserRoot_NotFound(t *testing.T) {
-	store := new(MockKVStore)
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Once()
-
-	user, err := db.GetDefaultRootUserRoot(store)
-
-	assert.NoError(t, err)
-	assert.Nil(t, user)
-	store.AssertExpectations(t)
-}
-
-func TestGetDefaultRootUserRoot_KVStoreGetError(t *testing.T) {
-	store := new(MockKVStore)
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, errors.New("kv get failed")).Once()
-
-	user, err := db.GetDefaultRootUserRoot(store)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "kv get failed")
-	assert.Nil(t, user)
-	store.AssertExpectations(t)
-}
-
-func TestDeleteUser_NoRootUserDefined(t *testing.T) {
-	store := new(MockKVStore)
-	usernameToDelete := "someuser"
-
-	store.On("Get", db.AdminFC, constants.DefaultRootUserRootKey).Return(nil, nil).Once()
-
-	store.On("Write", mock.AnythingOfType("*db.WriteBatch")).Run(func(args mock.Arguments) {
-		batch := args.Get(0).(*db.WriteBatch)
-		assert.Equal(t, 1, batch.Count(), "WriteBatch should have one operation (the delete)")
-
-	}).Return(nil).Once()
-
-	err := db.DeleteUser(store, usernameToDelete)
-
-	assert.NoError(t, err)
-	store.AssertExpectations(t)
+	mockStore.AssertExpectations(t)
 }
