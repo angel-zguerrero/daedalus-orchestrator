@@ -818,3 +818,59 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 		require.True(t, found, "missing value %s", expected)
 	}
 }
+func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
+	kvRocksDB := setupKVMaster(t, "rocksdb")
+	var buf bytes.Buffer
+	cmd := dragonboat.Command{
+		Type: dragonboat.RW,
+		CMD: dragonboat.RWK_Command{
+			Op: dragonboat.Write,
+			CMD: dragonboat.WK_Command{
+				Key:              "snap_key",
+				Value:            []byte("snap_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               dragonboat.PutOp,
+			},
+		},
+	}
+
+	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
+	_, err := kvRocksDB.Update([]statemachine.Entry{
+		{Cmd: buf.Bytes(), Index: kvRocksDB.GetLastApplied() + 1},
+	})
+	require.NoError(t, err)
+
+	var snap bytes.Buffer
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	defer cancel()
+
+	err = kvRocksDB.SaveSnapshot(nil, &snap, ctx.Done())
+	require.NoError(t, err)
+
+	_ = kvRocksDB.Close()
+	kvPebble := setupKVMaster(t, "pebble")
+	require.NoError(t, err)
+	defer kvPebble.Close()
+
+	err = kvPebble.RecoverFromSnapshot(&snap, ctx.Done())
+	require.NoError(t, err)
+
+	query := dragonboat.RK_Command{
+		Key:              "snap_key",
+		ColumnFamilyName: db.DefaultFC,
+	}
+
+	val, err := kvPebble.Lookup(query)
+
+	require.NoError(t, err)
+	require.Equal(t, []byte("snap_value"), val)
+
+	query = dragonboat.RK_Command{
+		Key:              dragonboat.AppliedIndexKey,
+		ColumnFamilyName: db.MetaFC,
+	}
+
+	val, err = kvPebble.Lookup(query)
+	require.NoError(t, err)
+	require.Equal(t, kvPebble.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
+}
