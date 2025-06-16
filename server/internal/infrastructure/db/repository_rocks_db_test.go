@@ -12,19 +12,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 )
 
-const TemporalFC = "temporal_fc"
-
-type testEntity struct {
-	ID       string `orm:"primary-key"`
-	Name     string `orm:"unique"`
-	LastName string
-	Age      int
-}
-
-func (testEntity) TableName() string {
-	return "users"
-}
-
 func newRocksdbStore(t *testing.T) *db.RocksdbStore {
 	tmpDir := t.TempDir()
 	opts := grocksdb.NewDefaultOptions()
@@ -66,10 +53,11 @@ func newTestRepository(t *testing.T) (*db.Repository[testEntity], error) {
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
-func newTestTTLRepository(t *testing.T) (*db.Repository[testEntity], error) {
+func newTestTTLRepository(t *testing.T) (*db.Repository[testEntity], *db.RocksdbStore, error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	return db.NewRepository[testEntity](store, TemporalFC, "test_schema", iGF)
+	repository, err := db.NewRepository[testEntity](store, TemporalFC, "test_schema", iGF)
+	return repository, store, err
 }
 
 func newTestRepositorySpesificIds(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
@@ -90,10 +78,10 @@ func newTestRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntit
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 }
 
-func newTestTTLRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntity], error) {
+func newTestTTLRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntity], db.KVStore, error) {
 	store := newRocksdbStore(t)
-
-	return db.NewRepository[testEntity](store, TemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
+	repository, err := db.NewRepository[testEntity](store, TemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
+	return repository, store, err
 }
 
 func TestRepository_PutAndGet(t *testing.T) {

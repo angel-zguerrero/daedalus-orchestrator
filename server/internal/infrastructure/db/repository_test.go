@@ -4,38 +4,12 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/json"
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type TestIDGeneratorFactory struct {
-	ids   []string
-	index int
-	mu    sync.Mutex
-}
-
-func NewTestIDGeneratorFactory(ids []string) *TestIDGeneratorFactory {
-	return &TestIDGeneratorFactory{
-		ids: ids,
-	}
-}
-
-func (g *TestIDGeneratorFactory) GenerateID() string {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if len(g.ids) == 0 {
-		return ""
-	}
-
-	id := g.ids[g.index]
-	g.index = (g.index + 1) % len(g.ids) // avance circular
-	return id
-}
 
 type User struct {
 	ID   string `orm:"primary-key"`

@@ -11,13 +11,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 )
 
-func newPebbleStore(t *testing.T) db.KVStore {
-	tmpDir := t.TempDir()
-	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, nil)
-	require.NoError(t, err)
-	return store
-}
-
 func newTestRepositoryPebble(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newPebbleStore(t)
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
