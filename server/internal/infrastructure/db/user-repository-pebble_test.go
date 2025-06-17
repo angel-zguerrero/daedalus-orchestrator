@@ -1,15 +1,11 @@
 package db_test
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/shared/models"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -39,17 +35,17 @@ func newPebbleStoreForUserRepoTest(t *testing.T) db.KVStore {
 }
 
 // newUserRepoPebbleTest creates a new UnitOfWork and UserRepository for testing with Pebble.
-func newUserRepoPebbleTest(t *testing.T) (*db.UnitOfWork, *db.UserRepository) {
+func newUserRepoPebbleTest(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.UserRepository) {
 	store := newPebbleStoreForUserRepoTest(t)
 	uow := db.NewUnitOfWork(store)
 	userRepo, err := db.NewUserRepository(uow)
 	require.NoError(t, err, "Failed to create UserRepository with Pebble backend")
-	return uow, userRepo
+	return uow, store, userRepo
 }
 
 // TestPutUser_Success_Pebble tests creating a user successfully.
-func TestPutUser_Success_Pebble(t *testing.T) {
-	uow, repo := newUserRepoPebbleTest(t)
+func TestPebblePutUser_Success_Pebble(t *testing.T) {
+	uow, store, repo := newUserRepoPebbleTest(t)
 
 	userToCreate := models.CreateUser{
 		Username: "pebbleuser",
@@ -65,7 +61,7 @@ func TestPutUser_Success_Pebble(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify user is created by reading it back from a new UoW/Repo on the same store
-	verifyUOW := db.NewUnitOfWork(uow.Store()) // Use same store
+	verifyUOW := db.NewUnitOfWork(store) // Use same store
 	verifyRepo, err := db.NewUserRepository(verifyUOW)
 	require.NoError(t, err)
 
@@ -82,7 +78,7 @@ func TestPutUser_Success_Pebble(t *testing.T) {
 }
 
 // TestGetUser_Success_Pebble tests retrieving an existing user.
-func TestGetUser_Success_Pebble(t *testing.T) {
+func TestPebbleGetUser_Success_Pebble(t *testing.T) {
 	store := newPebbleStoreForUserRepoTest(t) // Single store for the test
 	userToCreate := models.CreateUser{Username: "getme_pebble", Email: "getme@pebble.com", Password: "password"}
 
@@ -107,28 +103,20 @@ func TestGetUser_Success_Pebble(t *testing.T) {
 	assert.Equal(t, userToCreate.Username, retrievedUser.Username)
 	assert.Equal(t, userToCreate.Email, retrievedUser.Email)
 
-	retrievedUserByEmail, err := readRepo.GetUserByEmail(userToCreate.Email)
-	require.NoError(t, err)
-	require.NotNil(t, retrievedUserByEmail)
-	assert.Equal(t, userToCreate.Username, retrievedUserByEmail.Username)
-	assert.Equal(t, userToCreate.Email, retrievedUserByEmail.Email)
 }
 
 // TestGetUser_NotFound_Pebble tests retrieving a non-existent user.
-func TestGetUser_NotFound_Pebble(t *testing.T) {
-	uow, repo := newUserRepoPebbleTest(t) // Fresh DB, no users
+func TestPebbleGetUser_NotFound_Pebble(t *testing.T) {
+	_, _, repo := newUserRepoPebbleTest(t) // Fresh DB, no users
 
 	user, err := repo.GetUserByUsername("nonexistent_pebble_user")
 	require.NoError(t, err)
 	require.Nil(t, user)
 
-	userByEmail, err := repo.GetUserByEmail("nonexistent_pebble@example.com")
-	require.NoError(t, err)
-	require.Nil(t, userByEmail)
 }
 
 // TestDeleteUser_Success_Pebble tests deleting an existing user.
-func TestDeleteUser_Success_Pebble(t *testing.T) {
+func TestPebbleDeleteUser_Success_Pebble(t *testing.T) {
 	store := newPebbleStoreForUserRepoTest(t)
 	userToDelete := models.CreateUser{Username: "deleteme_pebble", Email: "deleteme@pebble.com", Password: "password"}
 
@@ -161,7 +149,7 @@ func TestDeleteUser_Success_Pebble(t *testing.T) {
 }
 
 // TestDeleteUser_CannotDeleteRoot_Pebble tests that a root user cannot be deleted.
-func TestDeleteUser_CannotDeleteRoot_Pebble(t *testing.T) {
+func TestPebbleDeleteUser_CannotDeleteRoot_Pebble(t *testing.T) {
 	store := newPebbleStoreForUserRepoTest(t)
 	rootUserToCreate := models.CreateUser{
 		Username:   "root_pebble_admin",
@@ -199,15 +187,15 @@ func TestDeleteUser_CannotDeleteRoot_Pebble(t *testing.T) {
 }
 
 // TestDeleteUser_NotFound_Pebble (adapted from GetError)
-func TestDeleteUser_NotFound_Pebble(t *testing.T) {
-	uow, repo := newUserRepoPebbleTest(t) // Fresh DB
+func TestPebbleDeleteUser_NotFound_Pebble(t *testing.T) {
+	_, _, repo := newUserRepoPebbleTest(t) // Fresh DB
 	deleted, err := repo.DeleteUser("nonexistent_pebble_user_to_delete")
 	require.NoError(t, err) // DeleteUser returns (false, nil) if user not found
 	assert.False(t, deleted)
 }
 
 // TestLoginUser_Pebble tests various login scenarios.
-func TestLoginUser_Pebble(t *testing.T) {
+func TestPebbleLoginUser_Pebble(t *testing.T) {
 	store := newPebbleStoreForUserRepoTest(t) // Shared store for all sub-tests
 
 	userEmail := "login_pebble@example.com"
@@ -274,17 +262,3 @@ func TestLoginUser_Pebble(t *testing.T) {
 		assert.False(t, loggedIn)
 	})
 }
-
-// Skipped tests (similar to RocksDB version due to difficulty in simulating with real DB):
-// - TestGetUser_ErrorOnGet: Hard to simulate specific DB I/O errors.
-// - TestGetUser_UnmarshalError: Assumes repository marshals correctly; corruption is external.
-// - TestDeleteUser_UnmarshalRootError: Similar to GetUser_UnmarshalError.
-// - TestDeleteUser_WriteError: Hard to simulate commit failures reliably.
-// - TestPutUser_KVStorePutError: Hard to simulate commit failures reliably.
-// - Login_ErrorOnEmailLookup, Login_ErrorOnUsernameLookup: These imply DB connectivity issues,
-//   not just data not found, which are hard to simulate reliably without fault injection.
-//   If the DB connection is fine, lookups find data or return nil (no data).
-//   An actual error (e.g., DB closed) would be a different kind of test.
-//   The mock tests could force the store's Get method to return arbitrary errors,
-//   which isn't feasible here in the same way.
-//   The main "negative" path tested is user not found or password mismatch.

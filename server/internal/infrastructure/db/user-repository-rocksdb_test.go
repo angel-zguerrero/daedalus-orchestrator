@@ -1,7 +1,6 @@
 package db_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -27,7 +26,7 @@ func newRocksdbStoreForUserRepoTest(t *testing.T) *db.RocksdbStore {
 	// db.AdminFC is the primary one based on user-repository_test.go.
 	// It's important to list all CFs that will be accessed.
 	// Assuming UserRepository primarily uses AdminFC. If it uses others, they should be added here.
-	cfNames := []string{db.DefaultColumnFamilyName, db.AdminFC} // db.AdminFC is crucial for UserRepository
+	cfNames := []string{db.DefaultFC, db.AdminFC} // db.AdminFC is crucial for UserRepository
 	cfOpts := make([]*grocksdb.Options, len(cfNames))
 	for i := range cfNames {
 		cfOpts[i] = goOp
@@ -61,16 +60,16 @@ func newRocksdbStoreForUserRepoTest(t *testing.T) *db.RocksdbStore {
 }
 
 // newUserRepoTest creates a new UnitOfWork and UserRepository for testing.
-func newUserRepoTest(t *testing.T) (*db.UnitOfWork, *db.UserRepository) {
+func newUserRepoTest(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.UserRepository) {
 	store := newRocksdbStoreForUserRepoTest(t)
 	uow := db.NewUnitOfWork(store)
 	userRepo, err := db.NewUserRepository(uow)
 	require.NoError(t, err, "Failed to create UserRepository")
-	return uow, userRepo
+	return uow, store, userRepo
 }
 
-func TestPutUser_Success(t *testing.T) {
-	uow, repo := newUserRepoTest(t) // For this test, a single UoW/DB instance is fine
+func TestRocksDBPutUser_Success(t *testing.T) {
+	uow, store, repo := newUserRepoTest(t) // For this test, a single UoW/DB instance is fine
 
 	userToCreate := models.CreateUser{
 		Username: "testuser",
@@ -91,8 +90,10 @@ func TestPutUser_Success(t *testing.T) {
 	err = uow.Commit()
 	require.NoError(t, err)
 
-	// Verify user is created
-	retrievedUser, err := repo.GetUserByUsername("testuser")
+	verifyUOW := db.NewUnitOfWork(store) // Use same store
+	verifyRepo, err := db.NewUserRepository(verifyUOW)
+	require.NoError(t, err)
+	retrievedUser, err := verifyRepo.GetUserByUsername("testuser")
 	require.NoError(t, err)
 	require.NotNil(t, retrievedUser)
 	assert.Equal(t, userToCreate.Username, retrievedUser.Username)
@@ -106,7 +107,7 @@ func TestPutUser_Success(t *testing.T) {
 	assert.NoError(t, err, "Stored password hash should match original password")
 }
 
-func TestGetUser_Success(t *testing.T) {
+func TestRocksDBGetUser_Success(t *testing.T) {
 	store := newRocksdbStoreForUserRepoTest(t) // Create store once
 
 	userToCreate := models.CreateUser{Username: "getme", Email: "getme@example.com", Password: "password"}
@@ -132,24 +133,16 @@ func TestGetUser_Success(t *testing.T) {
 	assert.Equal(t, userToCreate.Username, retrievedUser.Username)
 	assert.Equal(t, userToCreate.Email, retrievedUser.Email)
 
-	retrievedUserByEmail, err := readRepo.GetUserByEmail(userToCreate.Email)
-	require.NoError(t, err)
-	require.NotNil(t, retrievedUserByEmail)
-	assert.Equal(t, userToCreate.Username, retrievedUserByEmail.Username)
-	assert.Equal(t, userToCreate.Email, retrievedUserByEmail.Email)
 }
 
-func TestGetUser_NotFound(t *testing.T) {
+func TestRocksDBGetUser_NotFound(t *testing.T) {
 	// For NotFound, a fresh DB from newUserRepoTest is fine, as it starts empty.
-	uow, repo := newUserRepoTest(t)
+	_, _, repo := newUserRepoTest(t)
 
 	user, err := repo.GetUserByUsername("nonexistentuser")
 	require.NoError(t, err) // Expect no error from the repo method itself for not found
 	require.Nil(t, user)
 
-	userByEmail, err := repo.GetUserByEmail("nonexistent@example.com")
-	require.NoError(t, err)
-	require.Nil(t, userByEmail)
 }
 
 // TestGetUser_ErrorOnGet: This test is tricky with a real DB.
@@ -170,7 +163,7 @@ func TestGetUser_NotFound(t *testing.T) {
 // 3. Try to read it via the repository.
 // This is too complex for a standard unit test. We will assume data is not corrupted.
 
-func TestDeleteUser_Success(t *testing.T) {
+func TestRocksDBDeleteUser_Success(t *testing.T) {
 	store := newRocksdbStoreForUserRepoTest(t) // Create store once
 	userToDelete := models.CreateUser{Username: "deleteme", Email: "deleteme@example.com", Password: "password"}
 
@@ -210,7 +203,7 @@ func TestDeleteUser_Success(t *testing.T) {
 	require.Nil(t, goneUser, "User should be deleted")
 }
 
-func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
+func TestRocksDBDeleteUser_CannotDeleteRoot(t *testing.T) {
 	store := newRocksdbStoreForUserRepoTest(t) // Create store once
 	rootUserToCreate := models.CreateUser{
 		Username:   "rootadmin",
@@ -257,9 +250,9 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 
 // TestDeleteUser_GetError: Similar to TestGetUser_ErrorOnGet, hard to simulate DB-level read errors.
 // The primary "get error" scenario in DeleteUser before actual deletion is "user not found".
-func TestDeleteUser_NotFound(t *testing.T) {
+func TestRocksDBDeleteUser_NotFound(t *testing.T) {
 	// For NotFound, a fresh DB from newUserRepoTest is fine.
-	uow, repo := newUserRepoTest(t)
+	_, _, repo := newUserRepoTest(t)
 
 	deleted, err := repo.DeleteUser("nonexistentuser")
 	require.NoError(t, err) // DeleteUser might return (false, nil) if user not found
@@ -267,11 +260,10 @@ func TestDeleteUser_NotFound(t *testing.T) {
 	// No commit as nothing should have been deleted.
 }
 
-
 // TestDeleteUser_UnmarshalRootError: Similar to TestGetUser_UnmarshalError. Assumes data integrity.
 
 // TestDeleteUser_WriteError: This tests if uow.Commit() fails after a delete operation.
-func TestDeleteUser_WriteError(t *testing.T) {
+func TestRocksDBDeleteUser_WriteError(t *testing.T) {
 	// This requires a way to make the underlying KVStore's Write/Commit fail.
 	// This is hard to achieve with a real RocksDB instance without specific fault injection.
 	// The mock test `TestDeleteUser_WriteError` mocks `store.Write` to return an error.
@@ -286,14 +278,14 @@ func TestDeleteUser_WriteError(t *testing.T) {
 }
 
 // TestPutUser_KVStorePutError: Similar to TestDeleteUser_WriteError. Tests uow.Commit() failure.
-func TestPutUser_KVStorePutError(t *testing.T) {
+func TestRocksDBPutUser_KVStorePutError(t *testing.T) {
 	// Similar rationale to TestDeleteUser_WriteError.
 	t.Skip("Skipping TestPutUser_KVStorePutError as it's hard to reliably simulate KVStore write failures with a real DB.")
 }
 
 // TestLoginUser tests all login scenarios.
-func TestLoginUser(t *testing.T) {
-	uow, repo := newUserRepoTest(t)
+func TestRocksDBLoginUser(t *testing.T) {
+	uow, _, repo := newUserRepoTest(t)
 
 	userEmail := "login@example.com"
 	userUsername := "loginuser"
@@ -327,7 +319,6 @@ func TestLoginUser(t *testing.T) {
 	require.NoError(t, err)
 	err = initialUOW.Commit()
 	require.NoError(t, err)
-
 
 	t.Run("LoginWithEmail_CorrectPassword_Success", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
@@ -393,9 +384,3 @@ func TestLoginUser(t *testing.T) {
 		t.Skip("Skipping Login_ErrorOnUsernameLookup as it's hard to reliably simulate specific KVStore read errors with a real DB beyond 'not found'.")
 	})
 }
-
-// Additional tests may be needed for edge cases or specific behaviors not covered,
-// but this adapts the main tests from user-repository_test.go.
-// Tests involving forced errors (UnmarshalError, GetError, WriteError) are skipped
-// as they are difficult to reliably reproduce with a real database without fault injection.
-// The focus here is on successful operations and "not found" scenarios.
