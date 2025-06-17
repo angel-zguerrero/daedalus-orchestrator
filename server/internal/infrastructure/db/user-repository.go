@@ -71,3 +71,39 @@ func (r *UserRepository) DeleteUser(username string) (bool, error) {
 
 	return r.repo.Delete(rootUser.ID)
 }
+
+func (r *UserRepository) Login(identifier, password string) (bool, error) {
+	user, err := r.repo.FindByField("Email", identifier)
+	if err != nil {
+		// Error during email lookup
+		return false, err
+	}
+
+	if user == nil {
+		// User not found by email, try by username
+		user, err = r.repo.FindByField("Username", identifier)
+		if err != nil {
+			// Error during username lookup
+			return false, err
+		}
+	}
+
+	if user == nil {
+		// User not found by either email or username
+		return false, nil
+	}
+
+	// User found, now validate password
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	if err != nil {
+		if err == bcrypt.ErrMismatchedHashAndPassword {
+			// Password does not match
+			return false, nil
+		}
+		// Some other error during password comparison
+		return false, err
+	}
+
+	// Password matches
+	return true, nil
+}
