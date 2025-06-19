@@ -11,6 +11,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// --- Test Structs for Conditional Uniqueness ---
+
+type ConditionalUniqueEntity struct {
+	ID                     string `orm:"primary-key"`
+	Name                   string
+	UniqueValue            string `orm:"unique,ignore-is-true:ShouldIgnoreUniqueness"`
+	ShouldIgnoreUniqueness bool   `orm:""`
+	NonBoolFlag            int    `orm:""` // For testing invalid type reference
+}
+
+func (e *ConditionalUniqueEntity) TableName() string {
+	return "conditional_unique_entities"
+}
+
+type InvalidConditionalEntityBadRef struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:NonExistentFlag"`
+}
+
+func (e *InvalidConditionalEntityBadRef) TableName() string { return "invalid_cond_bad_ref" }
+
+type InvalidConditionalEntityBadType struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:NonBoolFlag"`
+	NonBoolFlag int    `orm:""`
+}
+
+func (e *InvalidConditionalEntityBadType) TableName() string { return "invalid_cond_bad_type" }
+
 type User struct {
 	ID   string `orm:"primary-key"`
 	Name string `orm:"unique"`
@@ -18,6 +47,42 @@ type User struct {
 
 func (User) TableName() string {
 	return "users"
+}
+
+func TestNewRepositoryConditionalUniquenessValidations(t *testing.T) {
+	mockStore := new(MockKVStore) // Does not hit DB for these validations
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	t.Run("Valid ConditionalUniqueEntity", func(t *testing.T) {
+		_, err := db.NewRepository[ConditionalUniqueEntity](mockStore, "cf_valid", "test_valid", iGF)
+		require.NoError(t, err)
+	})
+
+	t.Run("InvalidConditionalEntityBadRef - NonExistentFlag", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidConditionalEntityBadRef](mockStore, "cf_bad_ref", "test_bad_ref", iGF)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'UniqueValue' tagged with 'ignore-is-true:NonExistentFlag', but referenced field 'NonExistentFlag' does not exist in struct InvalidConditionalEntityBadRef")
+	})
+
+	t.Run("InvalidConditionalEntityBadType - NonBoolFlag", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidConditionalEntityBadType](mockStore, "cf_bad_type", "test_bad_type", iGF)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'UniqueValue' tagged with 'ignore-is-true:NonBoolFlag', but referenced field 'NonBoolFlag' must be of type 'bool', found 'int'")
+	})
+
+	// Test for createFieldDefinition error: ignore-is-true with empty field name
+	type InvalidConditionalEmptyField struct {
+		ID          string `orm:"primary-key"`
+		UniqueValue string `orm:"ignore-is-true:"`
+	}
+	fn := func() string { return "invalid_cond_empty_field" }
+
+	t.Run("InvalidConditionalEmptyField - ignore-is-true with empty field", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidConditionalEmptyField](mockStore, "cf_empty", "test_empty", iGF)
+		require.Error(t, err)
+		// This error comes from createFieldDefinition
+		assert.Contains(t, err.Error(), "error extracting fields from struct InvalidConditionalEmptyField: invalid ignore-is-true format for field 'UniqueValue': ignore-is-true:")
+	})
 }
 
 func TestRepository_Create_Success(t *testing.T) {

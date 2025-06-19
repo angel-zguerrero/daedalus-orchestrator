@@ -42,6 +42,11 @@ type FieldDefinition struct {
 	MaxLength *int
 
 	TTL bool
+
+	// IgnoreIsTrueFieldName stores the name of the boolean field that, if true, bypasses the uniqueness check.
+	IgnoreIsTrueFieldName string
+	// HasConditionalUniqueness indicates if the 'ignore-is-true' tag is used for this field.
+	HasConditionalUniqueness bool
 }
 
 // TableDefinition describes the schema of a table in the key-value store.
@@ -508,6 +513,21 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 
 		for _, def := range r.definition.Fields {
 			if def.Unique {
+				shouldSkipUniqueness := false
+				if def.HasConditionalUniqueness {
+					boolFieldVal, err := getNestedFieldValue(val, def.IgnoreIsTrueFieldName)
+					if err != nil {
+						return nil, fmt.Errorf("error getting conditional uniqueness flag field '%s' for entity: %w", def.IgnoreIsTrueFieldName, err)
+					}
+					if boolFieldVal.Kind() == reflect.Bool && boolFieldVal.Bool() {
+						shouldSkipUniqueness = true
+					}
+				}
+
+				if shouldSkipUniqueness {
+					continue // Skip uniqueness operations for this field on this entity
+				}
+
 				fieldVal, err := getNestedFieldValue(val, def.Name)
 				if err != nil {
 					return nil, fmt.Errorf("error getting unique field '%s' for entity: %w", def.Name, err)
@@ -534,6 +554,7 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 	}
 
 	// Validar duplicados en la base
+	// This check inherently respects shouldSkipUniqueness because items are not added to uniqueChecks
 	for _, check := range uniqueChecks {
 		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, check.Key)
 		if err != nil {
@@ -577,11 +598,33 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 			}
 
 			if def.Unique {
-				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
-				if hasTTL {
-					batch.PutTTl(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), ttl)
+				shouldSkipUniqueness := false
+				if def.HasConditionalUniqueness {
+					boolFieldVal, err := getNestedFieldValue(entityPtrVal, def.IgnoreIsTrueFieldName)
+					if err != nil {
+						return nil, fmt.Errorf("error getting conditional uniqueness flag field '%s' for entity with ID '%s': %w", def.IgnoreIsTrueFieldName, id, err)
+					}
+					if boolFieldVal.Kind() == reflect.Bool && boolFieldVal.Bool() {
+						shouldSkipUniqueness = true
+					}
+				}
+
+				if shouldSkipUniqueness {
+					// Already processed other non-unique indexing for this field if any,
+					// so just continue the inner loop over fields to skip unique indexing.
+					// Note: If a field was ONLY unique and had no other indexing logic,
+					// this continue would skip to the next field def.
+					// The current structure has general indexing first, then unique indexing.
+					// This `continue` will effectively skip the unique indexing part below for this field.
+					// To be absolutely clear, we could place the unique indexing in an else block
+					// of `if shouldSkipUniqueness`, but the current flow with continue is fine.
 				} else {
-					batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
+					uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
+					if hasTTL {
+						batch.PutTTl(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), ttl)
+					} else {
+						batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
+					}
 				}
 			}
 		}
@@ -715,6 +758,21 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 				continue
 			}
 
+			shouldSkipForBatchCheck := false
+			if def.HasConditionalUniqueness {
+				boolFieldVal, err := getNestedFieldValue(entityPtrVal, def.IgnoreIsTrueFieldName)
+				if err != nil {
+					return nil, fmt.Errorf("error getting conditional uniqueness flag '%s' for entity ID '%s' (batch check): %w", def.IgnoreIsTrueFieldName, id, err)
+				}
+				if boolFieldVal.Kind() == reflect.Bool && boolFieldVal.Bool() {
+					shouldSkipForBatchCheck = true
+				}
+			}
+
+			if shouldSkipForBatchCheck {
+				continue
+			}
+
 			fieldVal, err := getNestedFieldValue(entityPtrVal, def.Name)
 			if err != nil {
 				return nil, fmt.Errorf("error getting unique field '%s' for entity ID '%s' (batch check): %w", def.Name, id, err)
@@ -802,26 +860,40 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 
 			if oldValue != newValue {
 				if def.Unique {
-					// Check for new value collision in DB
-					idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
-					existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
-					if errDb != nil {
-						return nil, fmt.Errorf("error checking unique constraint for field '%s', value '%s': %w", def.Name, newValue, errDb)
-					}
-					if len(existingIDBytes) > 0 && string(existingIDBytes) != id {
-						return nil, fmt.Errorf("duplicate unique field: %s = %s (conflicts with existing ID %s)", def.Name, newValue, string(existingIDBytes))
-					}
-
-					// Delete old unique index
+					// Always delete old unique index if value changed
 					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue)
 					batch.Delete(r.definition.ColumnFamily, oldUIdxKey)
 
-					// Add new unique index
-					newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
-					if hasTTL {
-						batch.PutTTl(r.definition.ColumnFamily, newUIdxKey, []byte(id), ttl)
-					} else {
-						batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
+					shouldSkipUniquenessForNewValue := false
+					if def.HasConditionalUniqueness {
+						// newEntityReflectVal is entityPtrVal (*T)
+						boolFieldVal, err := getNestedFieldValue(newEntityReflectVal, def.IgnoreIsTrueFieldName)
+						if err != nil {
+							return nil, fmt.Errorf("error getting conditional uniqueness flag '%s' for entity ID '%s' (update check): %w", def.IgnoreIsTrueFieldName, id, err)
+						}
+						if boolFieldVal.Kind() == reflect.Bool && boolFieldVal.Bool() {
+							shouldSkipUniquenessForNewValue = true
+						}
+					}
+
+					if !shouldSkipUniquenessForNewValue {
+						// Check for new value collision in DB
+						idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
+						existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
+						if errDb != nil {
+							return nil, fmt.Errorf("error checking unique constraint for field '%s', value '%s': %w", def.Name, newValue, errDb)
+						}
+						if len(existingIDBytes) > 0 && string(existingIDBytes) != id {
+							return nil, fmt.Errorf("duplicate unique field: %s = %s (conflicts with existing ID %s)", def.Name, newValue, string(existingIDBytes))
+						}
+
+						// Add new unique index
+						newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
+						if hasTTL { // Assuming hasTTL and ttl are determined for the entity
+							batch.PutTTl(r.definition.ColumnFamily, newUIdxKey, []byte(id), ttl)
+						} else {
+							batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
+						}
 					}
 				}
 
@@ -1101,6 +1173,26 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 		return nil, fmt.Errorf("struct %s must have a string field named 'ID' with `orm:\"primary-key\"`", t.Name())
 	}
 
+	// Validate conditional uniqueness fields
+	for fieldName, fieldDef := range table.Fields {
+		if fieldDef.HasConditionalUniqueness {
+			if fieldDef.IgnoreIsTrueFieldName == "" {
+				// This case should ideally be caught by createFieldDefinition
+				return nil, fmt.Errorf("internal error: field '%s' has conditional uniqueness but no ignore-is-true field name specified", fieldName)
+			}
+
+			referencedFieldName := fieldDef.IgnoreIsTrueFieldName
+			referencedFieldDef, ok := table.Fields[referencedFieldName]
+			if !ok {
+				return nil, fmt.Errorf("field '%s' tagged with 'ignore-is-true:%s', but referenced field '%s' does not exist in struct %s", fieldName, referencedFieldName, referencedFieldName, t.Name())
+			}
+
+			if referencedFieldDef.Type != "bool" {
+				return nil, fmt.Errorf("field '%s' tagged with 'ignore-is-true:%s', but referenced field '%s' must be of type 'bool', found '%s'", fieldName, referencedFieldName, referencedFieldName, referencedFieldDef.Type)
+			}
+		}
+	}
+
 	return &Repository[T]{definition: table, kvStore: kvStore, idGeneratorFactory: idGeneratorFactory}, nil
 }
 
@@ -1164,6 +1256,15 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 		switch {
 		case rule == "unique":
 			def.Unique = true
+		case strings.HasPrefix(rule, "ignore-is-true:"):
+			parts := strings.SplitN(rule, ":", 2)
+			if len(parts) == 2 && parts[1] != "" {
+				def.Unique = true // Conditional uniqueness implies uniqueness
+				def.HasConditionalUniqueness = true
+				def.IgnoreIsTrueFieldName = parts[1]
+			} else {
+				return FieldDefinition{}, fmt.Errorf("invalid ignore-is-true format for field '%s': %s", fullName, rule)
+			}
 		case rule == "primary-key":
 			if prefix != "" || field.Name != "ID" {
 				return FieldDefinition{}, fmt.Errorf("primary key can only be defined on top-level 'ID' field, found on '%s'", fullName)
