@@ -109,25 +109,25 @@ func (pq *PriorityQueue) Dequeue() *Task {
 			}
 
 			if i >= len(pq.priorities)-1 {
-                allQueuesThresholdMetOrEmpty := true
-                // Use different variable names for p, tasks, ok in this inner loop
-                // to avoid any possible (though unlikely for syntax error) confusion.
-                for _, p_check := range pq.priorities {
-                    if tasks_check, ok_check := pq.tasks[p_check]; ok_check && len(tasks_check) > 0 {
-                        // Check threshold for p_check; if not in map, it's 0.
-                        if pq.thresholds[p_check] == 0 || pq.processedCounts[p_check] < pq.thresholds[p_check] {
-                            allQueuesThresholdMetOrEmpty = false
-                            break
-                        }
-                    }
-                }
-                if allQueuesThresholdMetOrEmpty {
-                    for priorityKey := range pq.processedCounts {
-                        if pq.thresholds[priorityKey] > 0 {
-                            pq.processedCounts[priorityKey] = 0
-                        }
-                    }
-                }
+				allQueuesThresholdMetOrEmpty := true
+				// Use different variable names for p, tasks, ok in this inner loop
+				// to avoid any possible (though unlikely for syntax error) confusion.
+				for _, p_check := range pq.priorities {
+					if tasks_check, ok_check := pq.tasks[p_check]; ok_check && len(tasks_check) > 0 {
+						// Check threshold for p_check; if not in map, it's 0.
+						if pq.thresholds[p_check] == 0 || pq.processedCounts[p_check] < pq.thresholds[p_check] {
+							allQueuesThresholdMetOrEmpty = false
+							break
+						}
+					}
+				}
+				if allQueuesThresholdMetOrEmpty {
+					for priorityKey := range pq.processedCounts {
+						if pq.thresholds[priorityKey] > 0 {
+							pq.processedCounts[priorityKey] = 0
+						}
+					}
+				}
 			}
 		}
 	}

@@ -59,27 +59,36 @@ func TestPriorityQueue_BasicEnqueueDequeue(t *testing.T) {
 
 func TestPriorityQueue_ThresholdLogic_Example(t *testing.T) {
 	thresholds := map[int]int{
-		2: 0, // must fully consume all priority 2 tasks before going to 1
+		2: 6, // must fully consume all priority 2 tasks before going to 1
 		1: 4, // after 4 priority 1 tasks, allow one of priority 0
-		0: 1, // after 1 of priority 0, allow lower (if it existed) / or loop back to higher
+		0: 2, // after 1 of priority 0, allow lower (if it existed) / or loop back to higher
 	}
 	pq := NewPriorityQueue(thresholds)
 
 	tasks := []Task{
-		{ID: "A", Priority: 2, Index: 0}, {ID: "B", Priority: 2, Index: 1},
-		{ID: "C", Priority: 1, Index: 2}, {ID: "D", Priority: 1, Index: 3},
-		{ID: "E", Priority: 1, Index: 4}, {ID: "F", Priority: 1, Index: 5},
-		{ID: "G", Priority: 1, Index: 6}, // 5th task of priority 1
+		{ID: "C", Priority: 1, Index: 2},
+		{ID: "D", Priority: 1, Index: 3},
+		{ID: "E", Priority: 1, Index: 4},
+		{ID: "F", Priority: 1, Index: 5},
+		{ID: "G", Priority: 1, Index: 6},
+		{ID: "A", Priority: 2, Index: 1},
 		{ID: "H", Priority: 0, Index: 7},
 		{ID: "I", Priority: 0, Index: 8},
 		{ID: "J", Priority: 0, Index: 9},
+		{ID: "B", Priority: 2, Index: 0},
+		{ID: "K", Priority: 2, Index: 0},
+		{ID: "L", Priority: 2, Index: 0},
+		{ID: "M", Priority: 2, Index: 0},
+		{ID: "N", Priority: 2, Index: 0},
+		{ID: "O", Priority: 2, Index: 0},
+		{ID: "P", Priority: 2, Index: 0},
 	}
 
 	for _, task := range tasks {
 		pq.Enqueue(task)
 	}
 
-	expectedIDs := []string{"A", "B", "C", "D", "E", "F", "H", "G", "I", "J"}
+	expectedIDs := []string{"A", "B", "K", "L", "M", "N", "C", "D", "E", "F", "H", "I", "O", "P", "G", "J"}
 	actualIDs := []string{}
 
 	for i := 0; i < len(expectedIDs); i++ {
@@ -98,7 +107,6 @@ func TestPriorityQueue_ThresholdLogic_Example(t *testing.T) {
 		t.Errorf("Expected queue length to be 0 after dequeuing all, got %d", pq.Len())
 	}
 }
-
 
 func TestPriorityQueue_OnlyOnePriority(t *testing.T) {
 	thresholds := map[int]int{1: 2} // Threshold doesn't really matter if only one priority
@@ -138,9 +146,12 @@ func TestPriorityQueue_EmptyQueue(t *testing.T) {
 func TestPriorityQueue_ThresholdZeroForAll(t *testing.T) {
 	pq := NewPriorityQueue(map[int]int{2: 0, 1: 0, 0: 0})
 	tasks := []Task{
-		{ID: "A", Priority: 0, Index: 0}, {ID: "B", Priority: 1, Index: 1},
-		{ID: "C", Priority: 2, Index: 2}, {ID: "D", Priority: 1, Index: 3},
-		{ID: "E", Priority: 0, Index: 4}, {ID: "F", Priority: 2, Index: 5},
+		{ID: "A", Priority: 0, Index: 0},
+		{ID: "B", Priority: 1, Index: 1},
+		{ID: "C", Priority: 2, Index: 2},
+		{ID: "D", Priority: 1, Index: 3},
+		{ID: "E", Priority: 0, Index: 4},
+		{ID: "F", Priority: 2, Index: 5},
 	}
 	for _, task := range tasks {
 		pq.Enqueue(task)
@@ -222,7 +233,7 @@ func TestPriorityQueue_InterleavedEnqueueDequeue(t *testing.T) {
 }
 
 func TestPriorityQueue_NewHighestPriorityAdded(t *testing.T) {
-	pq := NewPriorityQueue(map[int]int{2:1, 1:1, 0:1}) // Explicitly define threshold for P2
+	pq := NewPriorityQueue(map[int]int{2: 1, 1: 1, 0: 1}) // Explicitly define threshold for P2
 	pq.Enqueue(Task{ID: "A", Priority: 0, Index: 0})
 	pq.Enqueue(Task{ID: "B", Priority: 1, Index: 1}) // B is P1
 
@@ -248,20 +259,19 @@ func TestPriorityQueue_NewHighestPriorityAdded(t *testing.T) {
 	if task == nil || task.ID != "A" {
 		t.Fatalf("Expected A, got %v. PQ state: curIdx %d, priorities %v, counts %v", formatTask(task), pq.currentIndex, pq.priorities, pq.processedCounts)
 	}
-    // pq.processedCounts[0] = 1. pq.currentIndex should now point to P2 (index 0 of [2,1,0])
+	// pq.processedCounts[0] = 1. pq.currentIndex should now point to P2 (index 0 of [2,1,0])
 
-    pq.Enqueue(Task{ID: "D", Priority: 0, Index: 3}) // Add D(0) to P0 queue
+	pq.Enqueue(Task{ID: "D", Priority: 0, Index: 3}) // Add D(0) to P0 queue
 
-    // P2 is empty. Dequeue should skip P2.
-    // P1 is empty. Dequeue should skip P1.
-    // pq.currentIndex should point to P0.
-    // P0 queue has D.
+	// P2 is empty. Dequeue should skip P2.
+	// P1 is empty. Dequeue should skip P1.
+	// pq.currentIndex should point to P0.
+	// P0 queue has D.
 	task = pq.Dequeue() // Should be D (P0)
 	if task == nil || task.ID != "D" {
 		t.Fatalf("Expected D, got %v. PQ state: curIdx %d, priorities %v, counts %v", formatTask(task), pq.currentIndex, pq.priorities, pq.processedCounts)
 	}
 }
-
 
 // Helper to format task details for logging
 func formatTask(task *Task) string {
