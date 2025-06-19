@@ -984,6 +984,29 @@ func newTestNRepository(t *testing.T) (*db.Repository[UserComplexN], error) {
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
 	return db.NewRepository[UserComplexN](store, TestFC, "test_schema", iGF)
 }
+
+func newNestedEntityTestRepositoryRocksDB(t *testing.T) (*db.Repository[NestedEntityTest], error) {
+	store := newRocksdbStore(t)                                                        // Assumes newRocksdbStore is defined in this file
+	iGF := NewTestIDGeneratorFactory([]string{"nid1", "nid2", "nid3", "nid4", "nid5"}) // Example IDs
+	return db.NewRepository[NestedEntityTest](store, TestFC, "nested_entity_schema", iGF)
+}
+
+type NestedMetaTest struct {
+	UniqueID    string `orm:"unique"`
+	OTValue     string
+	Description string
+}
+
+type NestedEntityTest struct {
+	ID   string `orm:"primary-key"`
+	Data string
+	Meta NestedMetaTest
+}
+
+func (NestedEntityTest) TableName() string {
+	return "nested_entities_test"
+}
+
 func TestRepository_PutAndGet_Nested(t *testing.T) {
 	repo, err := newTestNRepository(t)
 	require.NoError(t, err)
@@ -1018,4 +1041,271 @@ func TestRepository_PutAndGet_Nested(t *testing.T) {
 	found, err = repo.FindByField("Meta.Tag1", "t1")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Unknown field Meta.Tag1")
+}
+
+func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
+	repo, err := newNestedEntityTestRepositoryRocksDB(t)
+	require.NoError(t, err, "Failed to create repository for NestedEntityTest")
+
+	t.Run("Successful bulk creation with nested structs", func(t *testing.T) {
+		entities := []*NestedEntityTest{
+			{ID: "---", Data: "Entity1", Meta: NestedMetaTest{UniqueID: "uniqueA1", OTValue: "ttl1", Description: "Desc1"}},
+			{ID: "---", Data: "Entity2", Meta: NestedMetaTest{UniqueID: "uniqueA2", OTValue: "ttl2", Description: "Desc2"}},
+			{ID: "---", Data: "Entity3", Meta: NestedMetaTest{UniqueID: "uniqueA3", OTValue: "ttl3", Description: "Desc3"}},
+		}
+
+		ids, err := repo.BulkCreate(entities)
+		require.NoError(t, err, "BulkCreate failed for valid nested entities")
+		require.Len(t, ids, len(entities), "BulkCreate should return an ID for each entity")
+
+		for i, id := range ids {
+			require.NotEmpty(t, id, "Expected a non-empty ID for entity %d", i)
+			entities[i].ID = id // Assign returned ID for later checks
+
+			found, err := repo.FindByField("ID", id)
+			require.NoError(t, err, "FindByField by ID failed for created entity %s", id)
+			require.NotNil(t, found, "Should find entity by ID %s", id)
+			assert.Equal(t, entities[i].Data, found.Data, "Data field mismatch for entity %s", id)
+			assert.Equal(t, entities[i].Meta.UniqueID, found.Meta.UniqueID, "Meta.UniqueID field mismatch for entity %s", id)
+			assert.Equal(t, entities[i].Meta.OTValue, found.Meta.OTValue, "Meta.TTLValue field mismatch for entity %s", id)
+			assert.Equal(t, entities[i].Meta.Description, found.Meta.Description, "Meta.Description field mismatch for entity %s", id)
+		}
+
+		// Verify finding by nested unique index
+		foundByNestedUnique, err := repo.FindByField("Meta.UniqueID", "uniqueA2")
+		require.NoError(t, err, "FindByField by Meta.UniqueID failed")
+		require.NotNil(t, foundByNestedUnique, "Should find entity by Meta.UniqueID 'uniqueA2'")
+		assert.Equal(t, entities[1].ID, foundByNestedUnique.ID, "ID mismatch when finding by Meta.UniqueID")
+		assert.Equal(t, "Entity2", foundByNestedUnique.Data)
+		assert.Equal(t, "uniqueA2", foundByNestedUnique.Meta.UniqueID)
+	})
+
+	t.Run("Bulk creation with duplicate UniqueID within the batch", func(t *testing.T) {
+		// Need a fresh repo instance or ensure DB is clean if tests share state,
+		// but newNestedEntityTestRepositoryRocksDB creates a new store each time.
+		repoFresh, err := newNestedEntityTestRepositoryRocksDB(t)
+		require.NoError(t, err)
+
+		entities := []*NestedEntityTest{
+			{ID: "---", Data: "EntityX", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", OTValue: "ttlX", Description: "DescX"}},
+			{ID: "---", Data: "EntityY", Meta: NestedMetaTest{UniqueID: "anotherUniqueInBatch", OTValue: "ttlY", Description: "DescY"}},
+			{ID: "---", Data: "EntityZ", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", OTValue: "ttlZ", Description: "DescZ"}}, // Duplicate UniqueID
+		}
+
+		ids, err := repoFresh.BulkCreate(entities)
+		require.Error(t, err, "BulkCreate should fail due to duplicate UniqueID within the batch")
+		assert.Nil(t, ids, "IDs should be nil on batch creation failure")
+		// The exact error message depends on the implementation, but it should indicate a unique constraint violation.
+		// Example: assert.Contains(t, err.Error(), "duplicate key", "Error message should indicate a duplicate key problem")
+		// Or, more generically for unique constraints:
+		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a unique constraint violation")
+
+		// Verify no entities were partially inserted (transactional behavior)
+		found, err := repoFresh.FindByField("Meta.UniqueID", "duplicateKeyInBatch")
+		require.NoError(t, err)
+		assert.Nil(t, found, "No entity should be found with the conflicting UniqueID if batch failed")
+
+		found, err = repoFresh.FindByField("Meta.UniqueID", "anotherUniqueInBatch")
+		require.NoError(t, err)
+		assert.Nil(t, found, "No entity should be found with a non-conflicting UniqueID if batch failed")
+	})
+
+	t.Run("Bulk creation with UniqueID conflicting with existing data", func(t *testing.T) {
+		repoClean, err := newNestedEntityTestRepositoryRocksDB(t) // Fresh repo
+		require.NoError(t, err)
+
+		// Pre-existing entity
+		existingEntity := NestedEntityTest{ID: "---", Data: "ExistingData", Meta: NestedMetaTest{UniqueID: "conflictWithExisting", OTValue: "ttlE", Description: "DescE"}}
+		_, err = repoClean.Create(&existingEntity) // Use Create for single setup
+		require.NoError(t, err, "Setup: Failed to create initial entity")
+
+		entitiesToBulkCreate := []*NestedEntityTest{
+			{ID: "---", Data: "NewEntity1", Meta: NestedMetaTest{UniqueID: "newUnique1", OTValue: "ttlN1", Description: "DescN1"}},
+			{ID: "---", Data: "NewEntity2Conflicting", Meta: NestedMetaTest{UniqueID: "conflictWithExisting", OTValue: "ttlN2", Description: "DescN2"}}, // Conflicts with existingEntity.Meta.UniqueID
+			{ID: "---", Data: "NewEntity3", Meta: NestedMetaTest{UniqueID: "newUnique3", OTValue: "ttlN3", Description: "DescN3"}},
+		}
+
+		ids, err := repoClean.BulkCreate(entitiesToBulkCreate)
+		require.Error(t, err, "BulkCreate should fail due to conflict with existing UniqueID")
+		assert.Nil(t, ids, "IDs should be nil on batch creation failure due to existing conflict")
+		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a unique constraint violation")
+
+		// Verify the conflicting entity was not inserted and non-conflicting ones from the batch also weren't (if transactional)
+		foundNew, err := repoClean.FindByField("Meta.UniqueID", "newUnique1")
+		require.NoError(t, err)
+		assert.Nil(t, foundNew, "Non-conflicting entity from failed batch should not be inserted")
+
+		// Verify existing entity is still there
+		foundExisting, err := repoClean.FindByField("Meta.UniqueID", "conflictWithExisting")
+		require.NoError(t, err)
+		require.NotNil(t, foundExisting, "Original entity with the conflicting key should still exist")
+		assert.Equal(t, existingEntity.Data, foundExisting.Data)
+	})
+}
+
+func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
+	t.Run("Successful bulk update of nested structs", func(t *testing.T) {
+		repo, err := newNestedEntityTestRepositoryRocksDB(t) // Uses specific IDs: nid1, nid2, nid3, ...
+		require.NoError(t, err)
+
+		initialEntities := []*NestedEntityTest{
+			{ID: "---", Data: "DataOne", Meta: NestedMetaTest{UniqueID: "uniqueU1", OTValue: "ttlU1", Description: "DescU1"}},
+			{ID: "---", Data: "DataTwo", Meta: NestedMetaTest{UniqueID: "uniqueU2", OTValue: "ttlU2", Description: "DescU2"}},
+		}
+		createdIds, err := repo.BulkCreate(initialEntities)
+		require.NoError(t, err)
+		require.Len(t, createdIds, 2)
+
+		// Prepare updates
+		updatedEntities := []*NestedEntityTest{
+			{ID: createdIds[0], Data: "DataOneUpdated", Meta: NestedMetaTest{UniqueID: "uniqueU1_new", OTValue: "ttlU1_new", Description: "DescU1_new"}},
+			{ID: createdIds[1], Data: "DataTwoUpdated", Meta: NestedMetaTest{UniqueID: "uniqueU2_new", OTValue: "ttlU2_new", Description: "DescU2_new"}},
+		}
+
+		results, err := repo.BulkUpdate(updatedEntities)
+		require.NoError(t, err, "BulkUpdate failed for valid nested entity updates")
+		require.Len(t, results, len(updatedEntities), "BulkUpdate should return a result for each entity")
+		for i, success := range results {
+			assert.True(t, success, "Expected update for entity ID %s to succeed", updatedEntities[i].ID)
+		}
+
+		// Verify updates
+		for i, updatedEntity := range updatedEntities {
+			found, err := repo.FindByField("ID", updatedEntity.ID)
+			require.NoError(t, err)
+			require.NotNil(t, found)
+			assert.Equal(t, updatedEntity.Data, found.Data)
+			assert.Equal(t, updatedEntity.Meta.UniqueID, found.Meta.UniqueID)
+			assert.Equal(t, updatedEntity.Meta.OTValue, found.Meta.OTValue)
+			assert.Equal(t, updatedEntity.Meta.Description, found.Meta.Description)
+
+			// Verify old unique index is gone
+			oldUniqueValue := initialEntities[i].Meta.UniqueID
+			foundByOldUnique, err := repo.FindByField("Meta.UniqueID", oldUniqueValue)
+			require.NoError(t, err)
+			assert.Nil(t, foundByOldUnique, "Entity should not be found by old Meta.UniqueID %s", oldUniqueValue)
+
+			// Verify new unique index is present
+			foundByNewUnique, err := repo.FindByField("Meta.UniqueID", updatedEntity.Meta.UniqueID)
+			require.NoError(t, err)
+			require.NotNil(t, foundByNewUnique, "Entity should be found by new Meta.UniqueID %s", updatedEntity.Meta.UniqueID)
+			assert.Equal(t, updatedEntity.ID, foundByNewUnique.ID)
+		}
+	})
+
+	t.Run("Bulk update with UniqueID conflict within the batch", func(t *testing.T) {
+		repo, err := newNestedEntityTestRepositoryRocksDB(t)
+		require.NoError(t, err)
+
+		initialEntities := []*NestedEntityTest{
+			{ID: "---", Data: "Alpha", Meta: NestedMetaTest{UniqueID: "alphaUnique", OTValue: "ttlA", Description: "DescA"}},
+			{ID: "---", Data: "Beta", Meta: NestedMetaTest{UniqueID: "betaUnique", OTValue: "ttlB", Description: "DescB"}},
+		}
+		createdIds, err := repo.BulkCreate(initialEntities)
+		require.NoError(t, err)
+		require.Len(t, createdIds, 2)
+		initialEntities[0].ID = createdIds[0]
+		initialEntities[1].ID = createdIds[1]
+
+		// Try to update both to have the same UniqueID
+		conflictingUpdates := []*NestedEntityTest{
+			{ID: createdIds[0], Data: "AlphaUpdated", Meta: NestedMetaTest{UniqueID: "conflictKey", OTValue: "ttlA_new", Description: "DescA_new"}},
+			{ID: createdIds[1], Data: "BetaUpdated", Meta: NestedMetaTest{UniqueID: "conflictKey", OTValue: "ttlB_new", Description: "DescB_new"}},
+		}
+
+		_, err = repo.BulkUpdate(conflictingUpdates)
+		require.Error(t, err, "BulkUpdate should fail due to UniqueID conflict within the batch")
+		// The exact behavior of `results` on error might vary. Some implementations might return nil, others might return []bool{false, false}
+		// Based on existing BulkUpdate tests, it seems an error is returned and results might be nil or reflect failure.
+		// Let's assume the primary check is the error.
+		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a duplicate key problem")
+
+		// Verify original entities are unchanged
+		for _, originalEntity := range initialEntities {
+			found, err := repo.FindByField("ID", originalEntity.ID)
+			require.NoError(t, err)
+			require.NotNil(t, found)
+			assert.Equal(t, originalEntity.Data, found.Data, "Data should not have changed for ID %s", originalEntity.ID)
+			assert.Equal(t, originalEntity.Meta.UniqueID, found.Meta.UniqueID, "Meta.UniqueID should not have changed for ID %s", originalEntity.ID)
+		}
+	})
+
+	t.Run("Bulk update with UniqueID conflicting with another existing (untouched) entity", func(t *testing.T) {
+		repo, err := newNestedEntityTestRepositoryRocksDB(t)
+		require.NoError(t, err)
+
+		entities := []*NestedEntityTest{
+			{ID: "---", Data: "EntityToUpdate", Meta: NestedMetaTest{UniqueID: "originalUnique1", OTValue: "ttl1", Description: "Desc1"}},       // Will be nid1
+			{ID: "---", Data: "EntityToConflictWith", Meta: NestedMetaTest{UniqueID: "existingUnique2", OTValue: "ttl2", Description: "Desc2"}}, // Will be nid2
+		}
+		createdIds, err := repo.BulkCreate(entities)
+		require.NoError(t, err)
+		require.Len(t, createdIds, 2)
+		entities[0].ID = createdIds[0]
+		entities[1].ID = createdIds[1]
+
+		// Attempt to update EntityToUpdate's UniqueID to match EntityToConflictWith's UniqueID
+		updateAttempt := []*NestedEntityTest{
+			{ID: createdIds[0], Data: "EntityToUpdateModified", Meta: NestedMetaTest{UniqueID: "existingUnique2", OTValue: "ttl1_mod", Description: "Desc1_mod"}},
+		}
+
+		_, err = repo.BulkUpdate(updateAttempt)
+		require.Error(t, err, "BulkUpdate should fail due to conflict with another existing entity's UniqueID")
+		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a duplicate key problem")
+		// We expect results to be nil or indicate failure if the batch fails entirely.
+		// If the API returns per-entity status even on overarching error, it might be []bool{false}
+
+		// Verify EntityToUpdate was not actually updated
+		foundOriginal, err := repo.FindByField("ID", createdIds[0])
+		require.NoError(t, err)
+		require.NotNil(t, foundOriginal)
+		assert.Equal(t, "EntityToUpdate", foundOriginal.Data, "EntityToUpdate's data should not have changed")
+		assert.Equal(t, "originalUnique1", foundOriginal.Meta.UniqueID, "EntityToUpdate's UniqueID should not have changed")
+
+		// Verify EntityToConflictWith is also unchanged
+		foundUntouched, err := repo.FindByField("ID", createdIds[1])
+		require.NoError(t, err)
+		require.NotNil(t, foundUntouched)
+		assert.Equal(t, "EntityToConflictWith", foundUntouched.Data)
+		assert.Equal(t, "existingUnique2", foundUntouched.Meta.UniqueID)
+	})
+
+	t.Run("Bulk update including non-existent entities", func(t *testing.T) {
+		repo, err := newNestedEntityTestRepositoryRocksDB(t)
+		require.NoError(t, err)
+
+		existingEntity := NestedEntityTest{ID: "---", Data: "RealData", Meta: NestedMetaTest{UniqueID: "realUnique", OTValue: "ttlReal", Description: "DescReal"}}
+		createdIds, err := repo.BulkCreate([]*NestedEntityTest{&existingEntity})
+		require.NoError(t, err)
+		require.Len(t, createdIds, 1)
+		existingEntity.ID = createdIds[0]
+
+		updates := []*NestedEntityTest{
+			{ID: existingEntity.ID, Data: "RealDataUpdated", Meta: NestedMetaTest{UniqueID: "realUniqueUpdated", OTValue: "ttlRealUpdated", Description: "DescRealUpdated"}},
+			{ID: "nonExistentID1", Data: "PhantomData1", Meta: NestedMetaTest{UniqueID: "phantomUnique1", OTValue: "ttlPhantom1", Description: "DescPhantom1"}},
+			{ID: "nonExistentID2", Data: "PhantomData2", Meta: NestedMetaTest{UniqueID: "phantomUnique2", OTValue: "ttlPhantom2", Description: "DescPhantom2"}},
+		}
+
+		results, err := repo.BulkUpdate(updates)
+		require.NoError(t, err, "BulkUpdate with non-existent IDs should not error out if some are valid (depends on exact error handling, but usually it's per-item status)")
+		// This behavior (no error, but false for non-existent) is common for bulk ops.
+		// If the design is to error out if *any* ID is not found, this test needs adjustment.
+		// The existing `TestRepository_BulkUpdate` -> "Should return false for missing records" subtest suggests `NoError` is correct.
+		require.Len(t, results, len(updates))
+		assert.True(t, results[0], "Update for existing entity should succeed")
+		assert.False(t, results[1], "Update for non-existent entity nonExistentID1 should be marked as false")
+		assert.False(t, results[2], "Update for non-existent entity nonExistentID2 should be marked as false")
+
+		// Verify the existing entity was updated
+		found, err := repo.FindByField("ID", existingEntity.ID)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.Equal(t, "RealDataUpdated", found.Data)
+		assert.Equal(t, "realUniqueUpdated", found.Meta.UniqueID)
+
+		// Verify non-existent entities were not created
+		foundPhantom1, err := repo.FindByField("ID", "nonExistentID1")
+		require.NoError(t, err)
+		assert.Nil(t, foundPhantom1)
+	})
 }
