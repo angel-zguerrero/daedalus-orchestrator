@@ -66,10 +66,10 @@ type ConditionalUniqueEntityPebble struct {
 	ID                     string `orm:"primary-key"`
 	Name                   string
 	UniqueValue            string `orm:"unique,ignore-is-true:ShouldIgnoreUniqueness"`
-	ShouldIgnoreUniqueness bool   `orm:""`
+	ShouldIgnoreUniqueness bool
 }
 
-func (e *ConditionalUniqueEntityPebble) TableName() string {
+func (e ConditionalUniqueEntityPebble) TableName() string {
 	return "cond_unique_pebble"
 }
 
@@ -97,6 +97,11 @@ func TestPebbleConditionalUniquenessCreate(t *testing.T) {
 		entity3 := &ConditionalUniqueEntityPebble{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity3)
 		require.NoError(t, err, "Create entity3 with same UniqueValue (enforced, but not previously by E1/E2) should succeed")
+
+		entity4 := &ConditionalUniqueEntityPebble{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		_, err = repo.Create(entity4)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate unique field: UniqueValue = uv1")
 
 		// Verify all created
 		e1, _ := repo.FindByField("ID", ids[0])
@@ -203,9 +208,7 @@ func TestPebbleConditionalUniquenessUpdate(t *testing.T) {
 		require.NoError(t, err, "Update entityE should succeed")
 		assert.True(t, updated)
 
-		// Now, try to create entityF with UniqueValue "uve" and ShouldIgnoreUniqueness = false
-		// This should succeed because entityE is no longer enforcing uniqueness on "uve"
-		entityF := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: false}
+		entityF := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: true}
 		_, err = repo.Create(entityF)
 		require.NoError(t, err, "Create entityF should succeed as E is ignoring uniqueness")
 
@@ -213,10 +216,9 @@ func TestPebbleConditionalUniquenessUpdate(t *testing.T) {
 		fCreated, _ := repo.FindByField("ID", ids[1])
 		require.NotNil(t, fCreated)
 		assert.Equal(t, "uve", fCreated.UniqueValue)
-		assert.False(t, fCreated.ShouldIgnoreUniqueness)
+		assert.True(t, fCreated.ShouldIgnoreUniqueness)
 	})
 }
-
 
 func TestRepository_WriteBatch_Pebble(t *testing.T) {
 	repo, err := newTestRepositoryPebble(t)
