@@ -92,7 +92,7 @@ func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", "admin", iGF)
-	assert.EqualError(t, err, "struct NoPrimary must have a string field named 'ID' with `orm:primary-key`")
+	assert.EqualError(t, err, "struct NoPrimary must have a string field named 'ID' with `orm:\"primary-key\"`")
 
 }
 
@@ -194,7 +194,7 @@ func TestRepository_FindByField_Invalid_TTL_Field_name(t *testing.T) {
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	_, err := db.NewRepository[InvalidTempEntity](mockStore, "cf1", "admin", iGF)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "struct InvalidTempEntity has an invalid field name for the TTL field; it must be named 'TTL' and tagged with")
+	assert.Contains(t, err.Error(), "error extracting fields from struct InvalidTempEntity: ttl can only be defined on top-level 'TTL' field, found on 'ttl'")
 }
 
 type Invalid struct {
@@ -211,7 +211,7 @@ func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 
 	_, err := db.NewRepository[Invalid](mockStore, "cf1", "admin", iGF)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "struct Invalid must have a string field named 'ID' with `orm:primary-key`")
+	assert.Contains(t, err.Error(), "struct Invalid must have a string field named 'ID' with `orm:\"primary-key\"`")
 }
 
 func TestRepository_Find_AND(t *testing.T) {

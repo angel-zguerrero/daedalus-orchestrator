@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -473,6 +474,7 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 	var ids []string
 	batch := NewWriteBatch()
+
 	type uniqueCheck struct {
 		Key       string
 		FieldName string
@@ -493,30 +495,38 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 		}
 
 		// Set primary key field
-		for fieldName, def := range r.definition.Fields {
-			if def.Primary {
-				field := val.FieldByName(fieldName)
-				if field.IsValid() && field.CanSet() && field.Kind() == reflect.String {
-					field.SetString(id)
-				}
-				break
-			}
+		// The primary key field name is validated to be "ID" and top-level by NewRepository.
+		pkField, err := getNestedFieldValue(val, "ID")
+		if err != nil {
+			return nil, fmt.Errorf("error getting primary key field 'ID' for entity: %w", err)
+		}
+		if pkField.IsValid() && pkField.CanSet() && pkField.Kind() == reflect.String {
+			pkField.SetString(id)
+		} else {
+			return nil, fmt.Errorf("primary key field 'ID' is not a settable string field")
 		}
 
-		for fieldName, def := range r.definition.Fields {
+		for _, def := range r.definition.Fields {
 			if def.Unique {
-				fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
-				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+				fieldVal, err := getNestedFieldValue(val, def.Name)
+				if err != nil {
+					return nil, fmt.Errorf("error getting unique field '%s' for entity: %w", def.Name, err)
+				}
+				if !fieldVal.IsValid() {
+					return nil, fmt.Errorf("unique field '%s' is invalid for entity", def.Name)
+				}
+				fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
+				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
 				uniqueChecks = append(uniqueChecks, uniqueCheck{
 					Key:       uniqueIdxKey,
-					FieldName: fieldName,
+					FieldName: def.Name,
 					Value:     fieldValue,
 				})
 
 				// Validación de duplicados en el mismo batch
-				batchKey := fieldName + ":" + fieldValue
+				batchKey := def.Name + ":" + fieldValue
 				if _, exists := uniqueInBatch[batchKey]; exists {
-					return nil, fmt.Errorf("duplicate unique field in input batch: %s = %s", fieldName, fieldValue)
+					return nil, fmt.Errorf("duplicate unique field in input batch: %s = %s", def.Name, fieldValue)
 				}
 				uniqueInBatch[batchKey] = struct{}{}
 			}
@@ -536,23 +546,30 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 
 	// Insertar datos y sus índices
 	for i, entity := range entities {
-		val := reflect.ValueOf(entity)
-		if val.Kind() == reflect.Ptr {
-			val = val.Elem()
-		}
+		entityPtrVal := reflect.ValueOf(entity) // entity is *T
+
 		id := ids[i]
 
-		hasTTL, ttl, err := r.checkForTTL(val)
+		// Pass entityPtrVal (which is *T) to checkForTTL
+		hasTTL, ttl, err := r.checkForTTL(entityPtrVal)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error checking TTL for entity with ID '%s': %w", id, err)
 		}
 
-		for fieldName, def := range r.definition.Fields {
-			if def.TTL {
+		for _, def := range r.definition.Fields {
+			if def.TTL { // TTL field itself is not indexed like other fields.
 				continue
 			}
-			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
-			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
+			// Pass entityPtrVal (which is *T) to getNestedFieldValue
+			fieldVal, err := getNestedFieldValue(entityPtrVal, def.Name)
+			if err != nil {
+				return nil, fmt.Errorf("error getting field '%s' for entity with ID '%s': %w", def.Name, id, err)
+			}
+			if !fieldVal.IsValid() {
+				return nil, fmt.Errorf("field '%s' is invalid for entity with ID '%s'", def.Name, id)
+			}
+			fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
+			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue, id)
 			if hasTTL {
 				batch.PutTTl(r.definition.ColumnFamily, idxKey, []byte(id), ttl)
 			} else {
@@ -560,8 +577,7 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 			}
 
 			if def.Unique {
-				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
-
+				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
 				if hasTTL {
 					batch.PutTTl(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), ttl)
 				} else {
@@ -589,31 +605,49 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 	return ids, nil
 }
 
-func (r *Repository[T]) checkForTTL(val reflect.Value) (bool, int, error) {
-	hasTTL := false
-	ttl := 0
-
-	for fieldName, field := range r.definition.Fields {
-		if field.TTL {
-			rawValue := val.FieldByName(fieldName)
-			if !rawValue.IsValid() {
-				return false, 0, fmt.Errorf("invalid field name for TTL: %s", fieldName)
-			}
-
-			switch rawValue.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				ttl = int(rawValue.Int())
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				ttl = int(rawValue.Uint())
-			default:
-				return false, 0, fmt.Errorf("TTL field '%s' must be of integer type", fieldName)
-			}
-
-			hasTTL = true
+// checkForTTL checks if the entity has a TTL field defined and retrieves its value.
+// entityValue is the reflect.Value of the entity (can be pointer or struct).
+func (r *Repository[T]) checkForTTL(entityValue reflect.Value) (bool, int, error) {
+	var ttlFieldName string
+	hasTTLDefinition := false
+	for fName, fDef := range r.definition.Fields {
+		if fDef.TTL {
+			ttlFieldName = fName // This should be "TTL" as per NewRepository validation
+			hasTTLDefinition = true
 			break
 		}
 	}
-	return hasTTL, ttl, nil
+
+	if !hasTTLDefinition {
+		return false, 0, nil // No TTL field defined in schema
+	}
+
+	// getNestedFieldValue expects a struct or pointer to struct.
+	// ttlFieldName is validated to be top-level "TTL".
+	ttlVal, err := getNestedFieldValue(entityValue, ttlFieldName)
+	if err != nil {
+		return false, 0, fmt.Errorf("error getting TTL field '%s': %w", ttlFieldName, err)
+	}
+
+	if !ttlVal.IsValid() {
+		// This could happen if the "TTL" field is somehow missing from the struct instance,
+		// though schema validation in NewRepository should ensure it exists.
+		// Or if entityValue was nil and not handled by getNestedFieldValue (it should error).
+		return false, 0, fmt.Errorf("TTL field '%s' is invalid or not found on the entity instance", ttlFieldName)
+	}
+
+	var ttl int
+	switch ttlVal.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		ttl = int(ttlVal.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		ttl = int(ttlVal.Uint())
+	default:
+		// This should be caught by schema validation in NewRepository.
+		return false, 0, fmt.Errorf("TTL field '%s' must be of integer type, but found %s", ttlFieldName, ttlVal.Kind())
+	}
+
+	return true, ttl, nil
 }
 
 // Create creates a single entity in the repository.
@@ -645,56 +679,61 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 //   - A slice of booleans indicating whether each corresponding entity was updated.
 //   - An error if the operation fails (e.g., due to a unique constraint violation).
 func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
-	var zero T
-	t := reflect.TypeOf(zero)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
+	// Determine the primary key field name (should be "ID" due to NewRepository validation)
 	var primaryFieldName string
-	for name, def := range r.definition.Fields {
-		if def.Primary {
+	for name, fDef := range r.definition.Fields {
+		if fDef.Primary {
 			primaryFieldName = name
 			break
 		}
 	}
 	if primaryFieldName == "" {
-		return nil, fmt.Errorf("no primary key defined")
+		return nil, fmt.Errorf("no primary key defined for the entity type")
 	}
 
 	results := make([]bool, len(entities))
 	batch := NewWriteBatch()
 
-	uniqueValuesInBatch := make(map[string]map[string]string)
+	// For checking unique constraints within the batch
+	uniqueValuesInBatch := make(map[string]map[string]string) // fieldName -> value -> entityID
 
 	for i, entity := range entities {
 		if entity == nil {
 			results[i] = false
 			continue
 		}
-		entityVal := reflect.ValueOf(entity).Elem()
-		id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
+		entityPtrVal := reflect.ValueOf(entity) // entity is *T
 
-		for fieldName, def := range r.definition.Fields {
+		idFieldVal, err := getNestedFieldValue(entityPtrVal, primaryFieldName)
+		if err != nil {
+			return nil, fmt.Errorf("error getting ID for entity for batch unique check: %w", err)
+		}
+		id := fmt.Sprintf("%v", idFieldVal.Interface())
+
+		for _, def := range r.definition.Fields {
 			if def.Primary || !def.Unique {
 				continue
 			}
 
-			field := entityVal.FieldByName(fieldName)
-			if !field.IsValid() {
+			fieldVal, err := getNestedFieldValue(entityPtrVal, def.Name)
+			if err != nil {
+				return nil, fmt.Errorf("error getting unique field '%s' for entity ID '%s' (batch check): %w", def.Name, id, err)
+			}
+			if !fieldVal.IsValid() {
+				// Assuming if a field is not valid/present, it cannot violate uniqueness for this check.
+				// More robust error handling might be needed if fields are mandatory.
 				continue
 			}
+			value := fmt.Sprintf("%v", fieldVal.Interface())
 
-			value := fmt.Sprintf("%v", field.Interface())
-
-			if _, ok := uniqueValuesInBatch[fieldName]; !ok {
-				uniqueValuesInBatch[fieldName] = make(map[string]string)
+			if _, ok := uniqueValuesInBatch[def.Name]; !ok {
+				uniqueValuesInBatch[def.Name] = make(map[string]string)
 			}
 
-			if existingID, exists := uniqueValuesInBatch[fieldName][value]; exists && existingID != id {
-				return nil, fmt.Errorf("duplicate unique field in batch: %s = %s", fieldName, value)
+			if existingID, exists := uniqueValuesInBatch[def.Name][value]; exists && existingID != id {
+				return nil, fmt.Errorf("duplicate unique field in input batch: %s = %s", def.Name, value)
 			}
-			uniqueValuesInBatch[fieldName][value] = id
+			uniqueValuesInBatch[def.Name][value] = id
 		}
 	}
 
@@ -703,60 +742,82 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 			results[i] = false
 			continue
 		}
-		entityVal := reflect.ValueOf(entity).Elem()
-		id := fmt.Sprintf("%v", entityVal.FieldByName(primaryFieldName).Interface())
+		entityPtrVal := reflect.ValueOf(entity) // entity is *T
 
-		current, err := r.FindByField(primaryFieldName, id)
+		idFieldVal, err := getNestedFieldValue(entityPtrVal, primaryFieldName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting ID for entity for update: %w", err)
 		}
-		if current == nil {
-			results[i] = false
+		id := fmt.Sprintf("%v", idFieldVal.Interface())
+
+		// Fetch current entity from DB
+		currentEntityStored, err := r.FindByField(primaryFieldName, id)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching current entity with ID '%s' for update: %w", id, err)
+		}
+		if currentEntityStored == nil {
+			results[i] = false // Entity not found, cannot update
 			continue
 		}
 
 		changed := false
-		currentVal := reflect.ValueOf(current).Elem()
-		newVal := reflect.ValueOf(entity).Elem()
+		// currentEntityStored is *T, get its Elem for getNestedFieldValue. Pass pointer to checkForTTL.
+		currentEntityReflectVal := reflect.ValueOf(currentEntityStored)
+		newEntityReflectVal := entityPtrVal // *T
 
-		hasTTL, ttl, err := r.checkForTTL(entityVal)
+		// Pass pointer to checkForTTL
+		hasTTL, ttl, err := r.checkForTTL(newEntityReflectVal)
 		if err != nil {
 			return nil, err
 		}
 
-		for fieldName, def := range r.definition.Fields {
-			if def.Primary {
-				continue
-			}
-			if def.TTL {
-				continue
-			}
+		currentEntityDataVal := currentEntityReflectVal.Elem() // For setting fields if changed
 
-			curField := currentVal.FieldByName(fieldName)
-			newField := newVal.FieldByName(fieldName)
-
-			if !curField.IsValid() || !newField.IsValid() {
+		for _, def := range r.definition.Fields {
+			if def.Primary || def.TTL { // Primary key and TTL managed separately
 				continue
 			}
 
-			oldValue := fmt.Sprintf("%v", curField.Interface())
-			newValue := fmt.Sprintf("%v", newField.Interface())
+			// Pass pointers to getNestedFieldValue, it will Elem() internally
+			currentFieldVal, err := getNestedFieldValue(currentEntityReflectVal, def.Name)
+			if err != nil {
+				return nil, fmt.Errorf("error getting current field '%s' for entity ID '%s': %w", def.Name, id, err)
+			}
+			newFieldVal, err := getNestedFieldValue(newEntityReflectVal, def.Name)
+			if err != nil {
+				return nil, fmt.Errorf("error getting new field '%s' for entity ID '%s': %w", def.Name, id, err)
+			}
+
+			if !currentFieldVal.IsValid() || !newFieldVal.IsValid() {
+				// This implies a schema mismatch or partially defined entity.
+				// If new field is invalid, it might be an issue. If old is invalid, it means it wasn't set.
+				// For now, if either is invalid, we cannot compare or update this field.
+				// A more robust system might error if a non-nullable new field is invalid.
+				fmt.Printf("Warning: field '%s' is invalid on current or new entity (ID '%s'). Skipping update for this field.\n", def.Name, id)
+				continue
+			}
+
+			oldValue := fmt.Sprintf("%v", currentFieldVal.Interface())
+			newValue := fmt.Sprintf("%v", newFieldVal.Interface())
 
 			if oldValue != newValue {
 				if def.Unique {
-					idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
-					existing, err := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
-					if err != nil {
-						return nil, err
+					// Check for new value collision in DB
+					idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
+					existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
+					if errDb != nil {
+						return nil, fmt.Errorf("error checking unique constraint for field '%s', value '%s': %w", def.Name, newValue, errDb)
 					}
-					if len(existing) > 0 && string(existing) != id {
-						return nil, fmt.Errorf("duplicate unique field: %s = %s", fieldName, newValue)
+					if len(existingIDBytes) > 0 && string(existingIDBytes) != id {
+						return nil, fmt.Errorf("duplicate unique field: %s = %s (conflicts with existing ID %s)", def.Name, newValue, string(existingIDBytes))
 					}
 
-					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue)
+					// Delete old unique index
+					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue)
 					batch.Delete(r.definition.ColumnFamily, oldUIdxKey)
 
-					newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue)
+					// Add new unique index
+					newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
 					if hasTTL {
 						batch.PutTTl(r.definition.ColumnFamily, newUIdxKey, []byte(id), ttl)
 					} else {
@@ -764,25 +825,36 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 					}
 				}
 
-				oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, oldValue, id)
+				// Delete old regular index
+				oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue, id)
 				batch.Delete(r.definition.ColumnFamily, oldIdxKey)
 
-				newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, newValue, id)
-
+				// Add new regular index
+				newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue, id)
 				if hasTTL {
 					batch.PutTTl(r.definition.ColumnFamily, newIdxKey, []byte(id), ttl)
 				} else {
 					batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id))
 				}
 
-				curField.Set(newField)
+				// Update the field in the currentEntityDataVal model, which will be marshaled
+				targetFieldToSet, errSet := getNestedFieldValue(currentEntityDataVal, def.Name)
+				if errSet != nil {
+					return nil, fmt.Errorf("failed to get field %s for setting on entity ID %s: %w", def.Name, id, errSet)
+				}
+				if targetFieldToSet.CanSet() {
+					targetFieldToSet.Set(newFieldVal)
+				} else {
+					return nil, fmt.Errorf("cannot set field %s on current entity for update (ID %s)", def.Name, id)
+				}
 				changed = true
 			}
 		}
 
 		if changed {
 			dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-			dataBytes, err := json.Marshal(current)
+			// Marshal the modified currentEntityStored, which now contains the merged changes
+			dataBytes, err := json.Marshal(currentEntityStored)
 			if err != nil {
 				return nil, err
 			}
@@ -805,9 +877,6 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 	return results, nil
 }
 
-// Update updates a single entity in the repository.
-// It's a convenience wrapper around BulkUpdate.
-//
 // Parameters:
 //   - entity: A pointer to the entity to update. The primary key field must be populated.
 //
@@ -857,19 +926,32 @@ func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 		}
 		results[i] = true
 
-		val := reflect.ValueOf(entity)
-		if val.Kind() == reflect.Ptr {
-			val = val.Elem()
-		}
+		entityPtrVal := reflect.ValueOf(entity) // entity is *T (result from FindByField)
 
-		for fieldName, def := range r.definition.Fields {
-			fieldValue := fmt.Sprintf("%v", val.FieldByName(fieldName).Interface())
+		for _, def := range r.definition.Fields {
+			if def.TTL { // TTL fields don't have separate general indexes
+				continue
+			}
+			// Pass pointer, getNestedFieldValue will Elem()
+			fieldVal, err := getNestedFieldValue(entityPtrVal, def.Name)
+			if err != nil {
+				// If a field doesn't exist on the entity (e.g. schema evolution), we can't delete its index based on value.
+				// Log this, as it might lead to stale indexes.
+				fmt.Printf("Warning: could not get field %s for deleting index of entity ID %s: %v. Stale index might remain.\n", def.Name, id, err)
+				continue
+			}
+			if !fieldVal.IsValid() {
+				fmt.Printf("Warning: field %s is invalid for deleting index of entity ID %s. Stale index might remain.\n", def.Name, id)
+				continue
+			}
 
-			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue, id)
+			fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
+
+			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue, id)
 			batch.Delete(r.definition.ColumnFamily, idxKey)
 
 			if def.Unique {
-				idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+				idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
 				batch.Delete(r.definition.ColumnFamily, idxUKey)
 			}
 		}
@@ -914,6 +996,50 @@ func (idG *DefaultIDGeneratorFactory) GenerateID() string {
 	return strings.ReplaceAll(uuid.New().String(), "-", "")
 }
 
+// getNestedFieldValue retrieves the reflect.Value of a potentially nested field.
+// entityValue is the reflect.Value of the struct or a pointer to the struct.
+// fieldName can be "Field" or "StructField.NestedField".
+func getNestedFieldValue(entityValue reflect.Value, fieldName string) (reflect.Value, error) {
+	if fieldName == "" {
+		return reflect.Value{}, fmt.Errorf("fieldName cannot be empty")
+	}
+
+	currentVal := entityValue
+	// Dereference if it's a pointer, until we get the actual struct or a non-pointer.
+	for currentVal.Kind() == reflect.Ptr {
+		if currentVal.IsNil() {
+			return reflect.Value{}, fmt.Errorf("cannot get field '%s' from nil pointer", fieldName)
+		}
+		currentVal = currentVal.Elem()
+	}
+
+	if currentVal.Kind() != reflect.Struct {
+		return reflect.Value{}, fmt.Errorf("expected a struct or pointer to struct to get field '%s', but got %s", fieldName, entityValue.Kind())
+	}
+
+	parts := strings.Split(fieldName, ".")
+	finalField := currentVal
+
+	for i, part := range parts {
+		if finalField.Kind() == reflect.Ptr { // Should have been handled by initial loop, but for safety.
+			if finalField.IsNil() {
+				return reflect.Value{}, fmt.Errorf("encountered nil pointer while traversing path '%s' at part '%s'", fieldName, part)
+			}
+			finalField = finalField.Elem()
+		}
+
+		if finalField.Kind() != reflect.Struct {
+			return reflect.Value{}, fmt.Errorf("field '%s' in path '%s' is not a struct, but %s", strings.Join(parts[:i], "."), fieldName, finalField.Kind())
+		}
+
+		finalField = finalField.FieldByName(part)
+		if !finalField.IsValid() {
+			return reflect.Value{}, fmt.Errorf("field part '%s' not found in path '%s' on struct type %s", part, fieldName, finalField.Type().Name())
+		}
+	}
+	return finalField, nil
+}
+
 // NewRepository creates a new instance of the Repository.
 // It inspects the type T to determine the table schema, including field definitions,
 // primary key, and unique constraints based on struct tags.
@@ -948,58 +1074,137 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 		Fields:       map[string]FieldDefinition{},
 	}
 
+	fields, err := extractFieldsRecursively(t, "")
+	if err != nil {
+		return nil, fmt.Errorf("error extracting fields from struct %s: %w", t.Name(), err)
+	}
+
 	hasPrimaryKey := false
-	hasBadNameForTTL := false
-
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		tag := field.Tag.Get("orm")
-
-		def := FieldDefinition{
-			Name: field.Name,
-			Type: field.Type.Name(),
-		}
-
-		for _, rule := range strings.Split(tag, ",") {
-			rule = strings.TrimSpace(rule)
-			switch {
-			case rule == "unique":
-				def.Unique = true
-			case rule == "primary-key":
-				if field.Type.Kind() != reflect.String {
-					return nil, fmt.Errorf("field 'ID' must be of type string")
-				}
-				def.Primary = true
-				hasPrimaryKey = true
-				if field.Name != "ID" {
-					hasPrimaryKey = false
-				}
-			case rule == "ttl":
-				if field.Type.Kind() != reflect.Int {
-					return nil, fmt.Errorf("field 'TTL' must be of type int")
-				}
-				def.TTL = true
-				if field.Name != "TTL" {
-					hasBadNameForTTL = true
-				}
-			case strings.HasPrefix(rule, "max-length="):
-				var max int
-				fmt.Sscanf(rule, "max-length=%d", &max)
-				def.MaxLength = &max
+	hasTTL := false
+	for _, def := range fields {
+		table.Fields[def.Name] = def
+		if def.Primary {
+			if hasPrimaryKey {
+				return nil, fmt.Errorf("multiple primary keys defined in struct %s", t.Name())
 			}
+			hasPrimaryKey = true
 		}
-
-		table.Fields[field.Name] = def
+		if def.TTL {
+			if hasTTL {
+				return nil, fmt.Errorf("multiple TTL fields defined in struct %s", t.Name())
+			}
+			hasTTL = true
+		}
 	}
 
 	if !hasPrimaryKey {
-		return nil, fmt.Errorf("struct %s must have a string field named 'ID' with `orm:primary-key`", t.Name())
-	}
-	if hasBadNameForTTL {
-		return nil, fmt.Errorf("struct %s has an invalid field name for the TTL field; it must be named 'TTL' and tagged with `orm:\"ttl\"`", t.Name())
+		return nil, fmt.Errorf("struct %s must have a string field named 'ID' with `orm:\"primary-key\"`", t.Name())
 	}
 
 	return &Repository[T]{definition: table, kvStore: kvStore, idGeneratorFactory: idGeneratorFactory}, nil
+}
+
+// extractFieldsRecursively extracts field definitions from a struct type.
+// It handles embedded structs and ORM tags.
+func extractFieldsRecursively(t reflect.Type, prefix string) ([]FieldDefinition, error) {
+	var fields []FieldDefinition
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fieldType := field.Type
+
+		// Handle special types like time.Time that should not be recursed into
+		if fieldType.PkgPath() == "time" && fieldType.Name() == "Time" {
+			def, err := createFieldDefinition(field, prefix)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, def)
+			continue
+		}
+
+		switch fieldType.Kind() {
+		case reflect.Struct:
+			newPrefix := prefix
+			if !field.Anonymous { // Named struct
+				newPrefix += field.Name + "."
+			}
+			embeddedFields, err := extractFieldsRecursively(fieldType, newPrefix)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, embeddedFields...)
+		default:
+			def, err := createFieldDefinition(field, prefix)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, def)
+		}
+	}
+	return fields, nil
+}
+
+// createFieldDefinition creates a FieldDefinition from a reflect.StructField and prefix.
+func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefinition, error) {
+	tag := field.Tag.Get("orm")
+	fullName := prefix + field.Name
+
+	def := FieldDefinition{
+		Name: fullName,
+		Type: field.Type.Name(),
+	}
+
+	for _, rule := range strings.Split(tag, ",") {
+		rule = strings.TrimSpace(rule)
+		switch {
+		case rule == "unique":
+			def.Unique = true
+		case rule == "primary-key":
+			if prefix != "" || field.Name != "ID" {
+				return FieldDefinition{}, fmt.Errorf("primary key can only be defined on top-level 'ID' field, found on '%s'", fullName)
+			}
+			if field.Type.Kind() != reflect.String {
+				return FieldDefinition{}, fmt.Errorf("field 'ID' must be of type string, found %s for '%s'", field.Type.Kind(), fullName)
+			}
+			def.Primary = true
+		case rule == "ttl":
+			if prefix != "" || field.Name != "TTL" {
+				return FieldDefinition{}, fmt.Errorf("ttl can only be defined on top-level 'TTL' field, found on '%s'", fullName)
+			}
+			// TTL can be int, int32, int64, uint, uint32, uint64
+			switch field.Type.Kind() {
+			case reflect.Int, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint32, reflect.Uint64:
+				// valid
+			default:
+				return FieldDefinition{}, fmt.Errorf("field 'TTL' must be of integer type, found %s for '%s'", field.Type.Kind(), fullName)
+			}
+			def.TTL = true
+		case strings.HasPrefix(rule, "max-length="):
+			parts := strings.SplitN(rule, "=", 2)
+			if len(parts) != 2 {
+				return FieldDefinition{}, fmt.Errorf("invalid max-length format for field '%s': %s", fullName, rule)
+			}
+			max, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return FieldDefinition{}, fmt.Errorf("invalid max-length value for field '%s': %s", fullName, parts[1])
+			}
+			if max <= 0 {
+				return FieldDefinition{}, fmt.Errorf("max-length must be positive for field '%s': %d", fullName, max)
+			}
+			def.MaxLength = &max
+		case rule == "":
+			// ignore empty rule
+		default:
+			// Optional: Log or return error for unknown tags
+			// fmt.Printf("Warning: Unknown ORM tag '%s' for field '%s'\n", rule, fullName)
+		}
+	}
+	return def, nil
 }
 
 func NewRepositoryWithBatch[T ORMEntity](kvStore KVStore, ColumnFamily, schema string, idGeneratorFactory IDGeneratorFactory, batch *WriteBatch) (*Repository[T], error) {
@@ -1007,6 +1212,9 @@ func NewRepositoryWithBatch[T ORMEntity](kvStore KVStore, ColumnFamily, schema s
 	if err != nil {
 		return nil, err
 	}
+	// TODO: This is a temporary hack. We should not be modifying the kvStore after the repository is created.
+	// This should be fixed by making the batch part of the KVStore interface or by passing it to the methods that need it.
+	// For now, we will just replace the kvStore with a delegated one.
 	repo.kvStore = &DelegatedKVStore{
 		base:  kvStore,
 		batch: batch,
