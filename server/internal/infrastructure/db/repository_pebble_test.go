@@ -60,6 +60,166 @@ func TestRepository_Get_NotFound_Pebble(t *testing.T) {
 	assert.Nil(t, found)
 }
 
+// --- Conditional Uniqueness Tests ---
+
+type ConditionalUniqueEntityPebble struct {
+	ID                     string `orm:"primary-key"`
+	Name                   string
+	UniqueValue            string `orm:"unique,ignore-is-true:ShouldIgnoreUniqueness"`
+	ShouldIgnoreUniqueness bool
+}
+
+func (e ConditionalUniqueEntityPebble) TableName() string {
+	return "cond_unique_pebble"
+}
+
+func newTestConditionalUniqueRepoPebble(t *testing.T, initialIDs []string) (*db.Repository[ConditionalUniqueEntityPebble], db.KVStore) {
+	store := newPebbleStore(t) // Uses a new temp dir for each call
+	idGenerator := NewTestIDGeneratorFactory(initialIDs)
+	repo, err := db.NewRepository[ConditionalUniqueEntityPebble](store, TestFC, "test_schema_cond", idGenerator)
+	require.NoError(t, err, "Failed to create repository for ConditionalUniqueEntityPebble")
+	return repo, store
+}
+
+func TestPebbleConditionalUniquenessCreate(t *testing.T) {
+	t.Run("IgnoreUniqueness", func(t *testing.T) {
+		ids := []string{"id1", "id2", "id3"}
+		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
+
+		entity1 := &ConditionalUniqueEntityPebble{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
+		_, err := repo.Create(entity1)
+		require.NoError(t, err, "Create entity1 should succeed")
+
+		entity2 := &ConditionalUniqueEntityPebble{Name: "E2", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
+		_, err = repo.Create(entity2)
+		require.NoError(t, err, "Create entity2 with same UniqueValue (ignored) should succeed")
+
+		entity3 := &ConditionalUniqueEntityPebble{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		_, err = repo.Create(entity3)
+		require.NoError(t, err, "Create entity3 with same UniqueValue (enforced, but not previously by E1/E2) should succeed")
+
+		entity4 := &ConditionalUniqueEntityPebble{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		_, err = repo.Create(entity4)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate unique field: UniqueValue = uv1")
+
+		// Verify all created
+		e1, _ := repo.FindByField("ID", ids[0])
+		require.NotNil(t, e1)
+		assert.Equal(t, "uv1", e1.UniqueValue)
+
+		e2, _ := repo.FindByField("ID", ids[1])
+		require.NotNil(t, e2)
+		assert.Equal(t, "uv1", e2.UniqueValue)
+
+		e3, _ := repo.FindByField("ID", ids[2])
+		require.NotNil(t, e3)
+		assert.Equal(t, "uv1", e3.UniqueValue)
+		assert.False(t, e3.ShouldIgnoreUniqueness)
+	})
+
+	t.Run("EnforceUniqueness", func(t *testing.T) {
+		ids := []string{"id4", "id5", "id6"} // Fresh IDs for this subtest
+		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
+
+		entity4 := &ConditionalUniqueEntityPebble{Name: "E4", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
+		_, err := repo.Create(entity4)
+		require.NoError(t, err, "Create entity4 should succeed")
+
+		entity5 := &ConditionalUniqueEntityPebble{Name: "E5", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
+		_, err = repo.Create(entity5)
+		require.Error(t, err, "Create entity5 with same UniqueValue (enforced) should fail")
+		assert.Contains(t, err.Error(), "duplicate unique field")
+
+		entity6 := &ConditionalUniqueEntityPebble{Name: "E6", UniqueValue: "uv2", ShouldIgnoreUniqueness: true}
+		_, err = repo.Create(entity6)
+		require.NoError(t, err, "Create entity6 with same UniqueValue (ignored) should succeed")
+
+		e4, _ := repo.FindByField("ID", ids[0])
+		require.NotNil(t, e4)
+		assert.Equal(t, "uv2", e4.UniqueValue)
+
+		e6, _ := repo.FindByField("ID", ids[2]) // id5 failed, so entity6 gets ids[2] if factory generates sequentially
+		require.NotNil(t, e6)
+		assert.Equal(t, "uv2", e6.UniqueValue)
+		assert.True(t, e6.ShouldIgnoreUniqueness)
+	})
+}
+
+func TestPebbleConditionalUniquenessUpdate(t *testing.T) {
+	t.Run("UpdateWithFlagTrueBypassesConflict", func(t *testing.T) {
+		ids := []string{"idA", "idB"}
+		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
+
+		entityA := &ConditionalUniqueEntityPebble{ID: ids[0], Name: "EntityA", UniqueValue: "uva", ShouldIgnoreUniqueness: false}
+		_, err := repo.Create(entityA)
+		require.NoError(t, err)
+
+		entityB := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityB", UniqueValue: "uvb", ShouldIgnoreUniqueness: false}
+		_, err = repo.Create(entityB)
+		require.NoError(t, err)
+
+		// Update entityB to have UniqueValue "uva" (conflicts with A) but with ShouldIgnoreUniqueness = true
+		entityB.UniqueValue = "uva"
+		entityB.ShouldIgnoreUniqueness = true
+		updated, err := repo.Update(entityB)
+		require.NoError(t, err, "Update entityB should succeed")
+		assert.True(t, updated)
+
+		// Verify B is updated
+		bUpdated, _ := repo.FindByField("ID", ids[1])
+		require.NotNil(t, bUpdated)
+		assert.Equal(t, "uva", bUpdated.UniqueValue)
+		assert.True(t, bUpdated.ShouldIgnoreUniqueness)
+	})
+
+	t.Run("UpdateWithFlagFalseHitsConflict", func(t *testing.T) {
+		ids := []string{"idC", "idD"}
+		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
+
+		entityC := &ConditionalUniqueEntityPebble{ID: ids[0], Name: "EntityC", UniqueValue: "uvc", ShouldIgnoreUniqueness: false}
+		_, err := repo.Create(entityC)
+		require.NoError(t, err)
+
+		entityD := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityD", UniqueValue: "uvd", ShouldIgnoreUniqueness: false}
+		_, err = repo.Create(entityD)
+		require.NoError(t, err)
+
+		// Attempt to update entityD to have UniqueValue "uvc" (conflicts with C) with ShouldIgnoreUniqueness = false
+		entityD.UniqueValue = "uvc"
+		entityD.ShouldIgnoreUniqueness = false
+		updated, err := repo.Update(entityD)
+		require.Error(t, err, "Update entityD should fail due to unique constraint")
+		assert.False(t, updated)
+		assert.Contains(t, err.Error(), "duplicate unique field")
+	})
+
+	t.Run("UpdateFlagFromFalseToTrueThenCreateNew", func(t *testing.T) {
+		ids := []string{"idE", "idF"}
+		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
+
+		entityE := &ConditionalUniqueEntityPebble{ID: ids[0], Name: "EntityE", UniqueValue: "uve", ShouldIgnoreUniqueness: false}
+		_, err := repo.Create(entityE)
+		require.NoError(t, err)
+
+		// Update entityE to set ShouldIgnoreUniqueness = true
+		entityE.ShouldIgnoreUniqueness = true
+		updated, err := repo.Update(entityE)
+		require.NoError(t, err, "Update entityE should succeed")
+		assert.True(t, updated)
+
+		entityF := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: true}
+		_, err = repo.Create(entityF)
+		require.NoError(t, err, "Create entityF should succeed as E is ignoring uniqueness")
+
+		// Verify F
+		fCreated, _ := repo.FindByField("ID", ids[1])
+		require.NotNil(t, fCreated)
+		assert.Equal(t, "uve", fCreated.UniqueValue)
+		assert.True(t, fCreated.ShouldIgnoreUniqueness)
+	})
+}
+
 func TestRepository_WriteBatch_Pebble(t *testing.T) {
 	repo, err := newTestRepositoryPebble(t)
 	require.NoError(t, err)

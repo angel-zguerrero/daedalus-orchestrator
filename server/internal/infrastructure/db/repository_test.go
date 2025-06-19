@@ -4,12 +4,148 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 
+	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+type TestIDGeneratorFactoryR struct {
+	ids   []string
+	index int
+	mu    sync.Mutex
+}
+
+func (g *TestIDGeneratorFactoryR) GenerateID() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if len(g.ids) == 0 {
+		return ""
+	}
+
+	id := g.ids[g.index]
+	g.index = (g.index + 1) % len(g.ids) // avance circular
+	return id
+}
+
+type MockKVStoreRepositoryTest struct {
+	mock.Mock
+	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle // Map of regular column family names to their handles.
+	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
+}
+
+func (m *MockKVStoreRepositoryTest) Get(AdminFC, key string) ([]byte, error) {
+	args := m.Called(AdminFC, key)
+	var s []byte
+	if tmp := args.Get(0); tmp != nil {
+		s = tmp.([]byte)
+	}
+	return s, args.Error(1)
+}
+
+func (m *MockKVStoreRepositoryTest) Delete(AdminFC, key string) error {
+	args := m.Called(AdminFC, key)
+	return args.Error(0)
+}
+
+func (r *MockKVStoreRepositoryTest) Exists(columnFamily, key string) (bool, error) {
+	val, err := r.Get(columnFamily, key)
+	if err != nil {
+		return false, err
+	}
+	return val != nil, nil
+}
+
+func (m *MockKVStoreRepositoryTest) Put(AdminFC, key string, value []byte, ttl int) error {
+	args := m.Called(AdminFC, key, value, ttl)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreRepositoryTest) PutRaw(AdminFC, key string, value []byte) error {
+	args := m.Called(AdminFC, key, value)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreRepositoryTest) Write(batch *db.WriteBatch) error {
+	args := m.Called(batch)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreRepositoryTest) WriteRaw(batch *db.WriteBatch) error {
+	args := m.Called(batch)
+	return args.Error(0)
+}
+
+func (m *MockKVStoreRepositoryTest) DumpAll() (interface{}, error) {
+	args := m.Called()
+	var s []byte
+	if tmp := args.Get(0); tmp != nil {
+		s = tmp.([]byte)
+	}
+	return s, args.Error(1)
+}
+
+func (r *MockKVStoreRepositoryTest) Iterate(fn func(cfName string, key, value []byte) error) error {
+	return nil
+}
+
+func (r *MockKVStoreRepositoryTest) ClearAll() error {
+	return nil
+}
+
+func (r *MockKVStoreRepositoryTest) Flush() error {
+	return nil
+}
+
+func (r *MockKVStoreRepositoryTest) Close() error {
+	return nil
+}
+
+func (r *MockKVStoreRepositoryTest) CleanExpiredKeys() error {
+	return nil
+}
+
+func (m *MockKVStoreRepositoryTest) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]db.KeyValuePair, string, error) {
+	args := m.Called(cfName, pattern, cursor, limit)
+	var s []db.KeyValuePair
+	if tmp := args.Get(0); tmp != nil {
+		s = tmp.([]db.KeyValuePair)
+	}
+	return s, "", args.Error(2)
+}
+
+// --- Test Structs for Conditional Uniqueness ---
+
+type ConditionalUniqueEntity struct {
+	ID                     string `orm:"primary-key"`
+	Name                   string
+	UniqueValue            string `orm:"unique,ignore-is-true:ShouldIgnoreUniqueness"`
+	ShouldIgnoreUniqueness bool   `orm:""`
+	NonBoolFlag            int    `orm:""` // For testing invalid type reference
+}
+
+func (e ConditionalUniqueEntity) TableName() string {
+	return "conditional_unique_entities"
+}
+
+type InvalidConditionalEntityBadRef struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:NonExistentFlag"`
+}
+
+func (e InvalidConditionalEntityBadRef) TableName() string { return "invalid_cond_bad_ref" }
+
+type InvalidConditionalEntityBadType struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:NonBoolFlag"`
+	NonBoolFlag int
+}
+
+func (e InvalidConditionalEntityBadType) TableName() string { return "invalid_cond_bad_type" }
 
 type User struct {
 	ID   string `orm:"primary-key"`
@@ -20,15 +156,60 @@ func (User) TableName() string {
 	return "users"
 }
 
+type InvalidConditionalEmptyField struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:"`
+}
+
+func (e InvalidConditionalEmptyField) TableName() string {
+	return "conditional_unique_entities"
+}
+
+func NewTestIDGeneratorFactoryR(ids []string) *TestIDGeneratorFactoryR {
+	return &TestIDGeneratorFactoryR{
+		ids: ids,
+	}
+}
+func TestNewRepositoryConditionalUniquenessValidations(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest) // Does not hit DB for these validations
+	iGF := NewTestIDGeneratorFactoryR([]string{})
+
+	t.Run("Valid ConditionalUniqueEntity", func(t *testing.T) {
+		_, err := db.NewRepository[ConditionalUniqueEntity](mockStore, "cf_valid", "test_valid", iGF)
+		require.NoError(t, err)
+	})
+
+	t.Run("InvalidConditionalEntityBadRef - NonExistentFlag", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidConditionalEntityBadRef](mockStore, "cf_bad_ref", "test_bad_ref", iGF)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'UniqueValue' tagged with 'ignore-is-true:NonExistentFlag', but referenced field 'NonExistentFlag' does not exist in struct InvalidConditionalEntityBadRef")
+	})
+
+	t.Run("InvalidConditionalEntityBadType - NonBoolFlag", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidConditionalEntityBadType](mockStore, "cf_bad_type", "test_bad_type", iGF)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'UniqueValue' tagged with 'ignore-is-true:NonBoolFlag', but referenced field 'NonBoolFlag' must be of type 'bool', found 'int'")
+	})
+
+	// Test for createFieldDefinition error: ignore-is-true with empty field name
+
+	t.Run("InvalidConditionalEmptyField - ignore-is-true with empty field", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidConditionalEmptyField](mockStore, "cf_empty", "test_empty", iGF)
+		require.Error(t, err)
+		// This error comes from createFieldDefinition
+		assert.Contains(t, err.Error(), "error extracting fields from struct InvalidConditionalEmptyField: invalid ignore-is-true format for field 'UniqueValue': ignore-is-true:")
+	})
+}
+
 func TestRepository_Create_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
 	user := User{
 		ID:   "123",
 		Name: "Alice",
 	}
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
@@ -59,14 +240,14 @@ func TestRepository_Create_Success(t *testing.T) {
 }
 
 func TestRepository_Create_DuplicateUnique(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
 	user := User{
 		ID:   "----",
 		Name: "Alice",
 	}
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
@@ -88,17 +269,17 @@ func (NoPrimary) TableName() string {
 }
 
 func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", "admin", iGF)
 	assert.EqualError(t, err, "struct NoPrimary must have a string field named 'ID' with `orm:\"primary-key\"`")
 
 }
 
 func TestRepository_FindByField_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -118,8 +299,8 @@ func TestRepository_FindByField_Success(t *testing.T) {
 }
 
 func TestRepository_FindByField_Unknown_Field_Name(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -129,8 +310,8 @@ func TestRepository_FindByField_Unknown_Field_Name(t *testing.T) {
 }
 
 func TestRepository_Find_AND_Unknown_Field_Name(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -154,8 +335,8 @@ func (TempEntity) TableName() string {
 }
 
 func TestRepository_FindByField_Invalid_Use_For_TTL_Query(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -165,8 +346,8 @@ func TestRepository_FindByField_Invalid_Use_For_TTL_Query(t *testing.T) {
 }
 
 func TestRepository_Find_AND_Invalid_Use_For_TTL_Query(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -190,8 +371,8 @@ func (InvalidTempEntity) TableName() string {
 }
 
 func TestRepository_FindByField_Invalid_TTL_Field_name(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	_, err := db.NewRepository[InvalidTempEntity](mockStore, "cf1", "admin", iGF)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error extracting fields from struct InvalidTempEntity: ttl can only be defined on top-level 'TTL' field, found on 'ttl'")
@@ -206,8 +387,8 @@ func (Invalid) TableName() string {
 }
 
 func TestNewRepository_MissingPrimaryKey(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 
 	_, err := db.NewRepository[Invalid](mockStore, "cf1", "admin", iGF)
 	assert.Error(t, err)
@@ -215,8 +396,8 @@ func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 }
 
 func TestRepository_Find_AND(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -237,8 +418,8 @@ func TestRepository_Find_AND(t *testing.T) {
 }
 
 func TestRepository_Find_OR(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -262,8 +443,8 @@ func TestRepository_Find_OR(t *testing.T) {
 }
 
 func TestRepository_Find_SpecialCharacters(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -282,8 +463,8 @@ func TestRepository_Find_SpecialCharacters(t *testing.T) {
 }
 
 func TestRepository_Find_NoMatch(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -296,9 +477,9 @@ func TestRepository_Find_NoMatch(t *testing.T) {
 }
 
 func TestRepository_Update_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -339,9 +520,9 @@ func TestRepository_Update_Success(t *testing.T) {
 }
 
 func TestRepository_Update_Nonexistent(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -355,9 +536,9 @@ func TestRepository_Update_Nonexistent(t *testing.T) {
 	assert.Equal(t, changed, false)
 }
 func TestRepository_Delete_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -389,9 +570,9 @@ func TestRepository_Delete_Success(t *testing.T) {
 }
 
 func TestRepository_Delete_NotFound(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -404,9 +585,9 @@ func TestRepository_Delete_NotFound(t *testing.T) {
 	mockStore.AssertExpectations(t)
 }
 func TestRepository_Delete_CorruptedData(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 
-	iGF := NewTestIDGeneratorFactory([]string{"123"})
+	iGF := NewTestIDGeneratorFactoryR([]string{"123"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -422,8 +603,8 @@ func TestRepository_Delete_CorruptedData(t *testing.T) {
 }
 
 func TestRepository_BulkCreate_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2", "id3"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2", "id3"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -464,8 +645,8 @@ func TestRepository_BulkCreate_Success(t *testing.T) {
 }
 
 func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -483,8 +664,8 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 }
 
 func TestRepository_BulkCreate_WriteError(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -500,8 +681,8 @@ func TestRepository_BulkCreate_WriteError(t *testing.T) {
 	assert.Contains(t, err.Error(), "write failed")
 }
 func TestRepository_BulkDelete_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -538,8 +719,8 @@ func TestRepository_BulkDelete_Success(t *testing.T) {
 }
 
 func TestRepository_BulkDelete_Partial(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -567,8 +748,8 @@ func TestRepository_BulkDelete_Partial(t *testing.T) {
 }
 
 func TestRepository_BulkDelete_InvalidData(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
@@ -583,8 +764,8 @@ func TestRepository_BulkDelete_InvalidData(t *testing.T) {
 	mockStore.AssertExpectations(t)
 }
 func TestRepository_BulkUpdate_Success(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
@@ -618,8 +799,8 @@ func TestRepository_BulkUpdate_Success(t *testing.T) {
 }
 
 func TestRepository_BulkUpdate_SomeNonexistent(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
@@ -646,8 +827,8 @@ func TestRepository_BulkUpdate_SomeNonexistent(t *testing.T) {
 }
 
 func TestRepository_BulkUpdate_DuplicateUniqueWithinBatch(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
@@ -672,8 +853,8 @@ func TestRepository_BulkUpdate_DuplicateUniqueWithinBatch(t *testing.T) {
 }
 
 func TestRepository_BulkUpdate_DuplicateUniqueExisting(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1", "id2"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
@@ -693,8 +874,8 @@ func TestRepository_BulkUpdate_DuplicateUniqueExisting(t *testing.T) {
 }
 
 func TestRepository_BulkUpdate_WriteError(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
@@ -714,8 +895,8 @@ func TestRepository_BulkUpdate_WriteError(t *testing.T) {
 }
 
 func TestRepository_BulkUpdate_InvalidData(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{"id1"})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{"id1"})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
@@ -730,8 +911,8 @@ func TestRepository_BulkUpdate_InvalidData(t *testing.T) {
 }
 
 func TestRepository_BulkUpdate_EmptyInput(t *testing.T) {
-	mockStore := new(MockKVStore)
-	iGF := NewTestIDGeneratorFactory([]string{})
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := NewTestIDGeneratorFactoryR([]string{})
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
@@ -781,9 +962,9 @@ func (UserComplexEmbedded) TableName() string {
 // --- Test Cases for Nested Fields ---
 
 func TestRepository_Create_NestedSuccess_UserComplexEmbedded(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "uce123"
-	iGF := NewTestIDGeneratorFactory([]string{entityID})
+	iGF := NewTestIDGeneratorFactoryR([]string{entityID})
 
 	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed", "test_sch_embed", iGF)
 	require.NoError(t, err)
@@ -821,9 +1002,9 @@ func TestRepository_Create_NestedSuccess_UserComplexEmbedded(t *testing.T) {
 }
 
 func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "uc456"
-	iGF := NewTestIDGeneratorFactory([]string{entityID})
+	iGF := NewTestIDGeneratorFactoryR([]string{entityID})
 
 	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
 	require.NoError(t, err)
@@ -841,7 +1022,7 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 	// Mock for unique checks
 	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Email:new@example.com").Return(nil, nil)
 	// Simulate Meta.Tag being a duplicate
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:existingTag").Return([]byte("anotherID"), nil).Once()
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:existingTag").Return([]byte("anotherID"), nil)
 	// No On("Write") should be called
 
 	_, err = repo.Create(&user)
@@ -852,9 +1033,9 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 }
 
 func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "uc789"
-	iGF := NewTestIDGeneratorFactory([]string{}) // Not used for FindByField directly for ID generation
+	iGF := NewTestIDGeneratorFactoryR([]string{}) // Not used for FindByField directly for ID generation
 
 	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
 	require.NoError(t, err)
@@ -887,9 +1068,9 @@ func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
 }
 
 func TestRepository_Find_NestedCondition_UserComplex(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "uc101"
-	iGF := NewTestIDGeneratorFactory([]string{})
+	iGF := NewTestIDGeneratorFactoryR([]string{})
 
 	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
 	require.NoError(t, err)
@@ -926,9 +1107,9 @@ func TestRepository_Find_NestedCondition_UserComplex(t *testing.T) {
 }
 
 func TestRepository_Update_NestedField_UserComplex(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "ucUpdate1"
-	iGF := NewTestIDGeneratorFactory([]string{})
+	iGF := NewTestIDGeneratorFactoryR([]string{})
 	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
 	require.NoError(t, err)
 
@@ -978,9 +1159,9 @@ func TestRepository_Update_NestedField_UserComplex(t *testing.T) {
 }
 
 func TestRepository_Update_NestedField_DuplicateUnique_UserComplex(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "ucUpdateDup1"
-	iGF := NewTestIDGeneratorFactory([]string{})
+	iGF := NewTestIDGeneratorFactoryR([]string{})
 	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
 	require.NoError(t, err)
 
@@ -1012,9 +1193,9 @@ func TestRepository_Update_NestedField_DuplicateUnique_UserComplex(t *testing.T)
 }
 
 func TestRepository_Delete_WithNestedFields_UserComplex(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "ucDelete1"
-	iGF := NewTestIDGeneratorFactory([]string{})
+	iGF := NewTestIDGeneratorFactoryR([]string{})
 	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
 	require.NoError(t, err)
 
@@ -1050,9 +1231,9 @@ func TestRepository_Delete_WithNestedFields_UserComplex(t *testing.T) {
 // Test for UserComplexEmbedded with anonymous MetaForEmbed
 // Focus on Create to check field name generation for embedded fields.
 func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
-	mockStore := new(MockKVStore)
+	mockStore := new(MockKVStoreRepositoryTest)
 	entityID := "uceFieldTest"
-	iGF := NewTestIDGeneratorFactory([]string{entityID})
+	iGF := NewTestIDGeneratorFactoryR([]string{entityID})
 
 	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed_fn", "test_sch_fn", iGF)
 	require.NoError(t, err)
