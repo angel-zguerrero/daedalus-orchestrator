@@ -907,3 +907,44 @@ func TestRepository_BulkUpdate_Pebble(t *testing.T) {
 		assert.Equal(t, "ValidUpdate", final.Name)
 	})
 }
+
+func newTestNRepositoryPebble(t *testing.T) (*db.Repository[UserComplexN], error) {
+	store := newPebbleStore(t)
+	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
+	return db.NewRepository[UserComplexN](store, TestFC, "test_schema", iGF)
+}
+func TestRepository_PutAndGet_Nested_Pebble(t *testing.T) {
+	repo, err := newTestNRepository(t)
+	require.NoError(t, err)
+	entity := UserComplexN{ID: "----", Email: "Alice@x.com", Status: "active", Meta: MetaN{
+		Tag:         "t1",
+		ConfigCode:  55,
+		Description: "None",
+	}}
+
+	id, err := repo.Create(&entity)
+	require.NoError(t, err)
+	assert.Equal(t, id, "123")
+
+	found, err := repo.FindByField("ID", "123")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "123", found.ID)
+	assert.Equal(t, entity.Email, found.Email)
+
+	found, err = repo.FindByField("Email", "Alice@x.com")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "123", found.ID)
+	assert.Equal(t, entity.Email, found.Email)
+
+	found, err = repo.FindByField("Meta.Tag", "t1")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "123", found.ID)
+	assert.Equal(t, entity.Email, found.Email)
+
+	found, err = repo.FindByField("Meta.Tag1", "t1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Unknown field Meta.Tag1")
+}

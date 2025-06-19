@@ -740,3 +740,354 @@ func TestRepository_BulkUpdate_EmptyInput(t *testing.T) {
 	assert.NotNil(t, results)
 	assert.Len(t, results, 0)
 }
+
+// --- Structs for Nested Field Tests ---
+
+type Meta struct {
+	Tag         string `orm:"unique"`
+	ConfigCode  int
+	Description string
+}
+
+type UserComplex struct {
+	ID     string `orm:"primary-key"`
+	Email  string `orm:"unique"`
+	Meta   Meta   // Named field
+	Status string
+	Extra  *Meta // Pointer to a struct, for testing pointer handling
+}
+
+func (UserComplex) TableName() string {
+	return "users_complex"
+}
+
+type MetaForEmbed struct {
+	Tag         string `orm:"unique"` // Will become "Tag" at top level due to embedding
+	ConfigCode  int    // Will become "ConfigCode"
+	Description string // Will become "Description"
+}
+
+type UserComplexEmbedded struct {
+	ID           string `orm:"primary-key"`
+	Email        string `orm:"unique"`
+	MetaForEmbed        // Embedded field
+	Status       string
+}
+
+func (UserComplexEmbedded) TableName() string {
+	return "users_complex_embedded"
+}
+
+// --- Test Cases for Nested Fields ---
+
+func TestRepository_Create_NestedSuccess_UserComplexEmbedded(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "uce123"
+	iGF := NewTestIDGeneratorFactory([]string{entityID})
+
+	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed", "test_sch_embed", iGF)
+	require.NoError(t, err)
+
+	user := UserComplexEmbedded{
+		Email:  "embedded@example.com",
+		Status: "pending",
+		MetaForEmbed: MetaForEmbed{ // Fields from MetaForEmbed should be top-level
+			Tag:         "embeddedTag1",
+			ConfigCode:  303,
+			Description: "Embedded Desc",
+		},
+	}
+
+	// Mock for unique checks (Email and embedded Tag)
+	mockStore.On("Get", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Email:embedded@example.com").Return(nil, nil).Once()
+	// Assuming embedded field 'Tag' becomes a top-level field name 'Tag'
+	mockStore.On("Get", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Tag:embeddedTag1").Return(nil, nil).Once()
+
+	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
+		return batch.Count() > 0
+	})).Return(nil).Once()
+
+	createdID, err := repo.Create(&user)
+	require.NoError(t, err)
+	assert.Equal(t, entityID, createdID)
+	assert.Equal(t, entityID, user.ID)
+
+	// Verify some key names based on embedding (Tag, ConfigCode should be top-level)
+	// In a real test, capture the batch passed to Write and assert its contents.
+	// For example, one of the calls to Put in the batch should be for:
+	// "test_sch_embed:users_complex_embedded:idx:Tag:embeddedTag1:" + entityID
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "uc456"
+	iGF := NewTestIDGeneratorFactory([]string{entityID})
+
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
+	require.NoError(t, err)
+
+	user := UserComplex{
+		Email:  "new@example.com", // Assume this is unique for now
+		Status: "active",
+		Meta: Meta{
+			Tag:         "existingTag", // This tag will cause a duplicate error
+			ConfigCode:  102,
+			Description: "Desc",
+		},
+	}
+
+	// Mock for unique checks
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Email:new@example.com").Return(nil, nil)
+	// Simulate Meta.Tag being a duplicate
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:existingTag").Return([]byte("anotherID"), nil).Once()
+	// No On("Write") should be called
+
+	_, err = repo.Create(&user)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique field: Meta.Tag = existingTag")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "uc789"
+	iGF := NewTestIDGeneratorFactory([]string{}) // Not used for FindByField directly for ID generation
+
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
+	require.NoError(t, err)
+
+	expectedUser := UserComplex{
+		ID:     entityID,
+		Email:  "findme@example.com",
+		Status: "found",
+		Meta: Meta{
+			Tag:         "findThisTag",
+			ConfigCode:  103,
+			Description: "Found Description",
+		},
+	}
+	jsonData, err := json.Marshal(expectedUser)
+	require.NoError(t, err)
+
+	uniqueIdxKey := "test_sch:users_complex:idx-u:Meta.Tag:findThisTag"
+	dataKey := "test_sch:users_complex:data:" + entityID
+
+	mockStore.On("Get", "cf_complex", uniqueIdxKey).Return([]byte(entityID), nil).Once()
+	mockStore.On("Get", "cf_complex", dataKey).Return(jsonData, nil).Once()
+
+	foundUser, err := repo.FindByField("Meta.Tag", "findThisTag")
+	require.NoError(t, err)
+	require.NotNil(t, foundUser)
+	assert.Equal(t, expectedUser, *foundUser)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Find_NestedCondition_UserComplex(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "uc101"
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
+	require.NoError(t, err)
+
+	user := UserComplex{
+		ID:     entityID,
+		Email:  "filter@example.com",
+		Status: "active",
+		Meta: Meta{
+			Tag:         "filterTag",
+			ConfigCode:  404,
+			Description: "Filtered item",
+		},
+	}
+	jsonData, _ := json.Marshal(user)
+
+	// Mock KVStore SearchByPatternPaginatedKV calls
+	// For "Meta.Tag = 'filterTag'"
+	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", "test_sch:users_complex:idx:Meta.Tag:filterTag:*", "", 1000).
+		Return([]db.KeyValuePair{{Key: "...", Value: []byte(entityID)}}, "", nil).Once()
+	// For "Email = 'filter@example.com'"
+	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", "test_sch:users_complex:idx:Email:filter@example.com:*", "", 1000).
+		Return([]db.KeyValuePair{{Key: "...", Value: []byte(entityID)}}, "", nil).Once()
+
+	// Mock Get for the data key
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(jsonData, nil).Once()
+
+	result, err := repo.Find("Meta.Tag = 'filterTag' & Email = 'filter@example.com'", 1000, "")
+	require.NoError(t, err)
+	require.Len(t, result.Entities, 1)
+	assert.Equal(t, user, result.Entities[0])
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Update_NestedField_UserComplex(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "ucUpdate1"
+	iGF := NewTestIDGeneratorFactory([]string{})
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
+	require.NoError(t, err)
+
+	originalUser := UserComplex{
+		ID:     entityID,
+		Email:  "update@example.com",
+		Status: "stale",
+		Meta: Meta{
+			Tag:         "oldTag",
+			ConfigCode:  500,
+			Description: "Old Description",
+		},
+	}
+	updatedUser := UserComplex{
+		ID:     entityID,             // ID must be the same
+		Email:  "update@example.com", // Email not changed
+		Status: "current",            // Top-level field changed
+		Meta: Meta{
+			Tag:         "newTag",          // Nested unique field changed
+			ConfigCode:  501,               // Nested non-unique field changed
+			Description: "New Description", // Nested non-unique field changed
+		},
+	}
+
+	originalData, _ := json.Marshal(originalUser)
+	// updatedData, _ := json.Marshal(updatedUser) // repo.Update internally marshals the modified 'current'
+
+	// 1. FindByField (ID) to get current entity
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(originalData, nil).Once()
+
+	// 2. Unique check for new Meta.Tag value
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:newTag").Return(nil, nil).Once()
+	// (No other unique fields changed in this test case for Meta)
+
+	// 3. Write batch operations (simplified, actual batch content is complex)
+	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
+		// A real test would capture and inspect the batch.
+		// Count > 0 implies deletes and puts for changed fields' indexes and the main data.
+		return batch.Count() > 0
+	})).Return(nil).Once()
+
+	changed, err := repo.Update(&updatedUser)
+	require.NoError(t, err)
+	assert.True(t, changed)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Update_NestedField_DuplicateUnique_UserComplex(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "ucUpdateDup1"
+	iGF := NewTestIDGeneratorFactory([]string{})
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
+	require.NoError(t, err)
+
+	originalUser := UserComplex{
+		ID:    entityID,
+		Email: "updatedup@example.com",
+		Meta:  Meta{Tag: "originalTag"},
+	}
+	updatedUser := UserComplex{
+		ID:    entityID,
+		Email: "updatedup@example.com",
+		Meta:  Meta{Tag: "conflictingTag"}, // This tag will conflict
+	}
+
+	originalData, _ := json.Marshal(originalUser)
+
+	// 1. FindByField (ID)
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(originalData, nil).Once()
+
+	// 2. Unique check for new Meta.Tag shows it exists for another ID
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:conflictingTag").Return([]byte("anotherEntityID"), nil).Once()
+
+	changed, err := repo.Update(&updatedUser)
+	require.Error(t, err)
+	assert.False(t, changed)
+	assert.Contains(t, err.Error(), "duplicate unique field: Meta.Tag = conflictingTag")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Delete_WithNestedFields_UserComplex(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "ucDelete1"
+	iGF := NewTestIDGeneratorFactory([]string{})
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", "test_sch", iGF)
+	require.NoError(t, err)
+
+	userToDelete := UserComplex{
+		ID:     entityID,
+		Email:  "delete@example.com",
+		Status: "marked_for_deletion",
+		Meta: Meta{
+			Tag:         "deleteTag",
+			ConfigCode:  999,
+			Description: "To be deleted",
+		},
+		Extra: &Meta{Tag: "delExtra"},
+	}
+	jsonData, _ := json.Marshal(userToDelete)
+
+	// 1. FindByField (ID) to get entity before deleting its indexes
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(jsonData, nil).Once()
+
+	// 2. Write batch for deletions
+	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
+		// Expect many deletes: data, all regular indexes, all unique indexes
+		return batch.Count() > 0 // Simplified check
+	})).Return(nil).Once()
+
+	deleted, err := repo.Delete(entityID)
+	require.NoError(t, err)
+	assert.True(t, deleted)
+
+	mockStore.AssertExpectations(t)
+}
+
+// Test for UserComplexEmbedded with anonymous MetaForEmbed
+// Focus on Create to check field name generation for embedded fields.
+func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
+	mockStore := new(MockKVStore)
+	entityID := "uceFieldTest"
+	iGF := NewTestIDGeneratorFactory([]string{entityID})
+
+	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed_fn", "test_sch_fn", iGF)
+	require.NoError(t, err)
+
+	user := UserComplexEmbedded{
+		Email:  "embedfn@example.com",
+		Status: "active_embed_fn",
+		MetaForEmbed: MetaForEmbed{
+			Tag:         "embedFnTag", // Expect 'Tag' as field name
+			ConfigCode:  777,          // Expect 'ConfigCode'
+			Description: "Desc for embed FN",
+		},
+	}
+
+	// Mock unique checks. If extractFieldsRecursively makes embedded fields top-level,
+	// then "Tag" should be the unique field name, not "MetaForEmbed.Tag".
+	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Email:embedfn@example.com").Return(nil, nil).Once()
+	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Tag:embedFnTag").Return(nil, nil).Once() // Key check
+
+	// Mock the Write call
+	// In a real test, capture the batch and verify specific index keys, e.g.:
+	// - test_sch_fn:users_complex_embedded:idx:Tag:embedFnTag:<id>
+	// - test_sch_fn:users_complex_embedded:idx:ConfigCode:777:<id>
+	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
+		// For now, a simple count check.
+		// A more thorough test would capture the batch and verify its contents.
+		// Example: Iterate batch.Ops, check for specific key patterns.
+		// For this test, ensuring the unique checks above are for "Tag" (not "MetaForEmbed.Tag")
+		// and that the code doesn't error out is the primary goal given the complexity of full batch verification here.
+		return batch.Count() > 0
+	})).Return(nil).Once()
+
+	createdID, err := repo.Create(&user)
+	require.NoError(t, err)
+	assert.Equal(t, entityID, createdID)
+
+	mockStore.AssertExpectations(t)
+}
