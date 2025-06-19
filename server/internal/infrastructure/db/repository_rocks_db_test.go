@@ -986,14 +986,14 @@ func newTestNRepository(t *testing.T) (*db.Repository[UserComplexN], error) {
 }
 
 func newNestedEntityTestRepositoryRocksDB(t *testing.T) (*db.Repository[NestedEntityTest], error) {
-	store := newRocksdbStore(t) // Assumes newRocksdbStore is defined in this file
+	store := newRocksdbStore(t)                                                        // Assumes newRocksdbStore is defined in this file
 	iGF := NewTestIDGeneratorFactory([]string{"nid1", "nid2", "nid3", "nid4", "nid5"}) // Example IDs
 	return db.NewRepository[NestedEntityTest](store, TestFC, "nested_entity_schema", iGF)
 }
 
 type NestedMetaTest struct {
 	UniqueID    string `orm:"unique"`
-	TTLValue    string `orm:"ttl"`
+	OTValue     string
 	Description string
 }
 
@@ -1049,9 +1049,9 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 
 	t.Run("Successful bulk creation with nested structs", func(t *testing.T) {
 		entities := []*NestedEntityTest{
-			{ID: "---", Data: "Entity1", Meta: NestedMetaTest{UniqueID: "uniqueA1", TTLValue: "ttl1", Description: "Desc1"}},
-			{ID: "---", Data: "Entity2", Meta: NestedMetaTest{UniqueID: "uniqueA2", TTLValue: "ttl2", Description: "Desc2"}},
-			{ID: "---", Data: "Entity3", Meta: NestedMetaTest{UniqueID: "uniqueA3", TTLValue: "ttl3", Description: "Desc3"}},
+			{ID: "---", Data: "Entity1", Meta: NestedMetaTest{UniqueID: "uniqueA1", OTValue: "ttl1", Description: "Desc1"}},
+			{ID: "---", Data: "Entity2", Meta: NestedMetaTest{UniqueID: "uniqueA2", OTValue: "ttl2", Description: "Desc2"}},
+			{ID: "---", Data: "Entity3", Meta: NestedMetaTest{UniqueID: "uniqueA3", OTValue: "ttl3", Description: "Desc3"}},
 		}
 
 		ids, err := repo.BulkCreate(entities)
@@ -1067,7 +1067,7 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 			require.NotNil(t, found, "Should find entity by ID %s", id)
 			assert.Equal(t, entities[i].Data, found.Data, "Data field mismatch for entity %s", id)
 			assert.Equal(t, entities[i].Meta.UniqueID, found.Meta.UniqueID, "Meta.UniqueID field mismatch for entity %s", id)
-			assert.Equal(t, entities[i].Meta.TTLValue, found.Meta.TTLValue, "Meta.TTLValue field mismatch for entity %s", id)
+			assert.Equal(t, entities[i].Meta.OTValue, found.Meta.OTValue, "Meta.TTLValue field mismatch for entity %s", id)
 			assert.Equal(t, entities[i].Meta.Description, found.Meta.Description, "Meta.Description field mismatch for entity %s", id)
 		}
 
@@ -1087,9 +1087,9 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 
 		entities := []*NestedEntityTest{
-			{ID: "---", Data: "EntityX", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", TTLValue: "ttlX", Description: "DescX"}},
-			{ID: "---", Data: "EntityY", Meta: NestedMetaTest{UniqueID: "anotherUniqueInBatch", TTLValue: "ttlY", Description: "DescY"}},
-			{ID: "---", Data: "EntityZ", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", TTLValue: "ttlZ", Description: "DescZ"}}, // Duplicate UniqueID
+			{ID: "---", Data: "EntityX", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", OTValue: "ttlX", Description: "DescX"}},
+			{ID: "---", Data: "EntityY", Meta: NestedMetaTest{UniqueID: "anotherUniqueInBatch", OTValue: "ttlY", Description: "DescY"}},
+			{ID: "---", Data: "EntityZ", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", OTValue: "ttlZ", Description: "DescZ"}}, // Duplicate UniqueID
 		}
 
 		ids, err := repoFresh.BulkCreate(entities)
@@ -1115,14 +1115,14 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Pre-existing entity
-		existingEntity := NestedEntityTest{ID: "---", Data: "ExistingData", Meta: NestedMetaTest{UniqueID: "conflictWithExisting", TTLValue: "ttlE", Description: "DescE"}}
+		existingEntity := NestedEntityTest{ID: "---", Data: "ExistingData", Meta: NestedMetaTest{UniqueID: "conflictWithExisting", OTValue: "ttlE", Description: "DescE"}}
 		_, err = repoClean.Create(&existingEntity) // Use Create for single setup
 		require.NoError(t, err, "Setup: Failed to create initial entity")
 
 		entitiesToBulkCreate := []*NestedEntityTest{
-			{ID: "---", Data: "NewEntity1", Meta: NestedMetaTest{UniqueID: "newUnique1", TTLValue: "ttlN1", Description: "DescN1"}},
-			{ID: "---", Data: "NewEntity2Conflicting", Meta: NestedMetaTest{UniqueID: "conflictWithExisting", TTLValue: "ttlN2", Description: "DescN2"}}, // Conflicts with existingEntity.Meta.UniqueID
-			{ID: "---", Data: "NewEntity3", Meta: NestedMetaTest{UniqueID: "newUnique3", TTLValue: "ttlN3", Description: "DescN3"}},
+			{ID: "---", Data: "NewEntity1", Meta: NestedMetaTest{UniqueID: "newUnique1", OTValue: "ttlN1", Description: "DescN1"}},
+			{ID: "---", Data: "NewEntity2Conflicting", Meta: NestedMetaTest{UniqueID: "conflictWithExisting", OTValue: "ttlN2", Description: "DescN2"}}, // Conflicts with existingEntity.Meta.UniqueID
+			{ID: "---", Data: "NewEntity3", Meta: NestedMetaTest{UniqueID: "newUnique3", OTValue: "ttlN3", Description: "DescN3"}},
 		}
 
 		ids, err := repoClean.BulkCreate(entitiesToBulkCreate)
@@ -1149,8 +1149,8 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 
 		initialEntities := []*NestedEntityTest{
-			{ID: "---", Data: "DataOne", Meta: NestedMetaTest{UniqueID: "uniqueU1", TTLValue: "ttlU1", Description: "DescU1"}},
-			{ID: "---", Data: "DataTwo", Meta: NestedMetaTest{UniqueID: "uniqueU2", TTLValue: "ttlU2", Description: "DescU2"}},
+			{ID: "---", Data: "DataOne", Meta: NestedMetaTest{UniqueID: "uniqueU1", OTValue: "ttlU1", Description: "DescU1"}},
+			{ID: "---", Data: "DataTwo", Meta: NestedMetaTest{UniqueID: "uniqueU2", OTValue: "ttlU2", Description: "DescU2"}},
 		}
 		createdIds, err := repo.BulkCreate(initialEntities)
 		require.NoError(t, err)
@@ -1158,8 +1158,8 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 		// Prepare updates
 		updatedEntities := []*NestedEntityTest{
-			{ID: createdIds[0], Data: "DataOneUpdated", Meta: NestedMetaTest{UniqueID: "uniqueU1_new", TTLValue: "ttlU1_new", Description: "DescU1_new"}},
-			{ID: createdIds[1], Data: "DataTwoUpdated", Meta: NestedMetaTest{UniqueID: "uniqueU2_new", TTLValue: "ttlU2_new", Description: "DescU2_new"}},
+			{ID: createdIds[0], Data: "DataOneUpdated", Meta: NestedMetaTest{UniqueID: "uniqueU1_new", OTValue: "ttlU1_new", Description: "DescU1_new"}},
+			{ID: createdIds[1], Data: "DataTwoUpdated", Meta: NestedMetaTest{UniqueID: "uniqueU2_new", OTValue: "ttlU2_new", Description: "DescU2_new"}},
 		}
 
 		results, err := repo.BulkUpdate(updatedEntities)
@@ -1176,7 +1176,7 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 			require.NotNil(t, found)
 			assert.Equal(t, updatedEntity.Data, found.Data)
 			assert.Equal(t, updatedEntity.Meta.UniqueID, found.Meta.UniqueID)
-			assert.Equal(t, updatedEntity.Meta.TTLValue, found.Meta.TTLValue)
+			assert.Equal(t, updatedEntity.Meta.OTValue, found.Meta.OTValue)
 			assert.Equal(t, updatedEntity.Meta.Description, found.Meta.Description)
 
 			// Verify old unique index is gone
@@ -1198,8 +1198,8 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 
 		initialEntities := []*NestedEntityTest{
-			{ID: "---", Data: "Alpha", Meta: NestedMetaTest{UniqueID: "alphaUnique", TTLValue: "ttlA", Description: "DescA"}},
-			{ID: "---", Data: "Beta", Meta: NestedMetaTest{UniqueID: "betaUnique", TTLValue: "ttlB", Description: "DescB"}},
+			{ID: "---", Data: "Alpha", Meta: NestedMetaTest{UniqueID: "alphaUnique", OTValue: "ttlA", Description: "DescA"}},
+			{ID: "---", Data: "Beta", Meta: NestedMetaTest{UniqueID: "betaUnique", OTValue: "ttlB", Description: "DescB"}},
 		}
 		createdIds, err := repo.BulkCreate(initialEntities)
 		require.NoError(t, err)
@@ -1209,11 +1209,11 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 		// Try to update both to have the same UniqueID
 		conflictingUpdates := []*NestedEntityTest{
-			{ID: createdIds[0], Data: "AlphaUpdated", Meta: NestedMetaTest{UniqueID: "conflictKey", TTLValue: "ttlA_new", Description: "DescA_new"}},
-			{ID: createdIds[1], Data: "BetaUpdated", Meta: NestedMetaTest{UniqueID: "conflictKey", TTLValue: "ttlB_new", Description: "DescB_new"}},
+			{ID: createdIds[0], Data: "AlphaUpdated", Meta: NestedMetaTest{UniqueID: "conflictKey", OTValue: "ttlA_new", Description: "DescA_new"}},
+			{ID: createdIds[1], Data: "BetaUpdated", Meta: NestedMetaTest{UniqueID: "conflictKey", OTValue: "ttlB_new", Description: "DescB_new"}},
 		}
 
-		results, err := repo.BulkUpdate(conflictingUpdates)
+		_, err = repo.BulkUpdate(conflictingUpdates)
 		require.Error(t, err, "BulkUpdate should fail due to UniqueID conflict within the batch")
 		// The exact behavior of `results` on error might vary. Some implementations might return nil, others might return []bool{false, false}
 		// Based on existing BulkUpdate tests, it seems an error is returned and results might be nil or reflect failure.
@@ -1235,8 +1235,8 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 
 		entities := []*NestedEntityTest{
-			{ID: "---", Data: "EntityToUpdate", Meta: NestedMetaTest{UniqueID: "originalUnique1", TTLValue: "ttl1", Description: "Desc1"}},      // Will be nid1
-			{ID: "---", Data: "EntityToConflictWith", Meta: NestedMetaTest{UniqueID: "existingUnique2", TTLValue: "ttl2", Description: "Desc2"}}, // Will be nid2
+			{ID: "---", Data: "EntityToUpdate", Meta: NestedMetaTest{UniqueID: "originalUnique1", OTValue: "ttl1", Description: "Desc1"}},       // Will be nid1
+			{ID: "---", Data: "EntityToConflictWith", Meta: NestedMetaTest{UniqueID: "existingUnique2", OTValue: "ttl2", Description: "Desc2"}}, // Will be nid2
 		}
 		createdIds, err := repo.BulkCreate(entities)
 		require.NoError(t, err)
@@ -1246,10 +1246,10 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 		// Attempt to update EntityToUpdate's UniqueID to match EntityToConflictWith's UniqueID
 		updateAttempt := []*NestedEntityTest{
-			{ID: createdIds[0], Data: "EntityToUpdateModified", Meta: NestedMetaTest{UniqueID: "existingUnique2", TTLValue: "ttl1_mod", Description: "Desc1_mod"}},
+			{ID: createdIds[0], Data: "EntityToUpdateModified", Meta: NestedMetaTest{UniqueID: "existingUnique2", OTValue: "ttl1_mod", Description: "Desc1_mod"}},
 		}
 
-		results, err := repo.BulkUpdate(updateAttempt)
+		_, err = repo.BulkUpdate(updateAttempt)
 		require.Error(t, err, "BulkUpdate should fail due to conflict with another existing entity's UniqueID")
 		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a duplicate key problem")
 		// We expect results to be nil or indicate failure if the batch fails entirely.
@@ -1274,16 +1274,16 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		repo, err := newNestedEntityTestRepositoryRocksDB(t)
 		require.NoError(t, err)
 
-		existingEntity := NestedEntityTest{ID: "---", Data: "RealData", Meta: NestedMetaTest{UniqueID: "realUnique", TTLValue: "ttlReal", Description: "DescReal"}}
+		existingEntity := NestedEntityTest{ID: "---", Data: "RealData", Meta: NestedMetaTest{UniqueID: "realUnique", OTValue: "ttlReal", Description: "DescReal"}}
 		createdIds, err := repo.BulkCreate([]*NestedEntityTest{&existingEntity})
 		require.NoError(t, err)
 		require.Len(t, createdIds, 1)
 		existingEntity.ID = createdIds[0]
 
 		updates := []*NestedEntityTest{
-			{ID: existingEntity.ID, Data: "RealDataUpdated", Meta: NestedMetaTest{UniqueID: "realUniqueUpdated", TTLValue: "ttlRealUpdated", Description: "DescRealUpdated"}},
-			{ID: "nonExistentID1", Data: "PhantomData1", Meta: NestedMetaTest{UniqueID: "phantomUnique1", TTLValue: "ttlPhantom1", Description: "DescPhantom1"}},
-			{ID: "nonExistentID2", Data: "PhantomData2", Meta: NestedMetaTest{UniqueID: "phantomUnique2", TTLValue: "ttlPhantom2", Description: "DescPhantom2"}},
+			{ID: existingEntity.ID, Data: "RealDataUpdated", Meta: NestedMetaTest{UniqueID: "realUniqueUpdated", OTValue: "ttlRealUpdated", Description: "DescRealUpdated"}},
+			{ID: "nonExistentID1", Data: "PhantomData1", Meta: NestedMetaTest{UniqueID: "phantomUnique1", OTValue: "ttlPhantom1", Description: "DescPhantom1"}},
+			{ID: "nonExistentID2", Data: "PhantomData2", Meta: NestedMetaTest{UniqueID: "phantomUnique2", OTValue: "ttlPhantom2", Description: "DescPhantom2"}},
 		}
 
 		results, err := repo.BulkUpdate(updates)

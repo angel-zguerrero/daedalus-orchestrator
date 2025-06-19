@@ -914,25 +914,25 @@ func newTestNRepositoryPebble(t *testing.T) (*db.Repository[UserComplexN], error
 	return db.NewRepository[UserComplexN](store, TestFC, "test_schema", iGF)
 }
 
-func newNestedEntityTestRepositoryPebble(t *testing.T) (*db.Repository[NestedEntityTest], error) {
-	store := newPebbleStore(t) // Assumes newPebbleStore is defined in this file
+func newNestedEntityTestPebbleRepositoryPebble(t *testing.T) (*db.Repository[NestedEntityTestPebble], error) {
+	store := newPebbleStore(t)                                                              // Assumes newPebbleStore is defined in this file
 	iGF := NewTestIDGeneratorFactory([]string{"pnid1", "pnid2", "pnid3", "pnid4", "pnid5"}) // Example IDs for Pebble
-	return db.NewRepository[NestedEntityTest](store, TestFC, "nested_entity_schema_pebble", iGF)
+	return db.NewRepository[NestedEntityTestPebble](store, TestFC, "nested_entity_schema_pebble", iGF)
 }
 
-type NestedMetaTest struct {
+type NestedMetaTestPebble struct {
 	UniqueID    string `orm:"unique"`
-	TTLValue    string `orm:"ttl"`
+	OTValue     string
 	Description string
 }
 
-type NestedEntityTest struct {
+type NestedEntityTestPebble struct {
 	ID   string `orm:"primary-key"`
 	Data string
-	Meta NestedMetaTest
+	Meta NestedMetaTestPebble
 }
 
-func (NestedEntityTest) TableName() string {
+func (NestedEntityTestPebble) TableName() string {
 	return "nested_entities_test"
 }
 
@@ -973,14 +973,14 @@ func TestRepository_PutAndGet_Nested_Pebble(t *testing.T) {
 }
 
 func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
-	repo, err := newNestedEntityTestRepositoryPebble(t)
-	require.NoError(t, err, "Failed to create repository for NestedEntityTest (Pebble)")
+	repo, err := newNestedEntityTestPebbleRepositoryPebble(t)
+	require.NoError(t, err, "Failed to create repository for NestedEntityTestPebble (Pebble)")
 
 	t.Run("Successful bulk creation with nested structs pebble", func(t *testing.T) {
-		entities := []*NestedEntityTest{
-			{ID: "---", Data: "EntityP1", Meta: NestedMetaTest{UniqueID: "uniqueP1", TTLValue: "ttlP1", Description: "DescP1"}},
-			{ID: "---", Data: "EntityP2", Meta: NestedMetaTest{UniqueID: "uniqueP2", TTLValue: "ttlP2", Description: "DescP2"}},
-			{ID: "---", Data: "EntityP3", Meta: NestedMetaTest{UniqueID: "uniqueP3", TTLValue: "ttlP3", Description: "DescP3"}},
+		entities := []*NestedEntityTestPebble{
+			{ID: "---", Data: "EntityP1", Meta: NestedMetaTestPebble{UniqueID: "uniqueP1", OTValue: "ttlP1", Description: "DescP1"}},
+			{ID: "---", Data: "EntityP2", Meta: NestedMetaTestPebble{UniqueID: "uniqueP2", OTValue: "ttlP2", Description: "DescP2"}},
+			{ID: "---", Data: "EntityP3", Meta: NestedMetaTestPebble{UniqueID: "uniqueP3", OTValue: "ttlP3", Description: "DescP3"}},
 		}
 
 		ids, err := repo.BulkCreate(entities)
@@ -996,7 +996,7 @@ func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
 			require.NotNil(t, found, "Should find entity by ID %s (Pebble)", id)
 			assert.Equal(t, entities[i].Data, found.Data, "Data field mismatch for entity %s (Pebble)", id)
 			assert.Equal(t, entities[i].Meta.UniqueID, found.Meta.UniqueID, "Meta.UniqueID field mismatch for entity %s (Pebble)", id)
-			assert.Equal(t, entities[i].Meta.TTLValue, found.Meta.TTLValue, "Meta.TTLValue field mismatch for entity %s (Pebble)", id)
+			assert.Equal(t, entities[i].Meta.OTValue, found.Meta.OTValue, "Meta.TTLValue field mismatch for entity %s (Pebble)", id)
 			assert.Equal(t, entities[i].Meta.Description, found.Meta.Description, "Meta.Description field mismatch for entity %s (Pebble)", id)
 		}
 
@@ -1010,13 +1010,13 @@ func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
 	})
 
 	t.Run("Bulk creation with duplicate UniqueID within the batch pebble", func(t *testing.T) {
-		repoFresh, err := newNestedEntityTestRepositoryPebble(t)
+		repoFresh, err := newNestedEntityTestPebbleRepositoryPebble(t)
 		require.NoError(t, err)
 
-		entities := []*NestedEntityTest{
-			{ID: "---", Data: "EntityPX", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatchP", TTLValue: "ttlPX", Description: "DescPX"}},
-			{ID: "---", Data: "EntityPY", Meta: NestedMetaTest{UniqueID: "anotherUniqueInBatchP", TTLValue: "ttlPY", Description: "DescPY"}},
-			{ID: "---", Data: "EntityPZ", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatchP", TTLValue: "ttlPZ", Description: "DescPZ"}}, // Duplicate UniqueID
+		entities := []*NestedEntityTestPebble{
+			{ID: "---", Data: "EntityPX", Meta: NestedMetaTestPebble{UniqueID: "duplicateKeyInBatchP", OTValue: "ttlPX", Description: "DescPX"}},
+			{ID: "---", Data: "EntityPY", Meta: NestedMetaTestPebble{UniqueID: "anotherUniqueInBatchP", OTValue: "ttlPY", Description: "DescPY"}},
+			{ID: "---", Data: "EntityPZ", Meta: NestedMetaTestPebble{UniqueID: "duplicateKeyInBatchP", OTValue: "ttlPZ", Description: "DescPZ"}}, // Duplicate UniqueID
 		}
 
 		ids, err := repoFresh.BulkCreate(entities)
@@ -1035,18 +1035,18 @@ func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
 	})
 
 	t.Run("Bulk creation with UniqueID conflicting with existing data pebble", func(t *testing.T) {
-		repoClean, err := newNestedEntityTestRepositoryPebble(t) // Fresh repo
+		repoClean, err := newNestedEntityTestPebbleRepositoryPebble(t) // Fresh repo
 		require.NoError(t, err)
 
 		// Pre-existing entity
-		existingEntity := NestedEntityTest{ID: "---", Data: "ExistingDataP", Meta: NestedMetaTest{UniqueID: "conflictWithExistingP", TTLValue: "ttlPE", Description: "DescPE"}}
+		existingEntity := NestedEntityTestPebble{ID: "---", Data: "ExistingDataP", Meta: NestedMetaTestPebble{UniqueID: "conflictWithExistingP", OTValue: "ttlPE", Description: "DescPE"}}
 		_, err = repoClean.Create(&existingEntity)
 		require.NoError(t, err, "Setup: Failed to create initial entity (Pebble)")
 
-		entitiesToBulkCreate := []*NestedEntityTest{
-			{ID: "---", Data: "NewEntityP1", Meta: NestedMetaTest{UniqueID: "newUniqueP1", TTLValue: "ttlPN1", Description: "DescPN1"}},
-			{ID: "---", Data: "NewEntityP2Conflicting", Meta: NestedMetaTest{UniqueID: "conflictWithExistingP", TTLValue: "ttlPN2", Description: "DescPN2"}}, // Conflicts
-			{ID: "---", Data: "NewEntityP3", Meta: NestedMetaTest{UniqueID: "newUniqueP3", TTLValue: "ttlPN3", Description: "DescPN3"}},
+		entitiesToBulkCreate := []*NestedEntityTestPebble{
+			{ID: "---", Data: "NewEntityP1", Meta: NestedMetaTestPebble{UniqueID: "newUniqueP1", OTValue: "ttlPN1", Description: "DescPN1"}},
+			{ID: "---", Data: "NewEntityP2Conflicting", Meta: NestedMetaTestPebble{UniqueID: "conflictWithExistingP", OTValue: "ttlPN2", Description: "DescPN2"}}, // Conflicts
+			{ID: "---", Data: "NewEntityP3", Meta: NestedMetaTestPebble{UniqueID: "newUniqueP3", OTValue: "ttlPN3", Description: "DescPN3"}},
 		}
 
 		ids, err := repoClean.BulkCreate(entitiesToBulkCreate)
@@ -1067,21 +1067,21 @@ func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
 
 func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 	t.Run("Successful bulk update of nested structs pebble", func(t *testing.T) {
-		repo, err := newNestedEntityTestRepositoryPebble(t) // Uses specific IDs: pnid1, pnid2, ...
+		repo, err := newNestedEntityTestPebbleRepositoryPebble(t) // Uses specific IDs: pnid1, pnid2, ...
 		require.NoError(t, err)
 
-		initialEntities := []*NestedEntityTest{
-			{ID: "---", Data: "DataOneP", Meta: NestedMetaTest{UniqueID: "uniquePU1", TTLValue: "ttlPU1", Description: "DescPU1"}},
-			{ID: "---", Data: "DataTwoP", Meta: NestedMetaTest{UniqueID: "uniquePU2", TTLValue: "ttlPU2", Description: "DescPU2"}},
+		initialEntities := []*NestedEntityTestPebble{
+			{ID: "---", Data: "DataOneP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU1", OTValue: "ttlPU1", Description: "DescPU1"}},
+			{ID: "---", Data: "DataTwoP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU2", OTValue: "ttlPU2", Description: "DescPU2"}},
 		}
 		createdIds, err := repo.BulkCreate(initialEntities)
 		require.NoError(t, err)
 		require.Len(t, createdIds, 2)
 
 		// Prepare updates
-		updatedEntities := []*NestedEntityTest{
-			{ID: createdIds[0], Data: "DataOneUpdatedP", Meta: NestedMetaTest{UniqueID: "uniquePU1_new", TTLValue: "ttlPU1_new", Description: "DescPU1_new"}},
-			{ID: createdIds[1], Data: "DataTwoUpdatedP", Meta: NestedMetaTest{UniqueID: "uniquePU2_new", TTLValue: "ttlPU2_new", Description: "DescPU2_new"}},
+		updatedEntities := []*NestedEntityTestPebble{
+			{ID: createdIds[0], Data: "DataOneUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU1_new", OTValue: "ttlPU1_new", Description: "DescPU1_new"}},
+			{ID: createdIds[1], Data: "DataTwoUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU2_new", OTValue: "ttlPU2_new", Description: "DescPU2_new"}},
 		}
 
 		results, err := repo.BulkUpdate(updatedEntities)
@@ -1098,7 +1098,7 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 			require.NotNil(t, found)
 			assert.Equal(t, updatedEntity.Data, found.Data)
 			assert.Equal(t, updatedEntity.Meta.UniqueID, found.Meta.UniqueID)
-			assert.Equal(t, updatedEntity.Meta.TTLValue, found.Meta.TTLValue)
+			assert.Equal(t, updatedEntity.Meta.OTValue, found.Meta.OTValue)
 			assert.Equal(t, updatedEntity.Meta.Description, found.Meta.Description)
 
 			oldUniqueValue := initialEntities[i].Meta.UniqueID
@@ -1114,12 +1114,12 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 	})
 
 	t.Run("Bulk update with UniqueID conflict within the batch pebble", func(t *testing.T) {
-		repo, err := newNestedEntityTestRepositoryPebble(t)
+		repo, err := newNestedEntityTestPebbleRepositoryPebble(t)
 		require.NoError(t, err)
 
-		initialEntities := []*NestedEntityTest{
-			{ID: "---", Data: "AlphaP", Meta: NestedMetaTest{UniqueID: "alphaUniqueP", TTLValue: "ttlAP", Description: "DescAP"}},
-			{ID: "---", Data: "BetaP", Meta: NestedMetaTest{UniqueID: "betaUniqueP", TTLValue: "ttlBP", Description: "DescBP"}},
+		initialEntities := []*NestedEntityTestPebble{
+			{ID: "---", Data: "AlphaP", Meta: NestedMetaTestPebble{UniqueID: "alphaUniqueP", OTValue: "ttlAP", Description: "DescAP"}},
+			{ID: "---", Data: "BetaP", Meta: NestedMetaTestPebble{UniqueID: "betaUniqueP", OTValue: "ttlBP", Description: "DescBP"}},
 		}
 		createdIds, err := repo.BulkCreate(initialEntities)
 		require.NoError(t, err)
@@ -1127,12 +1127,12 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		initialEntities[0].ID = createdIds[0]
 		initialEntities[1].ID = createdIds[1]
 
-		conflictingUpdates := []*NestedEntityTest{
-			{ID: createdIds[0], Data: "AlphaUpdatedP", Meta: NestedMetaTest{UniqueID: "conflictKeyP", TTLValue: "ttlAP_new", Description: "DescAP_new"}},
-			{ID: createdIds[1], Data: "BetaUpdatedP", Meta: NestedMetaTest{UniqueID: "conflictKeyP", TTLValue: "ttlBP_new", Description: "DescBP_new"}},
+		conflictingUpdates := []*NestedEntityTestPebble{
+			{ID: createdIds[0], Data: "AlphaUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "conflictKeyP", OTValue: "ttlAP_new", Description: "DescAP_new"}},
+			{ID: createdIds[1], Data: "BetaUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "conflictKeyP", OTValue: "ttlBP_new", Description: "DescBP_new"}},
 		}
 
-		results, err := repo.BulkUpdate(conflictingUpdates)
+		_, err = repo.BulkUpdate(conflictingUpdates)
 		require.Error(t, err, "BulkUpdate should fail due to UniqueID conflict within the batch (Pebble)")
 		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a duplicate key problem (Pebble)")
 
@@ -1146,12 +1146,12 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 	})
 
 	t.Run("Bulk update with UniqueID conflicting with another existing (untouched) entity pebble", func(t *testing.T) {
-		repo, err := newNestedEntityTestRepositoryPebble(t)
+		repo, err := newNestedEntityTestPebbleRepositoryPebble(t)
 		require.NoError(t, err)
 
-		entities := []*NestedEntityTest{
-			{ID: "---", Data: "EntityToUpdateP", Meta: NestedMetaTest{UniqueID: "originalUniqueP1", TTLValue: "ttlP1", Description: "DescP1"}},
-			{ID: "---", Data: "EntityToConflictWithP", Meta: NestedMetaTest{UniqueID: "existingUniqueP2", TTLValue: "ttlP2", Description: "DescP2"}},
+		entities := []*NestedEntityTestPebble{
+			{ID: "---", Data: "EntityToUpdateP", Meta: NestedMetaTestPebble{UniqueID: "originalUniqueP1", OTValue: "ttlP1", Description: "DescP1"}},
+			{ID: "---", Data: "EntityToConflictWithP", Meta: NestedMetaTestPebble{UniqueID: "existingUniqueP2", OTValue: "ttlP2", Description: "DescP2"}},
 		}
 		createdIds, err := repo.BulkCreate(entities)
 		require.NoError(t, err)
@@ -1159,11 +1159,11 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		entities[0].ID = createdIds[0]
 		entities[1].ID = createdIds[1]
 
-		updateAttempt := []*NestedEntityTest{
-			{ID: createdIds[0], Data: "EntityToUpdateModifiedP", Meta: NestedMetaTest{UniqueID: "existingUniqueP2", TTLValue: "ttlP1_mod", Description: "DescP1_mod"}},
+		updateAttempt := []*NestedEntityTestPebble{
+			{ID: createdIds[0], Data: "EntityToUpdateModifiedP", Meta: NestedMetaTestPebble{UniqueID: "existingUniqueP2", OTValue: "ttlP1_mod", Description: "DescP1_mod"}},
 		}
 
-		results, err := repo.BulkUpdate(updateAttempt)
+		_, err = repo.BulkUpdate(updateAttempt)
 		require.Error(t, err, "BulkUpdate should fail due to conflict with another existing entity's UniqueID (Pebble)")
 		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a duplicate key problem (Pebble)")
 
@@ -1181,19 +1181,19 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 	})
 
 	t.Run("Bulk update including non-existent entities pebble", func(t *testing.T) {
-		repo, err := newNestedEntityTestRepositoryPebble(t)
+		repo, err := newNestedEntityTestPebbleRepositoryPebble(t)
 		require.NoError(t, err)
 
-		existingEntity := NestedEntityTest{ID: "---", Data: "RealDataP", Meta: NestedMetaTest{UniqueID: "realUniqueP", TTLValue: "ttlRealP", Description: "DescRealP"}}
-		createdIds, err := repo.BulkCreate([]*NestedEntityTest{&existingEntity})
+		existingEntity := NestedEntityTestPebble{ID: "---", Data: "RealDataP", Meta: NestedMetaTestPebble{UniqueID: "realUniqueP", OTValue: "ttlRealP", Description: "DescRealP"}}
+		createdIds, err := repo.BulkCreate([]*NestedEntityTestPebble{&existingEntity})
 		require.NoError(t, err)
 		require.Len(t, createdIds, 1)
 		existingEntity.ID = createdIds[0]
 
-		updates := []*NestedEntityTest{
-			{ID: existingEntity.ID, Data: "RealDataUpdatedP", Meta: NestedMetaTest{UniqueID: "realUniqueUpdatedP", TTLValue: "ttlRealUpdatedP", Description: "DescRealUpdatedP"}},
-			{ID: "nonExistentIDP1", Data: "PhantomDataP1", Meta: NestedMetaTest{UniqueID: "phantomUniqueP1", TTLValue: "ttlPhantomP1", Description: "DescPhantomP1"}},
-			{ID: "nonExistentIDP2", Data: "PhantomDataP2", Meta: NestedMetaTest{UniqueID: "phantomUniqueP2", TTLValue: "ttlPhantomP2", Description: "DescPhantomP2"}},
+		updates := []*NestedEntityTestPebble{
+			{ID: existingEntity.ID, Data: "RealDataUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "realUniqueUpdatedP", OTValue: "ttlRealUpdatedP", Description: "DescRealUpdatedP"}},
+			{ID: "nonExistentIDP1", Data: "PhantomDataP1", Meta: NestedMetaTestPebble{UniqueID: "phantomUniqueP1", OTValue: "ttlPhantomP1", Description: "DescPhantomP1"}},
+			{ID: "nonExistentIDP2", Data: "PhantomDataP2", Meta: NestedMetaTestPebble{UniqueID: "phantomUniqueP2", OTValue: "ttlPhantomP2", Description: "DescPhantomP2"}},
 		}
 
 		results, err := repo.BulkUpdate(updates)
