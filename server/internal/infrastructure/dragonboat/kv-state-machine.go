@@ -105,7 +105,7 @@ func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 }
 
 func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, error) {
-	result, err := kv_store.Get(db.MetaFC, AppliedIndexKey)
+	result, err := kv_store.Get(db.MetaFC, AppliedIndexKey, time.Now()) // WORK, here now can be any value, due to the key used to store the "applyed index" is not ttl key
 	if err != nil {
 		return 0, err
 	}
@@ -117,6 +117,7 @@ func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, err
 }
 
 func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
+	now := time.Now() // TODO: MOVE this logic to "client of node" side
 	if s.aborted {
 		panic("update() called after abort set to true")
 	}
@@ -226,7 +227,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		}
 		switch mlcCmd.Op {
 		case ClearExpiredTTL:
-			err = kv_store.CleanExpiredKeys()
+			err = kv_store.CleanExpiredKeys(now)
 			if err != nil {
 				return nil, err
 			}
@@ -240,7 +241,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
 	batch.Put(db.MetaFC, AppliedIndexKey, appliedIndex)
 
-	if err := kv_store.Write(batch); err != nil {
+	if err := kv_store.Write(batch, now); err != nil {
 		return nil, err
 	}
 
@@ -252,6 +253,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 }
 
 func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
+	now := time.Now() // TODO: MOVE this logic to "client of node" side
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
@@ -272,7 +274,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 		case GetOp:
 			var data []byte
 
-			data, err = kv_store.Get(query.ColumnFamilyName, query.Key)
+			data, err = kv_store.Get(query.ColumnFamilyName, query.Key, now)
 			if err != nil {
 				return nil, err
 			}
@@ -286,6 +288,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 				query.KeyPattern,
 				query.Cursor,
 				int(query.Limit),
+				now,
 			)
 			if err != nil {
 				return nil, err
@@ -300,7 +303,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 		case GetOpTTL:
 			var data []byte
 
-			data, err = kv_store.Get(query.ColumnFamilyName, query.Key)
+			data, err = kv_store.Get(query.ColumnFamilyName, query.Key, now)
 			if err != nil {
 				return nil, err
 			}
@@ -313,6 +316,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 				query.KeyPattern,
 				query.Cursor,
 				int(query.Limit),
+				now,
 			)
 			if err != nil {
 				return nil, err

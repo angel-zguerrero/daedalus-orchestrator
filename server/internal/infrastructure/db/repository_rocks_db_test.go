@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
@@ -1433,7 +1434,7 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 
 		entities := []*NestedEntityTest{
-			{ID: "---", Data: "EntityToUpdate", Meta: NestedMetaTest{UniqueID: "originalUnique1", OTValue: "ttl1", Description: "Desc1"}},       // Will be nid1
+			{ID: "---", Data: "EntityToUpdate", Meta: NestedMetaTest{UniqueID: "originalUnique1", OTValue: "ttl1", Description: "Desc1"}},        // Will be nid1
 			{ID: "---", Data: "EntityToConflictWith", Meta: NestedMetaTest{UniqueID: "existingUniqueP2", OTValue: "ttl2", Description: "Desc2"}}, // Will be nid2
 		}
 		now := time.Now()
@@ -1466,7 +1467,7 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, foundUntouched)
 		assert.Equal(t, "EntityToConflictWith", foundUntouched.Data)
-		assert.Equal(t, "existingUnique2", foundUntouched.Meta.UniqueID)
+		assert.Equal(t, "existingUniqueP2", foundUntouched.Meta.UniqueID)
 	})
 
 	t.Run("Bulk update including non-existent entities", func(t *testing.T) {

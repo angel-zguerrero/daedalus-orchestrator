@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
@@ -135,15 +136,16 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 
 	// GetUserRoot (calls FindByField, which calls SearchByPatternPaginatedKV or Get)
 	// First call to GetUserRoot (is root missing?)
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return(nil, "", nil).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(2)
 	// CreateUser part:
 	// GetUserRoot again inside CreateUser
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return(nil, "", nil).Once()
 	// Exists checks for username and email (these are simplified, actual repo uses Get for unique index)
-	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.AnythingOfType("time.Time")).Return(false, nil).Once()
-	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.AnythingOfType("time.Time")).Return(false, nil).Once()
+	//store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(false, nil).Once()
+	//store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(false, nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(nil, nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(nil, nil).Once()
 	// Write for CreateUser
-	store.On("Write", mock.Anything, mock.AnythingOfType("time.Time")).Return(nil).Once()
+	store.On("Write", mock.Anything, mock.Anything).Return(nil).Once()
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
@@ -162,7 +164,7 @@ func Test_ErrorGettingRoot(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return(nil, "", errors.New("boom")).Times(1)
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", errors.New("boom")).Times(1)
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.Error(t, err)
@@ -181,18 +183,17 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 		DefaultRootPassword: "123456",
 	}
 	// First GetUserRoot in BootstrapRootUser
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Once()
-	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.AnythingOfType("time.Time")).Return(nil, nil).Once() // Assumes Get is called by FindByField
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Once() // Assumes Get is called by FindByField
 
 	// CreateUser part:
 	// GetUserRoot again inside CreateUser
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return(nil, "", nil).Once() // No root user found this time for CreateUser's internal check
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Once() // No root user found this time for CreateUser's internal check
 	// Exists checks for username and email
-	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.AnythingOfType("time.Time")).Return(false, nil).Once()
-	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.AnythingOfType("time.Time")).Return(false, nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(nil, nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(nil, nil).Once()
 	// Write for CreateUser
-	store.On("Write", mock.Anything, mock.AnythingOfType("time.Time")).Return(nil).Once()
-
+	store.On("Write", mock.Anything, mock.Anything).Return(nil).Once()
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
@@ -218,10 +219,10 @@ func Test_SkipsIfUserExists(t *testing.T) {
 	}
 
 	// GetUserRoot in BootstrapRootUser
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.AnythingOfType("time.Time")).Return([]byte(marshal(t, root)), nil).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return([]byte(marshal(t, root)), nil).Once()
 	// No Write should be called if user exists
-	// store.On("Write", mock.Anything, mock.AnythingOfType("time.Time")).Return(nil).Times(1) // This line was causing issues, Write is not always called
+	store.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1) // This line was causing issues, Write is not always called
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
@@ -242,8 +243,8 @@ func Test_ErrorFetchingUser(t *testing.T) {
 	}
 	//root := models.User{Username: "admin"}
 
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.AnythingOfType("time.Time")).Return(nil, errors.New("read error")).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, errors.New("read error")).Once()
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.Error(t, err)
@@ -262,17 +263,17 @@ func Test_ErrorPutsRoot(t *testing.T) {
 	}
 
 	// GetUserRoot in BootstrapRootUser
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Once()
-	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.AnythingOfType("time.Time")).Return(nil, nil).Once() // Assumes Get is called by FindByField
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Once() // Assumes Get is called by FindByField
 
 	// CreateUser part:
 	// GetUserRoot again inside CreateUser
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return(nil, "", nil).Once()
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Once()
 	// Exists checks for username and email
-	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.AnythingOfType("time.Time")).Return(false, nil).Once()
-	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.AnythingOfType("time.Time")).Return(false, nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(nil, nil).Once()
+	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(nil, nil).Once()
 
-	store.On("Write", mock.Anything, mock.AnythingOfType("time.Time")).Return(errors.New("write fail")).Once()
+	store.On("Write", mock.Anything, mock.Anything).Return(errors.New("write fail")).Once()
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
@@ -293,7 +294,7 @@ func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 		DefaultRootPassword: "testpass",
 	}
 
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return(nil, "", nil).Times(1)
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(1)
 	err = db.BootstrapRootUser(*repo, cfg)
 
 	assert.Error(t, err)
@@ -312,7 +313,7 @@ func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
 		DefaultRootPassword: "",
 	}
 
-	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.AnythingOfType("time.Time")).Return(nil, "", nil).Times(1)
+	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(1)
 	err = db.BootstrapRootUser(*repo, cfg)
 
 	assert.Error(t, err)
