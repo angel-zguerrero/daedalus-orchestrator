@@ -57,6 +57,94 @@ func TestRepository_PutAndGet_Pebble(t *testing.T) {
 	assert.Equal(t, entity.Name, found.Name)
 }
 
+func TestRepository_Create_DuplicatePrimaryKey_Pebble(t *testing.T) {
+	repo, err := newTestDeterministicRepositoryPebble(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	entity1 := testEntity{ID: "dup-pk-pebble-1", Name: "FirstPebbleEntity"}
+	id1, err := repo.Create(&entity1)
+	require.NoError(t, err)
+	assert.Equal(t, "dup-pk-pebble-1", id1)
+
+	// Attempt to create another entity with the same ID
+	entity2 := testEntity{ID: "dup-pk-pebble-1", Name: "SecondPebbleEntitySameID"}
+	_, err = repo.Create(&entity2)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = dup-pk-pebble-1 already exists")
+
+	// Verify only the first entity is there
+	found, err := repo.FindByField("ID", "dup-pk-pebble-1")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "FirstPebbleEntity", found.Name) // Should be the name of the first entity
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB_Pebble(t *testing.T) {
+	repo, err := newTestDeterministicRepositoryPebble(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	// Pre-existing entity
+	existingEntity := testEntity{ID: "existing-pebble-pk", Name: "AlreadyInPebbleDB"}
+	_, err = repo.Create(&existingEntity)
+	require.NoError(t, err)
+
+	entitiesToBulkCreate := []*testEntity{
+		{ID: "new-pebble-pk-1", Name: "NewPebbleEntity1"},
+		{ID: "existing-pebble-pk", Name: "TryToOverwritePebble"}, // This ID conflicts
+		{ID: "new-pebble-pk-2", Name: "NewPebbleEntity2"},
+	}
+
+	_, err = repo.BulkCreate(entitiesToBulkCreate)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = existing-pebble-pk already exists")
+
+	// Verify that non-conflicting new entities were not created
+	foundNew1, err := repo.FindByField("ID", "new-pebble-pk-1")
+	require.NoError(t, err)
+	assert.Nil(t, foundNew1)
+
+	// Verify existing entity is still the original one
+	foundExisting, err := repo.FindByField("ID", "existing-pebble-pk")
+	require.NoError(t, err)
+	require.NotNil(t, foundExisting)
+	assert.Equal(t, "AlreadyInPebbleDB", foundExisting.Name)
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch_Pebble(t *testing.T) {
+	repo, err := newTestDeterministicRepositoryPebble(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	duplicateIDInBatch := "batch-dup-pebble-pk"
+	entities := []*testEntity{
+		{ID: "unique-batch-pebble-1", Name: "BatchPebble1"},
+		{ID: duplicateIDInBatch, Name: "BatchPebble2"},
+		{ID: duplicateIDInBatch, Name: "BatchPebble3"}, // Duplicate ID within the batch
+	}
+
+	_, err = repo.BulkCreate(entities)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key in input batch: ID = "+duplicateIDInBatch)
+
+	// Verify no entities from the batch were created
+	foundUnique, err := repo.FindByField("ID", "unique-batch-pebble-1")
+	require.NoError(t, err)
+	assert.Nil(t, foundUnique)
+}
+
+func TestRepository_Create_EmptyProvidedID_Pebble(t *testing.T) {
+	repo, err := newTestDeterministicRepositoryPebble(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	entityWithEmptyID := testEntity{
+		ID:   "", // Explicitly empty ID
+		Name: "EntityWithEmptyIDPebble",
+	}
+
+	_, err = repo.Create(&entityWithEmptyID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary key field 'ID' cannot be empty when not generated")
+}
+
 func TestRepository_Get_NotFound_Pebble(t *testing.T) {
 	repo, err := newTestRepositoryPebble(t)
 	require.NoError(t, err)

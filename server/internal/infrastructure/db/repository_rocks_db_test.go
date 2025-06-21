@@ -112,6 +112,102 @@ func TestRepository_PutAndGet(t *testing.T) {
 	assert.Equal(t, entity.Name, found.Name)
 }
 
+func TestRepository_Create_DuplicatePrimaryKey_RocksDB(t *testing.T) {
+	repo, err := newTestDeterministicRepository(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	entity1 := testEntity{ID: "dup-pk-rocks-1", Name: "FirstEntity"}
+	id1, err := repo.Create(&entity1)
+	require.NoError(t, err)
+	assert.Equal(t, "dup-pk-rocks-1", id1)
+
+	// Attempt to create another entity with the same ID
+	entity2 := testEntity{ID: "dup-pk-rocks-1", Name: "SecondEntitySameID"}
+	_, err = repo.Create(&entity2)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = dup-pk-rocks-1 already exists")
+
+	// Verify only the first entity is there
+	found, err := repo.FindByField("ID", "dup-pk-rocks-1")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "FirstEntity", found.Name) // Should be the name of the first entity
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB_RocksDB(t *testing.T) {
+	repo, err := newTestDeterministicRepository(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	// Pre-existing entity
+	existingEntity := testEntity{ID: "existing-rocks-pk", Name: "AlreadyInDB"}
+	_, err = repo.Create(&existingEntity)
+	require.NoError(t, err)
+
+	entitiesToBulkCreate := []*testEntity{
+		{ID: "new-rocks-pk-1", Name: "NewEntity1"},
+		{ID: "existing-rocks-pk", Name: "TryToOverwrite"}, // This ID conflicts with existingEntity
+		{ID: "new-rocks-pk-2", Name: "NewEntity2"},
+	}
+
+	_, err = repo.BulkCreate(entitiesToBulkCreate)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = existing-rocks-pk already exists")
+
+	// Verify that non-conflicting new entities were not created due to batch failure
+	foundNew1, err := repo.FindByField("ID", "new-rocks-pk-1")
+	require.NoError(t, err)
+	assert.Nil(t, foundNew1)
+
+	foundNew2, err := repo.FindByField("ID", "new-rocks-pk-2")
+	require.NoError(t, err)
+	assert.Nil(t, foundNew2)
+
+	// Verify existing entity is still the original one
+	foundExisting, err := repo.FindByField("ID", "existing-rocks-pk")
+	require.NoError(t, err)
+	require.NotNil(t, foundExisting)
+	assert.Equal(t, "AlreadyInDB", foundExisting.Name)
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch_RocksDB(t *testing.T) {
+	repo, err := newTestDeterministicRepository(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	duplicateIDInBatch := "batch-dup-rocks-pk"
+	entities := []*testEntity{
+		{ID: "unique-batch-rocks-1", Name: "BatchRock1"},
+		{ID: duplicateIDInBatch, Name: "BatchRock2"},
+		{ID: duplicateIDInBatch, Name: "BatchRock3"}, // Duplicate ID within the same batch
+	}
+
+	_, err = repo.BulkCreate(entities)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key in input batch: ID = "+duplicateIDInBatch)
+
+	// Verify no entities from the batch were created
+	foundUnique, err := repo.FindByField("ID", "unique-batch-rocks-1")
+	require.NoError(t, err)
+	assert.Nil(t, foundUnique)
+
+	foundDup, err := repo.FindByField("ID", duplicateIDInBatch)
+	require.NoError(t, err)
+	assert.Nil(t, foundDup)
+}
+
+func TestRepository_Create_EmptyProvidedID_RocksDB(t *testing.T) {
+	repo, err := newTestDeterministicRepository(t) // Uses DeterministicIDGeneratorFactory
+	require.NoError(t, err)
+
+	entityWithEmptyID := testEntity{
+		ID:   "", // Explicitly empty ID
+		Name: "EntityWithEmptyIDRocks",
+	}
+
+	_, err = repo.Create(&entityWithEmptyID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary key field 'ID' cannot be empty when not generated")
+}
+
 // --- Conditional Uniqueness Tests ---
 
 type ConditionalUniqueEntityRocksDB struct {

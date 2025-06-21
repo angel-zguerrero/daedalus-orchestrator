@@ -239,6 +239,111 @@ func TestRepository_Create_Success(t *testing.T) {
 	mockStore.AssertExpectations(t)
 }
 
+func TestRepository_Create_DuplicatePrimaryKey_InDB(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing ID in entity
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	existingUserID := "existing-id-123"
+	user := User{
+		ID:   existingUserID, // Provide ID directly
+		Name: "Alice",
+	}
+
+	// Mock that the primary key (data key) already exists
+	dataKey := "admin:users:data:" + existingUserID
+	mockStore.On("Exists", "cf1", dataKey).Return(true, nil).Once()
+	// No unique checks for "Name" should be hit if PK check fails first
+	// No "Write" should be called
+
+	_, err = repo.Create(&user)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = "+existingUserID+" already exists")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing IDs in entities
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	existingUserID := "existing-bulk-id-456"
+	users := []*User{
+		{ID: "new-bulk-id-1", Name: "UserNew1"},
+		{ID: existingUserID, Name: "UserExistingID"}, // This ID already exists in DB
+		{ID: "new-bulk-id-2", Name: "UserNew2"},
+	}
+
+	// Mock that the primary key for the second user already exists
+	pkDataKeyExisting := "admin:users:data:" + existingUserID
+	// For the first user (new-bulk-id-1), PK check should pass
+	pkDataKeyNew1 := "admin:users:data:new-bulk-id-1"
+	mockStore.On("Exists", "cf1", pkDataKeyNew1).Return(false, nil).Once()
+	// For the second user (existingUserID), PK check should fail
+	mockStore.On("Exists", "cf1", pkDataKeyExisting).Return(true, nil).Once()
+	// No further Exists or Write calls should happen for subsequent users or the batch itself.
+
+	_, err = repo.BulkCreate(users)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = "+existingUserID+" already exists")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing IDs in entities
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	duplicateIDInBatch := "dup-batch-id-789"
+	users := []*User{
+		{ID: "unique-batch-id-1", Name: "BatchUser1"},
+		{ID: duplicateIDInBatch, Name: "BatchUser2"},
+		{ID: duplicateIDInBatch, Name: "BatchUser3"}, // Duplicate ID within the same batch
+	}
+
+	// Mock that the primary key for the first user (unique-batch-id-1) does not exist
+	pkDataKeyUnique1 := "admin:users:data:unique-batch-id-1"
+	mockStore.On("Exists", "cf1", pkDataKeyUnique1).Return(false, nil).Once()
+	// Mock that the primary key for the second user (duplicateIDInBatch) does not exist (for the first occurrence)
+	pkDataKeyDup := "admin:users:data:" + duplicateIDInBatch
+	mockStore.On("Exists", "cf1", pkDataKeyDup).Return(false, nil).Once()
+	// The third user will cause the "duplicate primary key in input batch" error before DB check.
+
+	_, err = repo.BulkCreate(users)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key in input batch: ID = "+duplicateIDInBatch)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Create_EmptyProvidedID(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Using this factory means ID must be provided
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	userWithEmptyID := User{
+		ID:   "", // Explicitly empty ID
+		Name: "UserWithEmptyID",
+	}
+
+	// No DB calls should be made if the ID is empty.
+	_, err = repo.Create(&userWithEmptyID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary key field 'ID' cannot be empty when not generated")
+
+	mockStore.AssertExpectations(t) // Should be no expectations set if code fails before DB interaction
+}
+
 func TestRepository_Create_DuplicateUnique(t *testing.T) {
 	mockStore := new(MockKVStoreRepositoryTest)
 

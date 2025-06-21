@@ -489,12 +489,12 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 
 	// Map para detectar duplicados en el batch, clave = campo+valor
 	uniqueInBatch := make(map[string]struct{})
+	// Map to detect duplicate primary keys in the batch
+	primaryKeysInBatch := make(map[string]struct{})
 
 	for _, entity := range entities {
-		id := r.idGeneratorFactory.GenerateID()
-		if id != "" {
-			ids = append(ids, id)
-		}
+		generatedID := r.idGeneratorFactory.GenerateID()
+		var currentEntityIDValue string
 
 		val := reflect.ValueOf(entity)
 		if val.Kind() == reflect.Ptr {
@@ -507,18 +507,43 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error getting primary key field 'ID' for entity: %w", err)
 		}
-		if pkField.IsValid() && pkField.CanSet() && pkField.Kind() == reflect.String {
-			if id != "" { // Using the ID passed as a parameter when the generated ID is an empty string. This feature was added to allow deterministic behavior
-				pkField.SetString(id)
-			} else {
-				ids = append(ids, fmt.Sprintf("%v", pkField.Interface()))
+		if !pkField.IsValid() || !pkField.CanSet() || pkField.Kind() != reflect.String {
+			return nil, fmt.Errorf("primary key field 'ID' is not a settable string field or is invalid")
+		}
+
+		if generatedID != "" { // ID was generated
+			pkField.SetString(generatedID)
+			currentEntityIDValue = generatedID
+			ids = append(ids, generatedID)
+		} else { // ID is provided in the entity
+			entityProvidedID := pkField.String()
+			if entityProvidedID == "" {
+				return nil, fmt.Errorf("primary key field 'ID' cannot be empty when not generated")
 			}
-		} else {
-			return nil, fmt.Errorf("primary key field 'ID' is not a settable string field")
+			currentEntityIDValue = entityProvidedID
+			ids = append(ids, entityProvidedID)
+		}
+
+		// Check for duplicate primary key in the batch
+		if _, exists := primaryKeysInBatch[currentEntityIDValue]; exists {
+			return nil, fmt.Errorf("duplicate primary key in input batch: ID = %s", currentEntityIDValue)
+		}
+		primaryKeysInBatch[currentEntityIDValue] = struct{}{}
+
+		// Check for duplicate primary key in the database
+		// This check must be done before the unique field checks for other fields
+		// as it's a more fundamental constraint.
+		pkDataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, currentEntityIDValue)
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, pkDataKey)
+		if err != nil {
+			return nil, fmt.Errorf("error checking existence for primary key %s: %w", currentEntityIDValue, err)
+		}
+		if exists {
+			return nil, fmt.Errorf("duplicate primary key: ID = %s already exists", currentEntityIDValue)
 		}
 
 		for _, def := range r.definition.Fields {
-			if def.Unique {
+			if def.Unique { // This handles non-primary unique fields
 				shouldSkipUniqueness := false
 				if def.HasConditionalUniqueness {
 					boolFieldVal, err := getNestedFieldValue(val, def.IgnoreIsTrueFieldName)
