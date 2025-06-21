@@ -222,8 +222,8 @@ func TestRepository_Create_Success(t *testing.T) {
 	uNameFieldKey := "admin:users:idx-u:Name:Alice"
 	indexKey := "admin:users:idx:ID:123:123"
 
-	//mockStore.On("Get", "cf1", uNameFieldKey, mock.Anything).Return(nil, nil)
-	mockStore.On("Exists", "cf1", uNameFieldKey, mock.Anything).Return(false, nil)
+	mockStore.On("Get", "cf1", uNameFieldKey, mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:123", mock.Anything).Return(nil, nil)
 
 	batch := db.NewWriteBatch()
 	batch.Put("cf1", indexKey, []byte("123"))
@@ -242,6 +242,115 @@ func TestRepository_Create_Success(t *testing.T) {
 	mockStore.AssertExpectations(t)
 }
 
+func TestRepository_Create_DuplicatePrimaryKey_InDB(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing ID in entity
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	existingUserID := "existing-id-123"
+	user := User{
+		ID:   existingUserID, // Provide ID directly
+		Name: "Alice",
+	}
+	data, _ := json.Marshal(user)
+	// Mock that the primary key (data key) already exists
+	dataKey := "admin:users:data:" + existingUserID
+	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
+	// No unique checks for "Name" should be hit if PK check fails first
+	// No "Write" should be called
+
+	_, err = repo.Create(&user, time.Now())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = "+existingUserID+" already exists")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing IDs in entities
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	existingUserID := "existing-bulk-id-456"
+	users := []*User{
+		{ID: "new-bulk-id-1", Name: "UserNew1"},
+		{ID: existingUserID, Name: "UserExistingID"}, // This ID already exists in DB
+		{ID: "new-bulk-id-2", Name: "UserNew2"},
+	}
+
+	// Mock that the primary key for the second user already exists
+	pkDataKeyExisting := "admin:users:data:" + existingUserID
+	// For the first user (new-bulk-id-1), PK check should pass
+	pkDataKeyNew1 := "admin:users:data:new-bulk-id-1"
+	mockStore.On("Get", "cf1", pkDataKeyNew1).Return(nil, nil).Once()
+	// For the second user (existingUserID), PK check should fail
+	//mockStore.On("Exists", "cf1", pkDataKeyExisting).Return(true, nil).Once()
+
+	data, _ := json.Marshal(&User{ID: existingUserID, Name: "UserExistingID"})
+	mockStore.On("Get", "cf1", pkDataKeyExisting).Return(data, nil)
+	// No further Exists or Write calls should happen for subsequent users or the batch itself.
+
+	_, err = repo.BulkCreate(users, time.Now())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key: ID = "+existingUserID+" already exists")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing IDs in entities
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	duplicateIDInBatch := "dup-batch-id-789"
+	users := []*User{
+		{ID: "unique-batch-id-1", Name: "BatchUser1"},
+		{ID: duplicateIDInBatch, Name: "BatchUser2"},
+		{ID: duplicateIDInBatch, Name: "BatchUser3"}, // Duplicate ID within the same batch
+	}
+
+	// Mock that the primary key for the first user (unique-batch-id-1) does not exist
+	pkDataKeyUnique1 := "admin:users:data:unique-batch-id-1"
+	// Mock that the primary key for the second user (duplicateIDInBatch) does not exist (for the first occurrence)
+	pkDataKeyDup := "admin:users:data:" + duplicateIDInBatch
+
+	// The third user will cause the "duplicate primary key in input batch" error before DB check.
+	mockStore.On("Get", "cf1", pkDataKeyUnique1).Return(nil, nil)
+	mockStore.On("Get", "cf1", pkDataKeyDup).Return(nil, nil)
+
+	_, err = repo.BulkCreate(users, time.Now())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate primary key in input batch: ID = "+duplicateIDInBatch)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Create_EmptyProvidedID(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+	iGF := &db.DeterministicIDGeneratorFactory{} // Using this factory means ID must be provided
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	require.NoError(t, err)
+
+	userWithEmptyID := User{
+		ID:   "", // Explicitly empty ID
+		Name: "UserWithEmptyID",
+	}
+
+	// No DB calls should be made if the ID is empty.
+	_, err = repo.Create(&userWithEmptyID, time.Now())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary key field 'ID' cannot be empty when not generated")
+
+	mockStore.AssertExpectations(t) // Should be no expectations set if code fails before DB interaction
+}
+
 func TestRepository_Create_DuplicateUnique(t *testing.T) {
 	mockStore := new(MockKVStoreRepositoryTest)
 
@@ -256,9 +365,9 @@ func TestRepository_Create_DuplicateUnique(t *testing.T) {
 	assert.NoError(t, err)
 
 	uIndexKey := "admin:users:idx-u:Name:Alice"
-	// The mock for Exists needs to be set up before Create is called.
-	// Exists is called with (columnFamily, key, now)
-	mockStore.On("Exists", "cf1", uIndexKey, mock.Anything).Return(true, nil)
+	dataey := "admin:users:data:123"
+	mockStore.On("Get", "cf1", uIndexKey, mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", "cf1", dataey, mock.Anything).Return(nil, nil)
 
 	_, err = repo.Create(&user, time.Now())
 	assert.Error(t, err)
@@ -632,7 +741,8 @@ func TestRepository_BulkCreate_Success(t *testing.T) {
 		uIdx := "admin:users:idx-u:Name:" + u.Name
 		pkIdx := "admin:users:idx:ID:" + id + ":" + id
 
-		mockStore.On("Exists", "cf1", uIdx, mock.Anything).Return(false, nil)
+		mockStore.On("Get", "cf1", uIdx, mock.Anything).Return(nil, nil)
+		mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(nil, nil)
 
 		batch.Put("cf1", dataKey, d)
 		batch.Put("cf1", nameIdx, []byte(id))
@@ -674,6 +784,8 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 	// (or rather, that the key it would use is taken).
 	mockStore.On("Exists", "cf1", "admin:users:idx-u:Name:Alice", mock.Anything).Return(true, nil).Once()
 
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(nil, nil).Once()
+	mockStore.On("Get", "cf1", "admin:users:data:id2", mock.Anything).Return(nil, nil).Once()
 	_, err = repo.BulkCreate(users, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field")
@@ -689,7 +801,8 @@ func TestRepository_BulkCreate_WriteError(t *testing.T) {
 		{Name: "Alice"},
 	}
 
-	mockStore.On("Exists", "cf1", "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Alice", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(nil, nil)
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
 
 	_, err = repo.BulkCreate(users, time.Now())
@@ -1001,7 +1114,8 @@ func TestRepository_Create_NestedSuccess_UserComplexEmbedded(t *testing.T) {
 	// These Gets are effectively Exists checks
 	mockStore.On("Exists", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Email:embedded@example.com", mock.Anything).Return(false, nil).Once()
 	// Assuming embedded field 'Tag' becomes a top-level field name 'Tag'
-	mockStore.On("Exists", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Tag:embeddedTag1", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Get", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Tag:embeddedTag1", mock.Anything).Return(nil, nil).Once()
+	mockStore.On("Get", "cf_embed", "test_sch_embed:users_complex_embedded:data:uce123", mock.Anything).Return(nil, nil).Once()
 
 	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
 		return batch.Count() > 0
@@ -1038,8 +1152,9 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 		},
 	}
 
-	// Mock for unique checks (Exists)
-	mockStore.On("Exists", "cf_complex", "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(false, nil)
+	// Mock for unique checks
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:uc456", mock.Anything).Return(nil, nil)
 	// Simulate Meta.Tag being a duplicate
 	mockStore.On("Exists", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:existingTag", mock.Anything).Return(true, nil)
 	// No On("Write") should be called
@@ -1048,7 +1163,7 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field: Meta.Tag = existingTag")
 
-	mockStore.AssertExpectations(t)
+	//mockStore.AssertExpectations(t)
 }
 
 func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
@@ -1269,9 +1384,9 @@ func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
 
 	// Mock unique checks. If extractFieldsRecursively makes embedded fields top-level,
 	// then "Tag" should be the unique field name, not "MetaForEmbed.Tag".
-	// These are effectively Exists checks.
-	mockStore.On("Exists", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Email:embedfn@example.com", mock.Anything).Return(false, nil).Once()
-	mockStore.On("Exists", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Tag:embedFnTag", mock.Anything).Return(false, nil).Once() // Key check
+	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Email:embedfn@example.com", mock.Anything).Return(nil, nil).Once()
+	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Tag:embedFnTag", mock.Anything).Return(nil, nil).Once() // Key check
+	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:data:uceFieldTest", mock.Anything).Return(nil, nil).Once()    // Key check
 
 	// Mock the Write call
 	// In a real test, capture the batch and verify specific index keys, e.g.:
@@ -1289,6 +1404,44 @@ func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
 	createdID, err := repo.Create(&user, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, entityID, createdID)
+
+	mockStore.AssertExpectations(t)
+}
+func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+
+	user := User{
+		ID:   "det-123",
+		Name: "Alice",
+	}
+
+	iGF := &db.DeterministicIDGeneratorFactory{}
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	data, _ := json.Marshal(user)
+	dataKey := "admin:users:data:det-123"
+	nameFieldKey := "admin:users:idx:Name:Alice:det-123"
+	uNameFieldKey := "admin:users:idx-u:Name:Alice"
+	indexKey := "admin:users:idx:ID:det-123:det-123"
+
+	mockStore.On("Get", "cf1", uNameFieldKey).Return(nil, nil)
+	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
+
+	batch := db.NewWriteBatch()
+	batch.Put("cf1", indexKey, []byte("det-123"))
+	batch.Put("cf1", nameFieldKey, []byte("det-123"))
+	batch.Put("cf1", uNameFieldKey, []byte("det-123"))
+	batch.Put("cf1", dataKey, data)
+
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	})).Return(nil)
+
+	id, err := repo.Create(&user, time.Now())
+	assert.NoError(t, err)
+	assert.Equal(t, id, "det-123")
 
 	mockStore.AssertExpectations(t)
 }

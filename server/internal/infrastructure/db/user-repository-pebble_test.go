@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -35,11 +36,37 @@ func newPebbleStoreForUserRepoTest(t *testing.T) db.KVStore {
 	return kvStore
 }
 
+type TestIDGeneratorFactoryRepositoryPebble struct {
+	ids   []string
+	index int
+	mu    sync.Mutex
+}
+
+func (g *TestIDGeneratorFactoryRepositoryPebble) GenerateID() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if len(g.ids) == 0 {
+		return ""
+	}
+
+	id := g.ids[g.index]
+	g.index = (g.index + 1) % len(g.ids) // avance circular
+	return id
+}
+
+func NewTestIDGeneratorFactoryRepositoryPebble(ids []string) *TestIDGeneratorFactoryRepositoryPebble {
+	return &TestIDGeneratorFactoryRepositoryPebble{
+		ids: ids,
+	}
+}
+
 // newUserRepoPebbleTest creates a new UnitOfWork and UserRepository for testing with Pebble.
 func newUserRepoPebbleTest(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.UserRepository) {
 	store := newPebbleStoreForUserRepoTest(t)
 	uow := db.NewUnitOfWork(store)
-	userRepo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	userRepo, err := db.NewUserRepository(uow, iGF)
 	require.NoError(t, err, "Failed to create UserRepository with Pebble backend")
 	return uow, store, userRepo
 }
@@ -60,10 +87,10 @@ func TestPebblePutUser_Success_Pebble(t *testing.T) {
 
 	err = uow.Commit(time.Now())
 	require.NoError(t, err)
-
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	// Verify user is created by reading it back from a new UoW/Repo on the same store
 	verifyUOW := db.NewUnitOfWork(store) // Use same store
-	verifyRepo, err := db.NewUserRepository(verifyUOW)
+	verifyRepo, err := db.NewUserRepository(verifyUOW, iGF)
 	require.NoError(t, err)
 
 	retrievedUser, err := verifyRepo.GetUserByUsername("pebbleuser")
@@ -85,7 +112,8 @@ func TestPebbleGetUser_Success_Pebble(t *testing.T) {
 
 	// Create user with initial UoW
 	createUOW := db.NewUnitOfWork(store)
-	createRepo, err := db.NewUserRepository(createUOW)
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	createRepo, err := db.NewUserRepository(createUOW, iGF)
 	require.NoError(t, err)
 	createdID, err := createRepo.CreateUser(userToCreate)
 	require.NoError(t, err)
@@ -95,7 +123,7 @@ func TestPebbleGetUser_Success_Pebble(t *testing.T) {
 
 	// Read user with a new UoW on the same store
 	readUOW := db.NewUnitOfWork(store)
-	readRepo, err := db.NewUserRepository(readUOW)
+	readRepo, err := db.NewUserRepository(readUOW, iGF)
 	require.NoError(t, err)
 
 	retrievedUser, err := readRepo.GetUserByUsername(userToCreate.Username)
@@ -123,7 +151,8 @@ func TestPebbleDeleteUser_Success_Pebble(t *testing.T) {
 
 	// Create user
 	createUOW := db.NewUnitOfWork(store)
-	createRepo, err := db.NewUserRepository(createUOW)
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	createRepo, err := db.NewUserRepository(createUOW, iGF)
 	require.NoError(t, err)
 	_, err = createRepo.CreateUser(userToDelete)
 	require.NoError(t, err)
@@ -132,7 +161,7 @@ func TestPebbleDeleteUser_Success_Pebble(t *testing.T) {
 
 	// Delete user
 	deleteUOW := db.NewUnitOfWork(store)
-	deleteRepo, err := db.NewUserRepository(deleteUOW)
+	deleteRepo, err := db.NewUserRepository(deleteUOW, iGF)
 	require.NoError(t, err)
 	deleted, err := deleteRepo.DeleteUser(userToDelete.Username)
 	require.NoError(t, err)
@@ -142,7 +171,7 @@ func TestPebbleDeleteUser_Success_Pebble(t *testing.T) {
 
 	// Verify user is deleted
 	verifyUOW := db.NewUnitOfWork(store)
-	verifyRepo, err := db.NewUserRepository(verifyUOW)
+	verifyRepo, err := db.NewUserRepository(verifyUOW, iGF)
 	require.NoError(t, err)
 	goneUser, err := verifyRepo.GetUserByUsername(userToDelete.Username)
 	require.NoError(t, err)
@@ -161,7 +190,8 @@ func TestPebbleDeleteUser_CannotDeleteRoot_Pebble(t *testing.T) {
 
 	// Create root user
 	createUOW := db.NewUnitOfWork(store)
-	createRepo, err := db.NewUserRepository(createUOW)
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	createRepo, err := db.NewUserRepository(createUOW, iGF)
 	require.NoError(t, err)
 	_, err = createRepo.CreateUser(rootUserToCreate)
 	require.NoError(t, err)
@@ -170,7 +200,7 @@ func TestPebbleDeleteUser_CannotDeleteRoot_Pebble(t *testing.T) {
 
 	// Attempt to delete
 	deleteUOW := db.NewUnitOfWork(store)
-	deleteRepo, err := db.NewUserRepository(deleteUOW)
+	deleteRepo, err := db.NewUserRepository(deleteUOW, iGF)
 	require.NoError(t, err)
 	deleted, err := deleteRepo.DeleteUser(rootUserToCreate.Username)
 	require.Error(t, err)
@@ -180,7 +210,7 @@ func TestPebbleDeleteUser_CannotDeleteRoot_Pebble(t *testing.T) {
 
 	// Verify user still exists
 	verifyUOW := db.NewUnitOfWork(store)
-	verifyRepo, err := db.NewUserRepository(verifyUOW)
+	verifyRepo, err := db.NewUserRepository(verifyUOW, iGF)
 	require.NoError(t, err)
 	stillRoot, err := verifyRepo.GetUserByUsername(rootUserToCreate.Username)
 	require.NoError(t, err)
@@ -206,7 +236,8 @@ func TestPebbleLoginUser_Pebble(t *testing.T) {
 
 	// Create the user for login tests
 	initialUOW := db.NewUnitOfWork(store)
-	initialRepo, err := db.NewUserRepository(initialUOW)
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	initialRepo, err := db.NewUserRepository(initialUOW, iGF)
 	require.NoError(t, err)
 	_, err = initialRepo.CreateUser(models.CreateUser{
 		Username: userUsername,
@@ -219,7 +250,8 @@ func TestPebbleLoginUser_Pebble(t *testing.T) {
 
 	t.Run("LoginWithEmail_CorrectPassword_Success_Pebble", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 		loggedIn, err := loginRepo.Login(userEmail, correctPassword)
 		require.NoError(t, err)
@@ -228,7 +260,8 @@ func TestPebbleLoginUser_Pebble(t *testing.T) {
 
 	t.Run("LoginWithUsername_CorrectPassword_Success_Pebble", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 		loggedIn, err := loginRepo.Login(userUsername, correctPassword)
 		require.NoError(t, err)
@@ -237,7 +270,8 @@ func TestPebbleLoginUser_Pebble(t *testing.T) {
 
 	t.Run("LoginWithEmail_IncorrectPassword_Failure_Pebble", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 		loggedIn, err := loginRepo.Login(userEmail, incorrectPassword)
 		require.NoError(t, err) // bcrypt mismatch is not an operational error
@@ -246,7 +280,8 @@ func TestPebbleLoginUser_Pebble(t *testing.T) {
 
 	t.Run("LoginWithUsername_IncorrectPassword_Failure_Pebble", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 		loggedIn, err := loginRepo.Login(userUsername, incorrectPassword)
 		require.NoError(t, err) // bcrypt mismatch is not an operational error
@@ -255,7 +290,8 @@ func TestPebbleLoginUser_Pebble(t *testing.T) {
 
 	t.Run("Login_UserNotFound_Failure_Pebble", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 		unknownIdentifier := "unknown_pebble@example.com"
 		loggedIn, err := loginRepo.Login(unknownIdentifier, "anypassword")
