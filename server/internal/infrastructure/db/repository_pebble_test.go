@@ -177,7 +177,7 @@ func newTestConditionalUniqueRepoPebble(t *testing.T, initialIDs []string) (*db.
 
 func TestPebbleConditionalUniquenessCreate(t *testing.T) {
 	t.Run("IgnoreUniqueness", func(t *testing.T) {
-		ids := []string{"id1", "id2", "id3"}
+		ids := []string{"id1", "id2", "id3", "id4"}
 		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
 
 		entity1 := &ConditionalUniqueEntityPebble{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}

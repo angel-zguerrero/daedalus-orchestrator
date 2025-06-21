@@ -231,7 +231,7 @@ func newTestConditionalUniqueRepoRocksDB(t *testing.T, initialIDs []string) (*db
 
 func TestRocksDBConditionalUniquenessCreate(t *testing.T) {
 	t.Run("IgnoreUniqueness", func(t *testing.T) {
-		ids := []string{"id1", "id2", "id3"}
+		ids := []string{"id1", "id2", "id3", "1d4"}
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
 
 		entity1 := &ConditionalUniqueEntityRocksDB{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
@@ -245,6 +245,11 @@ func TestRocksDBConditionalUniquenessCreate(t *testing.T) {
 		entity3 := &ConditionalUniqueEntityRocksDB{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity3)
 		require.NoError(t, err, "Create entity3 with same UniqueValue (enforced, but not previously by E1/E2) should succeed")
+
+		entity4 := &ConditionalUniqueEntityRocksDB{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		_, err = repo.Create(entity4)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate unique field: UniqueValue = uv1")
 
 		// Verify all created
 		e1, _ := repo.FindByField("ID", ids[0])
