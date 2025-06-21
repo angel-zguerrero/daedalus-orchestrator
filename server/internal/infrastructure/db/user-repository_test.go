@@ -3,6 +3,7 @@ package db_test
 import (
 	"encoding/json"
 	"errors"
+	"sync"
 
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/shared/models"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -101,10 +103,36 @@ func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string,
 	return s, "", args.Error(2)
 }
 
+type TestIDGeneratorFactoryRepository struct {
+	ids   []string
+	index int
+	mu    sync.Mutex
+}
+
+func (g *TestIDGeneratorFactoryRepository) GenerateID() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if len(g.ids) == 0 {
+		return ""
+	}
+
+	id := g.ids[g.index]
+	g.index = (g.index + 1) % len(g.ids) // avance circular
+	return id
+}
+
+func NewTestIDGeneratorFactoryRepository(ids []string) *TestIDGeneratorFactoryRepository {
+	return &TestIDGeneratorFactoryRepository{
+		ids: ids,
+	}
+}
+
 func TestPutUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 
 	user := models.CreateUser{Username: "foo", Email: "foo@mail.com", Password: "1234"}
@@ -112,6 +140,7 @@ func TestPutUser_Success(t *testing.T) {
 	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:foo").Return(nil, nil).Times(1)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:foo@mail.com").Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(1)
 	mockStore.On("Write", mock.Anything).Return(nil).Times(1)
 
 	id, err := repo.CreateUser(user)
@@ -125,7 +154,8 @@ func TestPutUser_Success(t *testing.T) {
 func TestGetUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 
 	u := models.User{Username: "foo", Email: "bar"}
 	data, _ := json.Marshal(u)
@@ -142,7 +172,8 @@ func TestGetUser_Success(t *testing.T) {
 func TestGetUser_NotFound(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bar").Return(nil, nil)
 
 	user, err := repo.GetUserByUsername("bar")
@@ -154,7 +185,8 @@ func TestGetUser_NotFound(t *testing.T) {
 func TestGetUser_ErrorOnGet(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return(nil, errors.New("get failed"))
 	user, err := repo.GetUserByUsername("x")
@@ -166,7 +198,8 @@ func TestGetUser_ErrorOnGet(t *testing.T) {
 func TestGetUser_UnmarshalError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return([]byte("123"), nil)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return([]byte("invalid-json"), nil)
@@ -180,7 +213,8 @@ func TestGetUser_UnmarshalError(t *testing.T) {
 func TestDeleteUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "other", ID: "123"}
 	rootData, _ := json.Marshal(root)
 
@@ -196,7 +230,8 @@ func TestDeleteUser_Success(t *testing.T) {
 func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "admin", ID: "123", IsRootUser: true}
 	rootData, _ := json.Marshal(root)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return([]byte("123"), nil)
@@ -210,7 +245,8 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 func TestDeleteUser_GetError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, mock.Anything).Return(nil, errors.New("get failed"))
 
 	_, err = repo.DeleteUser("someone")
@@ -221,7 +257,8 @@ func TestDeleteUser_GetError(t *testing.T) {
 func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return([]byte("123"), nil)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return([]byte("invalid-json"), nil)
 	_, err = repo.DeleteUser("x")
@@ -232,7 +269,8 @@ func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 func TestDeleteUser_WriteError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "user", ID: "123"}
 	rootData, _ := json.Marshal(root)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:user").Return([]byte("123"), nil)
@@ -249,7 +287,8 @@ func TestDeleteUser_WriteError(t *testing.T) {
 func TestPutUser_KVStorePutError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	userInput := models.CreateUser{
 		Username: "testuser",
 		Password: "password123",
@@ -259,6 +298,7 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:testuser").Return(nil, nil).Times(1)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:test@example.com").Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(1)
 	mockStore.On("Write", mock.Anything).Return(errors.New("kv put failed")).Times(1)
 
 	_, err = repo.CreateUser(userInput)
@@ -273,7 +313,8 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 func TestLoginUser(t *testing.T) {
 	mockStore := new(MockKVStore)
 	uow := db.NewUnitOfWork(mockStore)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 
 	userEmail := "test@example.com"

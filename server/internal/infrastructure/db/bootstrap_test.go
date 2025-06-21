@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/linxGnu/grocksdb"
@@ -118,10 +119,36 @@ func marshal(t *testing.T, v interface{}) []byte {
 	return data
 }
 
+type TestIDGeneratorFactoryBootstrap struct {
+	ids   []string
+	index int
+	mu    sync.Mutex
+}
+
+func (g *TestIDGeneratorFactoryBootstrap) GenerateID() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if len(g.ids) == 0 {
+		return ""
+	}
+
+	id := g.ids[g.index]
+	g.index = (g.index + 1) % len(g.ids) // avance circular
+	return id
+}
+
+func NewTestIDGeneratorFactoryBootstrap(ids []string) *TestIDGeneratorFactoryBootstrap {
+	return &TestIDGeneratorFactoryBootstrap{
+		ids: ids,
+	}
+}
+
 func Test_CreatesRootIfMissing(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
@@ -131,6 +158,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil).Times(2)
 	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com").Return(nil, nil).Times(1)
 	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return(nil, nil).Times(1)
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(1)
 
 	assert.NoError(t, err)
 
@@ -146,7 +174,8 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 func Test_ErrorGettingRoot(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
@@ -165,7 +194,8 @@ func Test_ErrorGettingRoot(t *testing.T) {
 func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
@@ -177,7 +207,7 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Times(2)
 	store.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(2)
 	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return(nil, nil).Times(1)
-
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(1)
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
 	err = uow.Commit()
@@ -188,7 +218,8 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 func Test_SkipsIfUserExists(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
@@ -215,7 +246,8 @@ func Test_SkipsIfUserExists(t *testing.T) {
 func Test_ErrorFetchingUser(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
@@ -235,7 +267,8 @@ func Test_ErrorFetchingUser(t *testing.T) {
 func Test_ErrorPutsRoot(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
 		DefaultRootUser:     "admin",
@@ -261,7 +294,8 @@ func Test_ErrorPutsRoot(t *testing.T) {
 func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	cfg := config.Config{
 		DefaultRootUser:     "", // Missing user
@@ -280,7 +314,8 @@ func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
 	uow := db.NewUnitOfWork(store)
-	repo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	cfg := config.Config{
 		DefaultRootUser:     "testuser",

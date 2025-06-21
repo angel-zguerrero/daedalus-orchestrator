@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"sync"
 	"testing"
 
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -59,15 +60,40 @@ func newRocksdbStoreForUserRepoTest(t *testing.T) *db.RocksdbStore {
 	}
 }
 
+type TestIDGeneratorFactoryRepositoryRocksDB struct {
+	ids   []string
+	index int
+	mu    sync.Mutex
+}
+
+func (g *TestIDGeneratorFactoryRepositoryRocksDB) GenerateID() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if len(g.ids) == 0 {
+		return ""
+	}
+
+	id := g.ids[g.index]
+	g.index = (g.index + 1) % len(g.ids) // avance circular
+	return id
+}
+
+func NewTestIDGeneratorFactoryRepositoryRocksDB(ids []string) *TestIDGeneratorFactoryRepositoryRocksDB {
+	return &TestIDGeneratorFactoryRepositoryRocksDB{
+		ids: ids,
+	}
+}
+
 // newUserRepoTest creates a new UnitOfWork and UserRepository for testing.
 func newUserRepoTest(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.UserRepository) {
 	store := newRocksdbStoreForUserRepoTest(t)
 	uow := db.NewUnitOfWork(store)
-	userRepo, err := db.NewUserRepository(uow)
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	userRepo, err := db.NewUserRepository(uow, iGF)
 	require.NoError(t, err, "Failed to create UserRepository")
 	return uow, store, userRepo
 }
-
 func TestRocksDBPutUser_Success(t *testing.T) {
 	uow, store, repo := newUserRepoTest(t) // For this test, a single UoW/DB instance is fine
 
@@ -89,9 +115,9 @@ func TestRocksDBPutUser_Success(t *testing.T) {
 
 	err = uow.Commit()
 	require.NoError(t, err)
-
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	verifyUOW := db.NewUnitOfWork(store) // Use same store
-	verifyRepo, err := db.NewUserRepository(verifyUOW)
+	verifyRepo, err := db.NewUserRepository(verifyUOW, iGF)
 	require.NoError(t, err)
 	retrievedUser, err := verifyRepo.GetUserByUsername("testuser")
 	require.NoError(t, err)
@@ -113,8 +139,9 @@ func TestRocksDBGetUser_Success(t *testing.T) {
 	userToCreate := models.CreateUser{Username: "getme", Email: "getme@example.com", Password: "password"}
 
 	// Create user with initial UoW
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	createUOW := db.NewUnitOfWork(store)
-	createRepo, err := db.NewUserRepository(createUOW)
+	createRepo, err := db.NewUserRepository(createUOW, iGF)
 	require.NoError(t, err)
 	createdID, err := createRepo.CreateUser(userToCreate)
 	require.NoError(t, err)
@@ -124,7 +151,7 @@ func TestRocksDBGetUser_Success(t *testing.T) {
 
 	// Read user with a new UoW on the same store
 	readUOW := db.NewUnitOfWork(store)
-	readRepo, err := db.NewUserRepository(readUOW)
+	readRepo, err := db.NewUserRepository(readUOW, iGF)
 	require.NoError(t, err)
 
 	retrievedUser, err := readRepo.GetUserByUsername(userToCreate.Username)
@@ -166,10 +193,10 @@ func TestRocksDBGetUser_NotFound(t *testing.T) {
 func TestRocksDBDeleteUser_Success(t *testing.T) {
 	store := newRocksdbStoreForUserRepoTest(t) // Create store once
 	userToDelete := models.CreateUser{Username: "deleteme", Email: "deleteme@example.com", Password: "password"}
-
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	// Create user
 	createUOW := db.NewUnitOfWork(store)
-	createRepo, err := db.NewUserRepository(createUOW)
+	createRepo, err := db.NewUserRepository(createUOW, iGF)
 	require.NoError(t, err)
 	createdID, err := createRepo.CreateUser(userToDelete)
 	require.NoError(t, err)
@@ -179,14 +206,14 @@ func TestRocksDBDeleteUser_Success(t *testing.T) {
 
 	// Confirm user exists before delete, using a new UoW
 	checkUOW1 := db.NewUnitOfWork(store)
-	checkRepo1, err := db.NewUserRepository(checkUOW1)
+	checkRepo1, err := db.NewUserRepository(checkUOW1, iGF)
 	require.NoError(t, err)
 	_, err = checkRepo1.GetUserByUsername(userToDelete.Username)
 	require.NoError(t, err) // Should find the user
 
 	// Delete user
 	deleteUOW := db.NewUnitOfWork(store)
-	deleteRepo, err := db.NewUserRepository(deleteUOW)
+	deleteRepo, err := db.NewUserRepository(deleteUOW, iGF)
 	require.NoError(t, err)
 	deleted, err := deleteRepo.DeleteUser(userToDelete.Username)
 	require.NoError(t, err)
@@ -196,7 +223,7 @@ func TestRocksDBDeleteUser_Success(t *testing.T) {
 
 	// Verify user is deleted, using another UoW
 	checkUOW2 := db.NewUnitOfWork(store)
-	checkRepo2, err := db.NewUserRepository(checkUOW2)
+	checkRepo2, err := db.NewUserRepository(checkUOW2, iGF)
 	require.NoError(t, err)
 	goneUser, err := checkRepo2.GetUserByUsername(userToDelete.Username)
 	require.NoError(t, err)
@@ -211,10 +238,10 @@ func TestRocksDBDeleteUser_CannotDeleteRoot(t *testing.T) {
 		Password:   "password",
 		IsRootUser: true,
 	}
-
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	// Create the root user
 	createUOW := db.NewUnitOfWork(store)
-	createRepo, err := db.NewUserRepository(createUOW)
+	createRepo, err := db.NewUserRepository(createUOW, iGF)
 	require.NoError(t, err)
 	rootUserID, err := createRepo.CreateUser(rootUserToCreate)
 	require.NoError(t, err)
@@ -224,7 +251,7 @@ func TestRocksDBDeleteUser_CannotDeleteRoot(t *testing.T) {
 
 	// Attempt to delete the root user
 	deleteUOW := db.NewUnitOfWork(store)
-	deleteRepo, err := db.NewUserRepository(deleteUOW)
+	deleteRepo, err := db.NewUserRepository(deleteUOW, iGF)
 	require.NoError(t, err)
 
 	// Get the created root user to ensure IsRootUser is set (using deleteRepo's context)
@@ -241,7 +268,7 @@ func TestRocksDBDeleteUser_CannotDeleteRoot(t *testing.T) {
 
 	// Verify user still exists
 	verifyUOW := db.NewUnitOfWork(store)
-	verifyRepo, err := db.NewUserRepository(verifyUOW)
+	verifyRepo, err := db.NewUserRepository(verifyUOW, iGF)
 	require.NoError(t, err)
 	stillRoot, err := verifyRepo.GetUserByUsername(rootUserToCreate.Username)
 	require.NoError(t, err)
@@ -310,10 +337,10 @@ func TestRocksDBLoginUser(t *testing.T) {
 
 	// Let's adjust: setup the store once, then create UoW/Repo from it for each sub-test.
 	store := newRocksdbStoreForUserRepoTest(t) // Create store once for all sub-tests
-
+	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	// Create user in this store
 	initialUOW := db.NewUnitOfWork(store)
-	initialRepo, err := db.NewUserRepository(initialUOW)
+	initialRepo, err := db.NewUserRepository(initialUOW, iGF)
 	require.NoError(t, err)
 	_, err = initialRepo.CreateUser(createdUser)
 	require.NoError(t, err)
@@ -322,7 +349,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 
 	t.Run("LoginWithEmail_CorrectPassword_Success", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 
 		loggedIn, err := loginRepo.Login(userEmail, correctPassword)
@@ -332,7 +359,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 
 	t.Run("LoginWithUsername_CorrectPassword_Success", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 
 		loggedIn, err := loginRepo.Login(userUsername, correctPassword)
@@ -342,7 +369,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 
 	t.Run("LoginWithEmail_IncorrectPassword_Failure", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 
 		loggedIn, err := loginRepo.Login(userEmail, incorrectPassword)
@@ -352,7 +379,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 
 	t.Run("LoginWithUsername_IncorrectPassword_Failure", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 
 		loggedIn, err := loginRepo.Login(userUsername, incorrectPassword)
@@ -362,7 +389,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 
 	t.Run("Login_UserNotFound_Failure", func(t *testing.T) {
 		loginUOW := db.NewUnitOfWork(store)
-		loginRepo, err := db.NewUserRepository(loginUOW)
+		loginRepo, err := db.NewUserRepository(loginUOW, iGF)
 		require.NoError(t, err)
 
 		unknownIdentifier := "unknown@example.com"

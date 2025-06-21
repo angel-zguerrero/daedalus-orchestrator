@@ -12,11 +12,11 @@ type UserRepository struct {
 	repo *Repository[models.User]
 }
 
-func NewUserRepository(uow *UnitOfWork) (*UserRepository, error) {
+func NewUserRepository(uow *UnitOfWork, factory IDGeneratorFactory) (*UserRepository, error) {
 	if uow == nil {
 		return nil, fmt.Errorf("UnitOfWork is required")
 	}
-	repo, err := GetRepository[models.User](uow, AdminFC, "admin_schema", &DefaultIDGeneratorFactory{})
+	repo, err := GetRepository[models.User](uow, AdminFC, "admin_schema", factory)
 	if err != nil {
 		return nil, err
 	}
