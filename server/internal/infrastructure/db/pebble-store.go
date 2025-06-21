@@ -195,7 +195,7 @@ func (ps *PebbleStore) getPrefixedKeyOld(cfName string, key string) (rawKey []by
 // Put stores the key-value pair in the specified column family.
 // If columnFamily is empty, it defaults to DefaultFC.
 // Handles TTL logic for TTL-enabled column families.
-func (ps *PebbleStore) Put(columnFamily, key string, value []byte, ttl int) error {
+func (ps *PebbleStore) Put(columnFamily, key string, value []byte, ttl int, now time.Time) error {
 	dataKey, isTTL, cfPrefix, err := ps.getPrefixedKey(columnFamily, key)
 	if err != nil {
 		return fmt.Errorf("Put: %w", err)
@@ -223,7 +223,7 @@ func (ps *PebbleStore) Put(columnFamily, key string, value []byte, ttl int) erro
 		oldTTLMillis, _ = strconv.ParseInt(string(oldTTLBytes), 10, 64)
 	}
 
-	newTTLMillis := time.Now().Add(time.Duration(ttl) * time.Second).UnixMilli()
+	newTTLMillis := now.Add(time.Duration(ttl) * time.Second).UnixMilli()
 
 	ttlIndexKeyOld := []byte{}
 	if oldTTLMillis > 0 {
@@ -284,8 +284,8 @@ func (ps *PebbleStore) PutRaw(columnFamily string, key string, value []byte) err
 
 // CleanExpiredKeys iterates through TTL-enabled column families and removes expired keys.
 // Assumes keys in TTL CFs are structured with specific prefixes for data, index, and expiry.
-func (ps *PebbleStore) CleanExpiredKeys() error {
-	nowMillis := time.Now().UnixMilli()
+func (ps *PebbleStore) CleanExpiredKeys(now time.Time) error {
+	nowMillis := now.UnixMilli()
 
 	for cfName, actualCfPrefix := range ps.ttlCfPrefixes {
 		// Construct the specific prefix for scanning TTL index entries within this CF
@@ -417,7 +417,7 @@ func (ps *PebbleStore) ClearAll() error {
 // - "prefix*": prefix match
 // - "*suffix": suffix match
 // - "*contains*": contains match
-func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error) {
+func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
 	var cfPrefix []byte
 	var isTTL bool
 
@@ -481,7 +481,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 			expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
 			expireKey = append(expireKey, []byte(actualKey)...)
 
-			expired, err := ps.isTTLKeyExpired(expireKey)
+			expired, err := ps.isTTLKeyExpired(expireKey, now)
 			if err != nil {
 				return nil, "", fmt.Errorf("SearchByPatternPaginatedKV TTL check error: %w", err)
 			}
@@ -582,7 +582,7 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 // If columnFamily is empty, it defaults to DefaultFC.
 // For TTL CFs, it retrieves the actual data, not metadata keys.
 // Returns nil, nil if the key is not found.
-func (ps *PebbleStore) Get(columnFamily, key string) ([]byte, error) {
+func (ps *PebbleStore) Get(columnFamily, key string, now time.Time) ([]byte, error) {
 	dataKey, isTTL, cfPrefix, err := ps.getPrefixedKey(columnFamily, key)
 
 	if err != nil {
@@ -593,7 +593,7 @@ func (ps *PebbleStore) Get(columnFamily, key string) ([]byte, error) {
 		// Construye la clave de expiración: cfPrefix + PrefixTTLExpire + key
 		expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
 		expireKey = append(expireKey, []byte(key)...)
-		expired, err := ps.isTTLKeyExpired(expireKey)
+		expired, err := ps.isTTLKeyExpired(expireKey, now)
 
 		if err != nil || expired {
 			return nil, err
@@ -615,7 +615,7 @@ func (ps *PebbleStore) Get(columnFamily, key string) ([]byte, error) {
 	return valueCopy, nil
 }
 
-func (ps *PebbleStore) isTTLKeyExpired(expireKey []byte) (bool, error) {
+func (ps *PebbleStore) isTTLKeyExpired(expireKey []byte, now time.Time) (bool, error) {
 	value, closer, err := ps.db.Get(expireKey)
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
@@ -630,13 +630,13 @@ func (ps *PebbleStore) isTTLKeyExpired(expireKey []byte) (bool, error) {
 		return false, fmt.Errorf("isTTLKeyExpired: invalid timestamp: %w", err)
 	}
 
-	return time.Now().UnixMilli() > expireAt, nil
+	return now.UnixMilli() > expireAt, nil
 }
 
 // Delete removes a key-value pair from the specified column family.
 // If columnFamily is empty, it defaults to DefaultFC.
 // Handles TTL logic for TTL-enabled column families.
-func (ps *PebbleStore) Delete(columnFamily, key string) error {
+func (ps *PebbleStore) Delete(columnFamily, key string, now time.Time) error {
 	resolvedCfName := columnFamily
 	if resolvedCfName == "" {
 		resolvedCfName = DefaultFC
@@ -710,8 +710,8 @@ func (ps *PebbleStore) Delete(columnFamily, key string) error {
 
 // Exists checks if a key exists in the specified column family.
 // If columnFamily is empty, it defaults to DefaultFC.
-func (ps *PebbleStore) Exists(columnFamily, key string) (bool, error) {
-	value, err := ps.Get(columnFamily, key)
+func (ps *PebbleStore) Exists(columnFamily, key string, now time.Time) (bool, error) {
+	value, err := ps.Get(columnFamily, key, now)
 	if err != nil {
 		// An error occurred during Get (e.g., invalid column family, DB error)
 		return false, err // Error is already context-rich from Get or getPrefixedKey
@@ -734,7 +734,7 @@ func (ps *PebbleStore) Close() error {
 
 // Write performs a batch of operations (Put/Delete) atomically.
 // Assumes WriteBatch and X are defined in the same package (e.g. kv-store.go)
-func (ps *PebbleStore) Write(batch *WriteBatch) error {
+func (ps *PebbleStore) Write(batch *WriteBatch, now time.Time) error {
 	if batch == nil || len(batch.Data) == 0 {
 		return nil
 	}
@@ -742,7 +742,7 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 	b := ps.db.NewBatch()
 	defer b.Close()
 
-	nowMillis := time.Now().UnixMilli()
+	nowMillis := now.UnixMilli()
 
 	for _, op := range batch.Data {
 		dataKey, isTTL, cfPrefix, err := ps.getPrefixedKey(op.CF, op.Key)

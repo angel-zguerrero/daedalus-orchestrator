@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
@@ -38,8 +39,8 @@ type MockKVStoreRepositoryTest struct {
 	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
 }
 
-func (m *MockKVStoreRepositoryTest) Get(AdminFC, key string) ([]byte, error) {
-	args := m.Called(AdminFC, key)
+func (m *MockKVStoreRepositoryTest) Get(AdminFC, key string, now time.Time) ([]byte, error) {
+	args := m.Called(AdminFC, key, now)
 	var s []byte
 	if tmp := args.Get(0); tmp != nil {
 		s = tmp.([]byte)
@@ -47,21 +48,21 @@ func (m *MockKVStoreRepositoryTest) Get(AdminFC, key string) ([]byte, error) {
 	return s, args.Error(1)
 }
 
-func (m *MockKVStoreRepositoryTest) Delete(AdminFC, key string) error {
-	args := m.Called(AdminFC, key)
+func (m *MockKVStoreRepositoryTest) Delete(AdminFC, key string, now time.Time) error {
+	args := m.Called(AdminFC, key, now)
 	return args.Error(0)
 }
 
-func (r *MockKVStoreRepositoryTest) Exists(columnFamily, key string) (bool, error) {
-	val, err := r.Get(columnFamily, key)
-	if err != nil {
-		return false, err
-	}
-	return val != nil, nil
+func (r *MockKVStoreRepositoryTest) Exists(columnFamily, key string, now time.Time) (bool, error) {
+	// Note: This mock's Exists calls its own Get. Ensure Get is also updated if directly used by Exists logic.
+	// For simplicity, we assume Get is called with appropriate 'now' if Exists needs it.
+	// However, the direct KVStore.Exists call is what matters for the interface.
+	args := r.Called(columnFamily, key, now)
+	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockKVStoreRepositoryTest) Put(AdminFC, key string, value []byte, ttl int) error {
-	args := m.Called(AdminFC, key, value, ttl)
+func (m *MockKVStoreRepositoryTest) Put(AdminFC, key string, value []byte, ttl int, now time.Time) error {
+	args := m.Called(AdminFC, key, value, ttl, now)
 	return args.Error(0)
 }
 
@@ -70,8 +71,8 @@ func (m *MockKVStoreRepositoryTest) PutRaw(AdminFC, key string, value []byte) er
 	return args.Error(0)
 }
 
-func (m *MockKVStoreRepositoryTest) Write(batch *db.WriteBatch) error {
-	args := m.Called(batch)
+func (m *MockKVStoreRepositoryTest) Write(batch *db.WriteBatch, now time.Time) error {
+	args := m.Called(batch, now)
 	return args.Error(0)
 }
 
@@ -105,12 +106,13 @@ func (r *MockKVStoreRepositoryTest) Close() error {
 	return nil
 }
 
-func (r *MockKVStoreRepositoryTest) CleanExpiredKeys() error {
-	return nil
+func (r *MockKVStoreRepositoryTest) CleanExpiredKeys(now time.Time) error {
+	args := r.Called(now)
+	return args.Error(0)
 }
 
-func (m *MockKVStoreRepositoryTest) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]db.KeyValuePair, string, error) {
-	args := m.Called(cfName, pattern, cursor, limit)
+func (m *MockKVStoreRepositoryTest) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]db.KeyValuePair, string, error) {
+	args := m.Called(cfName, pattern, cursor, limit, now)
 	var s []db.KeyValuePair
 	if tmp := args.Get(0); tmp != nil {
 		s = tmp.([]db.KeyValuePair)
@@ -220,8 +222,8 @@ func TestRepository_Create_Success(t *testing.T) {
 	uNameFieldKey := "admin:users:idx-u:Name:Alice"
 	indexKey := "admin:users:idx:ID:123:123"
 
-	mockStore.On("Get", "cf1", uNameFieldKey).Return(nil, nil)
-	mockStore.On("Get", "cf1", "admin:users:data:123").Return(nil, nil)
+	mockStore.On("Exists", "cf1", uNameFieldKey, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", "admin:users:data:123", mock.Anything).Return(false, nil)
 
 	batch := db.NewWriteBatch()
 	batch.Put("cf1", indexKey, []byte("123"))
@@ -231,9 +233,9 @@ func TestRepository_Create_Success(t *testing.T) {
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
-	id, err := repo.Create(&user)
+	id, err := repo.Create(&user, time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, id, "123")
 
@@ -252,14 +254,14 @@ func TestRepository_Create_DuplicatePrimaryKey_InDB(t *testing.T) {
 		ID:   existingUserID, // Provide ID directly
 		Name: "Alice",
 	}
-	data, _ := json.Marshal(user)
+
 	// Mock that the primary key (data key) already exists
 	dataKey := "admin:users:data:" + existingUserID
-	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
+	mockStore.On("Exists", "cf1", dataKey, mock.Anything).Return(true, nil)
 	// No unique checks for "Name" should be hit if PK check fails first
 	// No "Write" should be called
 
-	_, err = repo.Create(&user)
+	_, err = repo.Create(&user, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate primary key: ID = "+existingUserID+" already exists")
 
@@ -284,15 +286,14 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB(t *testing.T) {
 	pkDataKeyExisting := "admin:users:data:" + existingUserID
 	// For the first user (new-bulk-id-1), PK check should pass
 	pkDataKeyNew1 := "admin:users:data:new-bulk-id-1"
-	mockStore.On("Get", "cf1", pkDataKeyNew1).Return(nil, nil).Once()
+	mockStore.On("Exists", "cf1", pkDataKeyNew1, mock.Anything).Return(false, nil).Once()
 	// For the second user (existingUserID), PK check should fail
 	//mockStore.On("Exists", "cf1", pkDataKeyExisting).Return(true, nil).Once()
 
-	data, _ := json.Marshal(&User{ID: existingUserID, Name: "UserExistingID"})
-	mockStore.On("Get", "cf1", pkDataKeyExisting).Return(data, nil)
+	mockStore.On("Exists", "cf1", pkDataKeyExisting, mock.Anything).Return(true, nil)
 	// No further Exists or Write calls should happen for subsequent users or the batch itself.
 
-	_, err = repo.BulkCreate(users)
+	_, err = repo.BulkCreate(users, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate primary key: ID = "+existingUserID+" already exists")
 
@@ -319,10 +320,10 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch(t *testing.T) {
 	pkDataKeyDup := "admin:users:data:" + duplicateIDInBatch
 
 	// The third user will cause the "duplicate primary key in input batch" error before DB check.
-	mockStore.On("Get", "cf1", pkDataKeyUnique1).Return(nil, nil)
-	mockStore.On("Get", "cf1", pkDataKeyDup).Return(nil, nil)
+	mockStore.On("Exists", "cf1", pkDataKeyUnique1, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", pkDataKeyDup, mock.Anything).Return(false, nil)
 
-	_, err = repo.BulkCreate(users)
+	_, err = repo.BulkCreate(users, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate primary key in input batch: ID = "+duplicateIDInBatch)
 
@@ -342,7 +343,7 @@ func TestRepository_Create_EmptyProvidedID(t *testing.T) {
 	}
 
 	// No DB calls should be made if the ID is empty.
-	_, err = repo.Create(&userWithEmptyID)
+	_, err = repo.Create(&userWithEmptyID, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "primary key field 'ID' cannot be empty when not generated")
 
@@ -364,10 +365,11 @@ func TestRepository_Create_DuplicateUnique(t *testing.T) {
 
 	uIndexKey := "admin:users:idx-u:Name:Alice"
 	dataey := "admin:users:data:123"
-	mockStore.On("Get", "cf1", uIndexKey).Return([]byte("123"), nil)
-	mockStore.On("Get", "cf1", dataey).Return(nil, nil)
+	mockStore.On("Get", "cf1", uIndexKey, mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Exists", "cf1", uIndexKey, mock.Anything).Return(true, nil)
+	mockStore.On("Exists", "cf1", dataey, mock.Anything).Return(false, nil)
 
-	_, err = repo.Create(&user)
+	_, err = repo.Create(&user, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field")
 }
@@ -400,10 +402,10 @@ func TestRepository_FindByField_Success(t *testing.T) {
 	user := User{ID: "123", Name: "Alice"}
 	data, _ := json.Marshal(user)
 
-	mockStore.On("Get", "cf1", uIndexKey).Return([]byte("123"), nil)
-	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
+	mockStore.On("Get", "cf1", uIndexKey, mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(data, nil)
 
-	result, err := repo.FindByField("Name", "Alice")
+	result, err := repo.FindByField("Name", "Alice", time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, &user, result)
 
@@ -416,7 +418,7 @@ func TestRepository_FindByField_Unknown_Field_Name(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	_, err = repo.FindByField("x", "Alice")
+	_, err = repo.FindByField("x", "Alice", time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Unknown field x")
 }
@@ -427,10 +429,10 @@ func TestRepository_Find_AND_Unknown_Field_Name(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 
-	_, err = repo.Find("ID=123&X=Alice", 1000, "")
+	_, err = repo.Find("ID=123&X=Alice", 1000, "", time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Unknown field X")
 	mockStore.AssertExpectations(t)
@@ -452,7 +454,7 @@ func TestRepository_FindByField_Invalid_Use_For_TTL_Query(t *testing.T) {
 	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	_, err = repo.FindByField("TTL", "111")
+	_, err = repo.FindByField("TTL", "111", time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "TTL columns are not supported in query operations")
 }
@@ -463,10 +465,10 @@ func TestRepository_Find_AND_Invalid_Use_For_TTL_Query(t *testing.T) {
 	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:temporal_entities:idx:ID:123:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:temporal_entities:idx:ID:123:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 
-	_, err = repo.Find("ID=123&TTL=22", 1000, "")
+	_, err = repo.Find("ID=123&TTL=22", 1000, "", time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "TTL columns are not supported in query operation")
 	mockStore.AssertExpectations(t)
@@ -516,14 +518,14 @@ func TestRepository_Find_AND(t *testing.T) {
 	user := User{ID: "123", Name: "Alice"}
 	data, _ := json.Marshal(user)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:ID:123:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Alice:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Alice:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	mockStore.On("Get", "cf1", "admin:users:data:123").
+	mockStore.On("Get", "cf1", "admin:users:data:123", mock.Anything).
 		Return(data, nil)
 
-	result, err := repo.Find("ID=123&Name=Alice", 1000, "")
+	result, err := repo.Find("ID=123&Name=Alice", 1000, "", time.Now())
 	assert.NoError(t, err)
 	assert.Len(t, result.Entities, 1)
 	assert.Equal(t, &user, &result.Entities[0])
@@ -540,16 +542,16 @@ func TestRepository_Find_OR(t *testing.T) {
 	data1, _ := json.Marshal(user1)
 	data2, _ := json.Marshal(user2)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Alice:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Alice:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Bob:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Bob:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("456")}}, "", nil)
-	mockStore.On("Get", "cf1", "admin:users:data:123").
+	mockStore.On("Get", "cf1", "admin:users:data:123", mock.Anything).
 		Return(data1, nil)
-	mockStore.On("Get", "cf1", "admin:users:data:456").
+	mockStore.On("Get", "cf1", "admin:users:data:456", mock.Anything).
 		Return(data2, nil)
 
-	result, err := repo.Find("Name=Alice|Name=Bob", 1000, "")
+	result, err := repo.Find("Name=Alice|Name=Bob", 1000, "", time.Now())
 	assert.NoError(t, err)
 	assert.Len(t, result.Entities, 2)
 }
@@ -563,12 +565,12 @@ func TestRepository_Find_SpecialCharacters(t *testing.T) {
 	user := User{ID: "999", Name: "foo:bar"}
 	data, _ := json.Marshal(user)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:foo:bar:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:foo:bar:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("999")}}, "", nil)
-	mockStore.On("Get", "cf1", "admin:users:data:999").
+	mockStore.On("Get", "cf1", "admin:users:data:999", mock.Anything).
 		Return(data, nil)
 
-	result, err := repo.Find("Name=foo:bar", 1000, "")
+	result, err := repo.Find("Name=foo:bar", 1000, "", time.Now())
 	assert.NoError(t, err)
 	assert.Len(t, result.Entities, 1)
 	assert.Equal(t, &user, &result.Entities[0])
@@ -580,10 +582,10 @@ func TestRepository_Find_NoMatch(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Ghost:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", "admin:users:idx:Name:Ghost:*", "", 1000, mock.Anything).
 		Return(nil, "", nil)
 
-	result, err := repo.Find("Name=Ghost", 1000, "")
+	result, err := repo.Find("Name=Ghost", 1000, "", time.Now())
 	assert.NoError(t, err)
 	assert.Len(t, result.Entities, 0)
 }
@@ -609,8 +611,10 @@ func TestRepository_Update_Success(t *testing.T) {
 	originalData, _ := json.Marshal(originalUser)
 	updatedData, _ := json.Marshal(updatedUser)
 
-	mockStore.On("Get", "cf1", newUIndexKey).Return([]byte{}, nil)
-	mockStore.On("Get", "cf1", dataKey).Return(originalData, nil)
+	// FindByField (which calls Get) will be called with now.
+	// The Get for unique check will also be called with now.
+	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(originalData, nil)
+	mockStore.On("Get", "cf1", newUIndexKey, mock.Anything).Return(nil, nil)
 
 	batch := db.NewWriteBatch()
 	batch.Delete("cf1", oldUIndexKey)
@@ -622,9 +626,9 @@ func TestRepository_Update_Success(t *testing.T) {
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
-	changed, err := repo.Update(&updatedUser)
+	changed, err := repo.Update(&updatedUser, time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, changed, true)
 
@@ -641,9 +645,9 @@ func TestRepository_Update_Nonexistent(t *testing.T) {
 	user := User{ID: "999", Name: "Ghost"}
 	dataKey := "admin:users:data:999"
 
-	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
+	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(nil, nil) // For FindByField
 
-	changed, err := repo.Update(&user)
+	changed, err := repo.Update(&user, time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, changed, false)
 }
@@ -661,7 +665,7 @@ func TestRepository_Delete_Success(t *testing.T) {
 	pkIndexKey := "admin:users:idx:ID:123:123"
 	data, _ := json.Marshal(user)
 
-	mockStore.On("Get", "cf1", dataKey).Return(data, nil)
+	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(data, nil) // For FindByField
 
 	batch := db.NewWriteBatch()
 
@@ -672,9 +676,9 @@ func TestRepository_Delete_Success(t *testing.T) {
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
-	deleted, err := repo.Delete("123")
+	deleted, err := repo.Delete("123", time.Now())
 	assert.Equal(t, deleted, true)
 	assert.NoError(t, err)
 
@@ -689,9 +693,9 @@ func TestRepository_Delete_NotFound(t *testing.T) {
 	assert.NoError(t, err)
 
 	dataKey := "admin:users:data:123"
-	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
+	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(nil, nil) // For FindByField
 
-	deleted, err := repo.Delete("123")
+	deleted, err := repo.Delete("123", time.Now())
 	assert.Equal(t, deleted, false)
 	assert.NoError(t, err)
 	mockStore.AssertExpectations(t)
@@ -705,9 +709,9 @@ func TestRepository_Delete_CorruptedData(t *testing.T) {
 
 	dataKey := "admin:users:data:123"
 
-	mockStore.On("Get", "cf1", dataKey).Return([]byte("not a valid json"), nil)
+	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return([]byte("not a valid json"), nil) // For FindByField
 
-	deleted, err := repo.Delete("123")
+	deleted, err := repo.Delete("123", time.Now())
 	assert.Equal(t, deleted, false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid character")
@@ -737,8 +741,8 @@ func TestRepository_BulkCreate_Success(t *testing.T) {
 		uIdx := "admin:users:idx-u:Name:" + u.Name
 		pkIdx := "admin:users:idx:ID:" + id + ":" + id
 
-		mockStore.On("Get", "cf1", uIdx).Return(nil, nil)
-		mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
+		mockStore.On("Exists", "cf1", uIdx, mock.Anything).Return(false, nil)
+		mockStore.On("Exists", "cf1", dataKey, mock.Anything).Return(false, nil)
 
 		batch.Put("cf1", dataKey, d)
 		batch.Put("cf1", nameIdx, []byte(id))
@@ -748,9 +752,9 @@ func TestRepository_BulkCreate_Success(t *testing.T) {
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true // ya validamos el contenido arriba
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
-	ids, err := repo.BulkCreate(users)
+	ids, err := repo.BulkCreate(users, time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"id1", "id2", "id3"}, ids)
 
@@ -768,12 +772,21 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 		{Name: "Alice"}, // duplicado intencional
 	}
 
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Alice").Return(nil, nil).Once()
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Alice").Return([]byte("id1"), nil).Once()
+	mockStore.On("Exists", "cf1", "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil).Once() // For first Alice
+	// For second Alice, Exists check will happen against the batch first (which passes), then DB.
+	// This mock is for the DB check for the *second* Alice, assuming the first one was "not in DB" for its Exists check
+	// and then added to the batch. The test logic in BulkCreate checks batch then DB.
+	// So, this mock should reflect that the key *now* exists in DB due to the first Alice (hypothetically).
+	// However, the current test structure for duplicate unique in BulkCreate relies on the mock for `Exists`
+	// for *each* entity. If an entity's value is already in uniqueInBatch, it errors before DB check.
+	// If not in batch, it checks DB.
+	// Let's adjust the mock to simulate the scenario where the second "Alice" check finds the first "Alice" already in the DB
+	// (or rather, that the key it would use is taken).
+	mockStore.On("Exists", "cf1", "admin:users:idx-u:Name:Alice", mock.Anything).Return(true, nil).Once()
 
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(nil, nil).Once()
-	mockStore.On("Get", "cf1", "admin:users:data:id2").Return(nil, nil).Once()
-	_, err = repo.BulkCreate(users)
+	mockStore.On("Exists", "cf1", "admin:users:data:id1", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf1", "admin:users:data:id2", mock.Anything).Return(false, nil).Once()
+	_, err = repo.BulkCreate(users, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field")
 }
@@ -788,11 +801,11 @@ func TestRepository_BulkCreate_WriteError(t *testing.T) {
 		{Name: "Alice"},
 	}
 
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Alice").Return(nil, nil)
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(nil, nil)
-	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
+	mockStore.On("Exists", "cf1", "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", "admin:users:data:id1", mock.Anything).Return(false, nil)
+	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
 
-	_, err = repo.BulkCreate(users)
+	_, err = repo.BulkCreate(users, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "write failed")
 }
@@ -809,7 +822,8 @@ func TestRepository_BulkDelete_Success(t *testing.T) {
 
 	for _, u := range users {
 		data, _ := json.Marshal(u)
-		mockStore.On("Get", "cf1", "admin:users:data:"+u.ID).Return(data, nil)
+		// This Get is part of the FindByField call within BulkDelete
+		mockStore.On("Get", "cf1", "admin:users:data:"+u.ID, mock.Anything).Return(data, nil)
 	}
 
 	batch := db.NewWriteBatch()
@@ -824,9 +838,9 @@ func TestRepository_BulkDelete_Success(t *testing.T) {
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
-	deleted, err := repo.BulkDelete([]string{"id1", "id2"})
+	deleted, err := repo.BulkDelete([]string{"id1", "id2"}, time.Now())
 	assert.NoError(t, err)
 	require.Len(t, deleted, 2)
 	assert.True(t, deleted[0])
@@ -842,8 +856,9 @@ func TestRepository_BulkDelete_Partial(t *testing.T) {
 
 	user := &User{ID: "id1", Name: "Alice"}
 	data, _ := json.Marshal(user)
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(data, nil)
-	mockStore.On("Get", "cf1", "admin:users:data:id2").Return(nil, nil)
+	// These Gets are part of FindByField calls
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(data, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id2", mock.Anything).Return(nil, nil)
 
 	batch := db.NewWriteBatch()
 	batch.Delete("cf1", "admin:users:idx:Name:Alice:id1")
@@ -853,9 +868,9 @@ func TestRepository_BulkDelete_Partial(t *testing.T) {
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
-	deleted, err := repo.BulkDelete([]string{"id1", "id2"})
+	deleted, err := repo.BulkDelete([]string{"id1", "id2"}, time.Now())
 	assert.NoError(t, err)
 	require.Len(t, deleted, 2)
 	assert.True(t, deleted[0])
@@ -869,9 +884,9 @@ func TestRepository_BulkDelete_InvalidData(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return([]byte("invalid json"), nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return([]byte("invalid json"), nil) // For FindByField
 
-	deleted, err := repo.BulkDelete([]string{"id1"})
+	deleted, err := repo.BulkDelete([]string{"id1"}, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid character")
 
@@ -895,17 +910,17 @@ func TestRepository_BulkUpdate_Success(t *testing.T) {
 	originalData1, _ := json.Marshal(original1)
 	originalData2, _ := json.Marshal(original2)
 
-	// Se mockea GET para los datos originales
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData1, nil)
-	mockStore.On("Get", "cf1", "admin:users:data:id2").Return(originalData2, nil)
+	// Se mockea GET para los datos originales (called by FindByField)
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id2", mock.Anything).Return(originalData2, nil)
 
 	// Para las claves únicas nuevas, simular que no existen (para no dar error de duplicados)
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated").Return(nil, nil)
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:BobUpdated").Return(nil, nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:BobUpdated", mock.Anything).Return(nil, nil)
 
-	mockStore.On("Write", mock.Anything).Return(nil)
+	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil)
 
-	results, err := repo.BulkUpdate([]*User{&updated1, &updated2})
+	results, err := repo.BulkUpdate([]*User{&updated1, &updated2}, time.Now())
 	assert.NoError(t, err)
 	assert.Len(t, results, 2)
 	assert.True(t, results[0])
@@ -926,14 +941,14 @@ func TestRepository_BulkUpdate_SomeNonexistent(t *testing.T) {
 
 	originalData, _ := json.Marshal(existing)
 
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData, nil)
-	mockStore.On("Get", "cf1", "admin:users:data:id999").Return(nil, nil) // no existe
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(originalData, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id999", mock.Anything).Return(nil, nil) // no existe
 
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated").Return(nil, nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
 
-	mockStore.On("Write", mock.Anything).Return(nil)
+	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil)
 
-	results, err := repo.BulkUpdate([]*User{&updatedExisting, &nonexistent})
+	results, err := repo.BulkUpdate([]*User{&updatedExisting, &nonexistent}, time.Now())
 	assert.NoError(t, err)
 	assert.Len(t, results, 2)
 	assert.True(t, results[0])  // id1 actualizado
@@ -957,12 +972,12 @@ func TestRepository_BulkUpdate_DuplicateUniqueWithinBatch(t *testing.T) {
 	originalData1, _ := json.Marshal(original1)
 	originalData2, _ := json.Marshal(original2)
 
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData1, nil)
-	mockStore.On("Get", "cf1", "admin:users:data:id2").Return(originalData2, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id2", mock.Anything).Return(originalData2, nil)
 
 	// El repositorio debería detectar el duplicado dentro del batch sin llamar al store para el índice uName
 
-	results, err := repo.BulkUpdate([]*User{&updated1, &updated2})
+	results, err := repo.BulkUpdate([]*User{&updated1, &updated2}, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field")
 	assert.Nil(t, results)
@@ -979,11 +994,11 @@ func TestRepository_BulkUpdate_DuplicateUniqueExisting(t *testing.T) {
 
 	originalData1, _ := json.Marshal(original1)
 
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData1, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
 	// Simulamos que el índice único ya apunta a otro ID distinto al que actualizamos
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Bob").Return([]byte("otherID"), nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:Bob", mock.Anything).Return([]byte("otherID"), nil)
 
-	results, err := repo.BulkUpdate([]*User{&updated1})
+	results, err := repo.BulkUpdate([]*User{&updated1}, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field")
 	assert.Nil(t, results)
@@ -1000,12 +1015,12 @@ func TestRepository_BulkUpdate_WriteError(t *testing.T) {
 
 	originalData, _ := json.Marshal(original)
 
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return(originalData, nil)
-	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated").Return(nil, nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(originalData, nil)
+	mockStore.On("Get", "cf1", "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
 
-	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
+	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
 
-	results, err := repo.BulkUpdate([]*User{&updated})
+	results, err := repo.BulkUpdate([]*User{&updated}, time.Now())
 	assert.Error(t, err)
 	assert.Nil(t, results)
 }
@@ -1017,11 +1032,11 @@ func TestRepository_BulkUpdate_InvalidData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simula que data original almacenada está corrupta (no json válido)
-	mockStore.On("Get", "cf1", "admin:users:data:id1").Return([]byte("not json"), nil)
+	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return([]byte("not json"), nil)
 
 	updated := User{ID: "id1", Name: "AliceUpdated"}
 
-	results, err := repo.BulkUpdate([]*User{&updated})
+	results, err := repo.BulkUpdate([]*User{&updated}, time.Now())
 	assert.Error(t, err)
 	assert.Nil(t, results)
 }
@@ -1032,7 +1047,7 @@ func TestRepository_BulkUpdate_EmptyInput(t *testing.T) {
 	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
 	require.NoError(t, err)
 
-	results, err := repo.BulkUpdate([]*User{})
+	results, err := repo.BulkUpdate([]*User{}, time.Now())
 	assert.NoError(t, err)
 	assert.NotNil(t, results)
 	assert.Len(t, results, 0)
@@ -1096,16 +1111,17 @@ func TestRepository_Create_NestedSuccess_UserComplexEmbedded(t *testing.T) {
 	}
 
 	// Mock for unique checks (Email and embedded Tag)
-	mockStore.On("Get", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Email:embedded@example.com").Return(nil, nil).Once()
+	// These Gets are effectively Exists checks
+	mockStore.On("Exists", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Email:embedded@example.com", mock.Anything).Return(false, nil).Once()
 	// Assuming embedded field 'Tag' becomes a top-level field name 'Tag'
-	mockStore.On("Get", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Tag:embeddedTag1").Return(nil, nil).Once()
-	mockStore.On("Get", "cf_embed", "test_sch_embed:users_complex_embedded:data:uce123").Return(nil, nil).Once()
+	mockStore.On("Exists", "cf_embed", "test_sch_embed:users_complex_embedded:idx-u:Tag:embeddedTag1", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf_embed", "test_sch_embed:users_complex_embedded:data:uce123", mock.Anything).Return(false, nil).Once()
 
 	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
 		return batch.Count() > 0
-	})).Return(nil).Once()
+	}), mock.Anything).Return(nil).Once()
 
-	createdID, err := repo.Create(&user)
+	createdID, err := repo.Create(&user, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, entityID, createdID)
 	assert.Equal(t, entityID, user.ID)
@@ -1137,13 +1153,13 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 	}
 
 	// Mock for unique checks
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Email:new@example.com").Return(nil, nil)
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:uc456").Return(nil, nil)
+	mockStore.On("Exists", "cf_complex", "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf_complex", "test_sch:users_complex:data:uc456", mock.Anything).Return(false, nil)
 	// Simulate Meta.Tag being a duplicate
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:existingTag").Return([]byte("anotherID"), nil)
+	mockStore.On("Exists", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:existingTag", mock.Anything).Return(true, nil)
 	// No On("Write") should be called
 
-	_, err = repo.Create(&user)
+	_, err = repo.Create(&user, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field: Meta.Tag = existingTag")
 
@@ -1174,10 +1190,10 @@ func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
 	uniqueIdxKey := "test_sch:users_complex:idx-u:Meta.Tag:findThisTag"
 	dataKey := "test_sch:users_complex:data:" + entityID
 
-	mockStore.On("Get", "cf_complex", uniqueIdxKey).Return([]byte(entityID), nil).Once()
-	mockStore.On("Get", "cf_complex", dataKey).Return(jsonData, nil).Once()
+	mockStore.On("Get", "cf_complex", uniqueIdxKey, mock.Anything).Return([]byte(entityID), nil).Once()
+	mockStore.On("Get", "cf_complex", dataKey, mock.Anything).Return(jsonData, nil).Once()
 
-	foundUser, err := repo.FindByField("Meta.Tag", "findThisTag")
+	foundUser, err := repo.FindByField("Meta.Tag", "findThisTag", time.Now())
 	require.NoError(t, err)
 	require.NotNil(t, foundUser)
 	assert.Equal(t, expectedUser, *foundUser)
@@ -1207,16 +1223,16 @@ func TestRepository_Find_NestedCondition_UserComplex(t *testing.T) {
 
 	// Mock KVStore SearchByPatternPaginatedKV calls
 	// For "Meta.Tag = 'filterTag'"
-	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", "test_sch:users_complex:idx:Meta.Tag:filterTag:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", "test_sch:users_complex:idx:Meta.Tag:filterTag:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Key: "...", Value: []byte(entityID)}}, "", nil).Once()
 	// For "Email = 'filter@example.com'"
-	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", "test_sch:users_complex:idx:Email:filter@example.com:*", "", 1000).
+	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", "test_sch:users_complex:idx:Email:filter@example.com:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Key: "...", Value: []byte(entityID)}}, "", nil).Once()
 
 	// Mock Get for the data key
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(jsonData, nil).Once()
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID, mock.Anything).Return(jsonData, nil).Once()
 
-	result, err := repo.Find("Meta.Tag = 'filterTag' & Email = 'filter@example.com'", 1000, "")
+	result, err := repo.Find("Meta.Tag = 'filterTag' & Email = 'filter@example.com'", 1000, "", time.Now())
 	require.NoError(t, err)
 	require.Len(t, result.Entities, 1)
 	assert.Equal(t, user, result.Entities[0])
@@ -1256,10 +1272,10 @@ func TestRepository_Update_NestedField_UserComplex(t *testing.T) {
 	// updatedData, _ := json.Marshal(updatedUser) // repo.Update internally marshals the modified 'current'
 
 	// 1. FindByField (ID) to get current entity
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(originalData, nil).Once()
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID, mock.Anything).Return(originalData, nil).Once()
 
 	// 2. Unique check for new Meta.Tag value
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:newTag").Return(nil, nil).Once()
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:newTag", mock.Anything).Return(nil, nil).Once()
 	// (No other unique fields changed in this test case for Meta)
 
 	// 3. Write batch operations (simplified, actual batch content is complex)
@@ -1267,9 +1283,9 @@ func TestRepository_Update_NestedField_UserComplex(t *testing.T) {
 		// A real test would capture and inspect the batch.
 		// Count > 0 implies deletes and puts for changed fields' indexes and the main data.
 		return batch.Count() > 0
-	})).Return(nil).Once()
+	}), mock.Anything).Return(nil).Once()
 
-	changed, err := repo.Update(&updatedUser)
+	changed, err := repo.Update(&updatedUser, time.Now())
 	require.NoError(t, err)
 	assert.True(t, changed)
 
@@ -1297,12 +1313,12 @@ func TestRepository_Update_NestedField_DuplicateUnique_UserComplex(t *testing.T)
 	originalData, _ := json.Marshal(originalUser)
 
 	// 1. FindByField (ID)
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(originalData, nil).Once()
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID, mock.Anything).Return(originalData, nil).Once()
 
 	// 2. Unique check for new Meta.Tag shows it exists for another ID
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:conflictingTag").Return([]byte("anotherEntityID"), nil).Once()
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:idx-u:Meta.Tag:conflictingTag", mock.Anything).Return([]byte("anotherEntityID"), nil).Once()
 
-	changed, err := repo.Update(&updatedUser)
+	changed, err := repo.Update(&updatedUser, time.Now())
 	require.Error(t, err)
 	assert.False(t, changed)
 	assert.Contains(t, err.Error(), "duplicate unique field: Meta.Tag = conflictingTag")
@@ -1331,15 +1347,15 @@ func TestRepository_Delete_WithNestedFields_UserComplex(t *testing.T) {
 	jsonData, _ := json.Marshal(userToDelete)
 
 	// 1. FindByField (ID) to get entity before deleting its indexes
-	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID).Return(jsonData, nil).Once()
+	mockStore.On("Get", "cf_complex", "test_sch:users_complex:data:"+entityID, mock.Anything).Return(jsonData, nil).Once()
 
 	// 2. Write batch for deletions
 	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
 		// Expect many deletes: data, all regular indexes, all unique indexes
 		return batch.Count() > 0 // Simplified check
-	})).Return(nil).Once()
+	}), mock.Anything).Return(nil).Once()
 
-	deleted, err := repo.Delete(entityID)
+	deleted, err := repo.Delete(entityID, time.Now())
 	require.NoError(t, err)
 	assert.True(t, deleted)
 
@@ -1368,9 +1384,9 @@ func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
 
 	// Mock unique checks. If extractFieldsRecursively makes embedded fields top-level,
 	// then "Tag" should be the unique field name, not "MetaForEmbed.Tag".
-	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Email:embedfn@example.com").Return(nil, nil).Once()
-	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Tag:embedFnTag").Return(nil, nil).Once() // Key check
-	mockStore.On("Get", "cf_embed_fn", "test_sch_fn:users_complex_embedded:data:uceFieldTest").Return(nil, nil).Once()    // Key check
+	mockStore.On("Exists", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Email:embedfn@example.com", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf_embed_fn", "test_sch_fn:users_complex_embedded:idx-u:Tag:embedFnTag", mock.Anything).Return(false, nil).Once() // Key check
+	mockStore.On("Exists", "cf_embed_fn", "test_sch_fn:users_complex_embedded:data:uceFieldTest", mock.Anything).Return(false, nil).Once()    // Key check
 
 	// Mock the Write call
 	// In a real test, capture the batch and verify specific index keys, e.g.:
@@ -1383,9 +1399,9 @@ func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
 		// For this test, ensuring the unique checks above are for "Tag" (not "MetaForEmbed.Tag")
 		// and that the code doesn't error out is the primary goal given the complexity of full batch verification here.
 		return batch.Count() > 0
-	})).Return(nil).Once()
+	}), mock.Anything).Return(nil).Once()
 
-	createdID, err := repo.Create(&user)
+	createdID, err := repo.Create(&user, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, entityID, createdID)
 
@@ -1410,8 +1426,8 @@ func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
 	uNameFieldKey := "admin:users:idx-u:Name:Alice"
 	indexKey := "admin:users:idx:ID:det-123:det-123"
 
-	mockStore.On("Get", "cf1", uNameFieldKey).Return(nil, nil)
-	mockStore.On("Get", "cf1", dataKey).Return(nil, nil)
+	mockStore.On("Exists", "cf1", uNameFieldKey, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", dataKey, mock.Anything).Return(false, nil)
 
 	batch := db.NewWriteBatch()
 	batch.Put("cf1", indexKey, []byte("det-123"))
@@ -1421,9 +1437,9 @@ func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
-	})).Return(nil)
+	}), mock.Anything).Return(nil)
 
-	id, err := repo.Create(&user)
+	id, err := repo.Create(&user, time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, id, "det-123")
 

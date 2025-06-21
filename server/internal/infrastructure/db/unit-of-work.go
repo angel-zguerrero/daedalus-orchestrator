@@ -2,6 +2,7 @@ package db
 
 import (
 	"reflect"
+	"time"
 )
 
 type UnitOfWork struct {
@@ -18,8 +19,8 @@ func NewUnitOfWork(kvStore KVStore) *UnitOfWork {
 	}
 }
 
-func (u *UnitOfWork) Commit() error {
-	return u.kvStore.Write(u.batch)
+func (u *UnitOfWork) Commit(now time.Time) error {
+	return u.kvStore.Write(u.batch, now)
 }
 
 func GetRepository[T ORMEntity](uow *UnitOfWork, cf string, schema string, factory IDGeneratorFactory) (*Repository[T], error) {

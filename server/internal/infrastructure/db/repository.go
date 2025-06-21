@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -196,7 +197,7 @@ func parse(tokens []token) (*exprNode, error) {
 	}
 	return output[0], nil
 }
-func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]bool, error) {
+func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) (map[string]bool, error) {
 	conditionRegex := regexp.MustCompile(`(?i)^([\w.]+)\s*(=|!=|<=|>=|<|>|LIKE|BETWEEN)\s*(.+)$`)
 	parts := conditionRegex.FindStringSubmatch(strings.TrimSpace(condStr))
 	if len(parts) != 4 {
@@ -222,7 +223,7 @@ func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]boo
 	case "=":
 		pattern := prefix + value + ":*"
 		for {
-			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, pattern, cursorInner, limit)
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, pattern, cursorInner, limit, now)
 			if err != nil {
 				return nil, err
 			}
@@ -241,7 +242,7 @@ func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]boo
 			return nil, fmt.Errorf("invalid LIKE pattern: %s", value)
 		}
 		for {
-			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit, now)
 			if err != nil {
 				return nil, err
 			}
@@ -262,7 +263,7 @@ func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]boo
 		}
 	case "<", "<=", ">", ">=", "!=", "BETWEEN":
 		for {
-			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit)
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit, now)
 			if err != nil {
 				return nil, err
 			}
@@ -307,15 +308,15 @@ func (r *Repository[T]) evalCondition(condStr string, limit int) (map[string]boo
 
 	return allIDs, nil
 }
-func (r *Repository[T]) evalExpr(node *exprNode, limit int) (map[string]bool, error) {
+func (r *Repository[T]) evalExpr(node *exprNode, limit int, now time.Time) (map[string]bool, error) {
 	if node.op == "COND" {
-		return r.evalCondition(node.condStr, limit)
+		return r.evalCondition(node.condStr, limit, now)
 	}
-	left, err := r.evalExpr(node.left, limit)
+	left, err := r.evalExpr(node.left, limit, now)
 	if err != nil {
 		return nil, err
 	}
-	right, err := r.evalExpr(node.right, limit)
+	right, err := r.evalExpr(node.right, limit, now)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +359,7 @@ func (r *Repository[T]) evalExpr(node *exprNode, limit int) (map[string]bool, er
 // Returns:
 //   - A pointer to a FindResult struct containing the matched entities and the next cursor.
 //   - An error if the operation fails.
-func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResult[T], error) {
+func (r *Repository[T]) Find(filter string, limit int, cursor string, now time.Time) (*FindResult[T], error) {
 	tokens, err := tokenize(filter)
 	if err != nil {
 		return nil, err
@@ -367,7 +368,7 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 	if err != nil {
 		return nil, err
 	}
-	idMap, err := r.evalExpr(tree, limit)
+	idMap, err := r.evalExpr(tree, limit, now)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +394,7 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 	var results []T
 	for _, id := range selectedIDs {
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-		dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey)
+		dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey, now)
 		if err != nil {
 			return nil, err
 		}
@@ -424,7 +425,7 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string) (*FindResu
 // Returns:
 //   - A pointer to the matched entity, or nil if no entity is found.
 //   - An error if the operation fails.
-func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
+func (r *Repository[T]) FindByField(field string, value string, now time.Time) (*T, error) {
 	def := r.definition.Fields[field]
 	if def == (FieldDefinition{}) {
 		return nil, fmt.Errorf("Unknown field %s", field)
@@ -435,7 +436,7 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 	var dataKey string
 	if def.Unique {
 		searchKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, field, value)
-		idBytes, err := r.kvStore.Get(r.definition.ColumnFamily, searchKey)
+		idBytes, err := r.kvStore.Get(r.definition.ColumnFamily, searchKey, now)
 		if err != nil || idBytes == nil || len(idBytes) == 0 {
 			return nil, err
 		}
@@ -445,14 +446,14 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 		dataKey = fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, value)
 	} else {
 		searchKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
-		idBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, searchKey, "", 1)
+		idBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, searchKey, "", 1, now)
 		if err != nil || idBytes == nil || len(idBytes) == 0 {
 			return nil, err
 		}
 
 		dataKey = fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, string(idBytes[0].Value))
 	}
-	dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey)
+	dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey, now)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +477,7 @@ func (r *Repository[T]) FindByField(field string, value string) (*T, error) {
 // Returns:
 //   - A slice of strings containing the IDs of the newly created entities.
 //   - An error if the operation fails (e.g., due to a unique constraint violation).
-func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
+func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, error) {
 	var ids []string
 	batch := NewWriteBatch()
 
@@ -534,7 +535,7 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 		// This check must be done before the unique field checks for other fields
 		// as it's a more fundamental constraint.
 		pkDataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, currentEntityIDValue)
-		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, pkDataKey)
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, pkDataKey, now)
 		if err != nil {
 			return nil, fmt.Errorf("error checking existence for primary key %s: %w", currentEntityIDValue, err)
 		}
@@ -587,7 +588,7 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 	// Validar duplicados en la base
 	// This check inherently respects shouldSkipUniqueness because items are not added to uniqueChecks
 	for _, check := range uniqueChecks {
-		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, check.Key)
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, check.Key, now)
 		if err != nil {
 			return nil, err
 		}
@@ -672,7 +673,7 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 		}
 	}
 
-	if err := r.kvStore.Write(batch); err != nil {
+	if err := r.kvStore.Write(batch, now); err != nil {
 		return nil, err
 	}
 
@@ -733,8 +734,8 @@ func (r *Repository[T]) checkForTTL(entityValue reflect.Value) (bool, int, error
 // Returns:
 //   - The ID of the newly created entity.
 //   - An error if the operation fails.
-func (r *Repository[T]) Create(entity *T) (string, error) {
-	ids, err := r.BulkCreate([]*T{entity})
+func (r *Repository[T]) Create(entity *T, now time.Time) (string, error) {
+	ids, err := r.BulkCreate([]*T{entity}, now)
 	if err != nil {
 		return "", err
 	}
@@ -752,7 +753,7 @@ func (r *Repository[T]) Create(entity *T) (string, error) {
 // Returns:
 //   - A slice of booleans indicating whether each corresponding entity was updated.
 //   - An error if the operation fails (e.g., due to a unique constraint violation).
-func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
+func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error) {
 	// Determine the primary key field name (should be "ID" due to NewRepository validation)
 	var primaryFieldName string
 	for name, fDef := range r.definition.Fields {
@@ -840,7 +841,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 		id := fmt.Sprintf("%v", idFieldVal.Interface())
 
 		// Fetch current entity from DB
-		currentEntityStored, err := r.FindByField(primaryFieldName, id)
+		currentEntityStored, err := r.FindByField(primaryFieldName, id, now)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching current entity with ID '%s' for update: %w", id, err)
 		}
@@ -910,7 +911,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 					if !shouldSkipUniquenessForNewValue {
 						// Check for new value collision in DB
 						idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
-						existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, idxKey)
+						existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, idxKey, now)
 						if errDb != nil {
 							return nil, fmt.Errorf("error checking unique constraint for field '%s', value '%s': %w", def.Name, newValue, errDb)
 						}
@@ -972,7 +973,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 	}
 
 	if batch.Count() > 0 {
-		if err := r.kvStore.Write(batch); err != nil {
+		if err := r.kvStore.Write(batch, now); err != nil {
 			return nil, err
 		}
 	}
@@ -986,8 +987,8 @@ func (r *Repository[T]) BulkUpdate(entities []*T) ([]bool, error) {
 // Returns:
 //   - A boolean indicating whether the entity was updated.
 //   - An error if the operation fails.
-func (r *Repository[T]) Update(entity *T) (bool, error) {
-	results, err := r.BulkUpdate([]*T{entity})
+func (r *Repository[T]) Update(entity *T, now time.Time) (bool, error) {
+	results, err := r.BulkUpdate([]*T{entity}, now)
 	if err != nil {
 		return false, err
 	}
@@ -1003,7 +1004,7 @@ func (r *Repository[T]) Update(entity *T) (bool, error) {
 // Returns:
 //   - A slice of booleans indicating whether each corresponding entity was found and deleted.
 //   - An error if the operation fails.
-func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
+func (r *Repository[T]) BulkDelete(ids []string, now time.Time) ([]bool, error) {
 	var primaryFieldName string
 	for name, def := range r.definition.Fields {
 		if def.Primary {
@@ -1019,7 +1020,7 @@ func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 	batch := NewWriteBatch()
 
 	for i, id := range ids {
-		entity, err := r.FindByField(primaryFieldName, id)
+		entity, err := r.FindByField(primaryFieldName, id, now)
 		if err != nil {
 			return nil, fmt.Errorf("error finding entity with id %s: %w", id, err)
 		}
@@ -1064,7 +1065,7 @@ func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 	}
 
 	if batch.Count() > 0 {
-		if err := r.kvStore.Write(batch); err != nil {
+		if err := r.kvStore.Write(batch, now); err != nil {
 			return nil, fmt.Errorf("error applying bulk delete batch: %w", err)
 		}
 	}
@@ -1081,8 +1082,8 @@ func (r *Repository[T]) BulkDelete(ids []string) ([]bool, error) {
 // Returns:
 //   - A boolean indicating whether the entity was found and deleted.
 //   - An error if the operation fails.
-func (r *Repository[T]) Delete(id string) (bool, error) {
-	results, err := r.BulkDelete([]string{id})
+func (r *Repository[T]) Delete(id string, now time.Time) (bool, error) {
+	results, err := r.BulkDelete([]string{id}, now)
 	if err != nil {
 		return false, err
 	}

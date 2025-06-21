@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sync"
+	"time"
 
 	"testing"
 
@@ -23,8 +24,8 @@ type MockKVStore struct {
 	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
 }
 
-func (m *MockKVStore) Get(AdminFC, key string) ([]byte, error) {
-	args := m.Called(AdminFC, key)
+func (m *MockKVStore) Get(AdminFC, key string, now time.Time) ([]byte, error) {
+	args := m.Called(AdminFC, key, now)
 	var s []byte
 	if tmp := args.Get(0); tmp != nil {
 		s = tmp.([]byte)
@@ -32,21 +33,24 @@ func (m *MockKVStore) Get(AdminFC, key string) ([]byte, error) {
 	return s, args.Error(1)
 }
 
-func (m *MockKVStore) Delete(AdminFC, key string) error {
-	args := m.Called(AdminFC, key)
+func (m *MockKVStore) Delete(AdminFC, key string, now time.Time) error {
+	args := m.Called(AdminFC, key, now)
 	return args.Error(0)
 }
 
-func (r *MockKVStore) Exists(columnFamily, key string) (bool, error) {
-	val, err := r.Get(columnFamily, key)
+func (r *MockKVStore) Exists(columnFamily, key string, now time.Time) (bool, error) {
+	// This mock Exists calls its own Get.
+	// For tests that mock Exists directly: args := r.Called(columnFamily, key, now) ...
+	// For tests that rely on this passthrough:
+	data, err := r.Get(columnFamily, key, now) // Pass now here
 	if err != nil {
 		return false, err
 	}
-	return val != nil, nil
+	return data != nil, nil
 }
 
-func (m *MockKVStore) Put(AdminFC, key string, value []byte, ttl int) error {
-	args := m.Called(AdminFC, key, value, ttl)
+func (m *MockKVStore) Put(AdminFC, key string, value []byte, ttl int, now time.Time) error {
+	args := m.Called(AdminFC, key, value, ttl, now)
 	return args.Error(0)
 }
 
@@ -55,8 +59,8 @@ func (m *MockKVStore) PutRaw(AdminFC, key string, value []byte) error {
 	return args.Error(0)
 }
 
-func (m *MockKVStore) Write(batch *db.WriteBatch) error {
-	args := m.Called(batch)
+func (m *MockKVStore) Write(batch *db.WriteBatch, now time.Time) error {
+	args := m.Called(batch, now)
 	return args.Error(0)
 }
 
@@ -90,12 +94,13 @@ func (r *MockKVStore) Close() error {
 	return nil
 }
 
-func (r *MockKVStore) CleanExpiredKeys() error {
-	return nil
+func (r *MockKVStore) CleanExpiredKeys(now time.Time) error {
+	args := r.Called(now)
+	return args.Error(0)
 }
 
-func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]db.KeyValuePair, string, error) {
-	args := m.Called(cfName, pattern, cursor, limit)
+func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]db.KeyValuePair, string, error) {
+	args := m.Called(cfName, pattern, cursor, limit, now)
 	var s []db.KeyValuePair
 	if tmp := args.Get(0); tmp != nil {
 		s = tmp.([]db.KeyValuePair)
@@ -137,15 +142,15 @@ func TestPutUser_Success(t *testing.T) {
 
 	user := models.CreateUser{Username: "foo", Email: "foo@mail.com", Password: "1234"}
 
-	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:foo").Return(nil, nil).Times(1)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:foo@mail.com").Return(nil, nil).Times(1)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(1)
-	mockStore.On("Write", mock.Anything).Return(nil).Times(1)
+	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:foo", mock.Anything).Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:foo@mail.com", mock.Anything).Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Times(1)
+	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1)
 
 	id, err := repo.CreateUser(user)
 	assert.NoError(t, err)
-	err = uow.Commit()
+	err = uow.Commit(time.Now())
 	assert.NotNil(t, id)
 	assert.NoError(t, err)
 	mockStore.AssertExpectations(t)
@@ -160,8 +165,8 @@ func TestGetUser_Success(t *testing.T) {
 	u := models.User{Username: "foo", Email: "bar"}
 	data, _ := json.Marshal(u)
 
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:foo").Return([]byte("123"), nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(data, nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:foo", mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(data, nil)
 
 	user, err := repo.GetUserByUsername("foo")
 	assert.NoError(t, err)
@@ -174,7 +179,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	uow := db.NewUnitOfWork(mockStore)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bar").Return(nil, nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bar", mock.Anything).Return(nil, nil)
 
 	user, err := repo.GetUserByUsername("bar")
 	assert.NoError(t, err)
@@ -188,7 +193,7 @@ func TestGetUser_ErrorOnGet(t *testing.T) {
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return(nil, errors.New("get failed"))
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x", mock.Anything).Return(nil, errors.New("get failed"))
 	user, err := repo.GetUserByUsername("x")
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -201,8 +206,8 @@ func TestGetUser_UnmarshalError(t *testing.T) {
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return([]byte("123"), nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return([]byte("invalid-json"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x", mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return([]byte("invalid-json"), nil)
 
 	user, err := repo.GetUserByUsername("x")
 	assert.Error(t, err)
@@ -218,8 +223,8 @@ func TestDeleteUser_Success(t *testing.T) {
 	root := models.User{Username: "other", ID: "123"}
 	rootData, _ := json.Marshal(root)
 
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bob").Return([]byte("123"), nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(rootData, nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bob", mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(rootData, nil)
 
 	result, err := repo.DeleteUser("bob")
 	assert.Equal(t, true, result)
@@ -234,8 +239,8 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "admin", ID: "123", IsRootUser: true}
 	rootData, _ := json.Marshal(root)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin").Return([]byte("123"), nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(rootData, nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(rootData, nil)
 	_, err = repo.DeleteUser("admin")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot delete root user")
@@ -247,7 +252,7 @@ func TestDeleteUser_GetError(t *testing.T) {
 	uow := db.NewUnitOfWork(mockStore)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
-	mockStore.On("Get", db.AdminFC, mock.Anything).Return(nil, errors.New("get failed"))
+	mockStore.On("Get", db.AdminFC, mock.Anything, mock.Anything).Return(nil, errors.New("get failed"))
 
 	_, err = repo.DeleteUser("someone")
 	assert.Error(t, err)
@@ -259,8 +264,8 @@ func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 	uow := db.NewUnitOfWork(mockStore)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x").Return([]byte("123"), nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return([]byte("invalid-json"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x", mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return([]byte("invalid-json"), nil)
 	_, err = repo.DeleteUser("x")
 	assert.Error(t, err)
 	mockStore.AssertExpectations(t)
@@ -273,14 +278,14 @@ func TestDeleteUser_WriteError(t *testing.T) {
 	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "user", ID: "123"}
 	rootData, _ := json.Marshal(root)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:user").Return([]byte("123"), nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(rootData, nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:user", mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(rootData, nil)
 
-	mockStore.On("Write", mock.Anything).Return(errors.New("write failed"))
+	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
 
 	_, err = repo.DeleteUser("user")
 	assert.NoError(t, err)
-	err = uow.Commit()
+	err = uow.Commit(time.Now())
 	assert.Error(t, err)
 	mockStore.AssertExpectations(t)
 }
@@ -295,16 +300,16 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 		Email:    "test@example.com",
 	}
 
-	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1).Return(nil, "", nil)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:testuser").Return(nil, nil).Times(1)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:test@example.com").Return(nil, nil).Times(1)
-	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123").Return(nil, nil).Times(1)
-	mockStore.On("Write", mock.Anything).Return(errors.New("kv put failed")).Times(1)
+	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:testuser", mock.Anything).Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:test@example.com", mock.Anything).Return(nil, nil).Times(1)
+	mockStore.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Times(1)
+	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("kv put failed")).Times(1)
 
 	_, err = repo.CreateUser(userInput)
 
 	assert.NoError(t, err)
-	err = uow.Commit()
+	err = uow.Commit(time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "kv put failed")
 	mockStore.AssertExpectations(t)
@@ -334,8 +339,8 @@ func TestLoginUser(t *testing.T) {
 	userData, _ := json.Marshal(user)
 
 	t.Run("LoginWithEmail_CorrectPassword_Success", func(t *testing.T) {
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userEmail).Return([]byte(userID), nil).Once()
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userEmail, mock.Anything).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
 		found, err := repo.Login(userEmail, correctPassword)
 		assert.NoError(t, err)
@@ -345,9 +350,9 @@ func TestLoginUser(t *testing.T) {
 
 	t.Run("LoginWithUsername_CorrectPassword_Success", func(t *testing.T) {
 		// Mock email lookup to return nil, then username lookup to return the user
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userUsername).Return(nil, nil).Once()
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+userUsername).Return([]byte(userID), nil).Once()
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userUsername, mock.Anything).Return(nil, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+userUsername, mock.Anything).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
 		found, err := repo.Login(userUsername, correctPassword)
 		assert.NoError(t, err)
@@ -356,8 +361,8 @@ func TestLoginUser(t *testing.T) {
 	})
 
 	t.Run("LoginWithEmail_IncorrectPassword_Failure", func(t *testing.T) {
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userEmail).Return([]byte(userID), nil).Once()
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userEmail, mock.Anything).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
 		found, err := repo.Login(userEmail, incorrectPassword)
 		assert.NoError(t, err) // bcrypt.ErrMismatchedHashAndPassword is not an "error" for Login logic, it's a valid outcome
@@ -366,9 +371,9 @@ func TestLoginUser(t *testing.T) {
 	})
 
 	t.Run("LoginWithUsername_IncorrectPassword_Failure", func(t *testing.T) {
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userUsername).Return(nil, nil).Once()
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+userUsername).Return([]byte(userID), nil).Once()
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID).Return(userData, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+userUsername, mock.Anything).Return(nil, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+userUsername, mock.Anything).Return([]byte(userID), nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
 		found, err := repo.Login(userUsername, incorrectPassword)
 		assert.NoError(t, err) // bcrypt.ErrMismatchedHashAndPassword is not an "error" for Login logic
@@ -378,8 +383,8 @@ func TestLoginUser(t *testing.T) {
 
 	t.Run("Login_UserNotFound_Failure", func(t *testing.T) {
 		unknownIdentifier := "unknown@example.com"
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+unknownIdentifier).Return(nil, nil).Once()
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+unknownIdentifier).Return(nil, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+unknownIdentifier, mock.Anything).Return(nil, nil).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+unknownIdentifier, mock.Anything).Return(nil, nil).Once()
 
 		found, err := repo.Login(unknownIdentifier, "anypassword")
 		assert.NoError(t, err)
@@ -390,7 +395,7 @@ func TestLoginUser(t *testing.T) {
 	t.Run("Login_ErrorOnEmailLookup", func(t *testing.T) {
 		errorIdentifier := "error@example.com"
 		expectedError := errors.New("db error on email lookup")
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+errorIdentifier).Return(nil, expectedError).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+errorIdentifier, mock.Anything).Return(nil, expectedError).Once()
 
 		found, err := repo.Login(errorIdentifier, "anypassword")
 		assert.Error(t, err)
@@ -402,8 +407,8 @@ func TestLoginUser(t *testing.T) {
 	t.Run("Login_ErrorOnUsernameLookup", func(t *testing.T) {
 		errorIdentifier := "erroruser"
 		expectedError := errors.New("db error on username lookup")
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+errorIdentifier).Return(nil, nil).Once() // Email lookup fine, returns nil
-		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+errorIdentifier).Return(nil, expectedError).Once()
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:"+errorIdentifier, mock.Anything).Return(nil, nil).Once() // Email lookup fine, returns nil
+		mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:"+errorIdentifier, mock.Anything).Return(nil, expectedError).Once()
 
 		found, err := repo.Login(errorIdentifier, "anypassword")
 		assert.Error(t, err)

@@ -1,5 +1,7 @@
 package db
 
+import "time"
+
 type X struct {
 	CF    string
 	Key   string
@@ -61,12 +63,13 @@ type KVStore interface {
 	// Parameters:
 	//   - columnFamily: The name of the column family.
 	//   - key: The key to retrieve.
+	//   - now: The current time, for TTL calculations.
 	// Returns:
 	//   - The value as a byte slice, or nil if the key is not found.
 	//   - An error if any occurred during the operation.
-	Get(columnFamily string, key string) ([]byte, error)
+	Get(columnFamily string, key string, now time.Time) ([]byte, error)
 
-	Delete(columnFamily string, key string) error
+	Delete(columnFamily string, key string, now time.Time) error
 
 	// Put stores a key-value pair into a specific column family.
 	// If the key already exists, its value will be overwritten.
@@ -74,9 +77,11 @@ type KVStore interface {
 	//   - columnFamily: The name of the column family.
 	//   - key: The key to store.
 	//   - value: The value to store as a byte slice.
+	//   - ttl: Time-to-live for the key in seconds. 0 means no TTL.
+	//   - now: The current time, for TTL calculations.
 	// Returns:
 	//   - An error if any occurred during the operation.
-	Put(columnFamily string, key string, value []byte, ttl int) error
+	Put(columnFamily string, key string, value []byte, ttl int, now time.Time) error
 
 	PutRaw(columnFamily string, key string, value []byte) error
 
@@ -84,15 +89,16 @@ type KVStore interface {
 	// The exact type of `batch` depends on the KVStore implementation.
 	// Parameters:
 	//   - batch: A WriteBatch object containing the operations to apply.
+	//   - now: The current time, for TTL calculations within the batch.
 	// Returns:
 	//   - An error if any occurred during the operation.
-	Write(batch *WriteBatch) error // TODO: Use a more specific type like WriteBatch if possible
+	Write(batch *WriteBatch, now time.Time) error // TODO: Use a more specific type like WriteBatch if possible
 
 	WriteRaw(batch *WriteBatch) error
 
-	SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error)
+	SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error)
 
-	Exists(cfName, key string) (bool, error)
+	Exists(cfName, key string, now time.Time) (bool, error)
 
 	// DumpAll retrieves all key-value pairs from the store.
 	// The format of the returned data (interface{}) is implementation-specific.
@@ -129,5 +135,5 @@ type KVStore interface {
 	//   - An error if any occurred during the closing process.
 	Close() error
 
-	CleanExpiredKeys() error
+	CleanExpiredKeys(now time.Time) error
 }
