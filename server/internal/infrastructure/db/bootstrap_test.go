@@ -41,15 +41,8 @@ func (m *MockKVStoreBootstrap) Delete(AdminFC, key string, now time.Time) error 
 }
 
 func (r *MockKVStoreBootstrap) Exists(columnFamily, key string, now time.Time) (bool, error) {
-	// This mock Exists calls its own Get.
-	data, err := r.Get(columnFamily, key, now) // Pass now here
-	if err != nil {
-		return false, err
-	}
-	return data != nil, nil
-	// If directly mocking Exists:
-	// args := r.Called(columnFamily, key, now)
-	// return args.Bool(0), args.Error(1)
+	args := r.Called(columnFamily, key, now)
+	return args.Bool(0), args.Error(1)
 }
 
 func (m *MockKVStoreBootstrap) Put(AdminFC, key string, value []byte, ttl int, now time.Time) error {
@@ -162,9 +155,9 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 	}
 
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(2)
-	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(nil, nil).Times(1)
-	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(nil, nil).Times(1)
-	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Times(1)
+	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(false, nil).Times(1)
+	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(false, nil).Times(1)
+	store.On("Exists", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(false, nil).Times(1)
 
 	assert.NoError(t, err)
 
@@ -211,8 +204,10 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Times(2)
 	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Times(2)
-	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(nil, nil).Times(1)
-	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Times(1)
+	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(false, nil).Times(1)
+	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(false, nil).Times(1)
+	store.On("Exists", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(false, nil).Times(1)
+	store.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1)
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
 	err = uow.Commit(time.Now())
@@ -285,14 +280,15 @@ func Test_ErrorPutsRoot(t *testing.T) {
 
 	// GetUserRoot in BootstrapRootUser
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil).Once()
-	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Once() // Assumes Get is called by FindByField
+	store.On("Exists", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(false, nil).Once() // Assumes Get is called by FindByField
+	store.On("Get", db.AdminFC, "admin_schema:users:data:123", mock.Anything).Return(nil, nil).Once()      // Assumes Get is called by FindByField
 
 	// CreateUser part:
 	// GetUserRoot again inside CreateUser
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Once()
 	// Exists checks for username and email
-	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(nil, nil).Once()
-	store.On("Get", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(nil, nil).Once()
+	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return(false, nil).Once()
+	store.On("Exists", db.AdminFC, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(false, nil).Once()
 
 	store.On("Write", mock.Anything, mock.Anything).Return(errors.New("write fail")).Once()
 

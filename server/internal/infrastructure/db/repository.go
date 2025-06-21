@@ -535,7 +535,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		// This check must be done before the unique field checks for other fields
 		// as it's a more fundamental constraint.
 		pkDataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, currentEntityIDValue)
-		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, pkDataKey)
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, pkDataKey, now)
 		if err != nil {
 			return nil, fmt.Errorf("error checking existence for primary key %s: %w", currentEntityIDValue, err)
 		}

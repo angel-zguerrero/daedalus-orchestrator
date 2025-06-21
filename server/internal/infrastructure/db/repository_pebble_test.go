@@ -64,18 +64,18 @@ func TestRepository_Create_DuplicatePrimaryKey_Pebble(t *testing.T) {
 	require.NoError(t, err)
 
 	entity1 := testEntity{ID: "dup-pk-pebble-1", Name: "FirstPebbleEntity"}
-	id1, err := repo.Create(&entity1)
+	id1, err := repo.Create(&entity1, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, "dup-pk-pebble-1", id1)
 
 	// Attempt to create another entity with the same ID
 	entity2 := testEntity{ID: "dup-pk-pebble-1", Name: "SecondPebbleEntitySameID"}
-	_, err = repo.Create(&entity2)
+	_, err = repo.Create(&entity2, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate primary key: ID = dup-pk-pebble-1 already exists")
 
 	// Verify only the first entity is there
-	found, err := repo.FindByField("ID", "dup-pk-pebble-1")
+	found, err := repo.FindByField("ID", "dup-pk-pebble-1", time.Now())
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "FirstPebbleEntity", found.Name) // Should be the name of the first entity
@@ -87,7 +87,7 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB_Pebble(t *testing.T) {
 
 	// Pre-existing entity
 	existingEntity := testEntity{ID: "existing-pebble-pk", Name: "AlreadyInPebbleDB"}
-	_, err = repo.Create(&existingEntity)
+	_, err = repo.Create(&existingEntity, time.Now())
 	require.NoError(t, err)
 
 	entitiesToBulkCreate := []*testEntity{
@@ -96,17 +96,17 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB_Pebble(t *testing.T) {
 		{ID: "new-pebble-pk-2", Name: "NewPebbleEntity2"},
 	}
 
-	_, err = repo.BulkCreate(entitiesToBulkCreate)
+	_, err = repo.BulkCreate(entitiesToBulkCreate, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate primary key: ID = existing-pebble-pk already exists")
 
 	// Verify that non-conflicting new entities were not created
-	foundNew1, err := repo.FindByField("ID", "new-pebble-pk-1")
+	foundNew1, err := repo.FindByField("ID", "new-pebble-pk-1", time.Now())
 	require.NoError(t, err)
 	assert.Nil(t, foundNew1)
 
 	// Verify existing entity is still the original one
-	foundExisting, err := repo.FindByField("ID", "existing-pebble-pk")
+	foundExisting, err := repo.FindByField("ID", "existing-pebble-pk", time.Now())
 	require.NoError(t, err)
 	require.NotNil(t, foundExisting)
 	assert.Equal(t, "AlreadyInPebbleDB", foundExisting.Name)
@@ -123,12 +123,12 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch_Pebble(t *testing.T) 
 		{ID: duplicateIDInBatch, Name: "BatchPebble3"}, // Duplicate ID within the batch
 	}
 
-	_, err = repo.BulkCreate(entities)
+	_, err = repo.BulkCreate(entities, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate primary key in input batch: ID = "+duplicateIDInBatch)
 
 	// Verify no entities from the batch were created
-	foundUnique, err := repo.FindByField("ID", "unique-batch-pebble-1")
+	foundUnique, err := repo.FindByField("ID", "unique-batch-pebble-1", time.Now())
 	require.NoError(t, err)
 	assert.Nil(t, foundUnique)
 }
@@ -142,7 +142,7 @@ func TestRepository_Create_EmptyProvidedID_Pebble(t *testing.T) {
 		Name: "EntityWithEmptyIDPebble",
 	}
 
-	_, err = repo.Create(&entityWithEmptyID)
+	_, err = repo.Create(&entityWithEmptyID, time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "primary key field 'ID' cannot be empty when not generated")
 }
@@ -1518,17 +1518,17 @@ func TestRepository_PutAndGet_Deterministic_Id_Generator_Pebble(t *testing.T) {
 	require.NoError(t, err)
 	entity := testEntity{ID: "det-123", Name: "Alice"}
 
-	id, err := repo.Create(&entity)
+	id, err := repo.Create(&entity, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, id, "det-123")
 
-	found, err := repo.FindByField("ID", "det-123")
+	found, err := repo.FindByField("ID", "det-123", time.Now())
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "det-123", found.ID)
 	assert.Equal(t, entity.Name, found.Name)
 
-	found, err = repo.FindByField("Name", "Alice")
+	found, err = repo.FindByField("Name", "Alice", time.Now())
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "det-123", found.ID)
