@@ -88,18 +88,19 @@ func TestRepository_PutAndGet(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
 	entity := testEntity{ID: "----", Name: "Alice"}
+	now := time.Now()
 
-	id, err := repo.Create(&entity)
+	id, err := repo.Create(&entity, now)
 	require.NoError(t, err)
 	assert.Equal(t, id, "123")
 
-	found, err := repo.FindByField("ID", "123")
+	found, err := repo.FindByField("ID", "123", now)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "123", found.ID)
 	assert.Equal(t, entity.Name, found.Name)
 
-	found, err = repo.FindByField("Name", "Alice")
+	found, err = repo.FindByField("Name", "Alice", now)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "123", found.ID)
@@ -131,29 +132,30 @@ func TestRocksDBConditionalUniquenessCreate(t *testing.T) {
 	t.Run("IgnoreUniqueness", func(t *testing.T) {
 		ids := []string{"id1", "id2", "id3"}
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
+		now := time.Now()
 
 		entity1 := &ConditionalUniqueEntityRocksDB{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
-		_, err := repo.Create(entity1)
+		_, err := repo.Create(entity1, now)
 		require.NoError(t, err, "Create entity1 should succeed")
 
 		entity2 := &ConditionalUniqueEntityRocksDB{Name: "E2", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
-		_, err = repo.Create(entity2)
+		_, err = repo.Create(entity2, now)
 		require.NoError(t, err, "Create entity2 with same UniqueValue (ignored) should succeed")
 
 		entity3 := &ConditionalUniqueEntityRocksDB{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
-		_, err = repo.Create(entity3)
+		_, err = repo.Create(entity3, now)
 		require.NoError(t, err, "Create entity3 with same UniqueValue (enforced, but not previously by E1/E2) should succeed")
 
 		// Verify all created
-		e1, _ := repo.FindByField("ID", ids[0])
+		e1, _ := repo.FindByField("ID", ids[0], now)
 		require.NotNil(t, e1)
 		assert.Equal(t, "uv1", e1.UniqueValue)
 
-		e2, _ := repo.FindByField("ID", ids[1])
+		e2, _ := repo.FindByField("ID", ids[1], now)
 		require.NotNil(t, e2)
 		assert.Equal(t, "uv1", e2.UniqueValue)
 
-		e3, _ := repo.FindByField("ID", ids[2])
+		e3, _ := repo.FindByField("ID", ids[2], now)
 		require.NotNil(t, e3)
 		assert.Equal(t, "uv1", e3.UniqueValue)
 		assert.False(t, e3.ShouldIgnoreUniqueness)
@@ -162,25 +164,26 @@ func TestRocksDBConditionalUniquenessCreate(t *testing.T) {
 	t.Run("EnforceUniqueness", func(t *testing.T) {
 		ids := []string{"id4", "id5", "id6"} // Fresh IDs for this subtest
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
+		now := time.Now()
 
 		entity4 := &ConditionalUniqueEntityRocksDB{Name: "E4", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
-		_, err := repo.Create(entity4)
+		_, err := repo.Create(entity4, now)
 		require.NoError(t, err, "Create entity4 should succeed")
 
 		entity5 := &ConditionalUniqueEntityRocksDB{Name: "E5", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
-		_, err = repo.Create(entity5)
+		_, err = repo.Create(entity5, now)
 		require.Error(t, err, "Create entity5 with same UniqueValue (enforced) should fail")
 		assert.Contains(t, err.Error(), "duplicate unique field")
 
 		entity6 := &ConditionalUniqueEntityRocksDB{Name: "E6", UniqueValue: "uv2", ShouldIgnoreUniqueness: true}
-		_, err = repo.Create(entity6)
+		_, err = repo.Create(entity6, now)
 		require.NoError(t, err, "Create entity6 with same UniqueValue (ignored) should succeed")
 
-		e4, _ := repo.FindByField("ID", ids[0])
+		e4, _ := repo.FindByField("ID", ids[0], now)
 		require.NotNil(t, e4)
 		assert.Equal(t, "uv2", e4.UniqueValue)
 
-		e6, _ := repo.FindByField("ID", ids[2]) // id5 failed, so entity6 gets ids[2] if factory generates sequentially
+		e6, _ := repo.FindByField("ID", ids[2], now) // id5 failed, so entity6 gets ids[2] if factory generates sequentially
 		require.NotNil(t, e6)
 		assert.Equal(t, "uv2", e6.UniqueValue)
 		assert.True(t, e6.ShouldIgnoreUniqueness)
@@ -191,24 +194,25 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 	t.Run("UpdateWithFlagTrueBypassesConflict", func(t *testing.T) {
 		ids := []string{"idA", "idB"}
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
+		now := time.Now()
 
 		entityA := &ConditionalUniqueEntityRocksDB{ID: ids[0], Name: "EntityA", UniqueValue: "uva", ShouldIgnoreUniqueness: false}
-		_, err := repo.Create(entityA)
+		_, err := repo.Create(entityA, now)
 		require.NoError(t, err)
 
 		entityB := &ConditionalUniqueEntityRocksDB{ID: ids[1], Name: "EntityB", UniqueValue: "uvb", ShouldIgnoreUniqueness: false}
-		_, err = repo.Create(entityB)
+		_, err = repo.Create(entityB, now)
 		require.NoError(t, err)
 
 		// Update entityB to have UniqueValue "uva" (conflicts with A) but with ShouldIgnoreUniqueness = true
 		entityB.UniqueValue = "uva"
 		entityB.ShouldIgnoreUniqueness = true
-		updated, err := repo.Update(entityB)
+		updated, err := repo.Update(entityB, now)
 		require.NoError(t, err, "Update entityB should succeed")
 		assert.True(t, updated)
 
 		// Verify B is updated
-		bUpdated, _ := repo.FindByField("ID", ids[1])
+		bUpdated, _ := repo.FindByField("ID", ids[1], now)
 		require.NotNil(t, bUpdated)
 		assert.Equal(t, "uva", bUpdated.UniqueValue)
 		assert.True(t, bUpdated.ShouldIgnoreUniqueness)
@@ -217,19 +221,20 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 	t.Run("UpdateWithFlagFalseHitsConflict", func(t *testing.T) {
 		ids := []string{"idC", "idD"}
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
+		now := time.Now()
 
 		entityC := &ConditionalUniqueEntityRocksDB{ID: ids[0], Name: "EntityC", UniqueValue: "uvc", ShouldIgnoreUniqueness: false}
-		_, err := repo.Create(entityC)
+		_, err := repo.Create(entityC, now)
 		require.NoError(t, err)
 
 		entityD := &ConditionalUniqueEntityRocksDB{ID: ids[1], Name: "EntityD", UniqueValue: "uvd", ShouldIgnoreUniqueness: false}
-		_, err = repo.Create(entityD)
+		_, err = repo.Create(entityD, now)
 		require.NoError(t, err)
 
 		// Attempt to update entityD to have UniqueValue "uvc" (conflicts with C) with ShouldIgnoreUniqueness = false
 		entityD.UniqueValue = "uvc"
 		entityD.ShouldIgnoreUniqueness = false
-		updated, err := repo.Update(entityD)
+		updated, err := repo.Update(entityD, now)
 		require.Error(t, err, "Update entityD should fail due to unique constraint")
 		assert.False(t, updated)
 		assert.Contains(t, err.Error(), "duplicate unique field")
@@ -238,25 +243,26 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 	t.Run("UpdateFlagFromFalseToTrueThenCreateNew", func(t *testing.T) {
 		ids := []string{"idE", "idF"}
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
+		now := time.Now()
 
 		entityE := &ConditionalUniqueEntityRocksDB{ID: ids[0], Name: "EntityE", UniqueValue: "uve", ShouldIgnoreUniqueness: false}
-		_, err := repo.Create(entityE)
+		_, err := repo.Create(entityE, now)
 		require.NoError(t, err)
 
 		// Update entityE to set ShouldIgnoreUniqueness = true
 		entityE.ShouldIgnoreUniqueness = true
-		updated, err := repo.Update(entityE)
+		updated, err := repo.Update(entityE, now)
 		require.NoError(t, err, "Update entityE should succeed")
 		assert.True(t, updated)
 
 		// Now, try to create entityF with UniqueValue "uve" and ShouldIgnoreUniqueness = false
 		// This should succeed because entityE is no longer enforcing uniqueness on "uve"
 		entityF := &ConditionalUniqueEntityRocksDB{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: true}
-		_, err = repo.Create(entityF)
+		_, err = repo.Create(entityF, now)
 		require.NoError(t, err, "Create entityF should succeed as E is ignoring uniqueness")
 
 		// Verify F
-		fCreated, _ := repo.FindByField("ID", ids[1])
+		fCreated, _ := repo.FindByField("ID", ids[1], now)
 		require.NotNil(t, fCreated)
 		assert.Equal(t, "uve", fCreated.UniqueValue)
 		assert.True(t, fCreated.ShouldIgnoreUniqueness)
@@ -266,8 +272,9 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 func TestRepository_Get_NotFound(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
+	now := time.Now()
 
-	found, err := repo.FindByField("ID", "5566")
+	found, err := repo.FindByField("ID", "5566", now)
 	require.NoError(t, err)
 	assert.Nil(t, found)
 }
@@ -278,19 +285,20 @@ func TestRepository_WriteBatch(t *testing.T) {
 
 	a := testEntity{ID: "---", Name: "Alpha"}
 	b := testEntity{ID: "---", Name: "Beta"}
+	now := time.Now()
 
-	id, err := repo.Create(&a)
+	id, err := repo.Create(&a, now)
 	assert.Equal(t, id, "123")
 	require.NoError(t, err)
-	id, err = repo.Create(&b)
+	id, err = repo.Create(&b, now)
 	require.NoError(t, err)
 	assert.Equal(t, id, "456")
 
-	resA, err := repo.FindByField("ID", "123")
+	resA, err := repo.FindByField("ID", "123", now)
 	require.NoError(t, err)
 	assert.Equal(t, a.Name, resA.Name)
 
-	resB, err := repo.FindByField("ID", "456")
+	resB, err := repo.FindByField("ID", "456", now)
 	require.NoError(t, err)
 	assert.Equal(t, b.Name, resB.Name)
 }
@@ -298,13 +306,14 @@ func TestRepository_WriteBatch(t *testing.T) {
 func TestRepository_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
+	now := time.Now()
 
 	entity := testEntity{ID: "user:123:name", Name: "Alice"}
-	id, err := repo.Create(&entity)
+	id, err := repo.Create(&entity, now)
 	assert.Equal(t, id, "123")
 	require.NoError(t, err)
 
-	results, err := repo.Find("Name=Alice", 1000, "")
+	results, err := repo.Find("Name=Alice", 1000, "", now)
 	require.NoError(t, err)
 	require.Len(t, results.Entities, 1)
 	assert.Equal(t, entity.ID, results.Entities[0].ID)
@@ -317,18 +326,19 @@ func TestRepository_Update_SimpleFieldChange(t *testing.T) {
 
 	// Create original entity
 	entity := testEntity{ID: "123", Name: "Alice"}
-	id, err := repo.Create(&entity)
+	now := time.Now()
+	id, err := repo.Create(&entity, now)
 	require.NoError(t, err)
 	assert.Equal(t, "123", id)
 
 	// Change Name
 	entity.Name = "Alice Smith"
-	updated, err := repo.Update(&entity)
+	updated, err := repo.Update(&entity, now)
 	require.NoError(t, err)
 	assert.True(t, updated)
 
 	// Verify updated value
-	res, err := repo.FindByField("ID", "123")
+	res, err := repo.FindByField("ID", "123", now)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	assert.Equal(t, "Alice Smith", res.Name)
@@ -337,23 +347,24 @@ func TestRepository_Update_SimpleFieldChange(t *testing.T) {
 func TestRepository_Update_UniqueIndexChange(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
+	now := time.Now()
 
 	entity := testEntity{ID: "123", Name: "Alice"}
-	_, err = repo.Create(&entity)
+	_, err = repo.Create(&entity, now)
 	require.NoError(t, err)
 
 	entity.Name = "Bob"
-	updated, err := repo.Update(&entity)
+	updated, err := repo.Update(&entity, now)
 	require.NoError(t, err)
 	assert.True(t, updated)
 
 	// Should no longer be found by old index
-	old, err := repo.FindByField("Name", "Alice")
+	old, err := repo.FindByField("Name", "Alice", now)
 	require.NoError(t, err)
 	assert.Nil(t, old)
 
 	// Should now be found by new index
-	newFound, err := repo.FindByField("Name", "Bob")
+	newFound, err := repo.FindByField("Name", "Bob", now)
 	require.NoError(t, err)
 	require.NotNil(t, newFound)
 	assert.Equal(t, "123", newFound.ID)
@@ -366,15 +377,16 @@ func TestRepository_Update_IndexCollisionShouldFail(t *testing.T) {
 	// Create two users with different names
 	a := testEntity{ID: "123", Name: "Alice"}
 	b := testEntity{ID: "---", Name: "Bob"}
+	now := time.Now()
 
-	_, err = repo.Create(&a)
+	_, err = repo.Create(&a, now)
 	require.NoError(t, err)
-	_, err = repo.Create(&b)
+	_, err = repo.Create(&b, now)
 	require.NoError(t, err)
 
 	// Try to rename Alice to "Bob" → should fail (unique collision)
 	a.Name = "Bob"
-	updated, err := repo.Update(&a)
+	updated, err := repo.Update(&a, now)
 	assert.Error(t, err)
 	assert.False(t, updated)
 }
@@ -382,9 +394,10 @@ func TestRepository_Update_IndexCollisionShouldFail(t *testing.T) {
 func TestRepository_Update_NotFound(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
+	now := time.Now()
 
 	entity := testEntity{ID: "999", Name: "Zoe"}
-	ok, err := repo.Update(&entity)
+	ok, err := repo.Update(&entity, now)
 	require.NoError(t, err)
 	assert.False(t, ok)
 }
@@ -395,27 +408,28 @@ func TestRepository_Delete_Success_RocksDB(t *testing.T) {
 
 	// Crear entidad
 	entity := testEntity{ID: "---", Name: "Charlie"}
-	id, err := repo.Create(&entity)
+	now := time.Now()
+	id, err := repo.Create(&entity, now)
 	require.NoError(t, err)
 	assert.Equal(t, "123", id)
 
 	// Asegurar que se puede encontrar
-	found, err := repo.FindByField("ID", "123")
+	found, err := repo.FindByField("ID", "123", now)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 
 	// Eliminar entidad
-	deleted, err := repo.Delete("123")
+	deleted, err := repo.Delete("123", now)
 	require.NoError(t, err)
 	assert.True(t, deleted)
 
 	// Verificar que ya no se encuentra
-	found, err = repo.FindByField("ID", "123")
+	found, err = repo.FindByField("ID", "123", now)
 	require.NoError(t, err)
 	assert.Nil(t, found)
 
 	// Verificar que el índice único también se eliminó
-	found, err = repo.FindByField("Name", "Charlie")
+	found, err = repo.FindByField("Name", "Charlie", now)
 	require.NoError(t, err)
 	assert.Nil(t, found)
 }
@@ -423,8 +437,9 @@ func TestRepository_Delete_Success_RocksDB(t *testing.T) {
 func TestRepository_Delete_NotFound_RocksDB(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
+	now := time.Now()
 
-	deleted, err := repo.Delete("nonexistent-id")
+	deleted, err := repo.Delete("nonexistent-id", now)
 	require.NoError(t, err)
 	assert.False(t, deleted)
 }
@@ -437,28 +452,29 @@ func TestRepository_Find_FilteringAndPagination(t *testing.T) {
 	for i := 0; i < total; i++ {
 		name := fmt.Sprintf("Name_%04d", i)
 		entity := testEntity{ID: "---", Name: name}
-		_, err := repo.Create(&entity)
+		_, err := repo.Create(&entity, time.Now())
 		require.NoError(t, err)
 	}
+	now := time.Now()
 
 	// === Filtro simple ===
 	targetName := "Name_0003"
-	results, err := repo.Find(fmt.Sprintf("Name=%s", targetName), 10, "")
+	results, err := repo.Find(fmt.Sprintf("Name=%s", targetName), 10, "", now)
 	require.NoError(t, err)
 	require.Len(t, results.Entities, 1)
 	assert.Equal(t, targetName, results.Entities[0].Name)
 
-	firstPage, err := repo.Find("Name=Name_0003 | Name=Name_0004 | Name=Name_0005", 2, "")
+	firstPage, err := repo.Find("Name=Name_0003 | Name=Name_0004 | Name=Name_0005", 2, "", now)
 	require.NoError(t, err)
 	assert.Len(t, firstPage.Entities, 2)
 	assert.NotEmpty(t, firstPage.Cursor)
 
-	secondPage, err := repo.Find("Name=Name_0003 | Name=Name_0004 | Name=Name_0005", 2, firstPage.Cursor)
+	secondPage, err := repo.Find("Name=Name_0003 | Name=Name_0004 | Name=Name_0005", 2, firstPage.Cursor, now)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, len(secondPage.Entities), 1) // solo hay 3 en total
 
 	orFilter := "Name=Name_0007 | Name=Name_0010"
-	orResults, err := repo.Find(orFilter, 10, "")
+	orResults, err := repo.Find(orFilter, 10, "", now)
 	require.NoError(t, err)
 	assert.Len(t, orResults.Entities, 2)
 	names := map[string]bool{
@@ -469,24 +485,24 @@ func TestRepository_Find_FilteringAndPagination(t *testing.T) {
 		assert.True(t, names[e.Name])
 	}
 
-	andResults, err := repo.Find("Name=Name_0003 & Name=Name_0004", 10, "")
+	andResults, err := repo.Find("Name=Name_0003 & Name=Name_0004", 10, "", now)
 	require.NoError(t, err)
 	assert.Empty(t, andResults.Entities)
 
-	quoted, err := repo.Find("Name='Name_0003'", 10, "")
+	quoted, err := repo.Find("Name='Name_0003'", 10, "", now)
 	require.NoError(t, err)
 	require.Len(t, quoted.Entities, 1)
 	assert.Equal(t, "Name_0003", quoted.Entities[0].Name)
 
-	_, err = repo.Find("NameName_0003", 10, "")
+	_, err = repo.Find("NameName_0003", 10, "", now)
 	assert.Error(t, err)
 
 	entity := testEntity{ID: "abc123", Name: "Zeta_Unique"}
-	_, err = repo.Create(&entity)
+	_, err = repo.Create(&entity, time.Now())
 	require.NoError(t, err)
 
 	multiField := fmt.Sprintf("ID=%s & Name=%s", entity.ID, entity.Name)
-	multiResults, err := repo.Find(multiField, 10, "")
+	multiResults, err := repo.Find(multiField, 10, "", now)
 	require.NoError(t, err)
 	require.Len(t, multiResults.Entities, 1)
 	assert.Equal(t, entity.ID, multiResults.Entities[0].ID)
@@ -502,10 +518,11 @@ func TestRepository_Find_PaginationLoop(t *testing.T) {
 	for i := 0; i < total; i++ {
 		name := fmt.Sprintf("Name_%04d", i)
 		entity := testEntity{ID: "---", Name: name}
-		_, err := repo.Create(&entity)
+		_, err := repo.Create(&entity, time.Now())
 		require.NoError(t, err)
 		names[name] = true
 	}
+	now := time.Now()
 
 	var filterParts []string
 	for i := 10; i < 60; i++ {
@@ -518,7 +535,7 @@ func TestRepository_Find_PaginationLoop(t *testing.T) {
 	found := make(map[string]bool)
 
 	for {
-		page, err := repo.Find(filter, limit, cursor)
+		page, err := repo.Find(filter, limit, cursor, now)
 		require.NoError(t, err)
 
 		for _, e := range page.Entities {
@@ -545,20 +562,22 @@ func TestRepository_Find_Operators(t *testing.T) {
 		{ID: "---", Name: "Dana", LastName: "White", Age: 25},
 		{ID: "---", Name: "Eva", LastName: "Velasco", Age: 35},
 	}
+	creationTime := time.Now()
 	for _, e := range seed {
-		_, err := repo.Create(&e)
+		_, err := repo.Create(&e, creationTime)
 		require.NoError(t, err)
 	}
+	now := time.Now()
 
 	t.Run("Equal operator", func(t *testing.T) {
-		res, err := repo.Find("Age=30", 10, "")
+		res, err := repo.Find("Age=30", 10, "", now)
 		require.NoError(t, err)
 		require.Len(t, res.Entities, 1)
 		assert.Equal(t, "Bea", res.Entities[0].Name)
 	})
 
 	t.Run("Not equal operator", func(t *testing.T) {
-		res, err := repo.Find("Age!=30", 10, "")
+		res, err := repo.Find("Age!=30", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 4)
 		for _, e := range res.Entities {
@@ -567,53 +586,53 @@ func TestRepository_Find_Operators(t *testing.T) {
 	})
 
 	t.Run("Greater than operator", func(t *testing.T) {
-		res, err := repo.Find("Age>30", 10, "")
+		res, err := repo.Find("Age>30", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 2)
 		assert.ElementsMatch(t, []string{"Cleo", "Eva"}, []string{res.Entities[0].Name, res.Entities[1].Name})
 	})
 
 	t.Run("Greater than or equal", func(t *testing.T) {
-		res, err := repo.Find("Age>=30", 10, "")
+		res, err := repo.Find("Age>=30", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 3)
 	})
 
 	t.Run("Less than operator", func(t *testing.T) {
-		res, err := repo.Find("Age<30", 10, "")
+		res, err := repo.Find("Age<30", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 2)
 	})
 
 	t.Run("Less than or equal", func(t *testing.T) {
-		res, err := repo.Find("Age<=25", 10, "")
+		res, err := repo.Find("Age<=25", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 2)
 	})
 
 	t.Run("LIKE operator - prefix", func(t *testing.T) {
-		res, err := repo.Find("LastName LIKE Z*", 10, "")
+		res, err := repo.Find("LastName LIKE Z*", 10, "", now)
 		require.NoError(t, err)
 		require.Len(t, res.Entities, 1)
 		assert.Equal(t, "Ana", res.Entities[0].Name)
 	})
 
 	t.Run("LIKE operator - suffix", func(t *testing.T) {
-		res, err := repo.Find("LastName LIKE *nez", 10, "")
+		res, err := repo.Find("LastName LIKE *nez", 10, "", now)
 		require.NoError(t, err)
 		require.Len(t, res.Entities, 2)
 		assert.ElementsMatch(t, []string{"Cleo", "Bea"}, []string{res.Entities[0].Name, res.Entities[1].Name})
 	})
 
 	t.Run("LIKE operator - contains", func(t *testing.T) {
-		res, err := repo.Find("LastName LIKE *ela*", 10, "")
+		res, err := repo.Find("LastName LIKE *ela*", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 1)
 		assert.Equal(t, "Eva", res.Entities[0].Name)
 	})
 
 	t.Run("BETWEEN operator", func(t *testing.T) {
-		res, err := repo.Find("Age BETWEEN 25 AND 35", 10, "")
+		res, err := repo.Find("Age BETWEEN 25 AND 35", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 3)
 		names := []string{res.Entities[0].Name, res.Entities[1].Name, res.Entities[2].Name}
@@ -621,7 +640,7 @@ func TestRepository_Find_Operators(t *testing.T) {
 	})
 
 	t.Run("Combined operators", func(t *testing.T) {
-		res, err := repo.Find("Age>=25 & Age<=35", 10, "")
+		res, err := repo.Find("Age>=25 & Age<=35", 10, "", now)
 		require.NoError(t, err)
 		assert.Len(t, res.Entities, 3)
 	})
@@ -642,10 +661,11 @@ func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.
 			LastName: fmt.Sprintf("Last_%04d", i),
 			Age:      age,
 		}
-		_, err := repo.Create(&entity)
+		_, err := repo.Create(&entity, time.Now())
 		require.NoError(t, err)
 		names[name] = true
 	}
+	nowTest := time.Now()
 
 	t.Run("Simple pagination loop with 100 per page", func(t *testing.T) {
 		cursor := ""
@@ -653,7 +673,7 @@ func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.
 		limit := 100
 
 		for {
-			res, err := repo.Find("Age>=25", limit, cursor)
+			res, err := repo.Find("Age>=25", limit, cursor, nowTest)
 			require.NoError(t, err)
 
 			for _, e := range res.Entities {
@@ -682,7 +702,7 @@ func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.
 		limit := 10
 
 		for {
-			res, err := repo.Find(filterStr, limit, cursor)
+			res, err := repo.Find(filterStr, limit, cursor, nowTest)
 			require.NoError(t, err)
 			for _, e := range res.Entities {
 				found[e.Name] = true
@@ -697,7 +717,7 @@ func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.
 
 	t.Run("AND filter with age and name", func(t *testing.T) {
 		// Name should exist and age should match
-		res, err := repo.Find("Name=User_0001 & Age=25", 10, "")
+		res, err := repo.Find("Name=User_0001 & Age=25", 10, "", nowTest)
 		require.NoError(t, err)
 		if len(res.Entities) == 1 {
 			assert.Equal(t, "User_0001", res.Entities[0].Name)
@@ -708,7 +728,7 @@ func TestRepository_Find_LargeDatasetWithPaginationAndComplexFilters(t *testing.
 	})
 
 	t.Run("LIKE operator with many matches", func(t *testing.T) {
-		res, err := repo.Find("LastName LIKE Last_1*", 100, "")
+		res, err := repo.Find("LastName LIKE Last_1*", 100, "", nowTest)
 		require.NoError(t, err)
 		assert.Greater(t, len(res.Entities), 10)
 		for _, e := range res.Entities {
@@ -730,10 +750,12 @@ func TestRepository_Find_ComplexNestedFilters(t *testing.T) {
 		{ID: "---", Name: "Eva", LastName: "Velasco", Age: 35},
 		{ID: "---", Name: "Fina", LastName: "White", Age: 50},
 	}
+	creationTime := time.Now()
 	for _, e := range seed {
-		_, err := repo.Create(&e)
+		_, err := repo.Create(&e, creationTime)
 		require.NoError(t, err)
 	}
+	now := time.Now()
 
 	tests := []struct {
 		name     string
@@ -784,7 +806,7 @@ func TestRepository_Find_ComplexNestedFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := repo.Find(tt.filter, 100, "")
+			res, err := repo.Find(tt.filter, 100, "", now)
 			require.NoError(t, err)
 
 			var gotNames []string
@@ -806,12 +828,13 @@ func TestRepository_BulkCreate(t *testing.T) {
 			{ID: "---", Name: "UserB"},
 			{ID: "---", Name: "UserC"},
 		}
-		ids, err := repo.BulkCreate(entities)
+		now := time.Now()
+		ids, err := repo.BulkCreate(entities, now)
 		require.NoError(t, err)
 		assert.Len(t, ids, 3)
 
 		for _, id := range ids {
-			found, err := repo.FindByField("ID", id)
+			found, err := repo.FindByField("ID", id, now)
 			require.NoError(t, err)
 			assert.NotNil(t, found)
 		}
@@ -825,14 +848,15 @@ func TestRepository_BulkCreate(t *testing.T) {
 			{ID: "---", Name: "UniqueName1"},
 			{ID: "---", Name: "UniqueName2"},
 		}
-		_, err = repo.BulkCreate(first)
+		now := time.Now()
+		_, err = repo.BulkCreate(first, now)
 		require.NoError(t, err)
 
 		second := []*testEntity{
 			{ID: "---", Name: "UniqueName2"}, // duplicate
 			{ID: "---", Name: "UniqueName3"},
 		}
-		_, err = repo.BulkCreate(second)
+		_, err = repo.BulkCreate(second, now)
 		assert.Error(t, err)
 		require.Contains(t, err.Error(), "duplicate")
 	})
@@ -841,7 +865,7 @@ func TestRepository_BulkCreate(t *testing.T) {
 		repo, err := newTestRepositoryDefaultIdGenerator(t)
 		require.NoError(t, err)
 
-		ids, err := repo.BulkCreate([]*testEntity{})
+		ids, err := repo.BulkCreate([]*testEntity{}, time.Now())
 		require.NoError(t, err)
 		assert.Empty(t, ids)
 	})
@@ -854,12 +878,13 @@ func TestRepository_BulkCreate(t *testing.T) {
 		for i := 0; i < 500; i++ {
 			bulk = append(bulk, &testEntity{ID: "---", Name: fmt.Sprintf("Bulk_%d", i)})
 		}
-		ids, err := repo.BulkCreate(bulk)
+		now := time.Now()
+		ids, err := repo.BulkCreate(bulk, now)
 		require.NoError(t, err)
 		assert.Len(t, ids, 500)
 
 		// Spot check
-		found, err := repo.FindByField("Name", "Bulk_42")
+		found, err := repo.FindByField("Name", "Bulk_42", now)
 		require.NoError(t, err)
 		require.NotNil(t, found)
 	})
@@ -867,15 +892,16 @@ func TestRepository_BulkCreate(t *testing.T) {
 	t.Run("Partially duplicate should fail all", func(t *testing.T) {
 		repo, err := newTestRepositoryDefaultIdGenerator(t)
 		require.NoError(t, err)
+		now := time.Now()
 
-		_, err = repo.Create(&testEntity{ID: "---", Name: "ConflictName"})
+		_, err = repo.Create(&testEntity{ID: "---", Name: "ConflictName"}, now)
 
 		conflicting := []*testEntity{
 			{ID: "---", Name: "NewName1"},
 			{ID: "---", Name: "ConflictName"},
 			{ID: "---", Name: "NewName2"},
 		}
-		_, err = repo.BulkCreate(conflicting)
+		_, err = repo.BulkCreate(conflicting, now)
 		assert.Error(t, err)
 		require.Contains(t, err.Error(), "duplicate")
 	})
@@ -887,7 +913,7 @@ func TestRepository_BulkCreate(t *testing.T) {
 			{Name: "duplicate-name", Age: 200}, // mismo Name
 		}
 
-		_, err = repo.BulkCreate(batch)
+		_, err = repo.BulkCreate(batch, time.Now())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "duplicate") // adapta esto según el mensaje real
 	})
@@ -898,24 +924,25 @@ func TestRepository_BulkDelete(t *testing.T) {
 		ids := []string{"123", "456", "789"}
 		repo, err := newTestRepositorySpesificIds(t, ids)
 		require.NoError(t, err)
+		now := time.Now()
 
 		for _, id := range ids {
 			entity := testEntity{ID: id, Name: "Name_" + id}
-			_, err := repo.Create(&entity)
+			_, err := repo.Create(&entity, now)
 			require.NoError(t, err)
 		}
 
 		for _, id := range ids {
-			found, err := repo.FindByField("ID", id)
+			found, err := repo.FindByField("ID", id, now)
 			require.NoError(t, err)
 			require.NotNil(t, found)
 		}
 
-		_, err = repo.BulkDelete(ids)
+		_, err = repo.BulkDelete(ids, now)
 		require.NoError(t, err)
 
 		for _, id := range ids {
-			found, err := repo.FindByField("ID", id)
+			found, err := repo.FindByField("ID", id, now)
 			require.NoError(t, err)
 			assert.Nil(t, found)
 		}
@@ -924,18 +951,19 @@ func TestRepository_BulkDelete(t *testing.T) {
 	t.Run("Bulk delete with some non-existing IDs", func(t *testing.T) {
 		repo, err := newTestRepository(t)
 		require.NoError(t, err)
+		now := time.Now()
 
 		entity := testEntity{ID: "999", Name: "Alive"}
-		_, err = repo.Create(&entity)
+		_, err = repo.Create(&entity, now)
 		require.NoError(t, err)
 
 		// Mixed list: existing and non-existing
 		ids := []string{"999", "does_not_exist", "also_missing"}
-		_, err = repo.BulkDelete(ids)
+		_, err = repo.BulkDelete(ids, now)
 		require.NoError(t, err)
 
 		// Ensure the one that existed is deleted
-		found, err := repo.FindByField("ID", "999")
+		found, err := repo.FindByField("ID", "999", now)
 		require.NoError(t, err)
 		assert.Nil(t, found)
 	})
@@ -943,7 +971,7 @@ func TestRepository_BulkDelete(t *testing.T) {
 	t.Run("Empty list should not fail", func(t *testing.T) {
 		repo, err := newTestRepository(t)
 		require.NoError(t, err)
-		_, err = repo.BulkDelete([]string{})
+		_, err = repo.BulkDelete([]string{}, time.Now())
 		require.NoError(t, err)
 	})
 
@@ -951,22 +979,23 @@ func TestRepository_BulkDelete(t *testing.T) {
 		ids := []string{"111", "222"}
 		repo, err := newTestRepositorySpesificIds(t, ids)
 		require.NoError(t, err)
+		now := time.Now()
 
 		a := testEntity{ID: "111", Name: "Alpha"}
 		b := testEntity{ID: "222", Name: "Beta"}
-		_, err = repo.Create(&a)
+		_, err = repo.Create(&a, now)
 		require.NoError(t, err)
-		_, err = repo.Create(&b)
-		require.NoError(t, err)
-
-		_, err = repo.BulkDelete([]string{"111", "222"})
+		_, err = repo.Create(&b, now)
 		require.NoError(t, err)
 
-		foundA, err := repo.FindByField("Name", "Alpha")
+		_, err = repo.BulkDelete([]string{"111", "222"}, now)
+		require.NoError(t, err)
+
+		foundA, err := repo.FindByField("Name", "Alpha", now)
 		require.NoError(t, err)
 		assert.Nil(t, foundA)
 
-		foundB, err := repo.FindByField("Name", "Beta")
+		foundB, err := repo.FindByField("Name", "Beta", now)
 		require.NoError(t, err)
 		assert.Nil(t, foundB)
 	})
@@ -982,7 +1011,8 @@ func TestRepository_BulkUpdate(t *testing.T) {
 			{ID: "---", Name: "UserB"},
 			{ID: "---", Name: "UserC"},
 		}
-		ids, err := repo.BulkCreate(original)
+		now := time.Now()
+		ids, err := repo.BulkCreate(original, now)
 		require.NoError(t, err)
 		require.Len(t, ids, 3)
 
@@ -992,12 +1022,12 @@ func TestRepository_BulkUpdate(t *testing.T) {
 			{ID: ids[1], Name: "UpdatedB"},
 			{ID: ids[2], Name: "UpdatedC"},
 		}
-		result, err := repo.BulkUpdate(updated)
+		result, err := repo.BulkUpdate(updated, now)
 		require.NoError(t, err)
 		assert.Equal(t, []bool{true, true, true}, result)
 
 		for i, id := range ids {
-			entity, err := repo.FindByField("ID", id)
+			entity, err := repo.FindByField("ID", id, now)
 			require.NoError(t, err)
 			assert.Equal(t, updated[i].Name, entity.Name)
 		}
@@ -1007,7 +1037,7 @@ func TestRepository_BulkUpdate(t *testing.T) {
 		repo, err := newTestRepositoryDefaultIdGenerator(t)
 		require.NoError(t, err)
 
-		result, err := repo.BulkUpdate([]*testEntity{})
+		result, err := repo.BulkUpdate([]*testEntity{}, time.Now())
 		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
@@ -1018,7 +1048,8 @@ func TestRepository_BulkUpdate(t *testing.T) {
 
 		// Insert uno solo
 		entity := &testEntity{ID: "---", Name: "UserX"}
-		createdID, err := repo.Create(entity)
+		now := time.Now()
+		createdID, err := repo.Create(entity, now)
 		require.NoError(t, err)
 
 		// Uno existe, otro no
@@ -1026,7 +1057,7 @@ func TestRepository_BulkUpdate(t *testing.T) {
 			{ID: createdID, Name: "UpdatedX"},
 			{ID: "non-existent-id", Name: "ShouldFail"},
 		}
-		result, err := repo.BulkUpdate(toUpdate)
+		result, err := repo.BulkUpdate(toUpdate, now)
 		require.NoError(t, err)
 		assert.Equal(t, []bool{true, false}, result)
 	})
@@ -1038,11 +1069,12 @@ func TestRepository_BulkUpdate(t *testing.T) {
 		toUpdate := []*testEntity{
 			{ID: "ghost-id", Name: "Ghost"},
 		}
-		result, err := repo.BulkUpdate(toUpdate)
+		now := time.Now()
+		result, err := repo.BulkUpdate(toUpdate, now)
 		require.NoError(t, err)
 		assert.Equal(t, []bool{false}, result)
 
-		found, err := repo.FindByField("ID", "ghost-id")
+		found, err := repo.FindByField("ID", "ghost-id", now)
 		require.NoError(t, err)
 		assert.Nil(t, found)
 	})
@@ -1055,7 +1087,8 @@ func TestRepository_BulkUpdate(t *testing.T) {
 		for i := 0; i < 500; i++ {
 			original = append(original, &testEntity{ID: "---", Name: fmt.Sprintf("User_%d", i)})
 		}
-		ids, err := repo.BulkCreate(original)
+		now := time.Now()
+		ids, err := repo.BulkCreate(original, now)
 		require.NoError(t, err)
 		require.Len(t, ids, 500)
 
@@ -1063,7 +1096,7 @@ func TestRepository_BulkUpdate(t *testing.T) {
 		for i, id := range ids {
 			updated = append(updated, &testEntity{ID: id, Name: fmt.Sprintf("Updated_%d", i)})
 		}
-		result, err := repo.BulkUpdate(updated)
+		result, err := repo.BulkUpdate(updated, now)
 		require.NoError(t, err)
 		assert.Len(t, result, 500)
 		for i := range result {
@@ -1071,7 +1104,7 @@ func TestRepository_BulkUpdate(t *testing.T) {
 		}
 
 		// Spot check
-		check, err := repo.FindByField("Name", "Updated_42")
+		check, err := repo.FindByField("Name", "Updated_42", now)
 		require.NoError(t, err)
 		assert.NotNil(t, check)
 	})
@@ -1079,9 +1112,10 @@ func TestRepository_BulkUpdate(t *testing.T) {
 	t.Run("Duplicate IDs in input should update once", func(t *testing.T) {
 		repo, err := newTestRepositoryDefaultIdGenerator(t)
 		require.NoError(t, err)
+		now := time.Now()
 
 		entity := &testEntity{ID: "---", Name: "Original"}
-		id, err := repo.Create(entity)
+		id, err := repo.Create(entity, now)
 		require.NoError(t, err)
 
 		// Duplicado el mismo ID dos veces, con valores diferentes
@@ -1089,11 +1123,11 @@ func TestRepository_BulkUpdate(t *testing.T) {
 			{ID: id, Name: "FirstUpdate"},
 			{ID: id, Name: "SecondUpdate"},
 		}
-		result, err := repo.BulkUpdate(toUpdate)
+		result, err := repo.BulkUpdate(toUpdate, now)
 		require.NoError(t, err)
 		assert.Equal(t, []bool{true, true}, result)
 
-		final, err := repo.FindByField("ID", id)
+		final, err := repo.FindByField("ID", id, now)
 		require.NoError(t, err)
 		assert.Equal(t, "SecondUpdate", final.Name) // el último debe prevalecer
 	})
@@ -1101,20 +1135,21 @@ func TestRepository_BulkUpdate(t *testing.T) {
 	t.Run("Nil entries should be skipped or fail gracefully", func(t *testing.T) {
 		repo, err := newTestRepositoryDefaultIdGenerator(t)
 		require.NoError(t, err)
+		now := time.Now()
 
 		entity := &testEntity{ID: "---", Name: "Valid"}
-		id, err := repo.Create(entity)
+		id, err := repo.Create(entity, now)
 		require.NoError(t, err)
 
 		updates := []*testEntity{
 			nil,
 			{ID: id, Name: "ValidUpdate"},
 		}
-		result, err := repo.BulkUpdate(updates)
+		result, err := repo.BulkUpdate(updates, now)
 		require.NoError(t, err)
 		assert.Equal(t, []bool{false, true}, result) // nil => false, válido => true
 
-		final, err := repo.FindByField("ID", id)
+		final, err := repo.FindByField("ID", id, now)
 		require.NoError(t, err)
 		assert.Equal(t, "ValidUpdate", final.Name)
 	})
@@ -1172,30 +1207,31 @@ func TestRepository_PutAndGet_Nested(t *testing.T) {
 		ConfigCode:  55,
 		Description: "None",
 	}}
+	now := time.Now()
 
-	id, err := repo.Create(&entity)
+	id, err := repo.Create(&entity, now)
 	require.NoError(t, err)
 	assert.Equal(t, id, "123")
 
-	found, err := repo.FindByField("ID", "123")
+	found, err := repo.FindByField("ID", "123", now)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "123", found.ID)
 	assert.Equal(t, entity.Email, found.Email)
 
-	found, err = repo.FindByField("Email", "Alice@x.com")
+	found, err = repo.FindByField("Email", "Alice@x.com", now)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "123", found.ID)
 	assert.Equal(t, entity.Email, found.Email)
 
-	found, err = repo.FindByField("Meta.Tag", "t1")
+	found, err = repo.FindByField("Meta.Tag", "t1", now)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "123", found.ID)
 	assert.Equal(t, entity.Email, found.Email)
 
-	found, err = repo.FindByField("Meta.Tag1", "t1")
+	found, err = repo.FindByField("Meta.Tag1", "t1", now)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Unknown field Meta.Tag1")
 }
@@ -1210,8 +1246,9 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 			{ID: "---", Data: "Entity2", Meta: NestedMetaTest{UniqueID: "uniqueA2", OTValue: "ttl2", Description: "Desc2"}},
 			{ID: "---", Data: "Entity3", Meta: NestedMetaTest{UniqueID: "uniqueA3", OTValue: "ttl3", Description: "Desc3"}},
 		}
+		now := time.Now()
 
-		ids, err := repo.BulkCreate(entities)
+		ids, err := repo.BulkCreate(entities, now)
 		require.NoError(t, err, "BulkCreate failed for valid nested entities")
 		require.Len(t, ids, len(entities), "BulkCreate should return an ID for each entity")
 
@@ -1219,7 +1256,7 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 			require.NotEmpty(t, id, "Expected a non-empty ID for entity %d", i)
 			entities[i].ID = id // Assign returned ID for later checks
 
-			found, err := repo.FindByField("ID", id)
+			found, err := repo.FindByField("ID", id, now)
 			require.NoError(t, err, "FindByField by ID failed for created entity %s", id)
 			require.NotNil(t, found, "Should find entity by ID %s", id)
 			assert.Equal(t, entities[i].Data, found.Data, "Data field mismatch for entity %s", id)
@@ -1229,7 +1266,7 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 		}
 
 		// Verify finding by nested unique index
-		foundByNestedUnique, err := repo.FindByField("Meta.UniqueID", "uniqueA2")
+		foundByNestedUnique, err := repo.FindByField("Meta.UniqueID", "uniqueA2", now)
 		require.NoError(t, err, "FindByField by Meta.UniqueID failed")
 		require.NotNil(t, foundByNestedUnique, "Should find entity by Meta.UniqueID 'uniqueA2'")
 		assert.Equal(t, entities[1].ID, foundByNestedUnique.ID, "ID mismatch when finding by Meta.UniqueID")
@@ -1242,6 +1279,7 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 		// but newNestedEntityTestRepositoryRocksDB creates a new store each time.
 		repoFresh, err := newNestedEntityTestRepositoryRocksDB(t)
 		require.NoError(t, err)
+		now := time.Now()
 
 		entities := []*NestedEntityTest{
 			{ID: "---", Data: "EntityX", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", OTValue: "ttlX", Description: "DescX"}},
@@ -1249,7 +1287,7 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 			{ID: "---", Data: "EntityZ", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatch", OTValue: "ttlZ", Description: "DescZ"}}, // Duplicate UniqueID
 		}
 
-		ids, err := repoFresh.BulkCreate(entities)
+		ids, err := repoFresh.BulkCreate(entities, now)
 		require.Error(t, err, "BulkCreate should fail due to duplicate UniqueID within the batch")
 		assert.Nil(t, ids, "IDs should be nil on batch creation failure")
 		// The exact error message depends on the implementation, but it should indicate a unique constraint violation.
@@ -1258,11 +1296,11 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a unique constraint violation")
 
 		// Verify no entities were partially inserted (transactional behavior)
-		found, err := repoFresh.FindByField("Meta.UniqueID", "duplicateKeyInBatch")
+		found, err := repoFresh.FindByField("Meta.UniqueID", "duplicateKeyInBatch", now)
 		require.NoError(t, err)
 		assert.Nil(t, found, "No entity should be found with the conflicting UniqueID if batch failed")
 
-		found, err = repoFresh.FindByField("Meta.UniqueID", "anotherUniqueInBatch")
+		found, err = repoFresh.FindByField("Meta.UniqueID", "anotherUniqueInBatch", now)
 		require.NoError(t, err)
 		assert.Nil(t, found, "No entity should be found with a non-conflicting UniqueID if batch failed")
 	})
@@ -1270,10 +1308,11 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 	t.Run("Bulk creation with UniqueID conflicting with existing data", func(t *testing.T) {
 		repoClean, err := newNestedEntityTestRepositoryRocksDB(t) // Fresh repo
 		require.NoError(t, err)
+		now := time.Now()
 
 		// Pre-existing entity
 		existingEntity := NestedEntityTest{ID: "---", Data: "ExistingData", Meta: NestedMetaTest{UniqueID: "conflictWithExisting", OTValue: "ttlE", Description: "DescE"}}
-		_, err = repoClean.Create(&existingEntity) // Use Create for single setup
+		_, err = repoClean.Create(&existingEntity, now) // Use Create for single setup
 		require.NoError(t, err, "Setup: Failed to create initial entity")
 
 		entitiesToBulkCreate := []*NestedEntityTest{
@@ -1282,18 +1321,18 @@ func TestRepository_BulkCreate_Nested_RocksDB(t *testing.T) {
 			{ID: "---", Data: "NewEntity3", Meta: NestedMetaTest{UniqueID: "newUnique3", OTValue: "ttlN3", Description: "DescN3"}},
 		}
 
-		ids, err := repoClean.BulkCreate(entitiesToBulkCreate)
+		ids, err := repoClean.BulkCreate(entitiesToBulkCreate, now)
 		require.Error(t, err, "BulkCreate should fail due to conflict with existing UniqueID")
 		assert.Nil(t, ids, "IDs should be nil on batch creation failure due to existing conflict")
 		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a unique constraint violation")
 
 		// Verify the conflicting entity was not inserted and non-conflicting ones from the batch also weren't (if transactional)
-		foundNew, err := repoClean.FindByField("Meta.UniqueID", "newUnique1")
+		foundNew, err := repoClean.FindByField("Meta.UniqueID", "newUnique1", now)
 		require.NoError(t, err)
 		assert.Nil(t, foundNew, "Non-conflicting entity from failed batch should not be inserted")
 
 		// Verify existing entity is still there
-		foundExisting, err := repoClean.FindByField("Meta.UniqueID", "conflictWithExisting")
+		foundExisting, err := repoClean.FindByField("Meta.UniqueID", "conflictWithExisting", now)
 		require.NoError(t, err)
 		require.NotNil(t, foundExisting, "Original entity with the conflicting key should still exist")
 		assert.Equal(t, existingEntity.Data, foundExisting.Data)
@@ -1309,7 +1348,8 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 			{ID: "---", Data: "DataOne", Meta: NestedMetaTest{UniqueID: "uniqueU1", OTValue: "ttlU1", Description: "DescU1"}},
 			{ID: "---", Data: "DataTwo", Meta: NestedMetaTest{UniqueID: "uniqueU2", OTValue: "ttlU2", Description: "DescU2"}},
 		}
-		createdIds, err := repo.BulkCreate(initialEntities)
+		now := time.Now()
+		createdIds, err := repo.BulkCreate(initialEntities, now)
 		require.NoError(t, err)
 		require.Len(t, createdIds, 2)
 
@@ -1319,7 +1359,7 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 			{ID: createdIds[1], Data: "DataTwoUpdated", Meta: NestedMetaTest{UniqueID: "uniqueU2_new", OTValue: "ttlU2_new", Description: "DescU2_new"}},
 		}
 
-		results, err := repo.BulkUpdate(updatedEntities)
+		results, err := repo.BulkUpdate(updatedEntities, now)
 		require.NoError(t, err, "BulkUpdate failed for valid nested entity updates")
 		require.Len(t, results, len(updatedEntities), "BulkUpdate should return a result for each entity")
 		for i, success := range results {
@@ -1328,7 +1368,7 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 		// Verify updates
 		for i, updatedEntity := range updatedEntities {
-			found, err := repo.FindByField("ID", updatedEntity.ID)
+			found, err := repo.FindByField("ID", updatedEntity.ID, now)
 			require.NoError(t, err)
 			require.NotNil(t, found)
 			assert.Equal(t, updatedEntity.Data, found.Data)
@@ -1338,12 +1378,12 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 			// Verify old unique index is gone
 			oldUniqueValue := initialEntities[i].Meta.UniqueID
-			foundByOldUnique, err := repo.FindByField("Meta.UniqueID", oldUniqueValue)
+			foundByOldUnique, err := repo.FindByField("Meta.UniqueID", oldUniqueValue, now)
 			require.NoError(t, err)
 			assert.Nil(t, foundByOldUnique, "Entity should not be found by old Meta.UniqueID %s", oldUniqueValue)
 
 			// Verify new unique index is present
-			foundByNewUnique, err := repo.FindByField("Meta.UniqueID", updatedEntity.Meta.UniqueID)
+			foundByNewUnique, err := repo.FindByField("Meta.UniqueID", updatedEntity.Meta.UniqueID, now)
 			require.NoError(t, err)
 			require.NotNil(t, foundByNewUnique, "Entity should be found by new Meta.UniqueID %s", updatedEntity.Meta.UniqueID)
 			assert.Equal(t, updatedEntity.ID, foundByNewUnique.ID)
@@ -1358,7 +1398,8 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 			{ID: "---", Data: "Alpha", Meta: NestedMetaTest{UniqueID: "alphaUnique", OTValue: "ttlA", Description: "DescA"}},
 			{ID: "---", Data: "Beta", Meta: NestedMetaTest{UniqueID: "betaUnique", OTValue: "ttlB", Description: "DescB"}},
 		}
-		createdIds, err := repo.BulkCreate(initialEntities)
+		now := time.Now()
+		createdIds, err := repo.BulkCreate(initialEntities, now)
 		require.NoError(t, err)
 		require.Len(t, createdIds, 2)
 		initialEntities[0].ID = createdIds[0]
@@ -1370,7 +1411,7 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 			{ID: createdIds[1], Data: "BetaUpdated", Meta: NestedMetaTest{UniqueID: "conflictKey", OTValue: "ttlB_new", Description: "DescB_new"}},
 		}
 
-		_, err = repo.BulkUpdate(conflictingUpdates)
+		_, err = repo.BulkUpdate(conflictingUpdates, now)
 		require.Error(t, err, "BulkUpdate should fail due to UniqueID conflict within the batch")
 		// The exact behavior of `results` on error might vary. Some implementations might return nil, others might return []bool{false, false}
 		// Based on existing BulkUpdate tests, it seems an error is returned and results might be nil or reflect failure.
@@ -1379,7 +1420,7 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 		// Verify original entities are unchanged
 		for _, originalEntity := range initialEntities {
-			found, err := repo.FindByField("ID", originalEntity.ID)
+			found, err := repo.FindByField("ID", originalEntity.ID, now)
 			require.NoError(t, err)
 			require.NotNil(t, found)
 			assert.Equal(t, originalEntity.Data, found.Data, "Data should not have changed for ID %s", originalEntity.ID)
@@ -1393,9 +1434,10 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 		entities := []*NestedEntityTest{
 			{ID: "---", Data: "EntityToUpdate", Meta: NestedMetaTest{UniqueID: "originalUnique1", OTValue: "ttl1", Description: "Desc1"}},       // Will be nid1
-			{ID: "---", Data: "EntityToConflictWith", Meta: NestedMetaTest{UniqueID: "existingUnique2", OTValue: "ttl2", Description: "Desc2"}}, // Will be nid2
+			{ID: "---", Data: "EntityToConflictWith", Meta: NestedMetaTest{UniqueID: "existingUniqueP2", OTValue: "ttl2", Description: "Desc2"}}, // Will be nid2
 		}
-		createdIds, err := repo.BulkCreate(entities)
+		now := time.Now()
+		createdIds, err := repo.BulkCreate(entities, now)
 		require.NoError(t, err)
 		require.Len(t, createdIds, 2)
 		entities[0].ID = createdIds[0]
@@ -1403,24 +1445,24 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 
 		// Attempt to update EntityToUpdate's UniqueID to match EntityToConflictWith's UniqueID
 		updateAttempt := []*NestedEntityTest{
-			{ID: createdIds[0], Data: "EntityToUpdateModified", Meta: NestedMetaTest{UniqueID: "existingUnique2", OTValue: "ttl1_mod", Description: "Desc1_mod"}},
+			{ID: createdIds[0], Data: "EntityToUpdateModified", Meta: NestedMetaTest{UniqueID: "existingUniqueP2", OTValue: "ttl1_mod", Description: "Desc1_mod"}},
 		}
 
-		_, err = repo.BulkUpdate(updateAttempt)
+		_, err = repo.BulkUpdate(updateAttempt, now)
 		require.Error(t, err, "BulkUpdate should fail due to conflict with another existing entity's UniqueID")
 		require.Contains(t, err.Error(), "duplicate", "Error message should indicate a duplicate key problem")
 		// We expect results to be nil or indicate failure if the batch fails entirely.
 		// If the API returns per-entity status even on overarching error, it might be []bool{false}
 
 		// Verify EntityToUpdate was not actually updated
-		foundOriginal, err := repo.FindByField("ID", createdIds[0])
+		foundOriginal, err := repo.FindByField("ID", createdIds[0], now)
 		require.NoError(t, err)
 		require.NotNil(t, foundOriginal)
 		assert.Equal(t, "EntityToUpdate", foundOriginal.Data, "EntityToUpdate's data should not have changed")
 		assert.Equal(t, "originalUnique1", foundOriginal.Meta.UniqueID, "EntityToUpdate's UniqueID should not have changed")
 
 		// Verify EntityToConflictWith is also unchanged
-		foundUntouched, err := repo.FindByField("ID", createdIds[1])
+		foundUntouched, err := repo.FindByField("ID", createdIds[1], now)
 		require.NoError(t, err)
 		require.NotNil(t, foundUntouched)
 		assert.Equal(t, "EntityToConflictWith", foundUntouched.Data)
@@ -1430,9 +1472,10 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 	t.Run("Bulk update including non-existent entities", func(t *testing.T) {
 		repo, err := newNestedEntityTestRepositoryRocksDB(t)
 		require.NoError(t, err)
+		now := time.Now()
 
 		existingEntity := NestedEntityTest{ID: "---", Data: "RealData", Meta: NestedMetaTest{UniqueID: "realUnique", OTValue: "ttlReal", Description: "DescReal"}}
-		createdIds, err := repo.BulkCreate([]*NestedEntityTest{&existingEntity})
+		createdIds, err := repo.BulkCreate([]*NestedEntityTest{&existingEntity}, now)
 		require.NoError(t, err)
 		require.Len(t, createdIds, 1)
 		existingEntity.ID = createdIds[0]
@@ -1440,10 +1483,10 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		updates := []*NestedEntityTest{
 			{ID: existingEntity.ID, Data: "RealDataUpdated", Meta: NestedMetaTest{UniqueID: "realUniqueUpdated", OTValue: "ttlRealUpdated", Description: "DescRealUpdated"}},
 			{ID: "nonExistentID1", Data: "PhantomData1", Meta: NestedMetaTest{UniqueID: "phantomUnique1", OTValue: "ttlPhantom1", Description: "DescPhantom1"}},
-			{ID: "nonExistentID2", Data: "PhantomData2", Meta: NestedMetaTest{UniqueID: "phantomUnique2", OTValue: "ttlPhantom2", Description: "DescPhantom2"}},
+			{ID: "nonExistentID2", Data: "PhantomData2", Meta: NestedMetaTest{UniqueID: "phantomUnique2", OTValue: "ttlPhantom2", Description: "DescPhantomP2"}},
 		}
 
-		results, err := repo.BulkUpdate(updates)
+		results, err := repo.BulkUpdate(updates, now)
 		require.NoError(t, err, "BulkUpdate with non-existent IDs should not error out if some are valid (depends on exact error handling, but usually it's per-item status)")
 		// This behavior (no error, but false for non-existent) is common for bulk ops.
 		// If the design is to error out if *any* ID is not found, this test needs adjustment.
@@ -1454,14 +1497,14 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		assert.False(t, results[2], "Update for non-existent entity nonExistentID2 should be marked as false")
 
 		// Verify the existing entity was updated
-		found, err := repo.FindByField("ID", existingEntity.ID)
+		found, err := repo.FindByField("ID", existingEntity.ID, now)
 		require.NoError(t, err)
 		require.NotNil(t, found)
 		assert.Equal(t, "RealDataUpdated", found.Data)
 		assert.Equal(t, "realUniqueUpdated", found.Meta.UniqueID)
 
 		// Verify non-existent entities were not created
-		foundPhantom1, err := repo.FindByField("ID", "nonExistentID1")
+		foundPhantom1, err := repo.FindByField("ID", "nonExistentID1", now)
 		require.NoError(t, err)
 		assert.Nil(t, foundPhantom1)
 	})

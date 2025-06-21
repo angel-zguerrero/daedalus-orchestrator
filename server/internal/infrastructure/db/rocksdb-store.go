@@ -187,7 +187,7 @@ type RocksdbStore struct {
 //   - A byte slice containing the value if the key is found.
 //   - nil if the key is not found.
 //   - An error if the specified column family does not exist or if any other RocksDB error occurs.
-func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
+func (r *RocksdbStore) Get(columnFamily, key string, now time.Time) ([]byte, error) {
 	cf, isTTL, err := r.resolveColumnFamily(columnFamily)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func (r *RocksdbStore) Get(columnFamily, key string) ([]byte, error) {
 	}
 
 	// TTL logic
-	if expired, err := r.isTTLKeyExpired(cf, ro, key); err != nil || expired {
+	if expired, err := r.isTTLKeyExpired(cf, ro, key, now); err != nil || expired {
 		return nil, err
 	}
 
@@ -246,7 +246,7 @@ func (r *RocksdbStore) getValue(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.Re
 }
 
 // isTTLKeyExpired checks if the TTL key is expired
-func (r *RocksdbStore) isTTLKeyExpired(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, key string) (bool, error) {
+func (r *RocksdbStore) isTTLKeyExpired(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, key string, now time.Time) (bool, error) {
 	expireKey := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
 	slice, err := r.DB.GetCF(ro, cf, []byte(expireKey))
 	if err != nil {
@@ -263,10 +263,10 @@ func (r *RocksdbStore) isTTLKeyExpired(cf *grocksdb.ColumnFamilyHandle, ro *groc
 		return false, fmt.Errorf("invalid expire timestamp: %w", err)
 	}
 
-	return time.Now().UnixMilli() > expireAt, nil
+	return now.UnixMilli() > expireAt, nil
 }
 
-func (r *RocksdbStore) Delete(columnFamily, key string) error {
+func (r *RocksdbStore) Delete(columnFamily, key string, now time.Time) error {
 	cf, isTTL, err := r.resolveColumnFamily(columnFamily)
 	if err != nil {
 		return err
@@ -305,8 +305,8 @@ func (r *RocksdbStore) Delete(columnFamily, key string) error {
 	}
 }
 
-func (r *RocksdbStore) Exists(columnFamily, key string) (bool, error) {
-	val, err := r.Get(columnFamily, key)
+func (r *RocksdbStore) Exists(columnFamily, key string, now time.Time) (bool, error) {
+	val, err := r.Get(columnFamily, key, now)
 	if err != nil {
 		return false, err
 	}
@@ -332,7 +332,7 @@ func (r *RocksdbStore) Exists(columnFamily, key string) (bool, error) {
 //   - A slice of KeyValuePair structs matching the pattern.
 //   - A string representing the next cursor (the key of the last item returned), or an empty string if no more results.
 //   - An error if the column family is not found or if an iterator error occurs.
-func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int) ([]KeyValuePair, string, error) {
+func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
 
 	var results []KeyValuePair
 	var nextCursor string
@@ -393,7 +393,7 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 
 		// TTL check
 		if isTTL {
-			if expired, err := r.isTTLKeyExpired(cf, readOpts, keyStr); err != nil {
+			if expired, err := r.isTTLKeyExpired(cf, readOpts, keyStr, now); err != nil {
 				return nil, "", err
 			} else if expired {
 				continue
@@ -431,7 +431,7 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string
 //
 // Returns:
 //   - An error if the specified column family does not exist or if any other RocksDB error occurs during the put operation.
-func (r *RocksdbStore) Put(columnFamily, key string, value []byte, ttl int) error {
+func (r *RocksdbStore) Put(columnFamily, key string, value []byte, ttl int, now time.Time) error {
 	cf, isTTL, err := r.resolveColumnFamily(columnFamily)
 	if err != nil {
 		return err
@@ -447,7 +447,7 @@ func (r *RocksdbStore) Put(columnFamily, key string, value []byte, ttl int) erro
 		wo := grocksdb.NewDefaultWriteOptions()
 		defer wo.Destroy()
 
-		ttlMillis := time.Now().Add(time.Duration(ttl) * time.Second).UnixMilli()
+		ttlMillis := now.Add(time.Duration(ttl) * time.Second).UnixMilli()
 
 		dataKey := key
 		ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
@@ -495,7 +495,7 @@ func (r *RocksdbStore) PutRaw(columnFamily string, key string, value []byte) err
 //
 // Returns:
 //   - An error if the provided batch is not of the correct type or if any RocksDB error occurs during the write operation.
-func (r *RocksdbStore) Write(batch *WriteBatch) error {
+func (r *RocksdbStore) Write(batch *WriteBatch, now time.Time) error {
 	rocksBatch := grocksdb.NewWriteBatch()
 	defer rocksBatch.Destroy()
 
@@ -510,7 +510,7 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 			if !isTTL {
 				rocksBatch.PutCF(cf, []byte(op.Key), op.Value)
 			} else {
-				ttlMillis := time.Now().Add(time.Duration(op.TTL) * time.Second).UnixMilli()
+				ttlMillis := now.Add(time.Duration(op.TTL) * time.Second).UnixMilli()
 
 				dataKey := op.Key
 				ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)
@@ -796,9 +796,9 @@ func (r *RocksdbStore) Close() error {
 	return nil
 }
 
-func (r *RocksdbStore) CleanExpiredKeys() error {
+func (r *RocksdbStore) CleanExpiredKeys(now time.Time) error {
 	for name, handle := range r.TTLColumnFamilyHandles {
-		err := cleanExpiredKeys(r.DB, handle)
+		err := cleanExpiredKeys(r.DB, handle, now)
 		if err != nil {
 			return fmt.Errorf("error cleaning expired keys for CF %s: %w", name, err)
 		}
@@ -815,10 +815,11 @@ func (r *RocksdbStore) CleanExpiredKeys() error {
 // Parameters:
 //   - db: The RocksDB instance.
 //   - cf: The column family handle for the TTL-enabled column family to clean.
+//   - now: The current time.
 //
 // Returns:
 //   - An error if iterator operations or batch write operations fail.
-func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle) error {
+func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle, now time.Time) error {
 	const maxDeletions = 1000
 	var deleted int64
 
@@ -834,7 +835,7 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle)
 	it := db_instance.NewIteratorCF(readOpts, cf)
 	defer it.Close()
 
-	nowMillis := time.Now().UnixMilli()
+	nowMillis := now.UnixMilli()
 	prefix := []byte(PrefixTTLIndex)
 
 	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {

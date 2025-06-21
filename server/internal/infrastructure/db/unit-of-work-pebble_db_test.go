@@ -127,36 +127,38 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 		Content: "Test TTL Message",
 		TTL:     1, // 1 second TTL
 	}
+	now := time.Now()
 
-	_, err = carRepo.Create(car)
+	_, err = carRepo.Create(car, now)
 	if err != nil {
 		t.Fatalf("failed to create car: %v", err)
 	}
-	_, err = fixRepo.Create(order)
+	_, err = fixRepo.Create(order, now)
 	if err != nil {
 		t.Fatalf("failed to create fix order: %v", err)
 	}
-	_, err = notifRepo.Create(notif)
+	_, err = notifRepo.Create(notif, now)
 	if err != nil {
 		t.Fatalf("failed to create notification: %v", err)
 	}
 
-	err = uow.Commit()
+	err = uow.Commit(now)
 	if err != nil {
 		t.Fatalf("commit failed: %v", err)
 	}
 
-	savedCar, err := carRepo.FindByField("LicensePlate", "ABC123")
+	queryNow := time.Now()
+	savedCar, err := carRepo.FindByField("LicensePlate", "ABC123", queryNow)
 	if err != nil || savedCar == nil {
 		t.Fatalf("car not found after commit: %v", err)
 	}
 
-	savedOrder, err := fixRepo.FindByField("Code", "ORD-001")
+	savedOrder, err := fixRepo.FindByField("Code", "ORD-001", queryNow)
 	if err != nil || savedOrder == nil {
 		t.Fatalf("fix order not found after commit: %v", err)
 	}
 
-	savedNotif, err := notifRepo.FindByField("ID", notif.ID)
+	savedNotif, err := notifRepo.FindByField("ID", notif.ID, queryNow)
 	if err != nil || savedNotif == nil {
 		t.Fatalf("notification not found after commit: %v", err)
 	}
@@ -167,10 +169,11 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 
 	t.Log("Waiting TTL expiration...")
 	time.Sleep(2 * time.Second)
+	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store)
 	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
-	expired, err := nRepo.FindByField("ID", notif.ID)
+	expired, err := nRepo.FindByField("ID", notif.ID, checkTime)
 	if err != nil {
 		t.Fatalf("error checking expired ttl entity: %v", err)
 	}
@@ -190,19 +193,21 @@ func TestPebbleUnitOfWork_TTLBulkCreateAndExpire(t *testing.T) {
 		}
 		notifs = append(notifs, n)
 	}
+	now := time.Now()
 
-	_, err = notifRepo.BulkCreate(notifs)
+	_, err = notifRepo.BulkCreate(notifs, now)
 	require.NoError(t, err)
-	require.NoError(t, uow.Commit())
+	require.NoError(t, uow.Commit(now))
 
 	t.Log("Waiting TTL expiration for bulk notifications...")
 	time.Sleep(2 * time.Second)
+	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store)
 	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
-		found, err := nRepo.FindByField("ID", notif.ID)
+		found, err := nRepo.FindByField("ID", notif.ID, checkTime)
 		require.NoError(t, err)
 		require.Nil(t, found, "expected notification with ID %s to be expired", notif.ID)
 	}
@@ -236,22 +241,24 @@ func TestPebbleUnitOfWork_MassiveMixedEntities(t *testing.T) {
 			TTL:     1,
 		})
 	}
+	now := time.Now()
 
-	_, err = carRepo.BulkCreate(cars)
+	_, err = carRepo.BulkCreate(cars, now)
 	require.NoError(t, err)
-	_, err = fixRepo.BulkCreate(orders)
+	_, err = fixRepo.BulkCreate(orders, now)
 	require.NoError(t, err)
-	_, err = notifRepo.BulkCreate(notifs)
+	_, err = notifRepo.BulkCreate(notifs, now)
 	require.NoError(t, err)
-	require.NoError(t, uow.Commit())
+	require.NoError(t, uow.Commit(now))
 
 	time.Sleep(2 * time.Second)
+	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store)
 	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
-		found, err := nRepo.FindByField("ID", notif.ID)
+		found, err := nRepo.FindByField("ID", notif.ID, checkTime)
 		require.NoError(t, err)
 		require.Nil(t, found, "TTL notification with ID %s should have expired", notif.ID)
 	}

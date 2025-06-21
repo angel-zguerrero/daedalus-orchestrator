@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"time"
 
 	models "deadalus-orch/shared/models"
 
@@ -28,8 +29,9 @@ func (r *UserRepository) CreateUser(input models.CreateUser) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	now := time.Now()
 
-	rootUser, err := r.repo.FindByField("IsRootUser", "true")
+	rootUser, err := r.repo.FindByField("IsRootUser", "true", now)
 	if err != nil {
 		return "", err
 	}
@@ -45,19 +47,20 @@ func (r *UserRepository) CreateUser(input models.CreateUser) (string, error) {
 		IsRootUser:   input.IsRootUser,
 	}
 
-	return r.repo.Create(user)
+	return r.repo.Create(user, now)
 }
 
 func (r *UserRepository) GetUserByUsername(username string) (*models.User, error) {
-	return r.repo.FindByField("Username", username)
+	return r.repo.FindByField("Username", username, time.Now())
 }
 
 func (r *UserRepository) GetUserRoot() (*models.User, error) {
-	return r.repo.FindByField("IsRootUser", "true")
+	return r.repo.FindByField("IsRootUser", "true", time.Now())
 }
 
 func (r *UserRepository) DeleteUser(username string) (bool, error) {
-	rootUser, err := r.repo.FindByField("Username", username)
+	now := time.Now()
+	rootUser, err := r.repo.FindByField("Username", username, now)
 	if err != nil || rootUser == nil {
 		return false, err
 	}
@@ -69,11 +72,12 @@ func (r *UserRepository) DeleteUser(username string) (bool, error) {
 		return false, fmt.Errorf("cannot delete root user: %s", username)
 	}
 
-	return r.repo.Delete(rootUser.ID)
+	return r.repo.Delete(rootUser.ID, now)
 }
 
 func (r *UserRepository) Login(identifier, password string) (bool, error) {
-	user, err := r.repo.FindByField("Email", identifier)
+	now := time.Now()
+	user, err := r.repo.FindByField("Email", identifier, now)
 	if err != nil {
 		// Error during email lookup
 		return false, err
@@ -81,7 +85,7 @@ func (r *UserRepository) Login(identifier, password string) (bool, error) {
 
 	if user == nil {
 		// User not found by email, try by username
-		user, err = r.repo.FindByField("Username", identifier)
+		user, err = r.repo.FindByField("Username", identifier, now)
 		if err != nil {
 			// Error during username lookup
 			return false, err
