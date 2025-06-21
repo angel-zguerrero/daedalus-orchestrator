@@ -1272,3 +1272,40 @@ func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
 
 	mockStore.AssertExpectations(t)
 }
+func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
+	mockStore := new(MockKVStoreRepositoryTest)
+
+	user := User{
+		ID:   "det-123",
+		Name: "Alice",
+	}
+
+	iGF := &db.DeterministicIDGeneratorFactory{}
+
+	repo, err := db.NewRepository[User](mockStore, "cf1", "admin", iGF)
+	assert.NoError(t, err)
+
+	data, _ := json.Marshal(user)
+	dataKey := "admin:users:data:det-123"
+	nameFieldKey := "admin:users:idx:Name:Alice:det-123"
+	uNameFieldKey := "admin:users:idx-u:Name:Alice"
+	indexKey := "admin:users:idx:ID:det-123:det-123"
+
+	mockStore.On("Get", "cf1", uNameFieldKey).Return(nil, nil)
+
+	batch := db.NewWriteBatch()
+	batch.Put("cf1", indexKey, []byte("det-123"))
+	batch.Put("cf1", nameFieldKey, []byte("det-123"))
+	batch.Put("cf1", uNameFieldKey, []byte("det-123"))
+	batch.Put("cf1", dataKey, data)
+
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	})).Return(nil)
+
+	id, err := repo.Create(&user)
+	assert.NoError(t, err)
+	assert.Equal(t, id, "det-123")
+
+	mockStore.AssertExpectations(t)
+}

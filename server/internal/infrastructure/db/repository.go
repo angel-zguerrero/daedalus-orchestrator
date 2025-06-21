@@ -492,7 +492,9 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 
 	for _, entity := range entities {
 		id := r.idGeneratorFactory.GenerateID()
-		ids = append(ids, id)
+		if id != "" {
+			ids = append(ids, id)
+		}
 
 		val := reflect.ValueOf(entity)
 		if val.Kind() == reflect.Ptr {
@@ -506,7 +508,11 @@ func (r *Repository[T]) BulkCreate(entities []*T) ([]string, error) {
 			return nil, fmt.Errorf("error getting primary key field 'ID' for entity: %w", err)
 		}
 		if pkField.IsValid() && pkField.CanSet() && pkField.Kind() == reflect.String {
-			pkField.SetString(id)
+			if id != "" { // Using the ID passed as a parameter when the generated ID is an empty string. This feature was added to allow deterministic behavior
+				pkField.SetString(id)
+			} else {
+				ids = append(ids, fmt.Sprintf("%v", pkField.Interface()))
+			}
 		} else {
 			return nil, fmt.Errorf("primary key field 'ID' is not a settable string field")
 		}
@@ -1066,6 +1072,12 @@ type DefaultIDGeneratorFactory struct{}
 // It removes hyphens from the UUID string.
 func (idG *DefaultIDGeneratorFactory) GenerateID() string {
 	return strings.ReplaceAll(uuid.New().String(), "-", "")
+}
+
+type DeterministicIDGeneratorFactory struct{}
+
+func (idG *DeterministicIDGeneratorFactory) GenerateID() string {
+	return ""
 }
 
 // getNestedFieldValue retrieves the reflect.Value of a potentially nested field.

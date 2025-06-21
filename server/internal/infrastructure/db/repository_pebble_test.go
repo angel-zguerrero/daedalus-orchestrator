@@ -17,6 +17,12 @@ func newTestRepositoryPebble(t *testing.T) (*db.Repository[testEntity], error) {
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
+func newTestDeterministicRepositoryPebble(t *testing.T) (*db.Repository[testEntity], error) {
+	store := newPebbleStore(t)
+	iGF := &db.DeterministicIDGeneratorFactory{}
+	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
+}
+
 func newTestRepositorySpesificIdsPebble(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
 	store := newPebbleStore(t)
 	iGF := NewTestIDGeneratorFactory(ids)
@@ -1373,4 +1379,25 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, foundPhantom1)
 	})
+}
+func TestRepository_PutAndGet_Deterministic_Id_Generator_Pebble(t *testing.T) {
+	repo, err := newTestDeterministicRepositoryPebble(t)
+	require.NoError(t, err)
+	entity := testEntity{ID: "det-123", Name: "Alice"}
+
+	id, err := repo.Create(&entity)
+	require.NoError(t, err)
+	assert.Equal(t, id, "det-123")
+
+	found, err := repo.FindByField("ID", "det-123")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "det-123", found.ID)
+	assert.Equal(t, entity.Name, found.Name)
+
+	found, err = repo.FindByField("Name", "Alice")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "det-123", found.ID)
+	assert.Equal(t, entity.Name, found.Name)
 }

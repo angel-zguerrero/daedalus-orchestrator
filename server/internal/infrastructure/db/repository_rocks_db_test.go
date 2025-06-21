@@ -53,6 +53,12 @@ func newTestRepository(t *testing.T) (*db.Repository[testEntity], error) {
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
+func newTestDeterministicRepository(t *testing.T) (*db.Repository[testEntity], error) {
+	store := newRocksdbStore(t)
+	iGF := &db.DeterministicIDGeneratorFactory{}
+	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
+}
+
 func newTestTTLRepository(t *testing.T) (*db.Repository[testEntity], *db.RocksdbStore, error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
@@ -1465,4 +1471,25 @@ func TestRepository_BulkUpdate_Nested_RocksDB(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, foundPhantom1)
 	})
+}
+func TestRepository_PutAndGet_Deterministic_Id_Generator(t *testing.T) {
+	repo, err := newTestDeterministicRepository(t)
+	require.NoError(t, err)
+	entity := testEntity{ID: "det-123", Name: "Alice"}
+
+	id, err := repo.Create(&entity)
+	require.NoError(t, err)
+	assert.Equal(t, id, "det-123")
+
+	found, err := repo.FindByField("ID", "det-123")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "det-123", found.ID)
+	assert.Equal(t, entity.Name, found.Name)
+
+	found, err = repo.FindByField("Name", "Alice")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "det-123", found.ID)
+	assert.Equal(t, entity.Name, found.Name)
 }
