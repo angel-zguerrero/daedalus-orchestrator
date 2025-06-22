@@ -85,7 +85,7 @@ func newRocksdbStoreForUOWPebble(t *testing.T) *db.RocksdbStore {
 
 func newTestUOWDefaultIdGeneratorPebble(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.Repository[TestCarPebble], *db.Repository[TestCarPebbleFixOrderPebble], *db.Repository[TestNotificationPebble], error) {
 	store := newRocksdbStoreForUOWPebble(t)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 
 	carRepo, err := db.GetRepository[TestCarPebble](uow, UOWTestFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
@@ -171,7 +171,7 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	checkTime := time.Now()
 
-	uow2 := db.NewUnitOfWork(store)
+	uow2 := db.NewUnitOfWork(store, nil)
 	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
 	expired, err := nRepo.FindByField("ID", notif.ID, checkTime)
 	if err != nil {
@@ -203,7 +203,7 @@ func TestPebbleUnitOfWork_TTLBulkCreateAndExpire(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	checkTime := time.Now()
 
-	uow2 := db.NewUnitOfWork(store)
+	uow2 := db.NewUnitOfWork(store, nil)
 	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
@@ -254,7 +254,7 @@ func TestPebbleUnitOfWork_MassiveMixedEntities(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	checkTime := time.Now()
 
-	uow2 := db.NewUnitOfWork(store)
+	uow2 := db.NewUnitOfWork(store, nil)
 	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {

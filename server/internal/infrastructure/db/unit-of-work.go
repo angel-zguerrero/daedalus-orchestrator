@@ -11,9 +11,12 @@ type UnitOfWork struct {
 	kvStore KVStore
 }
 
-func NewUnitOfWork(kvStore KVStore) *UnitOfWork {
+func NewUnitOfWork(kvStore KVStore, batch *WriteBatch) *UnitOfWork {
+	if batch == nil {
+		batch = NewWriteBatch()
+	}
 	return &UnitOfWork{
-		batch:   NewWriteBatch(),
+		batch:   batch,
 		repos:   make(map[string]interface{}),
 		kvStore: kvStore,
 	}

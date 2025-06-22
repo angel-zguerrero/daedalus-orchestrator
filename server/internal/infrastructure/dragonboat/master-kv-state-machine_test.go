@@ -18,6 +18,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func GetNowInBytesRocks() ([]byte, error) {
+	now := time.Now()
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(now); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
 func TestOne(t *testing.T) {
 
 	//dragonboat.Init(101, 1, "3435")

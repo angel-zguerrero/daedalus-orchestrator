@@ -18,6 +18,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func GetNowInBytes() ([]byte, error) {
+	now := time.Now()
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(now); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
 func setupKV(t *testing.T, engine string) *dragonboat.KVBaseStateMachine {
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
@@ -161,9 +170,12 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 		},
 	}
 
+	now, err := GetNowInBytes()
+
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
-	_, err := kv.Update([]statemachine.Entry{
-		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+	_, err = kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
 	})
 	require.NoError(t, err)
 

@@ -1,11 +1,9 @@
 package dragonboat
 
 import (
-	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
-	"encoding/gob"
-	"fmt"
+	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
 )
@@ -22,27 +20,12 @@ func (r *TenantKVBaseStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
 	return OpenTenantDBFunc(dbPath)
 }
 
-func (r *TenantKVBaseStateMachine) Lookup(query interface{}) (RK_Command, error) {
-	lookupQuery, ok := query.(RK_Command)
-	if !ok {
-		return RK_Command{}, fmt.Errorf("expected query to be RK_Command, got %T", query)
-	}
-
-	return lookupQuery, nil
+func (r *TenantKVBaseStateMachine) Lookup(query interface{}, now time.Time) (interface{}, error) {
+	return nil, nil
 }
 
-func (r *TenantKVBaseStateMachine) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]Command, error) {
-	commands := make([]Command, len(ents))
-
-	for i, ent := range ents {
-		var cmd Command
-		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
-			return nil, fmt.Errorf("failed to decode command for entry at index %d (Raft index %d): %w", i, ent.Index, err)
-		}
-		commands[i] = cmd
-
-	}
-	return commands, nil
+func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) ([]byte, error) {
+	return nil, nil
 }
 
 func NewTenantKVStateMachine(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
