@@ -145,21 +145,44 @@ func TestSaveAndReplaceCurrentDB(t *testing.T) {
 }
 
 func TestParseRolesFlag(t *testing.T) {
+	// Test case 1: Empty role string, should return all default roles including Admin
 	all := ""
 	roles, err := ParseRolesFlag(&all)
-	if err != nil || len(roles) != 3 {
-		t.Errorf("expected all roles, got %v", roles)
-	}
+	assert.NoError(t, err)
+	assert.Len(t, roles, 4, "Expected all default roles including admin")
+	assert.Contains(t, roles, RoleConsensus)
+	assert.Contains(t, roles, RoleScheduler)
+	assert.Contains(t, roles, RoleConnector)
+	assert.Contains(t, roles, RoleAdmin)
+
+	// Test case 2: Custom roles
 	custom := "consensus,scheduler"
 	roles, err = ParseRolesFlag(&custom)
-	if err != nil || len(roles) != 2 {
-		t.Errorf("expected 2 roles, got %v", roles)
-	}
+	assert.NoError(t, err)
+	assert.Len(t, roles, 2, "Expected 2 custom roles")
+	assert.Contains(t, roles, RoleConsensus)
+	assert.Contains(t, roles, RoleScheduler)
+
+	// Test case 3: Only admin role
+	adminOnly := "admin"
+	roles, err = ParseRolesFlag(&adminOnly)
+	assert.NoError(t, err)
+	assert.Len(t, roles, 1, "Expected 1 role (admin)")
+	assert.Contains(t, roles, RoleAdmin)
+
+	// Test case 4: Custom roles including admin
+	customWithAdmin := "connector,admin"
+	roles, err = ParseRolesFlag(&customWithAdmin)
+	assert.NoError(t, err)
+	assert.Len(t, roles, 2, "Expected 2 custom roles including admin")
+	assert.Contains(t, roles, RoleConnector)
+	assert.Contains(t, roles, RoleAdmin)
+
+	// Test case 5: Invalid role
 	bad := "foo"
 	_, err = ParseRolesFlag(&bad)
-	if err == nil {
-		t.Errorf("expected error for invalid role")
-	}
+	assert.Error(t, err, "Expected error for invalid role")
+	assert.Contains(t, err.Error(), "invalid role: foo. Valid roles are: consensus, scheduler, connector, admin", "Error message should list valid roles including admin")
 }
 
 func TestParseMember(t *testing.T) {
@@ -258,8 +281,14 @@ func TestParseRolesList_ExtendedCases(t *testing.T) {
 		},
 		{
 			name:        "all valid roles",
-			input:       []string{"consensus", "scheduler", "connector"},
-			expected:    []NodeRole{RoleConsensus, RoleScheduler, RoleConnector},
+			input:       []string{"consensus", "scheduler", "connector", "admin"},
+			expected:    []NodeRole{RoleConsensus, RoleScheduler, RoleConnector, RoleAdmin},
+			expectError: false,
+		},
+		{
+			name:        "admin role alone",
+			input:       []string{"admin"},
+			expected:    []NodeRole{RoleAdmin},
 			expectError: false,
 		},
 	}
@@ -267,24 +296,24 @@ func TestParseRolesList_ExtendedCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rolesStr := strings.Join(tt.input, ",")
-			if len(tt.input) == 0 {
-				rolesStr = ""
-				if tt.name == "empty list" {
-					rolesStrPtr := ""
-					roles, err := ParseRolesFlag(&rolesStrPtr)
-					if tt.expectError {
-						assert.Error(t, err)
-					} else {
-						assert.NoError(t, err)
-						if tt.name == "empty list" {
-							assert.ElementsMatch(t, []NodeRole{RoleConsensus, RoleScheduler, RoleConnector}, roles, "ParseRolesFlag with empty string should yield all roles")
-						} else {
-							assert.ElementsMatch(t, tt.expected, roles)
-						}
-					}
-					return
+			// Special handling for the "empty list" test case, as ParseRolesFlag has specific behavior for empty input
+			if tt.name == "empty list" {
+				emptyStr := ""
+				roles, err := ParseRolesFlag(&emptyStr) // ParseRolesFlag is tested, not ParseRolesList
+				if tt.expectError {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+					// For an empty input string, ParseRolesFlag should return all default roles
+					assert.ElementsMatch(t, []NodeRole{RoleConsensus, RoleScheduler, RoleConnector, RoleAdmin}, roles, "ParseRolesFlag with empty string should yield all default roles")
 				}
+				return // Skip further processing for this specific test case
 			}
+
+			// For other test cases, we are effectively testing ParseRolesList via ParseRolesFlag
+			// by providing a non-empty, comma-separated string.
+			// ParseRolesList itself is not directly invoked here if tt.input is empty due to the above check,
+			// which is fine as ParseRolesFlag's default behavior is what we want to test for empty input.
 
 			roles, err := ParseRolesFlag(&rolesStr)
 

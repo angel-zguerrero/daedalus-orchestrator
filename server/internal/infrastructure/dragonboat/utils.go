@@ -272,13 +272,14 @@ func ParseRolesList(list []string) ([]NodeRole, error) {
 		string(RoleConsensus): true,
 		string(RoleScheduler): true,
 		string(RoleConnector): true,
+		string(RoleAdmin):     true,
 	}
 
 	roles := make([]NodeRole, 0, len(list))
 	for _, r := range list {
 		role := strings.TrimSpace(r)
 		if !validRoles[role] {
-			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, scheduler, connector", role)
+			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, scheduler, connector, admin", role)
 		}
 		roles = append(roles, NodeRole(role))
 	}
@@ -300,6 +301,7 @@ func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 			string(RoleConsensus),
 			string(RoleScheduler),
 			string(RoleConnector),
+			string(RoleAdmin),
 		})
 	}
 
