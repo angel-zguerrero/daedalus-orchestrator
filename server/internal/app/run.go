@@ -161,7 +161,7 @@ func Run() {
 			Msgf("❌ Failed Init raft Master node")
 	}
 
-	log.Info().Interface("", config.GlobalConfiguration.Roles).Msg("This node has these roles")
+	log.Info().Interface("", roles).Msg("This node has these roles")
 	var adminAPI *rest_api_admin.RestAdminAPI
 	adminAPIInitialized := false // To track if admin API has been initialized once
 

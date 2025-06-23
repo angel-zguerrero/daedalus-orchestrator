@@ -7,7 +7,7 @@ type Config struct {
 	// ReplicaID is the unique identifier for this node in a Raft cluster.
 	// It's essential for distinguishing replicas within a shard.
 	ReplicaID uint64
-	// Roles specifies the roles this node will perform in the cluster (e.g., "consensus", "scheduler", "connector").
+	// Roles specifies the roles this node will perform in the cluster (e.g., "consensus", "scheduler", "connector", "admin").
 	// It's typically a comma-separated string.
 	Roles string
 	// SelfMemberAddr is the network address (IP:port) that this node uses for Raft communication.
