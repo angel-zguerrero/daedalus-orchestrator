@@ -161,7 +161,7 @@ func Run() {
 			Msgf("❌ Failed Init raft Master node")
 	}
 
-	log.Info().Interface("", config.GlobalConfiguration.Roles).Msg("This node has these roles")
+	log.Info().Interface("", roles).Msg("This node has these roles")
 	var adminAPI *rest_api_admin.RestAdminAPI
 	adminAPIInitialized := false // To track if admin API has been initialized once
 
@@ -171,29 +171,48 @@ func Run() {
 		for isReady := range readyUpdates {
 			if isReady {
 				log.Info().Msg("✅ Node is ready for consensus.")
-				if adminAPI == nil && !adminAPIInitialized {
-					// Initialize and start the Admin API
-					jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
-					jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
+				// Check if the node has the Admin role before starting the Admin API
+				if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
+					if adminAPI == nil && !adminAPIInitialized {
+						// Initialize and start the Admin API
+						jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
+						jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
 
-					log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
+						log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
-					adminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
-					adminAPIInitialized = true // Mark as initialized
+						adminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
+						adminAPIInitialized = true // Mark as initialized
 
-					// The listen address for the Admin API should also be configurable.
-					adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
-					go func() {
-						if err := adminAPI.Start(adminListenAddr); err != nil {
-							log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
-							// If it fails to start, we might want to nullify adminAPI so it can be retried
-							// or handle this more gracefully. For now, just log.
+						// The listen address for the Admin API should also be configurable.
+						adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
+						go func() {
+							if err := adminAPI.Start(adminListenAddr); err != nil {
+								log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
+								// If it fails to start, we might want to nullify adminAPI so it can be retried
+								// or handle this more gracefully. For now, just log.
+							}
+						}()
+						log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
+
+					} else if adminAPI != nil {
+						log.Info().Msg("Admin API already running or was previously started.")
+					}
+				} else {
+					log.Info().Msg("Node does not have RoleAdmin. Admin API will not be started.")
+					// Ensure adminAPI is nil and marked as not initialized if it was somehow set previously
+					// or if the roles changed dynamically (though current logic doesn't support dynamic role changes post-startup).
+					if adminAPI != nil {
+						log.Info().Msg("Shutting down Admin API as RoleAdmin is not present.")
+						shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+						if err := adminAPI.Shutdown(shutdownCtx); err != nil {
+							log.Error().Err(err).Msg("❌ Error during Admin API shutdown due to missing RoleAdmin")
+						} else {
+							log.Info().Msg("✅ Admin API shut down successfully as RoleAdmin is not present.")
 						}
-					}()
-					log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start.")
-
-				} else if adminAPI != nil {
-					log.Info().Msg("Admin API already running or was previously started.")
+						cancelShutdown() // Ensure context is cancelled
+						adminAPI = nil
+						adminAPIInitialized = false
+					}
 				}
 			} else {
 				log.Info().Msg("⚠️ Node is NOT ready for consensus.")

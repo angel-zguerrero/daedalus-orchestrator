@@ -22,6 +22,8 @@ const (
 	RoleScheduler NodeRole = "scheduler"
 	// RoleConnector indicates that the node acts as a connector or gateway to external systems or services.
 	RoleConnector NodeRole = "connector"
+	// RoleAdmin indicates that the node should expose administrator-level APIs.
+	RoleAdmin NodeRole = "admin"
 )
 
 // MasterShardID is the dedicated Shard ID for the master shard, which handles cluster-wide metadata and coordination.
