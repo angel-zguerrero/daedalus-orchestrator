@@ -1,7 +1,9 @@
 package app
 
 import (
+	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
@@ -159,6 +161,8 @@ func Run() {
 	}
 
 	log.Info().Interface("", config.GlobalConfiguration.Roles).Msg("This node has these roles")
+	var adminAPI *rest_api_admin.RestAdminAPI
+	adminAPIInitialized := false // To track if admin API has been initialized once
 
 	go func() {
 		interval := 3 * time.Second
@@ -166,9 +170,61 @@ func Run() {
 		for isReady := range readyUpdates {
 			if isReady {
 				log.Info().Msg("✅ Node is ready for consensus.")
+				if adminAPI == nil && !adminAPIInitialized {
+					// Initialize and start the Admin API
+					// The JWT secret key should be securely managed, e.g., from config or env.
+					// For this example, using a hardcoded key.
+					// TODO: Make JWT Secret Key configurable
+					jwtSecret := "your-super-secret-jwt-key-change-me"
+					jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
+
+					log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
+
+					adminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
+					adminAPIInitialized = true // Mark as initialized
+
+					// The listen address for the Admin API should also be configurable.
+					// TODO: Make Admin API listen address configurable
+					adminListenAddr := "0.0.0.0:8081"
+					go func() {
+						if err := adminAPI.Start(adminListenAddr); err != nil {
+							log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
+							// If it fails to start, we might want to nullify adminAPI so it can be retried
+							// or handle this more gracefully. For now, just log.
+						}
+					}()
+					log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start.")
+
+				} else if adminAPI != nil {
+					log.Info().Msg("Admin API already running or was previously started.")
+				}
 			} else {
 				log.Info().Msg("⚠️ Node is NOT ready for consensus.")
+				if adminAPI != nil {
+					log.Info().Msg("🔌 Node not ready, shutting down Admin API...")
+					shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second) // 5-second timeout for graceful shutdown
+					defer cancelShutdown()
+					if err := adminAPI.Shutdown(shutdownCtx); err != nil {
+						log.Error().Err(err).Msg("❌ Error during Admin API shutdown")
+					} else {
+						log.Info().Msg("✅ Admin API shut down successfully.")
+					}
+					adminAPI = nil              // Set to nil so it can be restarted if node becomes ready again
+					adminAPIInitialized = false // Allow re-initialization
+				}
 			}
+		}
+		if adminAPI != nil {
+			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
+			shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelShutdown()
+			if err := adminAPI.Shutdown(shutdownCtx); err != nil {
+				log.Error().Err(err).Msg("❌ Error during final Admin API shutdown")
+			} else {
+				log.Info().Msg("✅ Admin API shut down successfully on node stop.")
+			}
+			adminAPI = nil
+			adminAPIInitialized = false
 		}
 	}()
 

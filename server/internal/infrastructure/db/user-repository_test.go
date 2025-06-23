@@ -59,8 +59,8 @@ func (m *MockKVStore) PutRaw(AdminFC, key string, value []byte) error {
 	return args.Error(0)
 }
 
-func (m *MockKVStore) Write(batch *db.WriteBatch, now time.Time) error {
-	args := m.Called(batch, now)
+func (m *MockKVStore) Write(batch *db.WriteBatch) error {
+	args := m.Called(batch)
 	return args.Error(0)
 }
 
@@ -150,7 +150,7 @@ func TestPutUser_Success(t *testing.T) {
 
 	id, err := repo.CreateUser(user)
 	assert.NoError(t, err)
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	assert.NotNil(t, id)
 	assert.NoError(t, err)
 	mockStore.AssertExpectations(t)
@@ -285,7 +285,7 @@ func TestDeleteUser_WriteError(t *testing.T) {
 
 	_, err = repo.DeleteUser("user")
 	assert.NoError(t, err)
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	assert.Error(t, err)
 	mockStore.AssertExpectations(t)
 }
@@ -309,7 +309,7 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 	_, err = repo.CreateUser(userInput)
 
 	assert.NoError(t, err)
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "kv put failed")
 	mockStore.AssertExpectations(t)

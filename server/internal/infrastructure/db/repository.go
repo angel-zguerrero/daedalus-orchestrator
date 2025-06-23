@@ -624,9 +624,9 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 			fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
 			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue, id)
 			if hasTTL {
-				batch.PutTTl(r.definition.ColumnFamily, idxKey, []byte(id), ttl)
+				batch.PutTTl(r.definition.ColumnFamily, idxKey, []byte(id), ttl, now)
 			} else {
-				batch.Put(r.definition.ColumnFamily, idxKey, []byte(id))
+				batch.Put(r.definition.ColumnFamily, idxKey, []byte(id), now)
 			}
 
 			if def.Unique {
@@ -653,9 +653,9 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 				} else {
 					uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
 					if hasTTL {
-						batch.PutTTl(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), ttl)
+						batch.PutTTl(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), ttl, now)
 					} else {
-						batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id))
+						batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), now)
 					}
 				}
 			}
@@ -667,13 +667,13 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 			return nil, err
 		}
 		if hasTTL {
-			batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl)
+			batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl, now)
 		} else {
-			batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+			batch.Put(r.definition.ColumnFamily, dataKey, dataBytes, now)
 		}
 	}
 
-	if err := r.kvStore.Write(batch, now); err != nil {
+	if err := r.kvStore.Write(batch); err != nil {
 		return nil, err
 	}
 
@@ -894,7 +894,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 				if def.Unique {
 					// Always delete old unique index if value changed
 					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue)
-					batch.Delete(r.definition.ColumnFamily, oldUIdxKey)
+					batch.Delete(r.definition.ColumnFamily, oldUIdxKey, now)
 
 					shouldSkipUniquenessForNewValue := false
 					if def.HasConditionalUniqueness {
@@ -922,23 +922,23 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 						// Add new unique index
 						newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
 						if hasTTL { // Assuming hasTTL and ttl are determined for the entity
-							batch.PutTTl(r.definition.ColumnFamily, newUIdxKey, []byte(id), ttl)
+							batch.PutTTl(r.definition.ColumnFamily, newUIdxKey, []byte(id), ttl, now)
 						} else {
-							batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id))
+							batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id), now)
 						}
 					}
 				}
 
 				// Delete old regular index
 				oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue, id)
-				batch.Delete(r.definition.ColumnFamily, oldIdxKey)
+				batch.Delete(r.definition.ColumnFamily, oldIdxKey, now)
 
 				// Add new regular index
 				newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue, id)
 				if hasTTL {
-					batch.PutTTl(r.definition.ColumnFamily, newIdxKey, []byte(id), ttl)
+					batch.PutTTl(r.definition.ColumnFamily, newIdxKey, []byte(id), ttl, now)
 				} else {
-					batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id))
+					batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id), now)
 				}
 
 				// Update the field in the currentEntityDataVal model, which will be marshaled
@@ -963,9 +963,9 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 				return nil, err
 			}
 			if hasTTL {
-				batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl)
+				batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl, now)
 			} else {
-				batch.Put(r.definition.ColumnFamily, dataKey, dataBytes)
+				batch.Put(r.definition.ColumnFamily, dataKey, dataBytes, now)
 			}
 		}
 
@@ -973,7 +973,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 	}
 
 	if batch.Count() > 0 {
-		if err := r.kvStore.Write(batch, now); err != nil {
+		if err := r.kvStore.Write(batch); err != nil {
 			return nil, err
 		}
 	}
@@ -1052,20 +1052,20 @@ func (r *Repository[T]) BulkDelete(ids []string, now time.Time) ([]bool, error) 
 			fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
 
 			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue, id)
-			batch.Delete(r.definition.ColumnFamily, idxKey)
+			batch.Delete(r.definition.ColumnFamily, idxKey, now)
 
 			if def.Unique {
 				idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
-				batch.Delete(r.definition.ColumnFamily, idxUKey)
+				batch.Delete(r.definition.ColumnFamily, idxUKey, now)
 			}
 		}
 
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-		batch.Delete(r.definition.ColumnFamily, dataKey)
+		batch.Delete(r.definition.ColumnFamily, dataKey, now)
 	}
 
 	if batch.Count() > 0 {
-		if err := r.kvStore.Write(batch, now); err != nil {
+		if err := r.kvStore.Write(batch); err != nil {
 			return nil, fmt.Errorf("error applying bulk delete batch: %w", err)
 		}
 	}

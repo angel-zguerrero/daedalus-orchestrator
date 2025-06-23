@@ -142,7 +142,7 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 		t.Fatalf("failed to create notification: %v", err)
 	}
 
-	err = uow.Commit(now)
+	err = uow.Commit()
 	if err != nil {
 		t.Fatalf("commit failed: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestPebbleUnitOfWork_TTLBulkCreateAndExpire(t *testing.T) {
 
 	_, err = notifRepo.BulkCreate(notifs, now)
 	require.NoError(t, err)
-	require.NoError(t, uow.Commit(now))
+	require.NoError(t, uow.Commit())
 
 	t.Log("Waiting TTL expiration for bulk notifications...")
 	time.Sleep(2 * time.Second)
@@ -249,7 +249,7 @@ func TestPebbleUnitOfWork_MassiveMixedEntities(t *testing.T) {
 	require.NoError(t, err)
 	_, err = notifRepo.BulkCreate(notifs, now)
 	require.NoError(t, err)
-	require.NoError(t, uow.Commit(now))
+	require.NoError(t, uow.Commit())
 
 	time.Sleep(2 * time.Second)
 	checkTime := time.Now()

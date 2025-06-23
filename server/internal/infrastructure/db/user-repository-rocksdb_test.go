@@ -3,7 +3,6 @@ package db_test
 import (
 	"sync"
 	"testing"
-	"time"
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/shared/models"
@@ -114,7 +113,7 @@ func TestRocksDBPutUser_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, id)
 
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	require.NoError(t, err)
 	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	verifyUOW := db.NewUnitOfWork(store, nil) // Use same store
@@ -147,7 +146,7 @@ func TestRocksDBGetUser_Success(t *testing.T) {
 	createdID, err := createRepo.CreateUser(userToCreate)
 	require.NoError(t, err)
 	require.NotEmpty(t, createdID)
-	err = createUOW.Commit(time.Now())
+	err = createUOW.Commit()
 	require.NoError(t, err)
 
 	// Read user with a new UoW on the same store
@@ -202,7 +201,7 @@ func TestRocksDBDeleteUser_Success(t *testing.T) {
 	createdID, err := createRepo.CreateUser(userToDelete)
 	require.NoError(t, err)
 	require.NotEmpty(t, createdID)
-	err = createUOW.Commit(time.Now())
+	err = createUOW.Commit()
 	require.NoError(t, err)
 
 	// Confirm user exists before delete, using a new UoW
@@ -219,7 +218,7 @@ func TestRocksDBDeleteUser_Success(t *testing.T) {
 	deleted, err := deleteRepo.DeleteUser(userToDelete.Username)
 	require.NoError(t, err)
 	require.True(t, deleted)
-	err = deleteUOW.Commit(time.Now())
+	err = deleteUOW.Commit()
 	require.NoError(t, err)
 
 	// Verify user is deleted, using another UoW
@@ -247,7 +246,7 @@ func TestRocksDBDeleteUser_CannotDeleteRoot(t *testing.T) {
 	rootUserID, err := createRepo.CreateUser(rootUserToCreate)
 	require.NoError(t, err)
 	require.NotEmpty(t, rootUserID)
-	err = createUOW.Commit(time.Now())
+	err = createUOW.Commit()
 	require.NoError(t, err)
 
 	// Attempt to delete the root user
@@ -328,7 +327,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 	}
 	_, err := repo.CreateUser(createdUser)
 	require.NoError(t, err)
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	require.NoError(t, err)
 
 	// Each sub-test should use a fresh UoW and Repo on the *same* underlying store
@@ -345,7 +344,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 	require.NoError(t, err)
 	_, err = initialRepo.CreateUser(createdUser)
 	require.NoError(t, err)
-	err = initialUOW.Commit(time.Now())
+	err = initialUOW.Commit()
 	require.NoError(t, err)
 
 	t.Run("LoginWithEmail_CorrectPassword_Success", func(t *testing.T) {

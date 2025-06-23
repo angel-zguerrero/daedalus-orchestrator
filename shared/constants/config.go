@@ -35,6 +35,9 @@ const ConfigMasterDBEngineKey = "master_db_engine"
 // ConfigTenantDBEngineKey is the key for the tenant database engine setting in the configuration file.
 const ConfigTenantDBEngineKey = "tenant_db_engine"
 
+// ConfigAdminAPIJWTExpirationHoursKey is the key for the Admin API JWT expiration hours setting in the configuration file.
+const ConfigAdminAPIJWTExpirationHoursKey = "admin_api_jwt_expiration_hours"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -76,6 +79,9 @@ const EnvVarMasterDBEngine = "MASTER_DB_ENGINE"
 
 // EnvVarTenantDBEngine is the environment variable name for the tenant database engine.
 const EnvVarTenantDBEngine = "TENANT_DB_ENGINE"
+
+// EnvVarAdminAPIJWTExpirationHours is the environment variable name for the Admin API JWT expiration hours.
+const EnvVarAdminAPIJWTExpirationHours = "ADMIN_API_JWT_EXPIRATION_HOURS"
 
 // OpenTelemetry specific environment variables.
 

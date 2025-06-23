@@ -111,7 +111,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		value := fmt.Sprintf("normalValue_%d", i)
 		item := testKeyData{ColumnFamily: normalCF, Key: key, Value: value, IsTTL: false}
 		generatedKeys[item.ColumnFamily+":"+item.Key] = item
-		batch.Put(item.ColumnFamily, item.Key, []byte(item.Value))
+		batch.Put(item.ColumnFamily, item.Key, []byte(item.Value), time.Now())
 	}
 
 	// Reset batch for TTL keys
@@ -127,7 +127,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		// Our test will use `testTTLSeconds` for *expected* expiry checks.
 		insertTime := time.Now()
 		// This Put should use the system's default TTL for the ttlCF
-		batch.PutTTl(ttlCF, key, []byte(value), testTTLSeconds)
+		batch.PutTTl(ttlCF, key, []byte(value), testTTLSeconds, time.Now())
 
 		item := testKeyData{
 			ColumnFamily: ttlCF,
@@ -140,7 +140,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		generatedKeys[item.ColumnFamily+":"+item.Key] = item
 	}
 
-	err = srcStore.Write(batch, time.Now())
+	err = srcStore.Write(batch)
 	require.NoError(t, err, "Failed to write normal keys to source store")
 
 	t.Log("Data generation complete.")
@@ -159,7 +159,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 	restoreBatch := NewWriteBatch()
 	for cfName, cfData := range dumpedMap {
 		for key, value := range cfData {
-			restoreBatch.Put(cfName, key, value)
+			restoreBatch.Put(cfName, key, value, time.Now())
 		}
 	}
 	err = targetStore.WriteRaw(restoreBatch)

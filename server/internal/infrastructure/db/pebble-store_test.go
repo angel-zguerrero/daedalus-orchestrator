@@ -111,10 +111,10 @@ func TestPebbleStore_WriteBatch(t *testing.T) {
 	now := time.Now()
 
 	batch := db.NewWriteBatch()
-	batch.Put(TestFC, "a", []byte("valueA"))
-	batch.Put(TestFC, "b", []byte("valueB"))
+	batch.Put(TestFC, "a", []byte("valueA"), now)
+	batch.Put(TestFC, "b", []byte("valueB"), now)
 
-	err = store.Write(batch, now)
+	err = store.Write(batch)
 	require.NoError(t, err)
 
 	resultA, err := store.Get(TestFC, "a", now)
@@ -326,7 +326,6 @@ func TestPebbleRepository_TTL_BasicExpiration(t *testing.T) {
 	// We use a 'now' that is definitely after expiry for these checks
 	expiredTimeCheck := creationTime.Add(time.Duration(entity.TTL+1) * time.Second)
 
-
 	mainDataKey = fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
 	dataBytes, err = store.Get(TemporalFC, mainDataKey, expiredTimeCheck)
 	require.NoError(t, err)
@@ -507,7 +506,6 @@ func TestPebbleRepository_TTL_BulkCreateExpiration(t *testing.T) {
 	table := entitiesToCreate[0].TableName() // All entities are of the same type
 	// Use a 'now' that is definitely after expiry for these checks
 	expiredTimeCheck := creationTime.Add(time.Duration(maxTTL+1) * time.Second)
-
 
 	for i, createdID := range createdIds {
 		originalEntity := entitiesToCreate[i] // Now has ID assigned

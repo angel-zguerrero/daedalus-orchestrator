@@ -1,5 +1,9 @@
 package utils
 
+import (
+	"time"
+)
+
 // HasDuplicates checks if a slice of strings contains any duplicate items.
 // It uses a map to keep track of items seen so far.
 //
@@ -34,4 +38,8 @@ func Contains(list []string, target string) bool {
 		}
 	}
 	return false
+}
+func GetNowInInt() int64 {
+	now := time.Now()
+	return now.UnixNano()
 }

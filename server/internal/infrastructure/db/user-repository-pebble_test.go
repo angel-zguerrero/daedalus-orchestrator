@@ -3,7 +3,6 @@ package db_test
 import (
 	"sync"
 	"testing"
-	"time"
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/shared/models"
@@ -85,7 +84,7 @@ func TestPebblePutUser_Success_Pebble(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, id)
 
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	require.NoError(t, err)
 	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
 	// Verify user is created by reading it back from a new UoW/Repo on the same store
@@ -118,7 +117,7 @@ func TestPebbleGetUser_Success_Pebble(t *testing.T) {
 	createdID, err := createRepo.CreateUser(userToCreate)
 	require.NoError(t, err)
 	require.NotEmpty(t, createdID)
-	err = createUOW.Commit(time.Now())
+	err = createUOW.Commit()
 	require.NoError(t, err)
 
 	// Read user with a new UoW on the same store
@@ -156,7 +155,7 @@ func TestPebbleDeleteUser_Success_Pebble(t *testing.T) {
 	require.NoError(t, err)
 	_, err = createRepo.CreateUser(userToDelete)
 	require.NoError(t, err)
-	err = createUOW.Commit(time.Now())
+	err = createUOW.Commit()
 	require.NoError(t, err)
 
 	// Delete user
@@ -166,7 +165,7 @@ func TestPebbleDeleteUser_Success_Pebble(t *testing.T) {
 	deleted, err := deleteRepo.DeleteUser(userToDelete.Username)
 	require.NoError(t, err)
 	require.True(t, deleted)
-	err = deleteUOW.Commit(time.Now())
+	err = deleteUOW.Commit()
 	require.NoError(t, err)
 
 	// Verify user is deleted
@@ -195,7 +194,7 @@ func TestPebbleDeleteUser_CannotDeleteRoot_Pebble(t *testing.T) {
 	require.NoError(t, err)
 	_, err = createRepo.CreateUser(rootUserToCreate)
 	require.NoError(t, err)
-	err = createUOW.Commit(time.Now())
+	err = createUOW.Commit()
 	require.NoError(t, err)
 
 	// Attempt to delete
@@ -245,7 +244,7 @@ func TestPebbleLoginUser_Pebble(t *testing.T) {
 		Password: correctPassword,
 	})
 	require.NoError(t, err)
-	err = initialUOW.Commit(time.Now())
+	err = initialUOW.Commit()
 	require.NoError(t, err)
 
 	t.Run("LoginWithEmail_CorrectPassword_Success_Pebble", func(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/pkg/utils"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -79,7 +79,6 @@ func (mn *RaftNode) StartReplica() error {
 	if mn.Join {
 		initialMembersMap = map[uint64]string{}
 	}
-	fmt.Println("StartOnDiskReplica!!!")
 	return mn.NH.StartOnDiskReplica(initialMembersMap, mn.Join, mn.stateMachine, cfg)
 
 }
@@ -189,10 +188,12 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 
 		for {
 			session := mn.NH.GetNoOPSession(mn.ShardID)
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 			var buf bytes.Buffer
+
 			cmd := Command{
+				Now:  utils.GetNowInInt(),
 				Type: RW,
 				CMD: RWK_Command{
 					Op: Write,
@@ -207,6 +208,7 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 
 			gob.NewEncoder(&buf).Encode(cmd)
 			_, err := mn.NH.SyncPropose(ctx, session, buf.Bytes())
+
 			cancel()
 
 			currentReady := (err == nil)

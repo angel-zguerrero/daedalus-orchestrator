@@ -8,6 +8,7 @@ type X struct {
 	Value []byte
 	Type  string
 	TTL   int
+	Now   time.Time
 }
 
 // WriteBatch represents a batch of write operations to be applied atomically.
@@ -22,31 +23,34 @@ func NewWriteBatch() *WriteBatch {
 }
 
 // Put adds a put operation to the batch.
-func (wb *WriteBatch) Put(columnFamily string, key string, value []byte) {
+func (wb *WriteBatch) Put(columnFamily string, key string, value []byte, now time.Time) {
 	wb.Data = append(wb.Data, X{
 		CF:    columnFamily,
 		Key:   key,
 		Value: value,
 		Type:  "put",
+		Now:   now,
 	})
 }
 
-func (wb *WriteBatch) PutTTl(columnFamily string, key string, value []byte, ttl int) {
+func (wb *WriteBatch) PutTTl(columnFamily string, key string, value []byte, ttl int, now time.Time) {
 	wb.Data = append(wb.Data, X{
 		CF:    columnFamily,
 		Key:   key,
 		Value: value,
 		Type:  "put",
 		TTL:   ttl,
+		Now:   now,
 	})
 }
 
 // Delete adds a delete operation to the batch.
-func (wb *WriteBatch) Delete(columnFamily string, key string) {
+func (wb *WriteBatch) Delete(columnFamily string, key string, now time.Time) {
 	wb.Data = append(wb.Data, X{
 		CF:   columnFamily,
 		Key:  key,
 		Type: "delete",
+		Now:  now,
 	})
 }
 
@@ -92,7 +96,7 @@ type KVStore interface {
 	//   - now: The current time, for TTL calculations within the batch.
 	// Returns:
 	//   - An error if any occurred during the operation.
-	Write(batch *WriteBatch, now time.Time) error // TODO: Use a more specific type like WriteBatch if possible
+	Write(batch *WriteBatch) error // TODO: Use a more specific type like WriteBatch if possible
 
 	WriteRaw(batch *WriteBatch) error
 

@@ -29,6 +29,7 @@ Available Flags:
   --self-member-addr The network address (in ip:port format) that this node will use for communication with other members in the cluster.
   --master-db-engine         The database engine for the master database (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "rocksdb"). Defaults to "pebble".
+  --admin-api-jwt-expiration-hours JWT expiration time in hours for the Admin API. Default is 3 hours.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -44,6 +45,7 @@ Environment Variables:
   TTL_INTERNAL_ERROR           TTL for internal error caching in seconds.
   MASTER_DB_ENGINE             The database engine for the master database.
   TENANT_DB_ENGINE             The database engine for tenant databases.
+  ADMIN_API_JWT_EXPIRATION_HOURS JWT expiration time in hours for the Admin API.
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -64,6 +66,7 @@ Configuration File:
     ttl_internal_error
     master_db_engine
     tenant_db_engine
+    admin_api_jwt_expiration_hours
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -100,6 +103,9 @@ var MasterDBEngineFlag = flag.String(constants.MasterDBEngineFlagName, "", "The 
 
 // TenantDBEngineFlag defines the --tenant-db-engine command-line flag for specifying the tenant database engine.
 var TenantDBEngineFlag = flag.String(constants.TenantDBEngineFlagName, "", "The database engine for tenant databases (e.g., \"pebble\", \"rocksdb\").")
+
+// AdminAPIJWTExpirationHoursFlag defines the --admin-api-jwt-expiration-hours command-line flag for specifying the Admin API JWT expiration in hours.
+var AdminAPIJWTExpirationHoursFlag = flag.Int("admin-api-jwt-expiration-hours", 0, "JWT expiration time in hours for the Admin API. Overrides config file and environment variable.")
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
@@ -220,6 +226,14 @@ func LoadDefaultConfiguration() error {
 		config.TenantDBEngine = envVal
 	}
 
+	if envVal := os.Getenv(constants.EnvVarAdminAPIJWTExpirationHours); envVal != "" {
+		jwtExpirationHours, err := strconv.Atoi(envVal)
+		if err != nil {
+			return err
+		}
+		config.AdminAPIJWTExpirationHours = jwtExpirationHours
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -252,6 +266,10 @@ func LoadDefaultConfiguration() error {
 		config.TenantDBEngine = *TenantDBEngineFlag
 	}
 
+	if *AdminAPIJWTExpirationHoursFlag != 0 {
+		config.AdminAPIJWTExpirationHours = *AdminAPIJWTExpirationHoursFlag
+	}
+
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
@@ -264,6 +282,9 @@ func LoadDefaultConfiguration() error {
 	}
 	if config.TenantDBEngine == "" {
 		config.TenantDBEngine = "pebble"
+	}
+	if config.AdminAPIJWTExpirationHours == 0 { // Note: 0 is the default for int if not set by flag/env/file
+		config.AdminAPIJWTExpirationHours = 3 // Default to 3 hours
 	}
 
 	// Specific default logic for cluster setup
@@ -386,6 +407,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 
 		case constants.ConfigTenantDBEngineKey:
 			cfg.tenant_db_engine = v
+		case constants.ConfigAdminAPIJWTExpirationHoursKey:
+			p, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.admin_api_jwt_expiration_hours = p
 		}
 	}
 

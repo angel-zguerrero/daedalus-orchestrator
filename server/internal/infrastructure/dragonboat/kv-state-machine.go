@@ -118,7 +118,7 @@ func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, err
 }
 
 func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
-	var now time.Time
+
 	if s.aborted {
 		panic("update() called after abort set to true")
 	}
@@ -130,11 +130,6 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if err := gob.NewDecoder(bytes.NewReader(ents[0].Cmd)).Decode(&now); err != nil {
-		return nil, fmt.Errorf("failed to decode current time for entry firts ent, %s", err)
-	}
-	ents = ents[1:]
 
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	batch := db.NewWriteBatch()
@@ -185,6 +180,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	for _, idx := range rwEntries {
 		cmd := commands[idx]
+		now := time.Unix(0, cmd.Now)
 		rwCmd, ok := cmd.CMD.(RWK_Command)
 		if !ok {
 			return nil, fmt.Errorf("expected RWK_Command for RW type, got %T", cmd.CMD)
@@ -201,13 +197,13 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 			case PutOp:
 
-				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value)
+				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, now)
 			case PutOpTTL:
-				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL)
+				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL, now)
 			case DeleteOp:
-				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
+				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key, now)
 			case DeleteOpTTL:
-				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key)
+				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key, now)
 			default:
 				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
 
@@ -220,6 +216,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	for _, idx := range specializedEntries {
 		cmd := commands[idx].CMD
+		now := time.Unix(0, commands[idx].Now)
 		result, err := s.stateMachineImpl.Update(cmd, uow, now)
 		if err != nil {
 			return nil, err
@@ -235,6 +232,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		}
 		switch mlcCmd.Op {
 		case ClearExpiredTTL:
+			now := time.Unix(0, commands[idx].Now)
 			err := kv_store.CleanExpiredKeys(now)
 			if err != nil {
 				return nil, err
@@ -247,9 +245,9 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
-	batch.Put(db.MetaFC, AppliedIndexKey, appliedIndex)
+	batch.Put(db.MetaFC, AppliedIndexKey, appliedIndex, time.Now())
 
-	if err := uow.Commit(now); err != nil {
+	if err := uow.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -271,10 +269,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("expected query to be Query_Command, got %T", query)
 		}
 
-		var now time.Time
-		if err := gob.NewDecoder(bytes.NewReader(query.Now)).Decode(&now); err != nil {
-			return nil, fmt.Errorf("failed to decode current time for entry firts ent, %s", err)
-		}
+		now := time.Unix(0, query.Now)
 		command, ok := query.Command.(RK_Command)
 		if !ok {
 			return s.stateMachineImpl.Lookup(command, now)
