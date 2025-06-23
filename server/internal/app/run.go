@@ -7,6 +7,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
+	"fmt"
 	"os"
 	"time"
 
@@ -172,10 +173,7 @@ func Run() {
 				log.Info().Msg("✅ Node is ready for consensus.")
 				if adminAPI == nil && !adminAPIInitialized {
 					// Initialize and start the Admin API
-					// The JWT secret key should be securely managed, e.g., from config or env.
-					// For this example, using a hardcoded key.
-					// TODO: Make JWT Secret Key configurable
-					jwtSecret := "your-super-secret-jwt-key-change-me"
+					jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
 					jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
 
 					log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
@@ -184,8 +182,7 @@ func Run() {
 					adminAPIInitialized = true // Mark as initialized
 
 					// The listen address for the Admin API should also be configurable.
-					// TODO: Make Admin API listen address configurable
-					adminListenAddr := "0.0.0.0:8081"
+					adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 					go func() {
 						if err := adminAPI.Start(adminListenAddr); err != nil {
 							log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")

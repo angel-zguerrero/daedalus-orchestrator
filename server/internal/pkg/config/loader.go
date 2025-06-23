@@ -30,6 +30,8 @@ Available Flags:
   --master-db-engine         The database engine for the master database (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --admin-api-jwt-expiration-hours JWT expiration time in hours for the Admin API. Default is 3 hours.
+  --admin-host                 Host address for the Admin API. Overrides config file and environment variable.
+  --admin-port                 Port for the Admin API. Overrides config file and environment variable.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -46,6 +48,9 @@ Environment Variables:
   MASTER_DB_ENGINE             The database engine for the master database.
   TENANT_DB_ENGINE             The database engine for tenant databases.
   ADMIN_API_JWT_EXPIRATION_HOURS JWT expiration time in hours for the Admin API.
+  ADMIN_LISTEN_ADDR_HOST       Host address for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrHost + `)
+  ADMIN_LISTEN_ADDR_PORT       Port for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrPort + `)
+  ADMIN_API_JWT_SECRET         JWT secret key for the Admin API. (Corresponds to ` + constants.EnvVarAdminAPIJWTSecret + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -67,6 +72,9 @@ Configuration File:
     master_db_engine
     tenant_db_engine
     admin_api_jwt_expiration_hours
+    admin_listen_addr_host
+    admin_listen_addr_port
+    admin_api_jwt_secret
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -106,6 +114,12 @@ var TenantDBEngineFlag = flag.String(constants.TenantDBEngineFlagName, "", "The 
 
 // AdminAPIJWTExpirationHoursFlag defines the --admin-api-jwt-expiration-hours command-line flag for specifying the Admin API JWT expiration in hours.
 var AdminAPIJWTExpirationHoursFlag = flag.Int("admin-api-jwt-expiration-hours", 0, "JWT expiration time in hours for the Admin API. Overrides config file and environment variable.")
+
+// AdminListenAddrHostFlag defines the --admin-host command-line flag for specifying the Admin API listen host.
+var AdminListenAddrHostFlag = flag.String("admin-host", "", "Host address for the Admin API. Overrides config file and environment variable.")
+
+// AdminListenAddrPortFlag defines the --admin-port command-line flag for specifying the Admin API listen port.
+var AdminListenAddrPortFlag = flag.Int("admin-port", 0, "Port for the Admin API. Overrides config file and environment variable.")
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
@@ -234,6 +248,22 @@ func LoadDefaultConfiguration() error {
 		config.AdminAPIJWTExpirationHours = jwtExpirationHours
 	}
 
+	if envVal := os.Getenv(constants.EnvVarAdminListenAddrHost); envVal != "" {
+		config.AdminListenAddrHost = envVal
+	}
+
+	if envVal := os.Getenv(constants.EnvVarAdminListenAddrPort); envVal != "" {
+		adminPort, err := strconv.Atoi(envVal)
+		if err != nil {
+			return err
+		}
+		config.AdminListenAddrPort = adminPort
+	}
+
+	if envVal := os.Getenv(constants.EnvVarAdminAPIJWTSecret); envVal != "" {
+		config.AdminAPIJWTSecret = envVal
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -270,6 +300,14 @@ func LoadDefaultConfiguration() error {
 		config.AdminAPIJWTExpirationHours = *AdminAPIJWTExpirationHoursFlag
 	}
 
+	if *AdminListenAddrHostFlag != "" {
+		config.AdminListenAddrHost = *AdminListenAddrHostFlag
+	}
+
+	if *AdminListenAddrPortFlag != 0 {
+		config.AdminListenAddrPort = *AdminListenAddrPortFlag
+	}
+
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
@@ -285,6 +323,16 @@ func LoadDefaultConfiguration() error {
 	}
 	if config.AdminAPIJWTExpirationHours == 0 { // Note: 0 is the default for int if not set by flag/env/file
 		config.AdminAPIJWTExpirationHours = 3 // Default to 3 hours
+	}
+	if config.AdminListenAddrHost == "" {
+		config.AdminListenAddrHost = "0.0.0.0"
+	}
+	if config.AdminListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
+		config.AdminListenAddrPort = 8081
+	}
+	if config.AdminAPIJWTSecret == "" {
+		config.AdminAPIJWTSecret = "super-secret-default-jwt-key-please-change"
+		log.Warn().Msgf("⚠️ WARNING: Admin API JWT Secret is not set, using default insecure key. Please set the %s environment variable or the admin_api_jwt_secret key in your configuration file.", constants.EnvVarAdminAPIJWTSecret)
 	}
 
 	// Specific default logic for cluster setup
@@ -413,6 +461,16 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.admin_api_jwt_expiration_hours = p
+		case "admin_listen_addr_host":
+			cfg.admin_listen_addr_host = v
+		case "admin_listen_addr_port":
+			p, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.admin_listen_addr_port = p
+		case constants.ConfigAdminAPIJWTSecretKey:
+			cfg.admin_api_jwt_secret = v
 		}
 	}
 
