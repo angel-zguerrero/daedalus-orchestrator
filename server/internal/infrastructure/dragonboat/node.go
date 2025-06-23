@@ -8,7 +8,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -80,7 +79,6 @@ func (mn *RaftNode) StartReplica() error {
 	if mn.Join {
 		initialMembersMap = map[uint64]string{}
 	}
-	fmt.Println("StartOnDiskReplica!!!", mn.stateMachine)
 	return mn.NH.StartOnDiskReplica(initialMembersMap, mn.Join, mn.stateMachine, cfg)
 
 }

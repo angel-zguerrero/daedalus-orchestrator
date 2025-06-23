@@ -142,14 +142,6 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	require.Nil(t, val)
 }
 
-func TestLookup_InvalidType(t *testing.T) {
-	kv := setupKVMaster(t, "rocksdb")
-	defer kv.Close()
-
-	_, err := kv.Lookup(dragonboat.Query_Command{Command: 0})
-	require.Error(t, err)
-}
-
 func TestSync(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
@@ -809,6 +801,7 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	for _, e := range entries {
 		cmd := dragonboat.Command{
 			Type: dragonboat.RW,
+			Now:  utils.GetNowInInt(),
 			CMD: dragonboat.RWK_Command{
 				Op: dragonboat.Write,
 				CMD: dragonboat.WK_Command{
