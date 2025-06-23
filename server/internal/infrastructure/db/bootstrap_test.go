@@ -145,7 +145,7 @@ func NewTestIDGeneratorFactoryBootstrap(ids []string) *TestIDGeneratorFactoryBoo
 
 func Test_CreatesRootIfMissing(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -172,7 +172,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 
 func Test_ErrorGettingRoot(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -192,7 +192,7 @@ func Test_ErrorGettingRoot(t *testing.T) {
 
 func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -217,7 +217,7 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 
 func Test_SkipsIfUserExists(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -248,7 +248,7 @@ func Test_SkipsIfUserExists(t *testing.T) {
 
 func Test_ErrorFetchingUser(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -269,7 +269,7 @@ func Test_ErrorFetchingUser(t *testing.T) {
 
 func Test_ErrorPutsRoot(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -303,7 +303,7 @@ func Test_ErrorPutsRoot(t *testing.T) {
 
 func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -323,7 +323,7 @@ func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 
 func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
 	store := new(MockKVStoreBootstrap)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)

@@ -3,8 +3,10 @@ package dragonboat_test
 import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/stretchr/testify/assert"
@@ -113,6 +115,7 @@ func TestMasterNode_PassesCorrectStateMachineType(t *testing.T) {
 		roles []dragonboat.NodeRole,
 		createStateMachine func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine,
 	) (*dragonboat.RaftNode, error) {
+		fmt.Println("esto se debe llamar?????", createStateMachine != nil)
 		passedCreateFunc = createStateMachine
 		return &dragonboat.RaftNode{}, nil
 	}
@@ -120,8 +123,10 @@ func TestMasterNode_PassesCorrectStateMachineType(t *testing.T) {
 
 	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil)
 	require.NoError(t, err)
-
+	time.Sleep(2 * time.Second)
 	if passedCreateFunc != nil {
+		fmt.Println("passedCreateFunc !!!!")
+		//fmt.Println(passedCreateFunc)
 		sm := passedCreateFunc(1, 1)
 		_, ok := sm.(statemachine.IOnDiskStateMachine)
 		assert.True(t, ok, "Passed function should return an IOnDiskStateMachine")

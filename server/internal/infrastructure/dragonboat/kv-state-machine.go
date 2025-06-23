@@ -1,6 +1,7 @@
 package dragonboat
 
 import (
+	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/binary"
 	"encoding/gob"
@@ -21,9 +22,9 @@ import (
 type KVStateMachineImpl interface {
 	OpenDB(dbPath string) (db.KVStore, error)
 
-	Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]Command, error)
+	Update(cmd any, uow *db.UnitOfWork, now time.Time) ([]byte, error)
 
-	Lookup(key interface{}) (RK_Command, error)
+	Lookup(key interface{}, now time.Time) (interface{}, error)
 }
 type KVBaseStateMachineConfig struct {
 	// TTLInternalError specifies the Time-To-Live (in seconds) for internal error messages stored in the database.
@@ -117,7 +118,7 @@ func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, err
 }
 
 func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
-	now := time.Now() // TODO: MOVE this logic to "client of node" side
+	var now time.Time
 	if s.aborted {
 		panic("update() called after abort set to true")
 	}
@@ -130,34 +131,30 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if err := gob.NewDecoder(bytes.NewReader(ents[0].Cmd)).Decode(&now); err != nil {
+		return nil, fmt.Errorf("failed to decode current time for entry firts ent, %s", err)
+	}
+	ents = ents[1:]
+
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	batch := db.NewWriteBatch()
+	uow := db.NewUnitOfWork(kv_store, batch)
 
-	commands, err := s.stateMachineImpl.Update(ents, batch)
+	commands := make([]Command, len(ents))
 
-	if err != nil {
-		error_key := time.Now().UnixMilli()
-		cmd := Command{
-			Type: RW,
-			CMD: RWK_Command{
-				Op: Write,
-				CMD: WK_Command{
-					Key:              "internal-errors:" + fmt.Sprintf("%020d", error_key),
-					Value:            []byte(err.Error()),
-					ColumnFamilyName: db.MasterEventFC,
-					TTL:              int(s.config.TTLInternalError),
-					Op:               PutOpTTL,
-				},
-			},
+	for i, ent := range ents {
+		var cmd Command
+		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
+			return nil, fmt.Errorf("failed to decode command for entry at index %d (Raft index %d): %w", i, ent.Index, err)
 		}
-		commands = []Command{
-			cmd,
-		}
+		commands[i] = cmd
+
 	}
 
 	var dllFCEntries []int
 	var rwEntries []int
 	var mclEntries []int
+	var specializedEntries []int
 
 	for i, cmd := range commands {
 		switch cmd.Type {
@@ -167,6 +164,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			rwEntries = append(rwEntries, i)
 		case MCL:
 			mclEntries = append(mclEntries, i)
+		case SPECIALIZED:
+			specializedEntries = append(specializedEntries, i)
 		default:
 			return nil, fmt.Errorf("unknown command type: %v", cmd.Type)
 		}
@@ -219,6 +218,15 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 
+	for _, idx := range specializedEntries {
+		cmd := commands[idx].CMD
+		result, err := s.stateMachineImpl.Update(cmd, uow, now)
+		if err != nil {
+			return nil, err
+		}
+		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd)), Data: result}
+	}
+
 	for _, idx := range mclEntries {
 		cmd := commands[idx]
 		mlcCmd, ok := cmd.CMD.(MCLK_Command)
@@ -227,7 +235,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		}
 		switch mlcCmd.Op {
 		case ClearExpiredTTL:
-			err = kv_store.CleanExpiredKeys(now)
+			err := kv_store.CleanExpiredKeys(now)
 			if err != nil {
 				return nil, err
 			}
@@ -241,7 +249,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
 	batch.Put(db.MetaFC, AppliedIndexKey, appliedIndex)
 
-	if err := kv_store.Write(batch, now); err != nil {
+	if err := uow.Commit(now); err != nil {
 		return nil, err
 	}
 
@@ -253,28 +261,35 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 }
 
 func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
-	now := time.Now() // TODO: MOVE this logic to "client of node" side
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	if kv_store != nil {
 
-		query, err := s.stateMachineImpl.Lookup(query)
+		query, ok := query.(Query_Command)
+		if !ok {
+			return nil, fmt.Errorf("expected query to be Query_Command, got %T", query)
+		}
 
-		if err == nil && s.closed {
+		var now time.Time
+		if err := gob.NewDecoder(bytes.NewReader(query.Now)).Decode(&now); err != nil {
+			return nil, fmt.Errorf("failed to decode current time for entry firts ent, %s", err)
+		}
+		command, ok := query.Command.(RK_Command)
+		if !ok {
+			return s.stateMachineImpl.Lookup(command, now)
+		}
+
+		if s.closed {
 			return nil, errors.New("lookup returned valid result when DiskKV is already closed")
 		}
 
-		if err != nil {
-			return nil, err
-		}
-
-		switch query.Op {
+		switch command.Op {
 
 		case GetOp:
 			var data []byte
 
-			data, err = kv_store.Get(query.ColumnFamilyName, query.Key, now)
+			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
 			if err != nil {
 				return nil, err
 			}
@@ -284,10 +299,10 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 		case Search:
 
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
-				query.ColumnFamilyName,
-				query.KeyPattern,
-				query.Cursor,
-				int(query.Limit),
+				command.ColumnFamilyName,
+				command.KeyPattern,
+				command.Cursor,
+				int(command.Limit),
 				now,
 			)
 			if err != nil {
@@ -303,7 +318,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 		case GetOpTTL:
 			var data []byte
 
-			data, err = kv_store.Get(query.ColumnFamilyName, query.Key, now)
+			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
 			if err != nil {
 				return nil, err
 			}
@@ -312,10 +327,10 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 			}
 		case SearchTTL:
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
-				query.ColumnFamilyName,
-				query.KeyPattern,
-				query.Cursor,
-				int(query.Limit),
+				command.ColumnFamilyName,
+				command.KeyPattern,
+				command.Cursor,
+				int(command.Limit),
 				now,
 			)
 			if err != nil {

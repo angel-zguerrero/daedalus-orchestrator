@@ -135,7 +135,7 @@ func NewTestIDGeneratorFactoryRepository(ids []string) *TestIDGeneratorFactoryRe
 
 func TestPutUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
@@ -158,7 +158,7 @@ func TestPutUser_Success(t *testing.T) {
 
 func TestGetUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 
@@ -176,7 +176,7 @@ func TestGetUser_Success(t *testing.T) {
 
 func TestGetUser_NotFound(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:bar", mock.Anything).Return(nil, nil)
@@ -189,7 +189,7 @@ func TestGetUser_NotFound(t *testing.T) {
 
 func TestGetUser_ErrorOnGet(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 
@@ -202,7 +202,7 @@ func TestGetUser_ErrorOnGet(t *testing.T) {
 
 func TestGetUser_UnmarshalError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 
@@ -217,7 +217,7 @@ func TestGetUser_UnmarshalError(t *testing.T) {
 
 func TestDeleteUser_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "other", ID: "123"}
@@ -234,7 +234,7 @@ func TestDeleteUser_Success(t *testing.T) {
 
 func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "admin", ID: "123", IsRootUser: true}
@@ -249,7 +249,7 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 
 func TestDeleteUser_GetError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, mock.Anything, mock.Anything).Return(nil, errors.New("get failed"))
@@ -261,7 +261,7 @@ func TestDeleteUser_GetError(t *testing.T) {
 
 func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, "admin_schema:users:idx-u:Username:x", mock.Anything).Return([]byte("123"), nil)
@@ -273,7 +273,7 @@ func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 
 func TestDeleteUser_WriteError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	root := models.User{Username: "user", ID: "123"}
@@ -291,7 +291,7 @@ func TestDeleteUser_WriteError(t *testing.T) {
 }
 func TestPutUser_KVStorePutError(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	userInput := models.CreateUser{
@@ -317,7 +317,7 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 
 func TestLoginUser(t *testing.T) {
 	mockStore := new(MockKVStore)
-	uow := db.NewUnitOfWork(mockStore)
+	uow := db.NewUnitOfWork(mockStore, nil)
 	iGF := NewTestIDGeneratorFactoryRepository([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)

@@ -71,6 +71,12 @@ type WK_Command struct {
 }
 
 // RK_Command (Read Key Command) defines the structure for commands that read a single key or search keys.
+
+type Query_Command struct {
+	Now     []byte
+	Command interface{}
+}
+
 type RK_Command struct {
 	Key              string // The specific key to read (used with GetOp, GetOpTTL).
 	KeyPattern       string // The pattern to search for (used with Search, SearchTTL).
@@ -129,6 +135,8 @@ const (
 	DDL_FC
 	// MCL indicates a Maintenance Control Language command, detailed by MCLK_Command.
 	MCL
+
+	SPECIALIZED
 )
 
 // Command is the generic wrapper for any type of command sent through the Raft consensus.

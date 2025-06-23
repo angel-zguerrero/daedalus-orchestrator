@@ -85,7 +85,7 @@ func newRocksdbStoreForUOW(t *testing.T) *db.RocksdbStore {
 
 func newTestUOWDefaultIdGenerator(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.Repository[TestCar], *db.Repository[TestCarFixOrder], *db.Repository[TestNotification], error) {
 	store := newRocksdbStoreForUOW(t)
-	uow := db.NewUnitOfWork(store)
+	uow := db.NewUnitOfWork(store, nil)
 
 	carRepo, err := db.GetRepository[TestCar](uow, UOWTestFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
@@ -171,7 +171,7 @@ func TestUnitOfWork_CreateAndCommit(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	checkTime := time.Now()
 
-	uow2 := db.NewUnitOfWork(store)
+	uow2 := db.NewUnitOfWork(store, nil)
 	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 	expired, err := nRepo.FindByField("ID", notif.ID, checkTime)
 	if err != nil {
@@ -203,7 +203,7 @@ func TestUnitOfWork_TTLBulkCreateAndExpire(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	checkTime := time.Now()
 
-	uow2 := db.NewUnitOfWork(store)
+	uow2 := db.NewUnitOfWork(store, nil)
 	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
@@ -254,7 +254,7 @@ func TestUnitOfWork_MassiveMixedEntities(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	checkTime := time.Now()
 
-	uow2 := db.NewUnitOfWork(store)
+	uow2 := db.NewUnitOfWork(store, nil)
 	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
