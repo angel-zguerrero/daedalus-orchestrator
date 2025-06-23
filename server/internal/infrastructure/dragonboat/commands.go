@@ -1,6 +1,9 @@
 package dragonboat
 
-import "encoding/gob"
+import (
+	"encoding/gob"
+	"time"
+)
 
 // init registers command structs with the gob package for serialization.
 // This is necessary for them to be transported over the network or persisted.
@@ -11,6 +14,7 @@ func init() {
 	gob.Register(DDL_Command{})
 	gob.Register(RWK_Command{})
 	gob.Register(MCLK_Command{})
+	gob.Register(time.Time{})
 }
 
 // ---- Read/Write (RW) Command Types ----
@@ -73,7 +77,7 @@ type WK_Command struct {
 // RK_Command (Read Key Command) defines the structure for commands that read a single key or search keys.
 
 type Query_Command struct {
-	Now     []byte
+	Now     int64
 	Command interface{}
 }
 
@@ -142,6 +146,7 @@ const (
 // Command is the generic wrapper for any type of command sent through the Raft consensus.
 // It allows different command structures to be handled uniformly at a higher level.
 type Command struct {
+	Now  int64
 	Type Command_Type // The overall type of the command.
 	CMD  any          // The actual specific command payload (e.g., RWK_Command, DDL_Command, MCLK_Command).
 }

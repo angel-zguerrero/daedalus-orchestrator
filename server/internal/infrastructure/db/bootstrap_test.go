@@ -55,8 +55,8 @@ func (m *MockKVStoreBootstrap) PutRaw(AdminFC, key string, value []byte) error {
 	return args.Error(0)
 }
 
-func (m *MockKVStoreBootstrap) Write(batch *db.WriteBatch, now time.Time) error {
-	args := m.Called(batch, now)
+func (m *MockKVStoreBootstrap) Write(batch *db.WriteBatch) error {
+	args := m.Called(batch)
 	return args.Error(0)
 }
 
@@ -165,7 +165,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
-	err = uow.Commit(time.Now()) // Commit should now take time
+	err = uow.Commit() // Commit should now take time
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
@@ -210,7 +210,7 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	store.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1)
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }
@@ -240,7 +240,7 @@ func Test_SkipsIfUserExists(t *testing.T) {
 
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
-	err = uow.Commit(time.Now()) // Commit might have no operations if root exists and no other changes
+	err = uow.Commit() // Commit might have no operations if root exists and no other changes
 
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
@@ -295,7 +295,7 @@ func Test_ErrorPutsRoot(t *testing.T) {
 	err = db.BootstrapRootUser(*repo, config)
 	assert.NoError(t, err)
 
-	err = uow.Commit(time.Now())
+	err = uow.Commit()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "write fail")
 	store.AssertExpectations(t)

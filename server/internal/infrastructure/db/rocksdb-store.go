@@ -495,7 +495,7 @@ func (r *RocksdbStore) PutRaw(columnFamily string, key string, value []byte) err
 //
 // Returns:
 //   - An error if the provided batch is not of the correct type or if any RocksDB error occurs during the write operation.
-func (r *RocksdbStore) Write(batch *WriteBatch, now time.Time) error {
+func (r *RocksdbStore) Write(batch *WriteBatch) error {
 	rocksBatch := grocksdb.NewWriteBatch()
 	defer rocksBatch.Destroy()
 
@@ -510,7 +510,7 @@ func (r *RocksdbStore) Write(batch *WriteBatch, now time.Time) error {
 			if !isTTL {
 				rocksBatch.PutCF(cf, []byte(op.Key), op.Value)
 			} else {
-				ttlMillis := now.Add(time.Duration(op.TTL) * time.Second).UnixMilli()
+				ttlMillis := op.Now.Add(time.Duration(op.TTL) * time.Second).UnixMilli()
 
 				dataKey := op.Key
 				ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)

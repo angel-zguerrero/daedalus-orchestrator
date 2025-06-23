@@ -734,15 +734,13 @@ func (ps *PebbleStore) Close() error {
 
 // Write performs a batch of operations (Put/Delete) atomically.
 // Assumes WriteBatch and X are defined in the same package (e.g. kv-store.go)
-func (ps *PebbleStore) Write(batch *WriteBatch, now time.Time) error {
+func (ps *PebbleStore) Write(batch *WriteBatch) error {
 	if batch == nil || len(batch.Data) == 0 {
 		return nil
 	}
 
 	b := ps.db.NewBatch()
 	defer b.Close()
-
-	nowMillis := now.UnixMilli()
 
 	for _, op := range batch.Data {
 		dataKey, isTTL, cfPrefix, err := ps.getPrefixedKey(op.CF, op.Key)
@@ -757,6 +755,7 @@ func (ps *PebbleStore) Write(batch *WriteBatch, now time.Time) error {
 					return fmt.Errorf("Write: failed to add put for key '%s': %w", op.Key, err)
 				}
 			} else {
+				nowMillis := op.Now.UnixMilli()
 				newTTLMillis := nowMillis + int64(op.TTL)*1000
 
 				ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)

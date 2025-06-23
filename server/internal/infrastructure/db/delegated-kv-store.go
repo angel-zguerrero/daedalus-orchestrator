@@ -22,7 +22,7 @@ func (d *DelegatedKVStore) Get(cf string, key string, now time.Time) ([]byte, er
 // Delete interceptado y va al batch
 // The `now` parameter is not used here as the actual deletion happens when the batch is written.
 func (d *DelegatedKVStore) Delete(cf string, key string, now time.Time) error {
-	d.batch.Delete(cf, key)
+	d.batch.Delete(cf, key, now)
 	return nil
 }
 
@@ -30,23 +30,23 @@ func (d *DelegatedKVStore) Delete(cf string, key string, now time.Time) error {
 // The `now` parameter is not used here as the actual put happens when the batch is written.
 func (d *DelegatedKVStore) Put(cf string, key string, value []byte, ttl int, now time.Time) error {
 	if ttl > 0 {
-		d.batch.PutTTl(cf, key, value, ttl)
+		d.batch.PutTTl(cf, key, value, ttl, now)
 	} else {
-		d.batch.Put(cf, key, value)
+		d.batch.Put(cf, key, value, now)
 	}
 	return nil
 }
 
 // PutRaw = sin TTL
 func (d *DelegatedKVStore) PutRaw(cf string, key string, value []byte) error {
-	d.batch.Put(cf, key, value)
+	d.batch.Put(cf, key, value, time.Now())
 	return nil
 }
 
 // Write delegates to the base store's Write method, passing the `now` parameter.
 // It's assumed that if d.batch is the one being written, the caller (e.g. UnitOfWork)
 // will call base.Write(d.batch, now) directly. This Write method is for other batches.
-func (d *DelegatedKVStore) Write(batch *WriteBatch, now time.Time) error {
+func (d *DelegatedKVStore) Write(batch *WriteBatch) error {
 	if batch == nil || batch == d.batch {
 		return nil
 	}

@@ -49,10 +49,10 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	now := time.Now()
 
 	batch := db.NewWriteBatch()
-	batch.Put(TestFC, "a", []byte("valueA"))
-	batch.Put(TestFC, "b", []byte("valueB"))
+	batch.Put(TestFC, "a", []byte("valueA"), now)
+	batch.Put(TestFC, "b", []byte("valueB"), now)
 
-	err = store.Write(batch, now)
+	err = store.Write(batch)
 	require.NoError(t, err)
 
 	resultA, err := store.Get(TestFC, "a", now)

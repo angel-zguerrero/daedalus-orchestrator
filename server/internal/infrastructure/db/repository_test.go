@@ -71,8 +71,8 @@ func (m *MockKVStoreRepositoryTest) PutRaw(AdminFC, key string, value []byte) er
 	return args.Error(0)
 }
 
-func (m *MockKVStoreRepositoryTest) Write(batch *db.WriteBatch, now time.Time) error {
-	args := m.Called(batch, now)
+func (m *MockKVStoreRepositoryTest) Write(batch *db.WriteBatch) error {
+	args := m.Called(batch)
 	return args.Error(0)
 }
 
@@ -224,18 +224,18 @@ func TestRepository_Create_Success(t *testing.T) {
 
 	mockStore.On("Exists", "cf1", uNameFieldKey, mock.Anything).Return(false, nil)
 	mockStore.On("Exists", "cf1", "admin:users:data:123", mock.Anything).Return(false, nil)
-
+	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Put("cf1", indexKey, []byte("123"))
-	batch.Put("cf1", nameFieldKey, []byte("123"))
-	batch.Put("cf1", uNameFieldKey, []byte("123"))
-	batch.Put("cf1", dataKey, data)
+	batch.Put("cf1", indexKey, []byte("123"), now)
+	batch.Put("cf1", nameFieldKey, []byte("123"), now)
+	batch.Put("cf1", uNameFieldKey, []byte("123"), now)
+	batch.Put("cf1", dataKey, data, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
 	}), mock.Anything).Return(nil)
 
-	id, err := repo.Create(&user, time.Now())
+	id, err := repo.Create(&user, now)
 	assert.NoError(t, err)
 	assert.Equal(t, id, "123")
 
@@ -615,14 +615,14 @@ func TestRepository_Update_Success(t *testing.T) {
 	// The Get for unique check will also be called with now.
 	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(originalData, nil)
 	mockStore.On("Get", "cf1", newUIndexKey, mock.Anything).Return(nil, nil)
-
+	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Delete("cf1", oldUIndexKey)
-	batch.Put("cf1", newUIndexKey, []byte("123"))
-	batch.Delete("cf1", oldIndexKey)
+	batch.Delete("cf1", oldUIndexKey, now)
+	batch.Put("cf1", newUIndexKey, []byte("123"), now)
+	batch.Delete("cf1", oldIndexKey, now)
 
-	batch.Put("cf1", newIndexKey, []byte("123"))
-	batch.Put("cf1", dataKey, updatedData)
+	batch.Put("cf1", newIndexKey, []byte("123"), now)
+	batch.Put("cf1", dataKey, updatedData, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -668,11 +668,11 @@ func TestRepository_Delete_Success(t *testing.T) {
 	mockStore.On("Get", "cf1", dataKey, mock.Anything).Return(data, nil) // For FindByField
 
 	batch := db.NewWriteBatch()
-
-	batch.Delete("cf1", indexKey)
-	batch.Delete("cf1", pkIndexKey)
-	batch.Delete("cf1", uIndexKey)
-	batch.Delete("cf1", dataKey)
+	now := time.Now()
+	batch.Delete("cf1", indexKey, now)
+	batch.Delete("cf1", pkIndexKey, now)
+	batch.Delete("cf1", uIndexKey, now)
+	batch.Delete("cf1", dataKey, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -743,11 +743,11 @@ func TestRepository_BulkCreate_Success(t *testing.T) {
 
 		mockStore.On("Exists", "cf1", uIdx, mock.Anything).Return(false, nil)
 		mockStore.On("Exists", "cf1", dataKey, mock.Anything).Return(false, nil)
-
-		batch.Put("cf1", dataKey, d)
-		batch.Put("cf1", nameIdx, []byte(id))
-		batch.Put("cf1", uIdx, []byte(id))
-		batch.Put("cf1", pkIdx, []byte(id))
+		now := time.Now()
+		batch.Put("cf1", dataKey, d, now)
+		batch.Put("cf1", nameIdx, []byte(id), now)
+		batch.Put("cf1", uIdx, []byte(id), now)
+		batch.Put("cf1", pkIdx, []byte(id), now)
 	}
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
@@ -825,16 +825,16 @@ func TestRepository_BulkDelete_Success(t *testing.T) {
 		// This Get is part of the FindByField call within BulkDelete
 		mockStore.On("Get", "cf1", "admin:users:data:"+u.ID, mock.Anything).Return(data, nil)
 	}
-
+	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Delete("cf1", "admin:users:idx:Name:Alice:id1")
-	batch.Delete("cf1", "admin:users:idx:Name:Bob:id2")
-	batch.Delete("cf1", "admin:users:idx:ID:id1:id1")
-	batch.Delete("cf1", "admin:users:idx:ID:id2:id2")
-	batch.Delete("cf1", "admin:users:idx-u:Name:Alice")
-	batch.Delete("cf1", "admin:users:idx-u:Name:Bob")
-	batch.Delete("cf1", "admin:users:data:id1")
-	batch.Delete("cf1", "admin:users:data:id2")
+	batch.Delete("cf1", "admin:users:idx:Name:Alice:id1", now)
+	batch.Delete("cf1", "admin:users:idx:Name:Bob:id2", now)
+	batch.Delete("cf1", "admin:users:idx:ID:id1:id1", now)
+	batch.Delete("cf1", "admin:users:idx:ID:id2:id2", now)
+	batch.Delete("cf1", "admin:users:idx-u:Name:Alice", now)
+	batch.Delete("cf1", "admin:users:idx-u:Name:Bob", now)
+	batch.Delete("cf1", "admin:users:data:id1", now)
+	batch.Delete("cf1", "admin:users:data:id2", now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -859,12 +859,12 @@ func TestRepository_BulkDelete_Partial(t *testing.T) {
 	// These Gets are part of FindByField calls
 	mockStore.On("Get", "cf1", "admin:users:data:id1", mock.Anything).Return(data, nil)
 	mockStore.On("Get", "cf1", "admin:users:data:id2", mock.Anything).Return(nil, nil)
-
+	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Delete("cf1", "admin:users:idx:Name:Alice:id1")
-	batch.Delete("cf1", "admin:users:idx:ID:id1:id1")
-	batch.Delete("cf1", "admin:users:idx-u:Name:Alice")
-	batch.Delete("cf1", "admin:users:data:id1")
+	batch.Delete("cf1", "admin:users:idx:Name:Alice:id1", now)
+	batch.Delete("cf1", "admin:users:idx:ID:id1:id1", now)
+	batch.Delete("cf1", "admin:users:idx-u:Name:Alice", now)
+	batch.Delete("cf1", "admin:users:data:id1", now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -1428,12 +1428,12 @@ func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
 
 	mockStore.On("Exists", "cf1", uNameFieldKey, mock.Anything).Return(false, nil)
 	mockStore.On("Exists", "cf1", dataKey, mock.Anything).Return(false, nil)
-
+	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Put("cf1", indexKey, []byte("det-123"))
-	batch.Put("cf1", nameFieldKey, []byte("det-123"))
-	batch.Put("cf1", uNameFieldKey, []byte("det-123"))
-	batch.Put("cf1", dataKey, data)
+	batch.Put("cf1", indexKey, []byte("det-123"), now)
+	batch.Put("cf1", nameFieldKey, []byte("det-123"), now)
+	batch.Put("cf1", uNameFieldKey, []byte("det-123"), now)
+	batch.Put("cf1", dataKey, data, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
