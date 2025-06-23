@@ -38,6 +38,15 @@ const ConfigTenantDBEngineKey = "tenant_db_engine"
 // ConfigAdminAPIJWTExpirationHoursKey is the key for the Admin API JWT expiration hours setting in the configuration file.
 const ConfigAdminAPIJWTExpirationHoursKey = "admin_api_jwt_expiration_hours"
 
+// ConfigAdminListenAddrHostKey is the key for the Admin API listen host setting in the configuration file.
+const ConfigAdminListenAddrHostKey = "admin_listen_addr_host"
+
+// ConfigAdminListenAddrPortKey is the key for the Admin API listen port setting in the configuration file.
+const ConfigAdminListenAddrPortKey = "admin_listen_addr_port"
+
+// ConfigAdminAPIJWTSecretKey is the key for the Admin API JWT secret setting in the configuration file.
+const ConfigAdminAPIJWTSecretKey = "admin_api_jwt_secret"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -82,6 +91,15 @@ const EnvVarTenantDBEngine = "TENANT_DB_ENGINE"
 
 // EnvVarAdminAPIJWTExpirationHours is the environment variable name for the Admin API JWT expiration hours.
 const EnvVarAdminAPIJWTExpirationHours = "ADMIN_API_JWT_EXPIRATION_HOURS"
+
+// EnvVarAdminListenAddrHost is the environment variable name for the Admin API listen host.
+const EnvVarAdminListenAddrHost = "ADMIN_LISTEN_ADDR_HOST"
+
+// EnvVarAdminListenAddrPort is the environment variable name for the Admin API listen port.
+const EnvVarAdminListenAddrPort = "ADMIN_LISTEN_ADDR_PORT"
+
+// EnvVarAdminAPIJWTSecret is the environment variable name for the Admin API JWT secret.
+const EnvVarAdminAPIJWTSecret = "ADMIN_API_JWT_SECRET"
 
 // OpenTelemetry specific environment variables.
 
