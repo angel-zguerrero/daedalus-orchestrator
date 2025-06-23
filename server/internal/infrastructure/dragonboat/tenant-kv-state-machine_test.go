@@ -16,6 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func GetNowInBytesRocksDBTenant() ([]byte, error) {
+	now := time.Now()
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(now); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
 func setupTenantKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	t.Helper()
 	// Ensure config is loaded as NewTenantKVRocksDBStateMachine might depend on it for paths
@@ -68,14 +77,15 @@ func TestTenantUpdate_SingleEntry(t *testing.T) {
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
 
-	entry := statemachine.Entry{
-		Cmd:   buf.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
-
-	result, err := kv.Update([]statemachine.Entry{entry})
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble backend based on default config
 	require.NoError(t, err)
-	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+
+	result, err := kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value) // Adjusted index for result
 }
 
 func TestTenantUpdate_AfterClose_Panics(t *testing.T) {
@@ -108,14 +118,23 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
 
-	_, err := kv.Update([]statemachine.Entry{
-		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+	nowUpdate, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
+
+	_, err = kv.Update([]statemachine.Entry{
+		{Cmd: nowUpdate, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
 	})
 	require.NoError(t, err)
 
-	query := dragonboat.RK_Command{
-		Key:              "lookup_key",
-		ColumnFamilyName: db.DefaultFC,
+	nowLookup, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
+	query := dragonboat.Query_Command{
+		Now: nowLookup,
+		Command: dragonboat.RK_Command{
+			Key:              "lookup_key",
+			ColumnFamilyName: db.DefaultFC,
+		},
 	}
 
 	val, err := kv.Lookup(query)
@@ -127,9 +146,14 @@ func TestTenantLookup_NonExistingKey(t *testing.T) {
 	kv := setupTenantKV(t)
 	defer kv.Close()
 
-	query := dragonboat.RK_Command{
-		Key:              "missing_key",
-		ColumnFamilyName: db.DefaultFC,
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
+	query := dragonboat.Query_Command{
+		Now: now,
+		Command: dragonboat.RK_Command{
+			Key:              "missing_key",
+			ColumnFamilyName: db.DefaultFC,
+		},
 	}
 	val, err := kv.Lookup(query)
 	require.NoError(t, err)
@@ -140,7 +164,8 @@ func TestTenantLookup_InvalidType(t *testing.T) {
 	kv := setupTenantKV(t)
 	defer kv.Close()
 
-	_, err := kv.Lookup(0)
+	// For invalid type, Now can be zero value or nil bytes, command itself is the problematic part
+	_, err := kv.Lookup(dragonboat.Query_Command{Command: 0})
 	require.Error(t, err)
 }
 
@@ -170,8 +195,12 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	}
 
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
-	_, err := kv.Update([]statemachine.Entry{
-		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
+	_, err = kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
 	})
 	require.NoError(t, err)
 
@@ -196,22 +225,29 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	query := dragonboat.RK_Command{
-		Key:              "snap_key",
-		ColumnFamilyName: db.DefaultFC,
+	nowLookup1, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
+	query1 := dragonboat.Query_Command{
+		Now: nowLookup1,
+		Command: dragonboat.RK_Command{
+			Key:              "snap_key",
+			ColumnFamilyName: db.DefaultFC,
+		},
 	}
-
-	val, err := kv2.Lookup(query)
-
+	val, err := kv2.Lookup(query1)
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	query = dragonboat.RK_Command{
-		Key:              dragonboat.AppliedIndexKey,
-		ColumnFamilyName: db.MetaFC,
+	nowLookup2, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
+	query2 := dragonboat.Query_Command{
+		Now: nowLookup2,
+		Command: dragonboat.RK_Command{
+			Key:              dragonboat.AppliedIndexKey,
+			ColumnFamilyName: db.MetaFC,
+		},
 	}
-
-	val, err = kv2.Lookup(query)
+	val, err = kv2.Lookup(query2)
 	require.NoError(t, err)
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
@@ -260,14 +296,15 @@ func TestTenantUpdate_AddColumnFamily(t *testing.T) {
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
 
-	entry := statemachine.Entry{
-		Cmd:   buf.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
-
-	result, err := kv.Update([]statemachine.Entry{entry})
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
 	require.NoError(t, err)
-	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+
+	result, err := kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value) // Adjusted index
 }
 func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	kv := setupTenantKV(t)
@@ -285,12 +322,13 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 		err := gob.NewEncoder(&buf).Encode(cmd)
 		require.NoError(t, err)
 
-		entry := statemachine.Entry{
-			Cmd:   buf.Bytes(),
-			Index: kv.GetLastApplied() + 1,
-		}
+		now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+		require.NoError(t, err)
 
-		_, err = kv.Update([]statemachine.Entry{entry})
+		_, err = kv.Update([]statemachine.Entry{
+			{Cmd: now, Index: kv.GetLastApplied() + 1},
+			{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+		})
 		require.NoError(t, err)
 	}
 
@@ -306,14 +344,15 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
 
-	entry := statemachine.Entry{
-		Cmd:   buf.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
-
-	result, err := kv.Update([]statemachine.Entry{entry})
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
 	require.NoError(t, err)
-	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+
+	result, err := kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value) // Adjusted index
 }
 
 func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
@@ -336,12 +375,13 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
 
-	entry := statemachine.Entry{
-		Cmd:   buf.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
 
-	result, err := kv.Update([]statemachine.Entry{entry})
+	result, err := kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
 	require.Error(t, err)
 	require.Nil(t, result)
 }
@@ -365,12 +405,13 @@ func TestTenantUpdate_PutWithTTL(t *testing.T) {
 	}
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
 
-	entry := statemachine.Entry{
-		Cmd:   buf.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
 
-	_, err := kv.Update([]statemachine.Entry{entry})
+	_, err = kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
 	require.NoError(t, err)
 }
 func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
@@ -389,12 +430,13 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 		err := gob.NewEncoder(&buf).Encode(cmd)
 		require.NoError(t, err)
 
-		entry := statemachine.Entry{
-			Cmd:   buf.Bytes(),
-			Index: kv.GetLastApplied() + 1,
-		}
+		now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+		require.NoError(t, err)
 
-		_, err = kv.Update([]statemachine.Entry{entry})
+		_, err = kv.Update([]statemachine.Entry{
+			{Cmd: now, Index: kv.GetLastApplied() + 1},
+			{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+		})
 		require.NoError(t, err)
 	}
 
@@ -409,14 +451,15 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	require.NoError(t, err)
 
-	entry := statemachine.Entry{
-		Cmd:   buf.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
-
-	result, err := kv.Update([]statemachine.Entry{entry})
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
 	require.NoError(t, err)
-	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+
+	result, err := kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value) // Adjusted index
 }
 
 func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
@@ -439,12 +482,13 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	}
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
 
-	entry := statemachine.Entry{
-		Cmd:   buf.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
+	now, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
 
-	_, err := kv.Update([]statemachine.Entry{entry})
+	_, err = kv.Update([]statemachine.Entry{
+		{Cmd: now, Index: kv.GetLastApplied() + 1},
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
@@ -462,11 +506,12 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	}
 	require.NoError(t, gob.NewEncoder(&bufDel).Encode(cmd))
 
-	entry = statemachine.Entry{
-		Cmd:   bufDel.Bytes(),
-		Index: kv.GetLastApplied() + 1,
-	}
+	nowDel, err := GetNowInBytesRocksDBTenant() // Assuming Pebble
+	require.NoError(t, err)
 
-	_, err = kv.Update([]statemachine.Entry{entry})
+	_, err = kv.Update([]statemachine.Entry{
+		{Cmd: nowDel, Index: kv.GetLastApplied() + 1},
+		{Cmd: bufDel.Bytes(), Index: kv.GetLastApplied() + 2},
+	})
 	require.NoError(t, err)
 }
