@@ -118,7 +118,6 @@ func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, err
 }
 
 func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.Entry, error) {
-
 	if s.aborted {
 		panic("update() called after abort set to true")
 	}
@@ -136,14 +135,23 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	uow := db.NewUnitOfWork(kv_store, batch)
 
 	commands := make([]Command, len(ents))
+	parseErrors := make([]bool, len(ents))
 
 	for i, ent := range ents {
 		var cmd Command
 		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
-			return nil, fmt.Errorf("failed to decode command for entry at index %d (Raft index %d): %w", i, ent.Index, err)
+			parseErrors[i] = true
+			msg := fmt.Sprintf(
+				"failed to decode command for entry at index %d (Raft index %d): %v",
+				i, ent.Index, err,
+			)
+			ents[i].Result = statemachine.Result{
+				Value: uint64(len(ents[i].Cmd)),
+				Data:  []byte(msg),
+			}
+			continue
 		}
 		commands[i] = cmd
-
 	}
 
 	var dllFCEntries []int
@@ -152,6 +160,9 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	var specializedEntries []int
 
 	for i, cmd := range commands {
+		if parseErrors[i] {
+			continue
+		}
 		switch cmd.Type {
 		case DDL_FC:
 			dllFCEntries = append(dllFCEntries, i)
@@ -162,83 +173,146 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		case SPECIALIZED:
 			specializedEntries = append(specializedEntries, i)
 		default:
-			return nil, fmt.Errorf("unknown command type: %v", cmd.Type)
+			msg := fmt.Sprintf("unknown command type: %v", cmd.Type)
+			ents[i].Result = statemachine.Result{
+				Value: uint64(len(ents[i].Cmd)),
+				Data:  []byte(msg),
+			}
+			parseErrors[i] = true
 		}
 	}
 
 	for _, idx := range dllFCEntries {
+		if parseErrors[idx] {
+			continue
+		}
 		cmd := commands[idx]
 		ddlCmd, ok := cmd.CMD.(DDL_Command)
 		if !ok {
-			return nil, fmt.Errorf("expected DDL_Command for DLL type, got %T", cmd.CMD)
+			msg := fmt.Sprintf("expected DDL_Command for DLL type, got %T", cmd.CMD)
+			ents[idx].Result = statemachine.Result{
+				Value: uint64(len(ents[idx].Cmd)),
+				Data:  []byte(msg),
+			}
+			continue
 		}
 		switch ddlCmd.Op {
-
+		// Implementar operaciones aquí
 		}
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 
 	for _, idx := range rwEntries {
+		if parseErrors[idx] {
+			continue
+		}
 		cmd := commands[idx]
 		now := time.Unix(0, cmd.Now)
 		rwCmd, ok := cmd.CMD.(RWK_Command)
 		if !ok {
-			return nil, fmt.Errorf("expected RWK_Command for RW type, got %T", cmd.CMD)
+			msg := fmt.Sprintf("expected RWK_Command for RW type, got %T", cmd.CMD)
+			ents[idx].Result = statemachine.Result{
+				Value: uint64(len(ents[idx].Cmd)),
+				Data:  []byte(msg),
+			}
+			continue
 		}
 		switch rwCmd.Op {
 		case Read:
-			return nil, fmt.Errorf("Invalid read operation: %T", cmd.CMD)
+			msg := fmt.Sprintf("Invalid read operation: %T", cmd.CMD)
+			ents[idx].Result = statemachine.Result{
+				Value: uint64(len(ents[idx].Cmd)),
+				Data:  []byte(msg),
+			}
+			continue
 		case Write:
 			wCmd, ok := rwCmd.CMD.(WK_Command)
 			if !ok {
-				return nil, fmt.Errorf("expected WK_Command for RW type, got %T", cmd.CMD)
+				msg := fmt.Sprintf("expected WK_Command for RW type, got %T", cmd.CMD)
+				ents[idx].Result = statemachine.Result{
+					Value: uint64(len(ents[idx].Cmd)),
+					Data:  []byte(msg),
+				}
+				continue
 			}
 			switch wCmd.Op {
-
 			case PutOp:
-
 				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, now)
 			case PutOpTTL:
 				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL, now)
-			case DeleteOp:
-				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key, now)
-			case DeleteOpTTL:
+			case DeleteOp, DeleteOpTTL:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key, now)
 			default:
-				return nil, fmt.Errorf("unknown W Operation: %v", wCmd.Op)
-
+				msg := fmt.Sprintf("unknown W Operation: %v", wCmd.Op)
+				ents[idx].Result = statemachine.Result{
+					Value: uint64(len(ents[idx].Cmd)),
+					Data:  []byte(msg),
+				}
+				continue
 			}
 		default:
-			return nil, fmt.Errorf("unknown RW Operation: %v", rwCmd.Op)
+			msg := fmt.Sprintf("unknown RW Operation: %v", rwCmd.Op)
+			ents[idx].Result = statemachine.Result{
+				Value: uint64(len(ents[idx].Cmd)),
+				Data:  []byte(msg),
+			}
+			continue
 		}
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
 
 	for _, idx := range specializedEntries {
+		if parseErrors[idx] {
+			continue
+		}
 		cmd := commands[idx].CMD
 		now := time.Unix(0, commands[idx].Now)
 		result, err := s.stateMachineImpl.Update(cmd, uow, now)
 		if err != nil {
-			return nil, err
+			ents[idx].Result = statemachine.Result{
+				Value: uint64(len(ents[idx].Cmd)),
+				Data:  []byte(err.Error()),
+			}
+			continue
 		}
-		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd)), Data: result}
+		ents[idx].Result = statemachine.Result{
+			Value: uint64(len(ents[idx].Cmd)),
+			Data:  result,
+		}
 	}
 
 	for _, idx := range mclEntries {
+		if parseErrors[idx] {
+			continue
+		}
 		cmd := commands[idx]
 		mlcCmd, ok := cmd.CMD.(MCLK_Command)
 		if !ok {
-			return nil, fmt.Errorf("expected MCLK_Command for RW type, got %T", cmd.CMD)
+			msg := fmt.Sprintf("expected MCLK_Command for MCL type, got %T", cmd.CMD)
+			ents[idx].Result = statemachine.Result{
+				Value: uint64(len(ents[idx].Cmd)),
+				Data:  []byte(msg),
+			}
+			continue
 		}
 		switch mlcCmd.Op {
 		case ClearExpiredTTL:
 			now := time.Unix(0, commands[idx].Now)
 			err := kv_store.CleanExpiredKeys(now)
 			if err != nil {
-				return nil, err
+				ents[idx].Result = statemachine.Result{
+					Value: uint64(len(ents[idx].Cmd)),
+					Data:  []byte(err.Error()),
+				}
+				continue
 			}
 		default:
-			return nil, fmt.Errorf("unknown MCL Operation: %v", mlcCmd.Op)
+			msg := fmt.Sprintf("unknown MCL Operation: %v", mlcCmd.Op)
+			ents[idx].Result = statemachine.Result{
+				Value: uint64(len(ents[idx].Cmd)),
+				Data:  []byte(msg),
+			}
+			continue
 		}
 		ents[idx].Result = statemachine.Result{Value: uint64(len(ents[idx].Cmd))}
 	}
