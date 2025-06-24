@@ -334,8 +334,11 @@ func TestPebble_Read_SingleEntryIntoUpdate(t *testing.T) {
 	result, err := kv.Update([]statemachine.Entry{
 		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
 	})
-	require.Error(t, err)
-	require.Nil(t, result)
+	require.NoError(t, err) // Update call itself should not error out
+	require.NotNil(t, result)
+	require.Len(t, result, 1)
+	// Expect an error message in Result.Data due to invalid operation type
+	require.Contains(t, string(result[0].Result.Data), "invalid command type for Update: Read")
 }
 func TestPebble_Update_PutWithTTL(t *testing.T) {
 	kv := setupKV(t, "pebble")
@@ -674,11 +677,14 @@ func TestPebble_Update_UnknownCommandType(t *testing.T) {
 	}
 	data := encodeCommand(t, cmd)
 
-	_, err := kv.Update([]statemachine.Entry{
+	result, err := kv.Update([]statemachine.Entry{
 		{Cmd: data, Index: kv.GetLastApplied() + 1},
 	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unknown command type")
+	require.NoError(t, err) // Update call itself should not error out
+	require.NotNil(t, result)
+	require.Len(t, result, 1)
+	// Expect an error message in Result.Data
+	require.Contains(t, string(result[0].Result.Data), "unknown command type: 999")
 }
 
 func TestPebble_Update_UnknownWriteOp(t *testing.T) {
@@ -700,11 +706,14 @@ func TestPebble_Update_UnknownWriteOp(t *testing.T) {
 	}
 	data := encodeCommand(t, cmd)
 
-	_, err := kv.Update([]statemachine.Entry{
+	result, err := kv.Update([]statemachine.Entry{
 		{Cmd: data, Index: kv.GetLastApplied() + 1},
 	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unknown W Operation")
+	require.NoError(t, err) // Update call itself should not error out
+	require.NotNil(t, result)
+	require.Len(t, result, 1)
+	// Expect an error message in Result.Data
+	require.Contains(t, string(result[0].Result.Data), "unknown W Operation: 999")
 }
 func TestPebble_RecoverFromSnapshot_InvalidData(t *testing.T) {
 	kv := setupKV(t, "pebble")
