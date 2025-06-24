@@ -41,7 +41,8 @@ func main() {
 			Str("func", "Run").
 			Msgf("❌ Failed loading configuration")
 	}
-
+	app := app.NewApplication()
 	app.Run()
 	<-stop
+	app.Stop()
 }

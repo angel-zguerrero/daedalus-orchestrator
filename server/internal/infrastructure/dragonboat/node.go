@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/lni/dragonboat/v4"
@@ -29,6 +30,8 @@ type RaftNode struct {
 	Join           bool                                                                   // Flag indicating if this node is joining an existing shard.
 	Roles          []NodeRole                                                             // Roles assigned to this node (e.g., consensus, scheduler).
 	stateMachine   func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine // A factory function that creates an instance of the on-disk state machine for this replica.
+	mu             sync.RWMutex
+	stopped        bool
 }
 
 // StartReplica initializes and starts the Raft replica on the NodeHost.
@@ -125,6 +128,13 @@ func (mn *RaftNode) GetClient() *client.Session {
 	return mn.NH.GetNoOPSession(mn.ShardID)
 }
 
+func (mn *RaftNode) Stop() {
+	mn.mu.Lock()
+	defer mn.mu.Unlock()
+	mn.NH.Close()
+	mn.stopped = true
+}
+
 // Write proposes a batch of commands to the Raft log.
 // It marshals the commands into JSON and uses SyncPropose to apply them.
 // This is a synchronous operation that waits for the proposal to be committed or to fail.
@@ -136,14 +146,18 @@ func (mn *RaftNode) GetClient() *client.Session {
 // Returns:
 //   - The result of the proposal from the state machine.
 //   - An error if marshaling fails or if SyncPropose encounters an error.
-func (mn *RaftNode) Write(ctx context.Context, comands []Command) (statemachine.Result, error) {
-	cs := mn.GetClient()
-	data, err := json.Marshal(comands)
-	if err != nil {
-		return statemachine.Result{}, err
+func (mn *RaftNode) Write(ctx context.Context, comand Command) (statemachine.Result, error) {
+	mn.mu.Lock()
+	defer mn.mu.Unlock()
+	if mn.stopped {
+		return statemachine.Result{}, errors.New("raft node is stopped")
 	}
-	result, err := mn.NH.SyncPropose(ctx, cs, data)
-	return result, err
+	cs := mn.GetClient()
+
+	var buf bytes.Buffer
+
+	gob.NewEncoder(&buf).Encode(comand)
+	return mn.NH.SyncPropose(ctx, cs, buf.Bytes())
 }
 
 // Read performs a linearizable read from the Raft state machine.
@@ -158,6 +172,11 @@ func (mn *RaftNode) Write(ctx context.Context, comands []Command) (statemachine.
 //   - The result of the read operation from the state machine.
 //   - An error if marshaling fails or if SyncRead encounters an error.
 func (mn *RaftNode) Read(ctx context.Context, cmd RK_Command) (interface{}, error) {
+	mn.mu.Lock()
+	defer mn.mu.Unlock()
+	if mn.stopped {
+		return statemachine.Result{}, errors.New("raft node is stopped")
+	}
 	data, err := json.Marshal(cmd)
 	if err != nil {
 		return statemachine.Result{}, err
@@ -187,10 +206,7 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 		var initialized bool
 
 		for {
-			session := mn.NH.GetNoOPSession(mn.ShardID)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-			var buf bytes.Buffer
 
 			cmd := Command{
 				Now:  utils.GetNowInInt(),
@@ -206,8 +222,7 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 				},
 			}
 
-			gob.NewEncoder(&buf).Encode(cmd)
-			_, err := mn.NH.SyncPropose(ctx, session, buf.Bytes())
+			_, err := mn.Write(ctx, cmd)
 
 			cancel()
 

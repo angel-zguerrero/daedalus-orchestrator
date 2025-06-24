@@ -45,7 +45,14 @@ import (
 //   - gRPC Server: Code for starting a gRPC server (commented out).
 //
 // These components might be integrated in future versions of the application.
-func Run() {
+
+type Application struct {
+	MasterNodeIsReady bool
+	MasterNode        *dragonboat.RaftNode
+	RestAdminAPI      *rest_api_admin.RestAdminAPI
+}
+
+func (app *Application) Run() {
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	if os.Getenv("LOGGER_FORMAT") == "pretty" || os.Getenv("LOGGER_FORMAT") == "" {
@@ -153,6 +160,7 @@ func Run() {
 	}
 
 	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles)
+	app.MasterNode = masterNode
 	if err != nil {
 		log.Fatal().
 			Err(err).
@@ -162,123 +170,116 @@ func Run() {
 	}
 
 	log.Info().Interface("", roles).Msg("This node has these roles")
-	var adminAPI *rest_api_admin.RestAdminAPI
+
 	adminAPIInitialized := false // To track if admin API has been initialized once
 
 	go func() {
 		interval := 3 * time.Second
 		readyUpdates := masterNode.StartNodeReadyWatcher(interval)
 		for isReady := range readyUpdates {
+			app.MasterNodeIsReady = isReady
 			if isReady {
 				log.Info().Msg("✅ Node is ready for consensus.")
-				// Check if the node has the Admin role before starting the Admin API
+
 				if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
-					if adminAPI == nil && !adminAPIInitialized {
+					if app.RestAdminAPI == nil && !adminAPIInitialized {
 						// Initialize and start the Admin API
 						jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
 						jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
 
 						log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
-						adminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
+						app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
 						adminAPIInitialized = true // Mark as initialized
 
 						// The listen address for the Admin API should also be configurable.
 						adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 						go func() {
-							if err := adminAPI.Start(adminListenAddr); err != nil {
+							if err := app.RestAdminAPI.Start(adminListenAddr); err != nil {
 								log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
-								// If it fails to start, we might want to nullify adminAPI so it can be retried
+								// If it fails to start, we might want to nullify app.RestAdminAPI so it can be retried
 								// or handle this more gracefully. For now, just log.
 							}
 						}()
 						log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
 
-					} else if adminAPI != nil {
+					} else if app.RestAdminAPI != nil {
 						log.Info().Msg("Admin API already running or was previously started.")
 					}
 				} else {
 					log.Info().Msg("Node does not have RoleAdmin. Admin API will not be started.")
-					// Ensure adminAPI is nil and marked as not initialized if it was somehow set previously
+					// Ensure app.RestAdminAPI is nil and marked as not initialized if it was somehow set previously
 					// or if the roles changed dynamically (though current logic doesn't support dynamic role changes post-startup).
-					if adminAPI != nil {
+					if app.RestAdminAPI != nil {
 						log.Info().Msg("Shutting down Admin API as RoleAdmin is not present.")
 						shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
-						if err := adminAPI.Shutdown(shutdownCtx); err != nil {
+						if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
 							log.Error().Err(err).Msg("❌ Error during Admin API shutdown due to missing RoleAdmin")
 						} else {
 							log.Info().Msg("✅ Admin API shut down successfully as RoleAdmin is not present.")
 						}
 						cancelShutdown() // Ensure context is cancelled
-						adminAPI = nil
+						app.RestAdminAPI = nil
 						adminAPIInitialized = false
 					}
 				}
 			} else {
 				log.Info().Msg("⚠️ Node is NOT ready for consensus.")
-				if adminAPI != nil {
+				if app.RestAdminAPI != nil {
 					log.Info().Msg("🔌 Node not ready, shutting down Admin API...")
-					shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second) // 5-second timeout for graceful shutdown
-					defer cancelShutdown()
-					if err := adminAPI.Shutdown(shutdownCtx); err != nil {
-						log.Error().Err(err).Msg("❌ Error during Admin API shutdown")
-					} else {
-						log.Info().Msg("✅ Admin API shut down successfully.")
-					}
-					adminAPI = nil              // Set to nil so it can be restarted if node becomes ready again
+					app.CloseAdminAPI()
 					adminAPIInitialized = false // Allow re-initialization
 				}
 			}
 		}
-		if adminAPI != nil {
+		if app.RestAdminAPI != nil {
 			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
-			shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancelShutdown()
-			if err := adminAPI.Shutdown(shutdownCtx); err != nil {
-				log.Error().Err(err).Msg("❌ Error during final Admin API shutdown")
-			} else {
-				log.Info().Msg("✅ Admin API shut down successfully on node stop.")
-			}
-			adminAPI = nil
+			app.CloseAdminAPI()
 			adminAPIInitialized = false
 		}
 	}()
+}
 
-	/*
-		dbConn, columnFamilyHandles, err := db.InitDB(configMap.DBname, db.DefaultPathProvider{})
-		if err != nil {
-
-			log.Fatal().
-				Err(err).
-				Str("package", "app").
-				Str("func", "Run").
-				Msgf("❌ Failed to init DB")
+func (app *Application) Stop() {
+	go func() {
+		if app.MasterNode != nil {
+			log.Info().Msg("Stopping Master Node...")
+			app.MasterNode.Stop()
+			log.Info().Msg("Master Node stopped.")
+		} else {
+			log.Warn().Msg("No Master Node to stop.")
 		}
+	}()
 
-		defer dbConn.Close()
-
-		rocksdbStore := &db.RocksdbStore{DB: dbConn, ColumnFamilyHandles: columnFamilyHandles}
-		if err := db.BootstrapRootUser(rocksdbStore, *configMap); err != nil {
-			log.Fatal().
-				Err(err).
-				Str("package", "app").
-				Str("func", "Run").
-				Msgf("❌ Bootstrap failed")
+	go func() {
+		if app.RestAdminAPI != nil {
+			app.CloseAdminAPI()
+		} else {
+			log.Warn().Msg("No Admin API to stop.")
 		}
-	*/
-	/*
-		err = server.StartGRPC(
-			*configMap,
-			server.DefaultListener,
-			server.DefaultGRPCServerFactory,
-		)
-		if err != nil {
+	}()
 
-			log.Fatal().
-				Err(err).
-				Str("package", "app").
-				Str("func", "Run").
-				Msgf("❌Failed to start gRPC server")
+	log.Info().Msg("Application stopped gracefully.")
+}
+func (app *Application) CloseAdminAPI() {
+	if app.RestAdminAPI != nil {
+		log.Info().Msg("Closing Admin API...")
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelShutdown()
+		if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
+			log.Error().Err(err).Msg("❌ Error during Admin API shutdown")
+		} else {
+			log.Info().Msg("✅ Admin API closed successfully.")
 		}
-	*/
+		app.RestAdminAPI = nil
+	} else {
+		log.Warn().Msg("No Admin API to close.")
+	}
+}
+func NewApplication() *Application {
+	return &Application{
+		MasterNodeIsReady: false,
+		MasterNode:        nil,
+		RestAdminAPI:      nil,
+	}
 }
