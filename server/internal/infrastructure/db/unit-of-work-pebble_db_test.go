@@ -10,44 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const UOWTestFCPebble = "test_fc"
-const UOWDefaultFCPebble = "default"
-const UOWTemporalFCPebble = "temporal_fc"
-
-type TestCarPebbleFixOrderPebble struct {
-	ID           string `orm:"primary-key"`
-	Code         string `orm:"unique"`
-	LicensePlate string
-	Amount       float32
-}
-
-func (TestCarPebbleFixOrderPebble) TableName() string {
-	return "car_fix_orders"
-}
-
-type TestCarPebble struct {
-	ID           string `orm:"primary-key"`
-	LicensePlate string `orm:"unique"`
-	Name         string
-	Model        string
-	Performace   float32
-	Year         int
-}
-
-func (TestCarPebble) TableName() string {
-	return "cars"
-}
-
-type TestNotificationPebble struct {
-	ID      string `orm:"primary-key"`
-	Content string
-	TTL     int `orm:"ttl"`
-}
-
-func (TestNotificationPebble) TableName() string {
-	return "cars"
-}
-
 func newRocksdbStoreForUOWPebble(t *testing.T) *db.RocksdbStore {
 	tmpDir := t.TempDir()
 	opts := grocksdb.NewDefaultOptions()
@@ -55,7 +17,7 @@ func newRocksdbStoreForUOWPebble(t *testing.T) *db.RocksdbStore {
 	opts.SetCreateIfMissingColumnFamilies(true)
 	goOp := grocksdb.NewDefaultOptions()
 
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{UOWDefaultFCPebble, UOWTestFCPebble, UOWTemporalFCPebble}, []*grocksdb.Options{goOp, goOp, goOp})
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{UOWDefaultFC, UOWTestFC, UOWTemporalFC}, []*grocksdb.Options{goOp, goOp, goOp})
 	require.NoError(t, err)
 	t.Cleanup(func() { rocks.Close() })
 
@@ -64,14 +26,14 @@ func newRocksdbStoreForUOWPebble(t *testing.T) *db.RocksdbStore {
 
 	cfMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames)-1)
 	for i, name := range columnFamilyNames {
-		if name != UOWTemporalFCPebble {
+		if name != UOWTemporalFC {
 			cfMap[name] = cfHs[i]
 		}
 	}
 
 	ttlCFMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames)-2)
 	for i, name := range columnFamilyNames {
-		if name == UOWTemporalFCPebble {
+		if name == UOWTemporalFC {
 			ttlCFMap[name] = cfHs[i]
 		}
 	}
@@ -83,19 +45,19 @@ func newRocksdbStoreForUOWPebble(t *testing.T) *db.RocksdbStore {
 	}
 }
 
-func newTestUOWDefaultIdGeneratorPebble(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.Repository[TestCarPebble], *db.Repository[TestCarPebbleFixOrderPebble], *db.Repository[TestNotificationPebble], error) {
+func newTestUOWDefaultIdGeneratorPebble(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.Repository[TestCar], *db.Repository[TestCarFixOrder], *db.Repository[TestNotification], error) {
 	store := newRocksdbStoreForUOWPebble(t)
 	uow := db.NewUnitOfWork(store, nil)
 
-	carRepo, err := db.GetRepository[TestCarPebble](uow, UOWTestFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
+	carRepo, err := db.GetRepository[TestCar](uow, UOWTestFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
 		t.Fatalf("failed to create car repo: %v", err)
 	}
-	testCarFixOrderRepo, err := db.GetRepository[TestCarPebbleFixOrderPebble](uow, UOWTestFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
+	testCarFixOrderRepo, err := db.GetRepository[TestCarFixOrder](uow, UOWTestFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
 		t.Fatalf("failed to create fix order repo: %v", err)
 	}
-	testNotificationRepo, err := db.GetRepository[TestNotificationPebble](uow, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
+	testNotificationRepo, err := db.GetRepository[TestNotification](uow, UOWTemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
 		t.Fatalf("failed to create notification repo: %v", err)
 	}
@@ -109,7 +71,7 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	car := &TestCarPebble{
+	car := &TestCar{
 		LicensePlate: "ABC123",
 		Name:         "Toyota",
 		Model:        "Corolla",
@@ -117,13 +79,13 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 		Year:         2020,
 	}
 
-	order := &TestCarPebbleFixOrderPebble{
+	order := &TestCarFixOrder{
 		Code:         "ORD-001",
 		LicensePlate: "ABC123",
 		Amount:       123.45,
 	}
 
-	notif := &TestNotificationPebble{
+	notif := &TestNotification{
 		Content: "Test TTL Message",
 		TTL:     1, // 1 second TTL
 	}
@@ -172,7 +134,7 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store, nil)
-	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
+	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 	expired, err := nRepo.FindByField("ID", notif.ID, checkTime)
 	if err != nil {
 		t.Fatalf("error checking expired ttl entity: %v", err)
@@ -185,9 +147,9 @@ func TestPebbleUnitOfWork_TTLBulkCreateAndExpire(t *testing.T) {
 	uow, store, _, _, notifRepo, err := newTestUOWDefaultIdGeneratorPebble(t)
 	require.NoError(t, err)
 
-	var notifs []*TestNotificationPebble
+	var notifs []*TestNotification
 	for i := 0; i < 1000; i++ {
-		n := &TestNotificationPebble{
+		n := &TestNotification{
 			Content: "Notify " + strconv.Itoa(i),
 			TTL:     1,
 		}
@@ -204,7 +166,7 @@ func TestPebbleUnitOfWork_TTLBulkCreateAndExpire(t *testing.T) {
 	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store, nil)
-	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
+	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
 		found, err := nRepo.FindByField("ID", notif.ID, checkTime)
@@ -216,13 +178,13 @@ func TestPebbleUnitOfWork_MassiveMixedEntities(t *testing.T) {
 	uow, store, carRepo, fixRepo, notifRepo, err := newTestUOWDefaultIdGeneratorPebble(t)
 	require.NoError(t, err)
 
-	var cars []*TestCarPebble
-	var orders []*TestCarPebbleFixOrderPebble
-	var notifs []*TestNotificationPebble
+	var cars []*TestCar
+	var orders []*TestCarFixOrder
+	var notifs []*TestNotification
 
 	for i := 0; i < 1000; i++ {
 		license := "XYZ" + strconv.Itoa(i)
-		cars = append(cars, &TestCarPebble{
+		cars = append(cars, &TestCar{
 			LicensePlate: license,
 			Name:         "name-" + strconv.Itoa(i),
 			Model:        "Model" + strconv.Itoa(i),
@@ -230,13 +192,13 @@ func TestPebbleUnitOfWork_MassiveMixedEntities(t *testing.T) {
 			Year:         2000 + (i % 24),
 		})
 
-		orders = append(orders, &TestCarPebbleFixOrderPebble{
+		orders = append(orders, &TestCarFixOrder{
 			Code:         "FIX" + strconv.Itoa(i),
 			LicensePlate: license,
 			Amount:       float32(i) * 10,
 		})
 
-		notifs = append(notifs, &TestNotificationPebble{
+		notifs = append(notifs, &TestNotification{
 			Content: "Message " + strconv.Itoa(i),
 			TTL:     1,
 		})
@@ -255,7 +217,7 @@ func TestPebbleUnitOfWork_MassiveMixedEntities(t *testing.T) {
 	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store, nil)
-	nRepo, _ := db.GetRepository[TestNotificationPebble](uow2, UOWTemporalFCPebble, "test_schema", &db.DefaultIDGeneratorFactory{})
+	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
 		found, err := nRepo.FindByField("ID", notif.ID, checkTime)

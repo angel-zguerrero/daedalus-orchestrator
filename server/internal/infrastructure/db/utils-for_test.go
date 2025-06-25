@@ -281,3 +281,40 @@ func (UserComplexEmbedded) TableName() string {
 }
 
 // --- Test Cases for Nested Fields ---
+const UOWTestFC = "test_fc"
+const UOWDefaultFC = "default"
+const UOWTemporalFC = "temporal_fc"
+
+type TestCarFixOrder struct {
+	ID           string `orm:"primary-key"`
+	Code         string `orm:"unique"`
+	LicensePlate string
+	Amount       float32
+}
+
+func (TestCarFixOrder) TableName() string {
+	return "car_fix_orders"
+}
+
+type TestCar struct {
+	ID           string `orm:"primary-key"`
+	LicensePlate string `orm:"unique"`
+	Name         string
+	Model        string
+	Performace   float32
+	Year         int
+}
+
+func (TestCar) TableName() string {
+	return "cars"
+}
+
+type TestNotification struct {
+	ID      string `orm:"primary-key"`
+	Content string
+	TTL     int `orm:"ttl"`
+}
+
+func (TestNotification) TableName() string {
+	return "cars"
+}
