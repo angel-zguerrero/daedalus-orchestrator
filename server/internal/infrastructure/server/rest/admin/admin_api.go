@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,20 +21,30 @@ type RestAdminAPI struct {
 	jwtKey      []byte
 	jwtDuration time.Duration
 	server      *http.Server
+	logger      zerolog.Logger
+}
+type zerologAdapter struct {
+	logger zerolog.Logger
+}
+
+func (z zerologAdapter) Write(p []byte) (n int, err error) {
+	z.logger.Info().Msg(string(p))
+	return len(p), nil
 }
 
 // NewRestAdminAPI creates a new instance of RestAdminAPI.
 // It initializes the Gin engine and sets up the API routes.
-func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDuration time.Duration) *RestAdminAPI {
+func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDuration time.Duration, logger zerolog.Logger) *RestAdminAPI {
 	if node == nil {
-		log.Fatal().Msg("Admin API: Raft node cannot be nil")
+		logger.Fatal().Msg("Admin API: Raft node cannot be nil")
 	}
 	if jwtSecretKey == "" {
-		log.Warn().Msg("Admin API: JWT secret key is empty. This is insecure.")
+		logger.Warn().Msg("Admin API: JWT secret key is empty. This is insecure.")
 		// In a real scenario, you might want to prevent startup or generate a temporary key.
 		// For now, we'll proceed but this should be addressed.
 	}
-
+	gin.DefaultWriter = zerologAdapter{logger}
+	gin.DefaultErrorWriter = zerologAdapter{logger}
 	engine := gin.Default()
 
 	api := &RestAdminAPI{
@@ -41,6 +52,7 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 		ginEngine:   engine,
 		jwtKey:      []byte(jwtSecretKey),
 		jwtDuration: jwtAuthDuration,
+		logger:      logger,
 	}
 
 	// Setup routes
@@ -68,7 +80,7 @@ func (api *RestAdminAPI) Start(listenAddr string) error {
 	if api.ginEngine == nil {
 		return fmt.Errorf("Admin API Gin engine not initialized")
 	}
-	log.Info().Str("address", listenAddr).Msg("🚀 Starting Admin REST API server...")
+	api.logger.Info().Str("address", listenAddr).Msg("🚀 Starting Admin REST API server...")
 
 	api.server = &http.Server{
 		Addr:    listenAddr,
@@ -76,16 +88,16 @@ func (api *RestAdminAPI) Start(listenAddr string) error {
 	}
 
 	if err := api.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Error().Err(err).Msg("❌ Failed to start Admin REST API server")
+		api.logger.Error().Err(err).Msg("❌ Failed to start Admin REST API server")
 		return err
 	}
-	log.Info().Msg("✅ Admin REST API server shut down gracefully.")
+	api.logger.Info().Msg("✅ Admin REST API server shut down gracefully.")
 	return nil
 }
 
 // Shutdown gracefully shuts down the Gin HTTP server.
 func (api *RestAdminAPI) Shutdown(ctx context.Context) error {
-	log.Info().Msg("🔌 Shutting down Admin REST API server...")
+	api.logger.Info().Msg("🔌 Shutting down Admin REST API server...")
 	if api.server != nil {
 		return api.server.Shutdown(ctx)
 	}
@@ -102,7 +114,7 @@ type loginRequest struct {
 func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Warn().Err(err).Msg("Login attempt with invalid payload")
+		api.logger.Warn().Err(err).Msg("Login attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
@@ -112,7 +124,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	// but we need to ensure they are not empty as per binding:"required".
 	if req.Username == "" || req.Password == "" {
 		// This case should ideally be caught by `binding:"required"`, but as a safeguard:
-		log.Warn().Msg("Login attempt with empty username or password")
+		api.logger.Warn().Msg("Login attempt with empty username or password")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Username and password are required"})
 		return
 	}
@@ -126,7 +138,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 
 	//if err != nil {
 	// If Propose returns an error, it means the Raft operation failed.
-	//	log.Error().Err(err).Str("username", req.Username).Msg("Raft Propose failed during login attempt")
+	//	api.logger.Error().Err(err).Str("username", req.Username).Msg("Raft Propose failed during login attempt")
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (proposal)"})
 	//	return
 	//}
@@ -137,12 +149,12 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	// Generate JWT token
 	tokenString, err := api.generateJWT(req.Username)
 	if err != nil {
-		log.Error().Err(err).Str("username", req.Username).Msg("Failed to generate JWT token during login")
+		api.logger.Error().Err(err).Str("username", req.Username).Msg("Failed to generate JWT token during login")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (token generation)"})
 		return
 	}
 
-	log.Info().Str("username", req.Username).Msg("User logged in successfully")
+	api.logger.Info().Str("username", req.Username).Msg("User logged in successfully")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
 		"token":   tokenString,
@@ -155,12 +167,12 @@ func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
 	//query := []byte(`{"action": "list_tenants"}`)
 	//_, err := api.node.Lookup(c.Request.Context(), query)
 	//if err != nil {
-	//	log.Error().Err(err).Msg("Raft Lookup failed for list_tenants")
+	//	api.logger.Error().Err(err).Msg("Raft Lookup failed for list_tenants")
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list tenants (lookup error)"})
 	//	return
 	//}
 	// Dummy response
-	log.Info().Msg("Admin API: Listing all tenants (dummy)")
+	api.logger.Info().Msg("Admin API: Listing all tenants (dummy)")
 	c.JSON(http.StatusOK, gin.H{"message": "Listing all tenants (dummy)", "tenants": []string{"tenantA", "tenantB"}})
 }
 
@@ -171,12 +183,12 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	//proposalData := []byte(`{"action": "create_tenant", "details": {"name": "newTenantFromAPI"}}`) // Dummy proposal
 	//_, err := api.node.Propose(c.Request.Context(), proposalData)
 	//if err != nil {
-	//	log.Error().Err(err).Msg("Raft Propose failed for create_tenant")
+	//	api.logger.Error().Err(err).Msg("Raft Propose failed for create_tenant")
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tenant (proposal error)"})
 	//	return
 	//}
 	// Dummy response
-	log.Info().Msg("Admin API: Tenant creation requested (dummy)")
+	api.logger.Info().Msg("Admin API: Tenant creation requested (dummy)")
 	c.JSON(http.StatusCreated, gin.H{"message": "Tenant created (dummy)", "id": "newTenantID123"})
 }
 
@@ -187,12 +199,12 @@ func (api *RestAdminAPI) getTenantHandler(c *gin.Context) {
 	//query := []byte(fmt.Sprintf(`{"action": "get_tenant", "id": "%s"}`, tenantID))
 	//_, err := api.node.Lookup(c.Request.Context(), query)
 	//if err != nil {
-	//	log.Error().Err(err).Str("tenantID", tenantID).Msg("Raft Lookup failed for get_tenant")
+	//	api.logger.Error().Err(err).Str("tenantID", tenantID).Msg("Raft Lookup failed for get_tenant")
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get tenant details (lookup error)"})
 	//	return
 	//}
 	// Dummy response
-	log.Info().Str("tenantID", tenantID).Msg("Admin API: Getting tenant details (dummy)")
+	api.logger.Info().Str("tenantID", tenantID).Msg("Admin API: Getting tenant details (dummy)")
 	c.JSON(http.StatusOK, gin.H{"message": "Details for tenant " + tenantID + " (dummy)", "id": tenantID, "name": "Dummy Tenant " + tenantID})
 }
 
@@ -203,12 +215,12 @@ func (api *RestAdminAPI) updateTenantHandler(c *gin.Context) {
 	//proposalData := []byte(fmt.Sprintf(`{"action": "update_tenant", "id": "%s", "details": {"name": "updatedNameFromAPI"}}`, tenantID)) // Dummy proposal
 	//_, err := api.node.Propose(c.Request.Context(), proposalData)
 	//if err != nil {
-	//	log.Error().Err(err).Str("tenantID", tenantID).Msg("Raft Propose failed for update_tenant")
+	//	api.logger.Error().Err(err).Str("tenantID", tenantID).Msg("Raft Propose failed for update_tenant")
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update tenant (proposal error)"})
 	//	return
 	//}
 	// Dummy response
-	log.Info().Str("tenantID", tenantID).Msg("Admin API: Tenant update requested (dummy)")
+	api.logger.Info().Str("tenantID", tenantID).Msg("Admin API: Tenant update requested (dummy)")
 	c.JSON(http.StatusOK, gin.H{"message": "Tenant " + tenantID + " updated (dummy)", "id": tenantID})
 }
 
@@ -219,18 +231,23 @@ func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
 	//proposalData := []byte(fmt.Sprintf(`{"action": "delete_tenant", "id": "%s"}`, tenantID)) // Dummy proposal
 	//_, err := api.node.Propose(c.Request.Context(), proposalData)
 	//if err != nil {
-	//	log.Error().Err(err).Str("tenantID", tenantID).Msg("Raft Propose failed for delete_tenant")
+	//	api.logger.Error().Err(err).Str("tenantID", tenantID).Msg("Raft Propose failed for delete_tenant")
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant (proposal error)"})
 	//	return
 	//}
 	// Dummy response
-	log.Info().Str("tenantID", tenantID).Msg("Admin API: Tenant deletion requested (dummy)")
+	api.logger.Info().Str("tenantID", tenantID).Msg("Admin API: Tenant deletion requested (dummy)")
 	c.JSON(http.StatusOK, gin.H{"message": "Tenant " + tenantID + " deleted (dummy)"})
 }
 
 // Helper function to get JWT expiration from global config (or use default)
 // This is a placeholder, as the actual duration is passed during NewRestAdminAPI construction.
 // However, it shows how one might access it if needed directly.
+// It's important to note that this function uses the global `log` instance.
+// If this function were to be used by methods that now have access to `api.logger`,
+// it would be inconsistent. For the purpose of this refactoring, we assume this function
+// is either not critically dependent on the specific logger instance for its warnings,
+// or it might be refactored separately if strict logger consistency is required everywhere.
 func getJWTExpirationDuration() time.Duration {
 	hours := config.GlobalConfiguration.AdminAPIJWTExpirationHours
 	if hours <= 0 {
