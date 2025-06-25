@@ -132,3 +132,152 @@ func NewTestIDGeneratorFactory(ids []string) *TestIDGeneratorFactory {
 		ids: ids,
 	}
 }
+
+const TestFC = "test_fc"
+const DefaultFC = "default"
+const TemporalFC = "temporal_fc"
+
+type testEntity struct {
+	ID       string `orm:"primary-key"`
+	Name     string `orm:"unique"`
+	LastName string
+	Age      int
+	TTL      int `orm:"ttl"`
+}
+
+func (testEntity) TableName() string {
+	return "users"
+}
+
+type ConditionalUniqueEntity struct {
+	ID                     string `orm:"primary-key"`
+	Name                   string
+	UniqueValue            string `orm:"unique,ignore-is-true:ShouldIgnoreUniqueness"`
+	ShouldIgnoreUniqueness bool
+}
+
+func (e ConditionalUniqueEntity) TableName() string {
+	return "conditional_unique_entities"
+}
+
+type InvalidConditionalEntityBadRef struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:NonExistentFlag"`
+}
+
+func (e InvalidConditionalEntityBadRef) TableName() string { return "invalid_cond_bad_ref" }
+
+type InvalidConditionalEntityBadType struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:NonBoolFlag"`
+	NonBoolFlag int
+}
+
+func (e InvalidConditionalEntityBadType) TableName() string { return "invalid_cond_bad_type" }
+
+type User struct {
+	ID   string `orm:"primary-key"`
+	Name string `orm:"unique"`
+}
+
+func (User) TableName() string {
+	return "users"
+}
+
+type InvalidConditionalEmptyField struct {
+	ID          string `orm:"primary-key"`
+	UniqueValue string `orm:"ignore-is-true:"`
+}
+
+func (e InvalidConditionalEmptyField) TableName() string {
+	return "conditional_unique_entities"
+}
+
+type NestedMetaTest struct {
+	UniqueID    string `orm:"unique"`
+	OTValue     string
+	Description string
+}
+
+type NestedEntityTest struct {
+	ID   string `orm:"primary-key"`
+	Data string
+	Meta NestedMetaTest
+}
+
+func (NestedEntityTest) TableName() string {
+	return "nested_entities_test"
+}
+
+type NoPrimary struct {
+	Name string
+}
+
+func (NoPrimary) TableName() string {
+	return "nopk"
+}
+
+type TempEntity struct {
+	ID    string `orm:"primary-key"`
+	Token string `orm:"unique"`
+	TTL   int    `orm:"ttl"`
+}
+
+func (TempEntity) TableName() string {
+	return "temporal_entities"
+}
+
+type InvalidTempEntity struct {
+	ID    string `orm:"primary-key"`
+	Token string `orm:"unique"`
+	ttl   int    `orm:"ttl"`
+}
+
+func (InvalidTempEntity) TableName() string {
+	return "invalid_temporal_entities"
+}
+
+type Invalid struct {
+	Name string `orm:"unique"`
+}
+
+func (Invalid) TableName() string {
+	return "invalid"
+}
+
+type Meta struct {
+	Tag         string `orm:"unique"`
+	ConfigCode  int
+	Description string
+}
+
+type UserComplex struct {
+	ID     string `orm:"primary-key"`
+	Email  string `orm:"unique"`
+	Meta   Meta   // Named field
+	Status string
+	Extra  *Meta // Pointer to a struct, for testing pointer handling
+}
+
+func (UserComplex) TableName() string {
+	return "users_complex"
+}
+
+type MetaForEmbed struct {
+	Tag         string `orm:"unique"` // Will become "Tag" at top level due to embedding
+	ConfigCode  int    // Will become "ConfigCode"
+	Description string // Will become "Description"
+}
+
+type UserComplexEmbedded struct {
+	ID           string `orm:"primary-key"`
+	Email        string `orm:"unique"`
+	MetaForEmbed        // Embedded field
+	Status       string
+}
+
+func (UserComplexEmbedded) TableName() string {
+	return "users_complex_embedded"
+}
+
+// --- Test Cases for Nested Fields ---

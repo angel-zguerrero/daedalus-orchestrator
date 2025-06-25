@@ -13,27 +13,49 @@ import (
 )
 
 func newTestRepositoryPebble(t *testing.T) (*db.Repository[testEntity], error) {
-	store := newPebbleStore(t)
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
 func newTestDeterministicRepositoryPebble(t *testing.T) (*db.Repository[testEntity], error) {
-	store := newPebbleStore(t)
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := &db.DeterministicIDGeneratorFactory{}
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
 func newTestRepositorySpesificIdsPebble(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
-	store := newPebbleStore(t)
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := NewTestIDGeneratorFactory(ids)
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
 }
 
 func newTestRepositoryDefaultIdGeneratorPebble(t *testing.T) (*db.Repository[testEntity], error) {
-	store := newPebbleStore(t)
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 
 	return db.NewRepository[testEntity](store, TestFC, "test_schema", &db.DefaultIDGeneratorFactory{})
+}
+
+func newTestNRepositoryPebble(t *testing.T) (*db.Repository[UserComplex], error) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
+	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
+	return db.NewRepository[UserComplex](store, TestFC, "test_schema", iGF)
+}
+
+func newNestedEntityTestPebbleRepositoryPebble(t *testing.T) (*db.Repository[NestedEntityTest], error) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})       // Assumes newPebbleStore is defined in this file
+	iGF := NewTestIDGeneratorFactory([]string{"pnid1", "pnid2", "pnid3", "pnid4", "pnid5"}) // Example IDs for Pebble
+	return db.NewRepository[NestedEntityTest](store, TestFC, "nested_entity_schema_pebble", iGF)
+}
+
+// --- Conditional Uniqueness Tests ---
+
+func newTestConditionalUniqueRepoPebble(t *testing.T, initialIDs []string) (*db.Repository[ConditionalUniqueEntity], db.KVStore) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
+	idGenerator := NewTestIDGeneratorFactory(initialIDs)
+	repo, err := db.NewRepository[ConditionalUniqueEntity](store, TestFC, "test_schema_cond", idGenerator)
+	require.NoError(t, err, "Failed to create repository for ConditionalUniqueEntity")
+	return repo, store
 }
 
 func TestRepository_PutAndGet_Pebble(t *testing.T) {
@@ -157,46 +179,25 @@ func TestRepository_Get_NotFound_Pebble(t *testing.T) {
 	assert.Nil(t, found)
 }
 
-// --- Conditional Uniqueness Tests ---
-
-type ConditionalUniqueEntityPebble struct {
-	ID                     string `orm:"primary-key"`
-	Name                   string
-	UniqueValue            string `orm:"unique,ignore-is-true:ShouldIgnoreUniqueness"`
-	ShouldIgnoreUniqueness bool
-}
-
-func (e ConditionalUniqueEntityPebble) TableName() string {
-	return "cond_unique_pebble"
-}
-
-func newTestConditionalUniqueRepoPebble(t *testing.T, initialIDs []string) (*db.Repository[ConditionalUniqueEntityPebble], db.KVStore) {
-	store := newPebbleStore(t) // Uses a new temp dir for each call
-	idGenerator := NewTestIDGeneratorFactory(initialIDs)
-	repo, err := db.NewRepository[ConditionalUniqueEntityPebble](store, TestFC, "test_schema_cond", idGenerator)
-	require.NoError(t, err, "Failed to create repository for ConditionalUniqueEntityPebble")
-	return repo, store
-}
-
 func TestPebbleConditionalUniquenessCreate(t *testing.T) {
 	t.Run("IgnoreUniqueness", func(t *testing.T) {
 		ids := []string{"id1", "id2", "id3", "id4"}
 		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
 		now := time.Now()
 
-		entity1 := &ConditionalUniqueEntityPebble{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
+		entity1 := &ConditionalUniqueEntity{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
 		_, err := repo.Create(entity1, now)
 		require.NoError(t, err, "Create entity1 should succeed")
 
-		entity2 := &ConditionalUniqueEntityPebble{Name: "E2", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
+		entity2 := &ConditionalUniqueEntity{Name: "E2", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
 		_, err = repo.Create(entity2, now)
 		require.NoError(t, err, "Create entity2 with same UniqueValue (ignored) should succeed")
 
-		entity3 := &ConditionalUniqueEntityPebble{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		entity3 := &ConditionalUniqueEntity{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity3, now)
 		require.NoError(t, err, "Create entity3 with same UniqueValue (enforced, but not previously by E1/E2) should succeed")
 
-		entity4 := &ConditionalUniqueEntityPebble{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		entity4 := &ConditionalUniqueEntity{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity4, now)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "duplicate unique field: UniqueValue = uv1")
@@ -221,16 +222,16 @@ func TestPebbleConditionalUniquenessCreate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
 		now := time.Now()
 
-		entity4 := &ConditionalUniqueEntityPebble{Name: "E4", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
+		entity4 := &ConditionalUniqueEntity{Name: "E4", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entity4, now)
 		require.NoError(t, err, "Create entity4 should succeed")
 
-		entity5 := &ConditionalUniqueEntityPebble{Name: "E5", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
+		entity5 := &ConditionalUniqueEntity{Name: "E5", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity5, now)
 		require.Error(t, err, "Create entity5 with same UniqueValue (enforced) should fail")
 		assert.Contains(t, err.Error(), "duplicate unique field")
 
-		entity6 := &ConditionalUniqueEntityPebble{Name: "E6", UniqueValue: "uv2", ShouldIgnoreUniqueness: true}
+		entity6 := &ConditionalUniqueEntity{Name: "E6", UniqueValue: "uv2", ShouldIgnoreUniqueness: true}
 		_, err = repo.Create(entity6, now)
 		require.NoError(t, err, "Create entity6 with same UniqueValue (ignored) should succeed")
 
@@ -251,11 +252,11 @@ func TestPebbleConditionalUniquenessUpdate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
 		now := time.Now()
 
-		entityA := &ConditionalUniqueEntityPebble{ID: ids[0], Name: "EntityA", UniqueValue: "uva", ShouldIgnoreUniqueness: false}
+		entityA := &ConditionalUniqueEntity{ID: ids[0], Name: "EntityA", UniqueValue: "uva", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entityA, now)
 		require.NoError(t, err)
 
-		entityB := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityB", UniqueValue: "uvb", ShouldIgnoreUniqueness: false}
+		entityB := &ConditionalUniqueEntity{ID: ids[1], Name: "EntityB", UniqueValue: "uvb", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entityB, now)
 		require.NoError(t, err)
 
@@ -278,11 +279,11 @@ func TestPebbleConditionalUniquenessUpdate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
 		now := time.Now()
 
-		entityC := &ConditionalUniqueEntityPebble{ID: ids[0], Name: "EntityC", UniqueValue: "uvc", ShouldIgnoreUniqueness: false}
+		entityC := &ConditionalUniqueEntity{ID: ids[0], Name: "EntityC", UniqueValue: "uvc", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entityC, now)
 		require.NoError(t, err)
 
-		entityD := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityD", UniqueValue: "uvd", ShouldIgnoreUniqueness: false}
+		entityD := &ConditionalUniqueEntity{ID: ids[1], Name: "EntityD", UniqueValue: "uvd", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entityD, now)
 		require.NoError(t, err)
 
@@ -300,7 +301,7 @@ func TestPebbleConditionalUniquenessUpdate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoPebble(t, ids)
 		now := time.Now()
 
-		entityE := &ConditionalUniqueEntityPebble{ID: ids[0], Name: "EntityE", UniqueValue: "uve", ShouldIgnoreUniqueness: false}
+		entityE := &ConditionalUniqueEntity{ID: ids[0], Name: "EntityE", UniqueValue: "uve", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entityE, now)
 		require.NoError(t, err)
 
@@ -310,7 +311,7 @@ func TestPebbleConditionalUniquenessUpdate(t *testing.T) {
 		require.NoError(t, err, "Update entityE should succeed")
 		assert.True(t, updated)
 
-		entityF := &ConditionalUniqueEntityPebble{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: true}
+		entityF := &ConditionalUniqueEntity{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: true}
 		_, err = repo.Create(entityF, now)
 		require.NoError(t, err, "Create entityF should succeed as E is ignoring uniqueness")
 
@@ -1198,38 +1199,10 @@ func TestRepository_BulkUpdate_Pebble(t *testing.T) {
 	})
 }
 
-func newTestNRepositoryPebble(t *testing.T) (*db.Repository[UserComplexN], error) {
-	store := newPebbleStore(t)
-	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	return db.NewRepository[UserComplexN](store, TestFC, "test_schema", iGF)
-}
-
-func newNestedEntityTestPebbleRepositoryPebble(t *testing.T) (*db.Repository[NestedEntityTestPebble], error) {
-	store := newPebbleStore(t)                                                              // Assumes newPebbleStore is defined in this file
-	iGF := NewTestIDGeneratorFactory([]string{"pnid1", "pnid2", "pnid3", "pnid4", "pnid5"}) // Example IDs for Pebble
-	return db.NewRepository[NestedEntityTestPebble](store, TestFC, "nested_entity_schema_pebble", iGF)
-}
-
-type NestedMetaTestPebble struct {
-	UniqueID    string `orm:"unique"`
-	OTValue     string
-	Description string
-}
-
-type NestedEntityTestPebble struct {
-	ID   string `orm:"primary-key"`
-	Data string
-	Meta NestedMetaTestPebble
-}
-
-func (NestedEntityTestPebble) TableName() string {
-	return "nested_entities_test"
-}
-
 func TestRepository_PutAndGet_Nested_Pebble(t *testing.T) {
-	repo, err := newTestNRepository(t)
+	repo, err := newTestNRepositoryPebble(t)
 	require.NoError(t, err)
-	entity := UserComplexN{ID: "----", Email: "Alice@x.com", Status: "active", Meta: MetaN{
+	entity := UserComplex{ID: "----", Email: "Alice@x.com", Status: "active", Meta: Meta{
 		Tag:         "t1",
 		ConfigCode:  55,
 		Description: "None",
@@ -1265,13 +1238,13 @@ func TestRepository_PutAndGet_Nested_Pebble(t *testing.T) {
 
 func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
 	repo, err := newNestedEntityTestPebbleRepositoryPebble(t)
-	require.NoError(t, err, "Failed to create repository for NestedEntityTestPebble (Pebble)")
+	require.NoError(t, err, "Failed to create repository for NestedEntityTest (Pebble)")
 
 	t.Run("Successful bulk creation with nested structs pebble", func(t *testing.T) {
-		entities := []*NestedEntityTestPebble{
-			{ID: "---", Data: "EntityP1", Meta: NestedMetaTestPebble{UniqueID: "uniqueP1", OTValue: "ttlP1", Description: "DescP1"}},
-			{ID: "---", Data: "EntityP2", Meta: NestedMetaTestPebble{UniqueID: "uniqueP2", OTValue: "ttlP2", Description: "DescP2"}},
-			{ID: "---", Data: "EntityP3", Meta: NestedMetaTestPebble{UniqueID: "uniqueP3", OTValue: "ttlP3", Description: "DescP3"}},
+		entities := []*NestedEntityTest{
+			{ID: "---", Data: "EntityP1", Meta: NestedMetaTest{UniqueID: "uniqueP1", OTValue: "ttlP1", Description: "DescP1"}},
+			{ID: "---", Data: "EntityP2", Meta: NestedMetaTest{UniqueID: "uniqueP2", OTValue: "ttlP2", Description: "DescP2"}},
+			{ID: "---", Data: "EntityP3", Meta: NestedMetaTest{UniqueID: "uniqueP3", OTValue: "ttlP3", Description: "DescP3"}},
 		}
 		now := time.Now()
 
@@ -1306,10 +1279,10 @@ func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
 		repoFresh, err := newNestedEntityTestPebbleRepositoryPebble(t)
 		require.NoError(t, err)
 
-		entities := []*NestedEntityTestPebble{
-			{ID: "---", Data: "EntityPX", Meta: NestedMetaTestPebble{UniqueID: "duplicateKeyInBatchP", OTValue: "ttlPX", Description: "DescPX"}},
-			{ID: "---", Data: "EntityPY", Meta: NestedMetaTestPebble{UniqueID: "anotherUniqueInBatchP", OTValue: "ttlPY", Description: "DescPY"}},
-			{ID: "---", Data: "EntityPZ", Meta: NestedMetaTestPebble{UniqueID: "duplicateKeyInBatchP", OTValue: "ttlPZ", Description: "DescPZ"}}, // Duplicate UniqueID
+		entities := []*NestedEntityTest{
+			{ID: "---", Data: "EntityPX", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatchP", OTValue: "ttlPX", Description: "DescPX"}},
+			{ID: "---", Data: "EntityPY", Meta: NestedMetaTest{UniqueID: "anotherUniqueInBatchP", OTValue: "ttlPY", Description: "DescPY"}},
+			{ID: "---", Data: "EntityPZ", Meta: NestedMetaTest{UniqueID: "duplicateKeyInBatchP", OTValue: "ttlPZ", Description: "DescPZ"}}, // Duplicate UniqueID
 		}
 		now := time.Now()
 
@@ -1333,15 +1306,15 @@ func TestRepository_BulkCreate_Nested_Pebble(t *testing.T) {
 		require.NoError(t, err)
 
 		// Pre-existing entity
-		existingEntity := NestedEntityTestPebble{ID: "---", Data: "ExistingDataP", Meta: NestedMetaTestPebble{UniqueID: "conflictWithExistingP", OTValue: "ttlPE", Description: "DescPE"}}
+		existingEntity := NestedEntityTest{ID: "---", Data: "ExistingDataP", Meta: NestedMetaTest{UniqueID: "conflictWithExistingP", OTValue: "ttlPE", Description: "DescPE"}}
 		now := time.Now()
 		_, err = repoClean.Create(&existingEntity, now)
 		require.NoError(t, err, "Setup: Failed to create initial entity (Pebble)")
 
-		entitiesToBulkCreate := []*NestedEntityTestPebble{
-			{ID: "---", Data: "NewEntityP1", Meta: NestedMetaTestPebble{UniqueID: "newUniqueP1", OTValue: "ttlPN1", Description: "DescPN1"}},
-			{ID: "---", Data: "NewEntityP2Conflicting", Meta: NestedMetaTestPebble{UniqueID: "conflictWithExistingP", OTValue: "ttlPN2", Description: "DescPN2"}}, // Conflicts
-			{ID: "---", Data: "NewEntityP3", Meta: NestedMetaTestPebble{UniqueID: "newUniqueP3", OTValue: "ttlPN3", Description: "DescPN3"}},
+		entitiesToBulkCreate := []*NestedEntityTest{
+			{ID: "---", Data: "NewEntityP1", Meta: NestedMetaTest{UniqueID: "newUniqueP1", OTValue: "ttlPN1", Description: "DescPN1"}},
+			{ID: "---", Data: "NewEntityP2Conflicting", Meta: NestedMetaTest{UniqueID: "conflictWithExistingP", OTValue: "ttlPN2", Description: "DescPN2"}}, // Conflicts
+			{ID: "---", Data: "NewEntityP3", Meta: NestedMetaTest{UniqueID: "newUniqueP3", OTValue: "ttlPN3", Description: "DescPN3"}},
 		}
 
 		ids, err := repoClean.BulkCreate(entitiesToBulkCreate, now)
@@ -1366,18 +1339,18 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		require.NoError(t, err)
 		now := time.Now()
 
-		initialEntities := []*NestedEntityTestPebble{
-			{ID: "---", Data: "DataOneP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU1", OTValue: "ttlPU1", Description: "DescPU1"}},
-			{ID: "---", Data: "DataTwoP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU2", OTValue: "ttlPU2", Description: "DescPU2"}},
+		initialEntities := []*NestedEntityTest{
+			{ID: "---", Data: "DataOneP", Meta: NestedMetaTest{UniqueID: "uniquePU1", OTValue: "ttlPU1", Description: "DescPU1"}},
+			{ID: "---", Data: "DataTwoP", Meta: NestedMetaTest{UniqueID: "uniquePU2", OTValue: "ttlPU2", Description: "DescPU2"}},
 		}
 		createdIds, err := repo.BulkCreate(initialEntities, now)
 		require.NoError(t, err)
 		require.Len(t, createdIds, 2)
 
 		// Prepare updates
-		updatedEntities := []*NestedEntityTestPebble{
-			{ID: createdIds[0], Data: "DataOneUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU1_new", OTValue: "ttlPU1_new", Description: "DescPU1_new"}},
-			{ID: createdIds[1], Data: "DataTwoUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "uniquePU2_new", OTValue: "ttlPU2_new", Description: "DescPU2_new"}},
+		updatedEntities := []*NestedEntityTest{
+			{ID: createdIds[0], Data: "DataOneUpdatedP", Meta: NestedMetaTest{UniqueID: "uniquePU1_new", OTValue: "ttlPU1_new", Description: "DescPU1_new"}},
+			{ID: createdIds[1], Data: "DataTwoUpdatedP", Meta: NestedMetaTest{UniqueID: "uniquePU2_new", OTValue: "ttlPU2_new", Description: "DescPU2_new"}},
 		}
 
 		results, err := repo.BulkUpdate(updatedEntities, now)
@@ -1413,9 +1386,9 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		repo, err := newNestedEntityTestPebbleRepositoryPebble(t)
 		require.NoError(t, err)
 
-		initialEntities := []*NestedEntityTestPebble{
-			{ID: "---", Data: "AlphaP", Meta: NestedMetaTestPebble{UniqueID: "alphaUniqueP", OTValue: "ttlAP", Description: "DescAP"}},
-			{ID: "---", Data: "BetaP", Meta: NestedMetaTestPebble{UniqueID: "betaUniqueP", OTValue: "ttlBP", Description: "DescBP"}},
+		initialEntities := []*NestedEntityTest{
+			{ID: "---", Data: "AlphaP", Meta: NestedMetaTest{UniqueID: "alphaUniqueP", OTValue: "ttlAP", Description: "DescAP"}},
+			{ID: "---", Data: "BetaP", Meta: NestedMetaTest{UniqueID: "betaUniqueP", OTValue: "ttlBP", Description: "DescBP"}},
 		}
 		now := time.Now()
 		createdIds, err := repo.BulkCreate(initialEntities, now)
@@ -1424,9 +1397,9 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		initialEntities[0].ID = createdIds[0]
 		initialEntities[1].ID = createdIds[1]
 
-		conflictingUpdates := []*NestedEntityTestPebble{
-			{ID: createdIds[0], Data: "AlphaUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "conflictKeyP", OTValue: "ttlAP_new", Description: "DescAP_new"}},
-			{ID: createdIds[1], Data: "BetaUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "conflictKeyP", OTValue: "ttlBP_new", Description: "DescBP_new"}},
+		conflictingUpdates := []*NestedEntityTest{
+			{ID: createdIds[0], Data: "AlphaUpdatedP", Meta: NestedMetaTest{UniqueID: "conflictKeyP", OTValue: "ttlAP_new", Description: "DescAP_new"}},
+			{ID: createdIds[1], Data: "BetaUpdatedP", Meta: NestedMetaTest{UniqueID: "conflictKeyP", OTValue: "ttlBP_new", Description: "DescBP_new"}},
 		}
 
 		_, err = repo.BulkUpdate(conflictingUpdates, now)
@@ -1446,9 +1419,9 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		repo, err := newNestedEntityTestPebbleRepositoryPebble(t)
 		require.NoError(t, err)
 
-		entities := []*NestedEntityTestPebble{
-			{ID: "---", Data: "EntityToUpdateP", Meta: NestedMetaTestPebble{UniqueID: "originalUniqueP1", OTValue: "ttlP1", Description: "DescP1"}},
-			{ID: "---", Data: "EntityToConflictWithP", Meta: NestedMetaTestPebble{UniqueID: "existingUniqueP2", OTValue: "ttlP2", Description: "DescP2"}},
+		entities := []*NestedEntityTest{
+			{ID: "---", Data: "EntityToUpdateP", Meta: NestedMetaTest{UniqueID: "originalUniqueP1", OTValue: "ttlP1", Description: "DescP1"}},
+			{ID: "---", Data: "EntityToConflictWithP", Meta: NestedMetaTest{UniqueID: "existingUniqueP2", OTValue: "ttlP2", Description: "DescP2"}},
 		}
 		now := time.Now()
 		createdIds, err := repo.BulkCreate(entities, now)
@@ -1457,8 +1430,8 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		entities[0].ID = createdIds[0]
 		entities[1].ID = createdIds[1]
 
-		updateAttempt := []*NestedEntityTestPebble{
-			{ID: createdIds[0], Data: "EntityToUpdateModifiedP", Meta: NestedMetaTestPebble{UniqueID: "existingUniqueP2", OTValue: "ttlP1_mod", Description: "DescP1_mod"}},
+		updateAttempt := []*NestedEntityTest{
+			{ID: createdIds[0], Data: "EntityToUpdateModifiedP", Meta: NestedMetaTest{UniqueID: "existingUniqueP2", OTValue: "ttlP1_mod", Description: "DescP1_mod"}},
 		}
 
 		_, err = repo.BulkUpdate(updateAttempt, now)
@@ -1483,16 +1456,16 @@ func TestRepository_BulkUpdate_Nested_Pebble(t *testing.T) {
 		require.NoError(t, err)
 		now := time.Now()
 
-		existingEntity := NestedEntityTestPebble{ID: "---", Data: "RealDataP", Meta: NestedMetaTestPebble{UniqueID: "realUniqueP", OTValue: "ttlRealP", Description: "DescRealP"}}
-		createdIds, err := repo.BulkCreate([]*NestedEntityTestPebble{&existingEntity}, now)
+		existingEntity := NestedEntityTest{ID: "---", Data: "RealDataP", Meta: NestedMetaTest{UniqueID: "realUniqueP", OTValue: "ttlRealP", Description: "DescRealP"}}
+		createdIds, err := repo.BulkCreate([]*NestedEntityTest{&existingEntity}, now)
 		require.NoError(t, err)
 		require.Len(t, createdIds, 1)
 		existingEntity.ID = createdIds[0]
 
-		updates := []*NestedEntityTestPebble{
-			{ID: existingEntity.ID, Data: "RealDataUpdatedP", Meta: NestedMetaTestPebble{UniqueID: "realUniqueUpdatedP", OTValue: "ttlRealUpdatedP", Description: "DescRealUpdatedP"}},
-			{ID: "nonExistentIDP1", Data: "PhantomDataP1", Meta: NestedMetaTestPebble{UniqueID: "phantomUniqueP1", OTValue: "ttlPhantomP1", Description: "DescPhantomP1"}},
-			{ID: "nonExistentIDP2", Data: "PhantomDataP2", Meta: NestedMetaTestPebble{UniqueID: "phantomUniqueP2", OTValue: "ttlPhantomP2", Description: "DescPhantomP2"}},
+		updates := []*NestedEntityTest{
+			{ID: existingEntity.ID, Data: "RealDataUpdatedP", Meta: NestedMetaTest{UniqueID: "realUniqueUpdatedP", OTValue: "ttlRealUpdatedP", Description: "DescRealUpdatedP"}},
+			{ID: "nonExistentIDP1", Data: "PhantomDataP1", Meta: NestedMetaTest{UniqueID: "phantomUniqueP1", OTValue: "ttlPhantomP1", Description: "DescPhantomP1"}},
+			{ID: "nonExistentIDP2", Data: "PhantomDataP2", Meta: NestedMetaTest{UniqueID: "phantomUniqueP2", OTValue: "ttlPhantomP2", Description: "DescPhantomP2"}},
 		}
 
 		results, err := repo.BulkUpdate(updates, now)

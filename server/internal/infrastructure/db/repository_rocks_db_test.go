@@ -91,6 +91,26 @@ func newTestTTLRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEn
 	return repository, store, err
 }
 
+func newTestConditionalUniqueRepoRocksDB(t *testing.T, initialIDs []string) (*db.Repository[ConditionalUniqueEntity], db.KVStore) {
+	store := newRocksdbStore(t) // Uses a new temp dir for each call
+	idGenerator := NewTestIDGeneratorFactory(initialIDs)
+	repo, err := db.NewRepository[ConditionalUniqueEntity](store, TestFC, "test_schema_cond", idGenerator)
+	require.NoError(t, err, "Failed to create repository for ConditionalUniqueEntity")
+	return repo, store
+}
+
+func newTestNRepository(t *testing.T) (*db.Repository[UserComplex], error) {
+	store := newRocksdbStore(t)
+	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
+	return db.NewRepository[UserComplex](store, TestFC, "test_schema", iGF)
+}
+
+func newNestedEntityTestRepositoryRocksDB(t *testing.T) (*db.Repository[NestedEntityTest], error) {
+	store := newRocksdbStore(t)                                                        // Assumes newRocksdbStore is defined in this file
+	iGF := NewTestIDGeneratorFactory([]string{"nid1", "nid2", "nid3", "nid4", "nid5"}) // Example IDs
+	return db.NewRepository[NestedEntityTest](store, TestFC, "nested_entity_schema", iGF)
+}
+
 func TestRepository_PutAndGet(t *testing.T) {
 	repo, err := newTestRepository(t)
 	require.NoError(t, err)
@@ -210,46 +230,25 @@ func TestRepository_Create_EmptyProvidedID_RocksDB(t *testing.T) {
 	assert.Contains(t, err.Error(), "primary key field 'ID' cannot be empty when not generated")
 }
 
-// --- Conditional Uniqueness Tests ---
-
-type ConditionalUniqueEntityRocksDB struct {
-	ID                     string `orm:"primary-key"`
-	Name                   string
-	UniqueValue            string `orm:"unique,ignore-is-true:ShouldIgnoreUniqueness"`
-	ShouldIgnoreUniqueness bool
-}
-
-func (e ConditionalUniqueEntityRocksDB) TableName() string {
-	return "cond_unique_rocks_db"
-}
-
-func newTestConditionalUniqueRepoRocksDB(t *testing.T, initialIDs []string) (*db.Repository[ConditionalUniqueEntityRocksDB], db.KVStore) {
-	store := newRocksdbStore(t) // Uses a new temp dir for each call
-	idGenerator := NewTestIDGeneratorFactory(initialIDs)
-	repo, err := db.NewRepository[ConditionalUniqueEntityRocksDB](store, TestFC, "test_schema_cond", idGenerator)
-	require.NoError(t, err, "Failed to create repository for ConditionalUniqueEntityRocksDB")
-	return repo, store
-}
-
 func TestRocksDBConditionalUniquenessCreate(t *testing.T) {
 	t.Run("IgnoreUniqueness", func(t *testing.T) {
 		ids := []string{"id1", "id2", "id3", "1d4"}
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
 		now := time.Now()
 
-		entity1 := &ConditionalUniqueEntityRocksDB{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
+		entity1 := &ConditionalUniqueEntity{Name: "E1", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
 		_, err := repo.Create(entity1, now)
 		require.NoError(t, err, "Create entity1 should succeed")
 
-		entity2 := &ConditionalUniqueEntityRocksDB{Name: "E2", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
+		entity2 := &ConditionalUniqueEntity{Name: "E2", UniqueValue: "uv1", ShouldIgnoreUniqueness: true}
 		_, err = repo.Create(entity2, now)
 		require.NoError(t, err, "Create entity2 with same UniqueValue (ignored) should succeed")
 
-		entity3 := &ConditionalUniqueEntityRocksDB{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		entity3 := &ConditionalUniqueEntity{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity3, now)
 		require.NoError(t, err, "Create entity3 with same UniqueValue (enforced, but not previously by E1/E2) should succeed")
 
-		entity4 := &ConditionalUniqueEntityRocksDB{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
+		entity4 := &ConditionalUniqueEntity{Name: "E3", UniqueValue: "uv1", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity4, time.Now())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "duplicate unique field: UniqueValue = uv1")
@@ -274,16 +273,16 @@ func TestRocksDBConditionalUniquenessCreate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
 		now := time.Now()
 
-		entity4 := &ConditionalUniqueEntityRocksDB{Name: "E4", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
+		entity4 := &ConditionalUniqueEntity{Name: "E4", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entity4, now)
 		require.NoError(t, err, "Create entity4 should succeed")
 
-		entity5 := &ConditionalUniqueEntityRocksDB{Name: "E5", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
+		entity5 := &ConditionalUniqueEntity{Name: "E5", UniqueValue: "uv2", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entity5, now)
 		require.Error(t, err, "Create entity5 with same UniqueValue (enforced) should fail")
 		assert.Contains(t, err.Error(), "duplicate unique field")
 
-		entity6 := &ConditionalUniqueEntityRocksDB{Name: "E6", UniqueValue: "uv2", ShouldIgnoreUniqueness: true}
+		entity6 := &ConditionalUniqueEntity{Name: "E6", UniqueValue: "uv2", ShouldIgnoreUniqueness: true}
 		_, err = repo.Create(entity6, now)
 		require.NoError(t, err, "Create entity6 with same UniqueValue (ignored) should succeed")
 
@@ -304,11 +303,11 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
 		now := time.Now()
 
-		entityA := &ConditionalUniqueEntityRocksDB{ID: ids[0], Name: "EntityA", UniqueValue: "uva", ShouldIgnoreUniqueness: false}
+		entityA := &ConditionalUniqueEntity{ID: ids[0], Name: "EntityA", UniqueValue: "uva", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entityA, now)
 		require.NoError(t, err)
 
-		entityB := &ConditionalUniqueEntityRocksDB{ID: ids[1], Name: "EntityB", UniqueValue: "uvb", ShouldIgnoreUniqueness: false}
+		entityB := &ConditionalUniqueEntity{ID: ids[1], Name: "EntityB", UniqueValue: "uvb", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entityB, now)
 		require.NoError(t, err)
 
@@ -331,11 +330,11 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
 		now := time.Now()
 
-		entityC := &ConditionalUniqueEntityRocksDB{ID: ids[0], Name: "EntityC", UniqueValue: "uvc", ShouldIgnoreUniqueness: false}
+		entityC := &ConditionalUniqueEntity{ID: ids[0], Name: "EntityC", UniqueValue: "uvc", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entityC, now)
 		require.NoError(t, err)
 
-		entityD := &ConditionalUniqueEntityRocksDB{ID: ids[1], Name: "EntityD", UniqueValue: "uvd", ShouldIgnoreUniqueness: false}
+		entityD := &ConditionalUniqueEntity{ID: ids[1], Name: "EntityD", UniqueValue: "uvd", ShouldIgnoreUniqueness: false}
 		_, err = repo.Create(entityD, now)
 		require.NoError(t, err)
 
@@ -353,7 +352,7 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 		repo, _ := newTestConditionalUniqueRepoRocksDB(t, ids)
 		now := time.Now()
 
-		entityE := &ConditionalUniqueEntityRocksDB{ID: ids[0], Name: "EntityE", UniqueValue: "uve", ShouldIgnoreUniqueness: false}
+		entityE := &ConditionalUniqueEntity{ID: ids[0], Name: "EntityE", UniqueValue: "uve", ShouldIgnoreUniqueness: false}
 		_, err := repo.Create(entityE, now)
 		require.NoError(t, err)
 
@@ -365,7 +364,7 @@ func TestRocksDBConditionalUniquenessUpdate(t *testing.T) {
 
 		// Now, try to create entityF with UniqueValue "uve" and ShouldIgnoreUniqueness = false
 		// This should succeed because entityE is no longer enforcing uniqueness on "uve"
-		entityF := &ConditionalUniqueEntityRocksDB{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: true}
+		entityF := &ConditionalUniqueEntity{ID: ids[1], Name: "EntityF", UniqueValue: "uve", ShouldIgnoreUniqueness: true}
 		_, err = repo.Create(entityF, now)
 		require.NoError(t, err, "Create entityF should succeed as E is ignoring uniqueness")
 
@@ -1263,54 +1262,10 @@ func TestRepository_BulkUpdate(t *testing.T) {
 	})
 }
 
-type MetaN struct {
-	Tag         string `orm:"unique"`
-	ConfigCode  int
-	Description string
-}
-
-type UserComplexN struct {
-	ID     string `orm:"primary-key"`
-	Email  string `orm:"unique"`
-	Meta   MetaN  // Named field
-	Status string
-}
-
-func (UserComplexN) TableName() string {
-	return "users_complex_n"
-}
-func newTestNRepository(t *testing.T) (*db.Repository[UserComplexN], error) {
-	store := newRocksdbStore(t)
-	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	return db.NewRepository[UserComplexN](store, TestFC, "test_schema", iGF)
-}
-
-func newNestedEntityTestRepositoryRocksDB(t *testing.T) (*db.Repository[NestedEntityTest], error) {
-	store := newRocksdbStore(t)                                                        // Assumes newRocksdbStore is defined in this file
-	iGF := NewTestIDGeneratorFactory([]string{"nid1", "nid2", "nid3", "nid4", "nid5"}) // Example IDs
-	return db.NewRepository[NestedEntityTest](store, TestFC, "nested_entity_schema", iGF)
-}
-
-type NestedMetaTest struct {
-	UniqueID    string `orm:"unique"`
-	OTValue     string
-	Description string
-}
-
-type NestedEntityTest struct {
-	ID   string `orm:"primary-key"`
-	Data string
-	Meta NestedMetaTest
-}
-
-func (NestedEntityTest) TableName() string {
-	return "nested_entities_test"
-}
-
 func TestRepository_PutAndGet_Nested(t *testing.T) {
 	repo, err := newTestNRepository(t)
 	require.NoError(t, err)
-	entity := UserComplexN{ID: "----", Email: "Alice@x.com", Status: "active", Meta: MetaN{
+	entity := UserComplex{ID: "----", Email: "Alice@x.com", Status: "active", Meta: Meta{
 		Tag:         "t1",
 		ConfigCode:  55,
 		Description: "None",

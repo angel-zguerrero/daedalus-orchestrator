@@ -11,37 +11,14 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 )
 
-const TestFC = "test_fc"
-const DefaultFC = "default"
-const TemporalFC = "temporal_fc"
-
-type testEntity struct {
-	ID       string `orm:"primary-key"`
-	Name     string `orm:"unique"`
-	LastName string
-	Age      int
-	TTL      int `orm:"ttl"`
-}
-
-func (testEntity) TableName() string {
-	return "users"
-}
-
-func newPebbleStore(t *testing.T) db.KVStore {
-	tmpDir := t.TempDir()
-	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC, TestFC}, []string{TemporalFC})
-	require.NoError(t, err)
-	return store
-}
-
 func newTestTTLRepositoryDefaultIdGeneratorPebble(t *testing.T) (*db.Repository[testEntity], db.KVStore, error) {
-	store := newPebbleStore(t)
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	repository, err := db.NewRepository[testEntity](store, TemporalFC, "test_schema", &db.DefaultIDGeneratorFactory{})
 	return repository, store, err
 }
 
 func newTestTTLRepositoryPebble(t *testing.T) (*db.Repository[testEntity], db.KVStore, error) {
-	store := newPebbleStore(t)
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
 	repository, err := db.NewRepository[testEntity](store, TemporalFC, "test_schema", iGF)
 	return repository, store, err
