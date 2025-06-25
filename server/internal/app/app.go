@@ -280,7 +280,8 @@ func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 
 		log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
-		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
+		// Pass the global log.Logger instance, which is configured in app.Run()
+		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration, log.Logger)
 
 		adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 		go func() {
