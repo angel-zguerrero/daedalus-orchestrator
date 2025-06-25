@@ -9,9 +9,11 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	dblog "github.com/lni/dragonboat/v4/logger"
+	"github.com/lni/goutils/syncutil"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -47,9 +49,10 @@ import (
 // These components might be integrated in future versions of the application.
 
 type Application struct {
-	MasterNodeIsReady bool
-	MasterNode        *dragonboat.RaftNode
-	RestAdminAPI      *rest_api_admin.RestAdminAPI
+	MasterNodeIsReady       bool
+	MasterNode              *dragonboat.RaftNode
+	RestAdminAPI            *rest_api_admin.RestAdminAPI
+	NodeReadyWatcherStopper *syncutil.Stopper
 }
 
 func (app *Application) Run() {
@@ -173,75 +176,93 @@ func (app *Application) Run() {
 
 	adminAPIInitialized := false // To track if admin API has been initialized once
 
-	go func() {
+	app.NodeReadyWatcherStopper.RunWorker(func() {
 		interval := 3 * time.Second
 		readyUpdates := masterNode.StartNodeReadyWatcher(interval)
-		for isReady := range readyUpdates {
-			app.MasterNodeIsReady = isReady
-			if isReady {
-				log.Info().Msg("✅ Node is ready for consensus.")
+		defer func() {
+			if app.RestAdminAPI != nil {
+				log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
+				app.CloseAdminAPI()
+			}
+		}()
 
-				if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
-					if app.RestAdminAPI == nil && !adminAPIInitialized {
-						// Initialize and start the Admin API
-						jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
-						jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
+		for {
+			select {
+			case isReady, ok := <-readyUpdates:
+				if !ok {
+					log.Info().Msg("✅ NodeReadyWatcher channel closed.")
+					return
+				}
 
-						log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
+				app.MasterNodeIsReady = isReady
+				if isReady {
+					log.Info().Msg("✅ Node is ready for consensus.")
 
-						app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
-						adminAPIInitialized = true // Mark as initialized
+					if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
+						if app.RestAdminAPI == nil && !adminAPIInitialized {
+							jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
+							jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
 
-						// The listen address for the Admin API should also be configurable.
-						adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
-						go func() {
-							if err := app.RestAdminAPI.Start(adminListenAddr); err != nil {
-								log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
-								// If it fails to start, we might want to nullify app.RestAdminAPI so it can be retried
-								// or handle this more gracefully. For now, just log.
+							log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
+
+							app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
+							adminAPIInitialized = true
+
+							adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
+							go func() {
+								if err := app.RestAdminAPI.Start(adminListenAddr); err != nil {
+									log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
+								}
+							}()
+							log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
+
+						} else if app.RestAdminAPI != nil {
+							log.Info().Msg("Admin API already running or was previously started.")
+						}
+					} else {
+						log.Info().Msg("Node does not have RoleAdmin. Admin API will not be started.")
+						if app.RestAdminAPI != nil {
+							log.Info().Msg("Shutting down Admin API as RoleAdmin is not present.")
+							shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+							if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
+								log.Error().Err(err).Msg("❌ Error during Admin API shutdown due to missing RoleAdmin")
+							} else {
+								log.Info().Msg("✅ Admin API shut down successfully as RoleAdmin is not present.")
 							}
-						}()
-						log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
-
-					} else if app.RestAdminAPI != nil {
-						log.Info().Msg("Admin API already running or was previously started.")
+							cancelShutdown()
+							app.RestAdminAPI = nil
+							adminAPIInitialized = false
+						}
 					}
 				} else {
-					log.Info().Msg("Node does not have RoleAdmin. Admin API will not be started.")
-					// Ensure app.RestAdminAPI is nil and marked as not initialized if it was somehow set previously
-					// or if the roles changed dynamically (though current logic doesn't support dynamic role changes post-startup).
+					log.Info().Msg("⚠️ Node is NOT ready for consensus.")
 					if app.RestAdminAPI != nil {
-						log.Info().Msg("Shutting down Admin API as RoleAdmin is not present.")
-						shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
-						if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
-							log.Error().Err(err).Msg("❌ Error during Admin API shutdown due to missing RoleAdmin")
-						} else {
-							log.Info().Msg("✅ Admin API shut down successfully as RoleAdmin is not present.")
-						}
-						cancelShutdown() // Ensure context is cancelled
-						app.RestAdminAPI = nil
+						log.Info().Msg("🔌 Node not ready, shutting down Admin API...")
+						app.CloseAdminAPI()
 						adminAPIInitialized = false
 					}
 				}
-			} else {
-				log.Info().Msg("⚠️ Node is NOT ready for consensus.")
-				if app.RestAdminAPI != nil {
-					log.Info().Msg("🔌 Node not ready, shutting down Admin API...")
-					app.CloseAdminAPI()
-					adminAPIInitialized = false // Allow re-initialization
-				}
+
+			case <-app.NodeReadyWatcherStopper.ShouldStop():
+
+				log.Info().Msg("🛑 NodeReadyWatcher received stop signal.")
+				return
+			case <-time.After(interval):
+
 			}
 		}
-		if app.RestAdminAPI != nil {
-			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
-			app.CloseAdminAPI()
-			adminAPIInitialized = false
-		}
-	}()
+	})
+
 }
 
 func (app *Application) Stop() {
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if app.MasterNode != nil {
 			log.Info().Msg("Stopping Master Node...")
 			app.MasterNode.Stop()
@@ -251,7 +272,9 @@ func (app *Application) Stop() {
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if app.RestAdminAPI != nil {
 			app.CloseAdminAPI()
 		} else {
@@ -259,7 +282,25 @@ func (app *Application) Stop() {
 		}
 	}()
 
-	log.Info().Msg("Application stopped gracefully.")
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.NodeReadyWatcherStopper.Stop()
+		log.Info().Msg("NodeReadyWatcher stopped.")
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Info().Msg("✅ All components stopped gracefully.")
+	case <-ctx.Done():
+		log.Warn().Msg("⚠ Stop operation timed out. Some components may not have stopped.")
+	}
 }
 func (app *Application) CloseAdminAPI() {
 	if app.RestAdminAPI != nil {
@@ -278,8 +319,9 @@ func (app *Application) CloseAdminAPI() {
 }
 func NewApplication() *Application {
 	return &Application{
-		MasterNodeIsReady: false,
-		MasterNode:        nil,
-		RestAdminAPI:      nil,
+		MasterNodeIsReady:       false,
+		MasterNode:              nil,
+		RestAdminAPI:            nil,
+		NodeReadyWatcherStopper: syncutil.NewStopper(),
 	}
 }
