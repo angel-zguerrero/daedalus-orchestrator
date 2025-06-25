@@ -6,11 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/linxGnu/grocksdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -19,90 +16,6 @@ import (
 
 	"deadalus-orch/server/internal/pkg/config"
 )
-
-type MockKVStoreBootstrap struct {
-	mock.Mock
-	ColumnFamilyHandles    map[string]*grocksdb.ColumnFamilyHandle // Map of regular column family names to their handles.
-	TTLColumnFamilyHandles map[string]*grocksdb.ColumnFamilyHandle // Map of TTL column family names to their handles.
-}
-
-func (m *MockKVStoreBootstrap) Get(AdminFC, key string, now time.Time) ([]byte, error) {
-	args := m.Called(AdminFC, key, now)
-	var s []byte
-	if tmp := args.Get(0); tmp != nil {
-		s = tmp.([]byte)
-	}
-	return s, args.Error(1)
-}
-
-func (m *MockKVStoreBootstrap) Delete(AdminFC, key string, now time.Time) error {
-	args := m.Called(AdminFC, key, now)
-	return args.Error(0)
-}
-
-func (r *MockKVStoreBootstrap) Exists(columnFamily, key string, now time.Time) (bool, error) {
-	args := r.Called(columnFamily, key, now)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockKVStoreBootstrap) Put(AdminFC, key string, value []byte, ttl int, now time.Time) error {
-	args := m.Called(AdminFC, key, value, ttl, now)
-	return args.Error(0)
-}
-
-func (m *MockKVStoreBootstrap) PutRaw(AdminFC, key string, value []byte) error {
-	args := m.Called(AdminFC, key, value)
-	return args.Error(0)
-}
-
-func (m *MockKVStoreBootstrap) Write(batch *db.WriteBatch) error {
-	args := m.Called(batch)
-	return args.Error(0)
-}
-
-func (m *MockKVStoreBootstrap) WriteRaw(batch *db.WriteBatch) error {
-	args := m.Called(batch)
-	return args.Error(0)
-}
-
-func (m *MockKVStoreBootstrap) DumpAll() (interface{}, error) {
-	args := m.Called()
-	var s []byte
-	if tmp := args.Get(0); tmp != nil {
-		s = tmp.([]byte)
-	}
-	return s, args.Error(1)
-}
-
-func (r *MockKVStoreBootstrap) Iterate(fn func(cfName string, key, value []byte) error) error {
-	return nil
-}
-
-func (r *MockKVStoreBootstrap) ClearAll() error {
-	return nil
-}
-
-func (r *MockKVStoreBootstrap) Flush() error {
-	return nil
-}
-
-func (r *MockKVStoreBootstrap) Close() error {
-	return nil
-}
-
-func (r *MockKVStoreBootstrap) CleanExpiredKeys(now time.Time) error {
-	args := r.Called(now)
-	return args.Error(0)
-}
-
-func (m *MockKVStoreBootstrap) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]db.KeyValuePair, string, error) {
-	args := m.Called(cfName, pattern, cursor, limit, now)
-	var s []db.KeyValuePair
-	if tmp := args.Get(0); tmp != nil {
-		s = tmp.([]db.KeyValuePair)
-	}
-	return s, "", args.Error(2)
-}
 
 func TestMain(m *testing.M) {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -118,35 +31,10 @@ func marshal(t *testing.T, v interface{}) []byte {
 	return data
 }
 
-type TestIDGeneratorFactoryBootstrap struct {
-	ids   []string
-	index int
-	mu    sync.Mutex
-}
-
-func (g *TestIDGeneratorFactoryBootstrap) GenerateID() string {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if len(g.ids) == 0 {
-		return ""
-	}
-
-	id := g.ids[g.index]
-	g.index = (g.index + 1) % len(g.ids) // avance circular
-	return id
-}
-
-func NewTestIDGeneratorFactoryBootstrap(ids []string) *TestIDGeneratorFactoryBootstrap {
-	return &TestIDGeneratorFactoryBootstrap{
-		ids: ids,
-	}
-}
-
 func Test_CreatesRootIfMissing(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
@@ -171,9 +59,9 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 }
 
 func Test_ErrorGettingRoot(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
@@ -191,9 +79,9 @@ func Test_ErrorGettingRoot(t *testing.T) {
 }
 
 func Test_PutsRootIfMissingInUsers(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
@@ -216,9 +104,9 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 }
 
 func Test_SkipsIfUserExists(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
@@ -247,9 +135,9 @@ func Test_SkipsIfUserExists(t *testing.T) {
 }
 
 func Test_ErrorFetchingUser(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
@@ -268,9 +156,9 @@ func Test_ErrorFetchingUser(t *testing.T) {
 }
 
 func Test_ErrorPutsRoot(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	config := config.Config{
@@ -302,9 +190,9 @@ func Test_ErrorPutsRoot(t *testing.T) {
 }
 
 func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	cfg := config.Config{
@@ -322,9 +210,9 @@ func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 }
 
 func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
-	store := new(MockKVStoreBootstrap)
+	store := new(MockKVStore)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryBootstrap([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	repo, err := db.NewUserRepository(uow, iGF)
 	assert.NoError(t, err)
 	cfg := config.Config{

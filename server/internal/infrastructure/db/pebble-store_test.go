@@ -2,7 +2,6 @@ package db_test
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -26,31 +25,6 @@ type testEntity struct {
 
 func (testEntity) TableName() string {
 	return "users"
-}
-
-type TestIDGeneratorFactory struct {
-	ids   []string
-	index int
-	mu    sync.Mutex
-}
-
-func (g *TestIDGeneratorFactory) GenerateID() string {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if len(g.ids) == 0 {
-		return ""
-	}
-
-	id := g.ids[g.index]
-	g.index = (g.index + 1) % len(g.ids) // avance circular
-	return id
-}
-
-func NewTestIDGeneratorFactory(ids []string) *TestIDGeneratorFactory {
-	return &TestIDGeneratorFactory{
-		ids: ids,
-	}
 }
 
 func newPebbleStore(t *testing.T) db.KVStore {

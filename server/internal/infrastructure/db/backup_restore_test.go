@@ -1,68 +1,14 @@
-package db
+package db_test
 
 // Ensure time is here, remove separate import "time" later
 import (
+	"deadalus-orch/server/internal/infrastructure/db"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
-
-const (
-	numNormalKeys = 2000
-	numTTLKeys    = 2000
-	normalCF      = "test_normal_cf"
-	ttlCF         = "test_ttl_cf"
-	// Small TTL for testing expiry quickly
-	testTTLSeconds = 3
-)
-
-type testKeyData struct {
-	ColumnFamily string
-	Key          string
-	Value        string
-	IsTTL        bool
-	InsertTime   time.Time     // To estimate expiry for TTL keys
-	ExpectedTTL  time.Duration // The TTL value set
-}
-
-// Helper to create a Pebble store for testing
-func newTestPebbleStore(t *testing.T, cfNames []string, ttlCfNames []string) KVStore {
-	tempDir, err := os.MkdirTemp("", "pebble_test_*")
-	require.NoError(t, err)
-	t.Logf("Creating Pebble store in: %s", tempDir)
-
-	store, err := CreatePebbleStore(tempDir, cfNames, ttlCfNames)
-	require.NoError(t, err)
-	require.NotNil(t, store)
-
-	t.Cleanup(func() {
-		t.Logf("Closing and removing Pebble store from: %s", tempDir)
-		store.Close()
-		os.RemoveAll(tempDir)
-	})
-	return store
-}
-
-// Helper to create a RocksDB store for testing
-func newTestRocksdbStore(t *testing.T, cfNames []string, ttlCfNames []string) KVStore {
-	tempDir, err := os.MkdirTemp("", "rocksdb_test_*")
-	require.NoError(t, err)
-	t.Logf("Creating RocksDB store in: %s", tempDir)
-
-	store, err := CreateRocksdbStore(tempDir, cfNames, ttlCfNames)
-	require.NoError(t, err)
-	require.NotNil(t, store)
-
-	t.Cleanup(func() {
-		t.Logf("Closing and removing RocksDB store from: %s", tempDir)
-		store.Close()
-		os.RemoveAll(tempDir)
-	})
-	return store
-}
 
 // Placeholder for TTLDefaultSeconds if not already available globally for tests
 // Note: The actual TTLDefaultSeconds is in the pebble-store.go and not exported.
@@ -78,7 +24,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 	allTestCfNames := []string{normalCF}
 	allTestTtlCfNames := []string{ttlCF}
 
-	var srcStore, targetStore KVStore
+	var srcStore, targetStore db.KVStore
 	var err error
 
 	// Initialize source store
@@ -105,7 +51,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 
 	// Data Generation and Insertion (Source Store)
 	t.Log("Generating and inserting data into source store...")
-	batch := NewWriteBatch()
+	batch := db.NewWriteBatch()
 	for i := 0; i < numNormalKeys; i++ {
 		key := fmt.Sprintf("normalKey_%d", i)
 		value := fmt.Sprintf("normalValue_%d", i)
@@ -115,7 +61,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 	}
 
 	// Reset batch for TTL keys
-	// batch = NewWriteBatch() // Not batching TTL Puts as per current KVStore design for TTLs
+	// batch = NewWriteBatch() // Not batching TTL Puts as per current db.KVStore design for TTLs
 	t.Logf("Note: TTL keys will be inserted using srcStore.Put(). This test will wait for `testTTLSeconds` (%ds) and expects CleanExpiredKeys to remove items that should have expired within this test-defined period.", testTTLSeconds)
 	for i := 0; i < numTTLKeys; i++ {
 		key := fmt.Sprintf("ttlKey_%d", i)
@@ -123,7 +69,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		// For TTL keys, Put handles the multi-key logic internally
 		// We rely on the store's Put method to correctly set up TTL.
 		// The TTL duration used by the store's Put method for TTL CFs is
-		// controlled by the KVStore implementation (e.g. pebble.TTLDefaultSeconds or a fixed value for RocksDB).
+		// controlled by the db.KVStore implementation (e.g. pebble.TTLDefaultSeconds or a fixed value for RocksDB).
 		// Our test will use `testTTLSeconds` for *expected* expiry checks.
 		insertTime := time.Now()
 		// This Put should use the system's default TTL for the ttlCF
@@ -156,7 +102,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 
 	// Restore (Target Store)
 	t.Log("Restoring data to target store...")
-	restoreBatch := NewWriteBatch()
+	restoreBatch := db.NewWriteBatch()
 	for cfName, cfData := range dumpedMap {
 		for key, value := range cfData {
 			restoreBatch.Put(cfName, key, value, time.Now())
@@ -239,7 +185,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 			require.Nil(t, retrievedValue, "Key %s (CF: %s) should be nil (expired and cleaned) but got value: %s", kd.Key, kd.ColumnFamily, string(retrievedValue))
 
 			// kd is the testKeyData for an expired key
-			expireRefKeyName := PrefixTTLExpire + kd.Key
+			expireRefKeyName := db.PrefixTTLExpire + kd.Key
 			retrievedExpireRefVal, err := targetStore.Get(kd.ColumnFamily, expireRefKeyName, expiryCheckTime)
 			require.NoError(t, err, "Error getting expire reference key %s for supposedly expired key %s (post-clean) in CF %s", expireRefKeyName, kd.Key, kd.ColumnFamily)
 			require.Nil(t, retrievedExpireRefVal, "Expire reference key %s for %s (CF %s) should be nil (expired and cleaned)", expireRefKeyName, kd.Key, kd.ColumnFamily)
