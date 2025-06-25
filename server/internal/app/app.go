@@ -53,6 +53,7 @@ type Application struct {
 	MasterNode              *dragonboat.RaftNode
 	RestAdminAPI            *rest_api_admin.RestAdminAPI
 	NodeReadyWatcherStopper *syncutil.Stopper
+	ApiLock                 sync.Mutex
 }
 
 func (app *Application) Run() {
@@ -174,8 +175,6 @@ func (app *Application) Run() {
 
 	log.Info().Interface("", roles).Msg("This node has these roles")
 
-	adminAPIInitialized := false // To track if admin API has been initialized once
-
 	app.NodeReadyWatcherStopper.RunWorker(func() {
 		interval := 3 * time.Second
 		readyUpdates := masterNode.StartNodeReadyWatcher(interval)
@@ -199,47 +198,17 @@ func (app *Application) Run() {
 					log.Info().Msg("✅ Node is ready for consensus.")
 
 					if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
-						if app.RestAdminAPI == nil && !adminAPIInitialized {
-							jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
-							jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
-
-							log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
-
-							app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
-							adminAPIInitialized = true
-
-							adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
-							go func() {
-								if err := app.RestAdminAPI.Start(adminListenAddr); err != nil {
-									log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
-								}
-							}()
-							log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
-
-						} else if app.RestAdminAPI != nil {
-							log.Info().Msg("Admin API already running or was previously started.")
-						}
+						app.StartAdminAPI(masterNode)
 					} else {
-						log.Info().Msg("Node does not have RoleAdmin. Admin API will not be started.")
-						if app.RestAdminAPI != nil {
-							log.Info().Msg("Shutting down Admin API as RoleAdmin is not present.")
-							shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
-							if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
-								log.Error().Err(err).Msg("❌ Error during Admin API shutdown due to missing RoleAdmin")
-							} else {
-								log.Info().Msg("✅ Admin API shut down successfully as RoleAdmin is not present.")
-							}
-							cancelShutdown()
-							app.RestAdminAPI = nil
-							adminAPIInitialized = false
-						}
+
+						app.CloseAdminAPI()
+						app.RestAdminAPI = nil
 					}
 				} else {
 					log.Info().Msg("⚠️ Node is NOT ready for consensus.")
 					if app.RestAdminAPI != nil {
 						log.Info().Msg("🔌 Node not ready, shutting down Admin API...")
 						app.CloseAdminAPI()
-						adminAPIInitialized = false
 					}
 				}
 
@@ -302,7 +271,32 @@ func (app *Application) Stop() {
 		log.Warn().Msg("⚠ Stop operation timed out. Some components may not have stopped.")
 	}
 }
+func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
+	app.ApiLock.Lock()
+	defer app.ApiLock.Unlock()
+	if app.RestAdminAPI == nil {
+		jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
+		jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
+
+		log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
+
+		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration)
+
+		adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
+		go func() {
+			if err := app.RestAdminAPI.Start(adminListenAddr); err != nil {
+				log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
+			}
+		}()
+		log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
+
+	} else if app.RestAdminAPI != nil {
+		log.Info().Msg("Admin API already running or was previously started.")
+	}
+}
 func (app *Application) CloseAdminAPI() {
+	app.ApiLock.Lock()
+	defer app.ApiLock.Unlock()
 	if app.RestAdminAPI != nil {
 		log.Info().Msg("Closing Admin API...")
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
