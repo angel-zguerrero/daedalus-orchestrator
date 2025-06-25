@@ -23,6 +23,14 @@ type RestAdminAPI struct {
 	server      *http.Server
 	logger      zerolog.Logger
 }
+type zerologAdapter struct {
+	logger zerolog.Logger
+}
+
+func (z zerologAdapter) Write(p []byte) (n int, err error) {
+	z.logger.Info().Msg(string(p))
+	return len(p), nil
+}
 
 // NewRestAdminAPI creates a new instance of RestAdminAPI.
 // It initializes the Gin engine and sets up the API routes.
@@ -35,7 +43,8 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 		// In a real scenario, you might want to prevent startup or generate a temporary key.
 		// For now, we'll proceed but this should be addressed.
 	}
-
+	gin.DefaultWriter = zerologAdapter{logger}
+	gin.DefaultErrorWriter = zerologAdapter{logger}
 	engine := gin.Default()
 
 	api := &RestAdminAPI{
