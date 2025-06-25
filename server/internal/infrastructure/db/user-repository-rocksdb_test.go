@@ -1,7 +1,6 @@
 package db_test
 
 import (
-	"sync"
 	"testing"
 
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -60,36 +59,11 @@ func newRocksdbStoreForUserRepoTest(t *testing.T) *db.RocksdbStore {
 	}
 }
 
-type TestIDGeneratorFactoryRepositoryRocksDB struct {
-	ids   []string
-	index int
-	mu    sync.Mutex
-}
-
-func (g *TestIDGeneratorFactoryRepositoryRocksDB) GenerateID() string {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if len(g.ids) == 0 {
-		return ""
-	}
-
-	id := g.ids[g.index]
-	g.index = (g.index + 1) % len(g.ids) // avance circular
-	return id
-}
-
-func NewTestIDGeneratorFactoryRepositoryRocksDB(ids []string) *TestIDGeneratorFactoryRepositoryRocksDB {
-	return &TestIDGeneratorFactoryRepositoryRocksDB{
-		ids: ids,
-	}
-}
-
 // newUserRepoTest creates a new UnitOfWork and UserRepository for testing.
 func newUserRepoTest(t *testing.T) (*db.UnitOfWork, db.KVStore, *db.UserRepository) {
 	store := newRocksdbStoreForUserRepoTest(t)
 	uow := db.NewUnitOfWork(store, nil)
-	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	userRepo, err := db.NewUserRepository(uow, iGF)
 	require.NoError(t, err, "Failed to create UserRepository")
 	return uow, store, userRepo
@@ -115,7 +89,7 @@ func TestRocksDBPutUser_Success(t *testing.T) {
 
 	err = uow.Commit()
 	require.NoError(t, err)
-	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	verifyUOW := db.NewUnitOfWork(store, nil) // Use same store
 	verifyRepo, err := db.NewUserRepository(verifyUOW, iGF)
 	require.NoError(t, err)
@@ -139,7 +113,7 @@ func TestRocksDBGetUser_Success(t *testing.T) {
 	userToCreate := models.CreateUser{Username: "getme", Email: "getme@example.com", Password: "password"}
 
 	// Create user with initial UoW
-	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	createUOW := db.NewUnitOfWork(store, nil)
 	createRepo, err := db.NewUserRepository(createUOW, iGF)
 	require.NoError(t, err)
@@ -193,7 +167,7 @@ func TestRocksDBGetUser_NotFound(t *testing.T) {
 func TestRocksDBDeleteUser_Success(t *testing.T) {
 	store := newRocksdbStoreForUserRepoTest(t) // Create store once
 	userToDelete := models.CreateUser{Username: "deleteme", Email: "deleteme@example.com", Password: "password"}
-	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	// Create user
 	createUOW := db.NewUnitOfWork(store, nil)
 	createRepo, err := db.NewUserRepository(createUOW, iGF)
@@ -238,7 +212,7 @@ func TestRocksDBDeleteUser_CannotDeleteRoot(t *testing.T) {
 		Password:   "password",
 		IsRootUser: true,
 	}
-	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	// Create the root user
 	createUOW := db.NewUnitOfWork(store, nil)
 	createRepo, err := db.NewUserRepository(createUOW, iGF)
@@ -337,7 +311,7 @@ func TestRocksDBLoginUser(t *testing.T) {
 
 	// Let's adjust: setup the store once, then create UoW/Repo from it for each sub-test.
 	store := newRocksdbStoreForUserRepoTest(t) // Create store once for all sub-tests
-	iGF := NewTestIDGeneratorFactoryRepositoryPebble([]string{"123"})
+	iGF := NewTestIDGeneratorFactory([]string{"123"})
 	// Create user in this store
 	initialUOW := db.NewUnitOfWork(store, nil)
 	initialRepo, err := db.NewUserRepository(initialUOW, iGF)
