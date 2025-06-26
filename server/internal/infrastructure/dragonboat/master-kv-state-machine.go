@@ -15,7 +15,7 @@ func (r *MasterKVDBStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
 	return db.OpenMasterDB(dbPath)
 }
 
-func (r *MasterKVDBStateMachine) Lookup(query interface{}, now time.Time) (interface{}, error) {
+func (r *MasterKVDBStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.Time) (interface{}, error) {
 	return nil, nil
 }
 

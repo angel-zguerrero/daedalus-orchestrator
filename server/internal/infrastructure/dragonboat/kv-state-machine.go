@@ -24,7 +24,7 @@ type KVStateMachineImpl interface {
 
 	Update(cmd any, uow *db.UnitOfWork, now time.Time) ([]byte, error)
 
-	Lookup(key interface{}, now time.Time) (interface{}, error)
+	Lookup(cmd any, uow *db.UnitOfWork, now time.Time) (interface{}, error)
 }
 type KVBaseStateMachineConfig struct {
 	// TTLInternalError specifies the Time-To-Live (in seconds) for internal error messages stored in the database.
@@ -345,8 +345,9 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 
 		now := time.Unix(0, query.Now)
 		repo_command, ok := query.Command.(Repository_Command)
+		uow := db.NewUnitOfWork(kv_store, nil)
 		if ok {
-			return s.stateMachineImpl.Lookup(repo_command.CMD, now)
+			return s.stateMachineImpl.Lookup(repo_command.CMD, uow, now)
 		}
 
 		command, ok := query.Command.(RK_Command)

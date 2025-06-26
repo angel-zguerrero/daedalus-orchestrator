@@ -171,7 +171,7 @@ func (mn *RaftNode) Write(ctx context.Context, comand Command) (statemachine.Res
 // Returns:
 //   - The result of the read operation from the state machine.
 //   - An error if marshaling fails or if SyncRead encounters an error.
-func (mn *RaftNode) Read(ctx context.Context, cmd RK_Command) (interface{}, error) {
+func (mn *RaftNode) Read(ctx context.Context, cmd Query_Command) (interface{}, error) {
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
 	if mn.stopped {

@@ -20,7 +20,7 @@ func (r *TenantKVBaseStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
 	return OpenTenantDBFunc(dbPath)
 }
 
-func (r *TenantKVBaseStateMachine) Lookup(query interface{}, now time.Time) (interface{}, error) {
+func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.Time) (interface{}, error) {
 	return nil, nil
 }
 
