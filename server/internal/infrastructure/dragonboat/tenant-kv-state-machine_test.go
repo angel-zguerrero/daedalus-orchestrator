@@ -7,6 +7,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config" // Added
 	"deadalus-orch/server/internal/pkg/utils"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/binary"
 	"encoding/gob"
 	"io"
@@ -23,7 +24,7 @@ func setupTenantKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup")
 
-	kv := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine)
+	kv := NewTenantKVStateMachine(1, 2).(*KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv.Open(stopc)
 	require.NoError(t, err)
@@ -53,16 +54,16 @@ func TestTenantUpdate_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "foo",
 				Value:            []byte("bar"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.PutOp,
+				Op:               commands.PutOp,
 			},
 		},
 	}
@@ -92,16 +93,16 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "lookup_key",
 				Value:            []byte("lookup_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.PutOp,
+				Op:               commands.PutOp,
 			},
 		},
 	}
@@ -113,9 +114,9 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "lookup_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -130,9 +131,9 @@ func TestTenantLookup_NonExistingKey(t *testing.T) {
 	kv := setupTenantKV(t)
 	defer kv.Close()
 
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "missing_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -154,16 +155,16 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupTenantKV(t)
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.PutOp,
+				Op:               commands.PutOp,
 			},
 		},
 	}
@@ -187,7 +188,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	// Also ensure config is loaded for the second instance if it's path dependent
 	err = config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup (kv2)")
-	kv2 := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine)
+	kv2 := NewTenantKVStateMachine(1, 2).(*KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -196,9 +197,9 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	query1 := dragonboat.Query_Command{
+	query1 := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -207,10 +208,10 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	query2 := dragonboat.Query_Command{
+	query2 := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
-			Key:              dragonboat.AppliedIndexKey,
+		Command: commands.RK_Command{
+			Key:              dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName: db.MetaFC,
 		},
 	}
@@ -253,11 +254,11 @@ func TestTenantUpdate_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
-		Type: dragonboat.DDL_FC,
-		CMD: dragonboat.DDL_Command{
+	cmd := commands.FSM_Command{
+		Type: commands.DDL_FC,
+		CMD: commands.DDL_Command{
 			ColumnFamilyName: "new_cf",
-			Op:               dragonboat.Add_CF_Op,
+			Op:               commands.Add_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -274,12 +275,12 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.FSM_Command{
-			Type: dragonboat.DDL_FC,
-			CMD: dragonboat.DDL_Command{
+		cmd := commands.FSM_Command{
+			Type: commands.DDL_FC,
+			CMD: commands.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               dragonboat.Add_CF_Op,
+				Op:               commands.Add_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -292,12 +293,12 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
-		Type: dragonboat.DDL_FC,
-		CMD: dragonboat.DDL_Command{
+	cmd := commands.FSM_Command{
+		Type: commands.DDL_FC,
+		CMD: commands.DDL_Command{
 
 			ColumnFamilyName: "to_delete_cf",
-			Op:               dragonboat.Remove_CF_Op,
+			Op:               commands.Remove_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -315,15 +316,15 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Read,
-			CMD: dragonboat.RK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Read,
+			CMD: commands.RK_Command{
 				Key:              "foo",
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.GetOp,
+				Op:               commands.GetOp,
 			},
 		},
 	}
@@ -338,24 +339,24 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: dragonboat.RWK_Command")
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: commands.RWK_Command") // Changed dragonboat.RWK_Command to commands.RWK_Command
 }
 func TestTenantUpdate_PutWithTTL(t *testing.T) {
 	kv := setupTenantKV(t)
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -371,12 +372,12 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.FSM_Command{
-			Type: dragonboat.DDL_FC,
-			CMD: dragonboat.DDL_Command{
+		cmd := commands.FSM_Command{
+			Type: commands.DDL_FC,
+			CMD: commands.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               dragonboat.Add_TTL_CF_Op,
+				Op:               commands.Add_TTL_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -389,11 +390,11 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
-		Type: dragonboat.DDL_FC,
-		CMD: dragonboat.DDL_Command{
+	cmd := commands.FSM_Command{
+		Type: commands.DDL_FC,
+		CMD: commands.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
-			Op:               dragonboat.Remove_TTL_CF_Op,
+			Op:               commands.Remove_TTL_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -411,17 +412,17 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -433,16 +434,16 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = dragonboat.FSM_Command{
+	cmd = commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "ttl_key",
 				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
-				Op:               dragonboat.DeleteOpTTL,
+				Op:               commands.DeleteOpTTL,
 			},
 		},
 	}

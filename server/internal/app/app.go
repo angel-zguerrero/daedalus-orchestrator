@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
 	"deadalus-orch/server/internal/pkg/config"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
 	"fmt"
@@ -25,7 +26,7 @@ import (
 //     - Sets the time field format to Unix timestamp.
 //     - Enables console-friendly output (pretty print) if LOGGER_FORMAT is "pretty" or not set.
 //     - Sets the global log level based on the ENV environment variable (ErrorLevel for "production", DebugLevel otherwise).
-//     - Sets a custom logger factory for Dragonboat internal logging.
+//     - Sets a custom logger factory for Dragonboat internal logging. // This refers to the external library
 //  2. Telemetry: Initializes OpenTelemetry for tracing and metrics.
 //     - Configuration is driven by environment variables:
 //     - ENV: Sets the environment (e.g., production, development).
@@ -50,7 +51,7 @@ import (
 
 type Application struct {
 	MasterNodeIsReady       bool
-	MasterNode              *dragonboat.RaftNode
+	MasterNode              *dragonboat.RaftNode // This is a struct from the dragonboat package that was NOT moved
 	RestAdminAPI            *rest_api_admin.RestAdminAPI
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
@@ -69,7 +70,7 @@ func (app *Application) Run() {
 	} else {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
-	dblog.SetLoggerFactory(dragonboat.CreateZerologger)
+	dblog.SetLoggerFactory(dragonboat.CreateZerologger) // This is from the external dragonboat lib, not the one we moved
 
 	ctx, tp, err := telemetry.Init(
 		constants.Env(os.Getenv(constants.EnvVarEnvKey)),
