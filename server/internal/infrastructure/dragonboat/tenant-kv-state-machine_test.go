@@ -53,7 +53,7 @@ func TestTenantUpdate_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -92,7 +92,7 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -154,7 +154,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupTenantKV(t)
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -253,7 +253,7 @@ func TestTenantUpdate_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "new_cf",
@@ -274,7 +274,7 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
@@ -292,7 +292,7 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 
@@ -315,7 +315,7 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -345,7 +345,7 @@ func TestTenantUpdate_PutWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -371,7 +371,7 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
@@ -389,7 +389,7 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
@@ -411,7 +411,7 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -433,7 +433,7 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = dragonboat.Command{
+	cmd = dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{

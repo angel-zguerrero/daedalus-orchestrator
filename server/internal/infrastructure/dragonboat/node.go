@@ -146,7 +146,7 @@ func (mn *RaftNode) Stop() {
 // Returns:
 //   - The result of the proposal from the state machine.
 //   - An error if marshaling fails or if SyncPropose encounters an error.
-func (mn *RaftNode) Write(ctx context.Context, comand Command) (statemachine.Result, error) {
+func (mn *RaftNode) Write(ctx context.Context, comand FSM_Command) (statemachine.Result, error) {
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
 	if mn.stopped {
@@ -208,7 +208,7 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 		for {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-			cmd := Command{
+			cmd := FSM_Command{
 				Now:  utils.GetNowInInt(),
 				Type: RW,
 				CMD: RWK_Command{

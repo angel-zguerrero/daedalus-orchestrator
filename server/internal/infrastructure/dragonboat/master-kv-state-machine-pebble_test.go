@@ -55,7 +55,7 @@ func TestPebble_Update_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -94,7 +94,7 @@ func TestPebble_Lookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -156,7 +156,7 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 	kv := setupKV(t, "pebble")
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -253,7 +253,7 @@ func TestPebble_Update_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "new_cf",
@@ -274,7 +274,7 @@ func TestPebble_Update_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
@@ -292,7 +292,7 @@ func TestPebble_Update_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 
@@ -315,7 +315,7 @@ func TestPebble_Read_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -345,7 +345,7 @@ func TestPebble_Update_PutWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -371,7 +371,7 @@ func TestPebble_Update_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
@@ -389,7 +389,7 @@ func TestPebble_Update_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
@@ -411,7 +411,7 @@ func TestPebble_Update_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -433,7 +433,7 @@ func TestPebble_Update_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = dragonboat.Command{
+	cmd = dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -458,7 +458,7 @@ func TestPebble_PutTTLStoresWithExpiration(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -501,7 +501,7 @@ func TestPebble_TTLExpirationRemovesKey(t *testing.T) {
 
 	// Put TTL entry
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -545,7 +545,7 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Insert with TTL
 	var bufPut bytes.Buffer
-	cmdPut := dragonboat.Command{
+	cmdPut := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -568,7 +568,7 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Delete it
 	var bufDel bytes.Buffer
-	cmdDel := dragonboat.Command{
+	cmdDel := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -607,7 +607,7 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 	key := "expiredKey"
 	value := []byte("some-value")
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -632,7 +632,7 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	clearCmd := dragonboat.Command{
+	clearCmd := dragonboat.FSM_Command{
 		Type: dragonboat.MCL,
 		CMD: dragonboat.MCLK_Command{
 			Op: dragonboat.ClearExpiredTTL,
@@ -659,7 +659,7 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
-func encodeCommand(t *testing.T, cmd dragonboat.Command) []byte {
+func encodeCommand(t *testing.T, cmd dragonboat.FSM_Command) []byte {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	if err != nil {
@@ -671,7 +671,7 @@ func TestPebble_Update_UnknownCommandType(t *testing.T) {
 	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: 999,
 		CMD:  nil,
 	}
@@ -691,7 +691,7 @@ func TestPebble_Update_UnknownWriteOp(t *testing.T) {
 	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -731,7 +731,7 @@ type failingImpl struct {
 	dragonboat.KVStateMachineImpl
 }
 
-func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.Command, error) {
+func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.FSM_Command, error) {
 	return nil, errors.New("simulated update error")
 }
 func (f *failingImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {
@@ -754,7 +754,7 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 	}
 
 	for _, entry := range entries {
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Now:  utils.GetNowInInt(),
 			Type: dragonboat.RW,
 			CMD:  dragonboat.RWK_Command{Op: dragonboat.Write, CMD: entry},
@@ -801,7 +801,7 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 
 	for _, e := range entries {
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Now:  utils.GetNowInInt(),
 			Type: dragonboat.RW,
 			CMD: dragonboat.RWK_Command{
@@ -858,7 +858,7 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 func TestSaveSnapshotAndRecoverPebbleToRocksDB(t *testing.T) {
 	kvPebble := setupKVMasterPebble(t, "pebble")
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{

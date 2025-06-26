@@ -134,11 +134,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	batch := db.NewWriteBatch()
 	uow := db.NewUnitOfWork(kv_store, batch)
 
-	commands := make([]Command, len(ents))
+	commands := make([]FSM_Command, len(ents))
 	parseErrors := make([]bool, len(ents))
 
 	for i, ent := range ents {
-		var cmd Command
+		var cmd FSM_Command
 		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
 			parseErrors[i] = true
 			msg := fmt.Sprintf(

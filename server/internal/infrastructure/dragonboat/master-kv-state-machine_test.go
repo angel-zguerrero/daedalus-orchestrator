@@ -52,7 +52,7 @@ func TestUpdate_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -91,7 +91,7 @@ func TestLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -154,7 +154,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -254,7 +254,7 @@ func TestUpdate_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "new_cf",
@@ -275,7 +275,7 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
@@ -295,7 +295,7 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 
@@ -318,7 +318,7 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -348,7 +348,7 @@ func TestUpdate_PutWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -374,7 +374,7 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.DDL_FC,
 			CMD: dragonboat.DDL_Command{
 
@@ -392,7 +392,7 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: dragonboat.DDL_FC,
 		CMD: dragonboat.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
@@ -414,7 +414,7 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -436,7 +436,7 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = dragonboat.Command{
+	cmd = dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -461,7 +461,7 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -505,7 +505,7 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 
 	// Put TTL entry
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -550,7 +550,7 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Insert with TTL
 	var bufPut bytes.Buffer
-	cmdPut := dragonboat.Command{
+	cmdPut := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -573,7 +573,7 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Delete it
 	var bufDel bytes.Buffer
-	cmdDel := dragonboat.Command{
+	cmdDel := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -613,7 +613,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	key := "expiredKey"
 	value := []byte("some-value")
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -638,7 +638,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	clearCmd := dragonboat.Command{
+	clearCmd := dragonboat.FSM_Command{
 		Type: dragonboat.MCL,
 		CMD: dragonboat.MCLK_Command{
 			Op: dragonboat.ClearExpiredTTL,
@@ -666,7 +666,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
-func encodeCommandR(t *testing.T, cmd dragonboat.Command) []byte {
+func encodeCommandR(t *testing.T, cmd dragonboat.FSM_Command) []byte {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	if err != nil {
@@ -678,7 +678,7 @@ func TestUpdate_UnknownCommandType(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Type: 999,
 		CMD:  nil,
 	}
@@ -698,7 +698,7 @@ func TestUpdate_UnknownWriteOp(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{
@@ -738,7 +738,7 @@ type failingRocksdbImpl struct {
 	dragonboat.KVStateMachineImpl
 }
 
-func (f *failingRocksdbImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.Command, error) {
+func (f *failingRocksdbImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.FSM_Command, error) {
 	return nil, errors.New("simulated update error")
 }
 func (f *failingRocksdbImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {
@@ -761,7 +761,7 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 	}
 
 	for _, entry := range entries {
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.RW,
 			CMD:  dragonboat.RWK_Command{Op: dragonboat.Write, CMD: entry},
 		}
@@ -808,7 +808,7 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 
 	for _, e := range entries {
-		cmd := dragonboat.Command{
+		cmd := dragonboat.FSM_Command{
 			Type: dragonboat.RW,
 			Now:  utils.GetNowInInt(),
 			CMD: dragonboat.RWK_Command{
@@ -865,7 +865,7 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	kvRocksDB := setupKVMaster(t, "rocksdb")
 	var buf bytes.Buffer
-	cmd := dragonboat.Command{
+	cmd := dragonboat.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: dragonboat.RW,
 		CMD: dragonboat.RWK_Command{

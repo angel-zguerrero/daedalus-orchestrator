@@ -8,7 +8,7 @@ import (
 // init registers command structs with the gob package for serialization.
 // This is necessary for them to be transported over the network or persisted.
 func init() {
-	gob.Register(Command{})
+	gob.Register(FSM_Command{})
 	gob.Register(WK_Command{})
 	gob.Register(RK_Command{})
 	gob.Register(DDL_Command{})
@@ -149,9 +149,9 @@ const (
 	SPECIALIZED
 )
 
-// Command is the generic wrapper for any type of command sent through the Raft consensus.
+// FSM_Command is the generic wrapper for any type of command sent through the Raft consensus.
 // It allows different command structures to be handled uniformly at a higher level.
-type Command struct {
+type FSM_Command struct {
 	Now  int64
 	Type Command_Type // The overall type of the command.
 	CMD  any          // The actual specific command payload (e.g., RWK_Command, DDL_Command, MCLK_Command).
