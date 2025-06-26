@@ -328,7 +328,7 @@ func LoadDefaultConfiguration() error {
 		config.AdminListenAddrHost = "0.0.0.0"
 	}
 	if config.AdminListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
-		config.AdminListenAddrPort = 8081
+		config.AdminListenAddrPort = 4500
 	}
 	if config.AdminAPIJWTSecret == "" {
 		config.AdminAPIJWTSecret = "super-secret-default-jwt-key-please-change"
