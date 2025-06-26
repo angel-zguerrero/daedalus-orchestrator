@@ -344,9 +344,14 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 		}
 
 		now := time.Unix(0, query.Now)
+		repo_command, ok := query.Command.(Repository_Command)
+		if ok {
+			return s.stateMachineImpl.Lookup(repo_command.CMD, now)
+		}
+
 		command, ok := query.Command.(RK_Command)
 		if !ok {
-			return s.stateMachineImpl.Lookup(command, now)
+			return nil, fmt.Errorf("expected command to be RK_Command, got %T", query.Command)
 		}
 
 		if s.closed {

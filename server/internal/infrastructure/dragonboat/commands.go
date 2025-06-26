@@ -15,6 +15,8 @@ func init() {
 	gob.Register(RWK_Command{})
 	gob.Register(MCLK_Command{})
 	gob.Register(time.Time{})
+	gob.Register(Repository_Command{})
+
 }
 
 // ---- Read/Write (RW) Command Types ----
@@ -89,6 +91,10 @@ type RK_Command struct {
 	ColumnFamilyName string // The name of the column family to operate on.
 	TTL              int64  // Expected TTL, or for filtering by TTL (usage may vary).
 	Op               R_Type // The specific read operation type (GetOp, GetOpTTL, Search, SearchTTL).
+}
+
+type Repository_Command struct {
+	CMD interface{} // The command to execute, which can be a complex query or operation.
 }
 
 // RWK_Command (Read/Write Key Command) is a wrapper command that encapsulates either a read or a write key command.
