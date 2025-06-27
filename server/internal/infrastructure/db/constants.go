@@ -9,8 +9,6 @@ const (
 )
 
 const (
-	DefaultFC     = "default"
-	MetaFC        = "meta"
-	AdminFC       = "admin_fc" // Assuming AdminFC should also be here if used by user_repository
-	MasterEventFC = "master_event_fc"
+	DefaultFC = "default"
+	MetaFC    = "meta"
 )

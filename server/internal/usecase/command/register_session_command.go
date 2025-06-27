@@ -43,7 +43,7 @@ func (cmd *RegisterSessionCommand) Execute(uow *db.UnitOfWork, now time.Time) ([
 		return nil, NewInfrastructureErrorWrap(err, "failed to initialize SessionRepository")
 	}
 
-	err = sessionRepo.RegisterSession(cmd.JWTToken)
+	err = sessionRepo.RegisterSession(cmd.JWTToken, now)
 	if err != nil {
 		// It could be a validation error (e.g. bad token) or a DB error.
 		// Consider if different error types (DomainError vs InfrastructureError) are needed.
