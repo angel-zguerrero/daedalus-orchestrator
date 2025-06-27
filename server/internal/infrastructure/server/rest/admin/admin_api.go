@@ -137,26 +137,6 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 		Now: time.Now().UnixNano(), // Or handle as per specific requirements if Query_Command.Now is actively used
 	}
 
-	// Call the node's Read method (SyncRead)
-	// The task implies a Read method on the node. Assuming it's similar to Lookup/Propose
-	// and is responsible for routing to the MasterKVDBStateMachine.Lookup method.
-	// The actual method name on `api.node` might be `SyncRead` or similar.
-	// For this example, I'll use a hypothetical `api.node.Read` method.
-	// If the method is `Lookup`, we'd use `api.node.Lookup(c.Request.Context(), queryCommand)`.
-	// The problem states "call the node’s Read method ... passing the Query_Command".
-	// Let's assume a `Read` method exists that behaves like `Lookup` but is meant for synchronous queries.
-	// If `api.node` is of type `*dragonboat.Node`, it has `SyncRead(ctx context.Context, clusterID uint64, query interface{}) (interface{}, error)`
-	// We'd need the clusterID for this. Assuming master cluster ID.
-	// For now, let's use `api.node.Lookup` as its signature is `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
-	// which matches well if we assume it can handle Query_Command.
-	// The problem description for master-kv-state-machine.go's Lookup method is:
-	// `Lookup(cmd any, uow *db.UnitOfWork, now time.Time) (interface{}, error)`
-	// The `RaftNode` interface's `Lookup` method is:
-	// `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
-	// The `dragonboat.Node`'s `Lookup` is:
-	// `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
-	// This seems to be the most direct path. The `uow` and `now` for `MasterKVDBStateMachine.Lookup`
-	// are prepared internally by the `dragonboat.Node.Lookup`'s machinery before calling the state machine.
 	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 	defer cancel()
 	result, err := api.node.Read(ctx, *queryCommand)
