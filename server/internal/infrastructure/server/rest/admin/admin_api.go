@@ -14,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"strings"
 )
 
 // RestAdminAPI handles the administrative REST API endpoints.
@@ -65,6 +66,7 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 		// Tenant routes (protected by JWT middleware in a real scenario)
 		// For now, JWT protection is not implemented on these routes yet.
 		tenantsGroup := adminAPIGroup.Group("/tenants")
+		tenantsGroup.Use(api.authMiddleware()) // Apply auth middleware to all tenant routes
 		{
 			tenantsGroup.GET("", api.getTenantsHandler)
 			tenantsGroup.POST("", api.createTenantHandler)
@@ -167,7 +169,31 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 		return
 	}
 
-	api.logger.Info().Str("username", req.Username).Msg("User logged in successfully")
+	// Register the session with the Raft node
+	registerSessionCmd := &commands.RegisterSessionCommand{
+		JWTToken: tokenString,
+		JWTKey:   api.jwtKey, // Use the same key as for JWT generation/validation
+	}
+
+	fsmCmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.REPOSITORY_COMMAND,
+		CMD:  registerSessionCmd,
+	}
+
+	// Use a new context for the Write operation, potentially with its own timeout
+	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
+	defer writeCancel()
+
+	_, err = api.node.Write(writeCtx, fsmCmd)
+	if err != nil {
+		// Log the error, but still return the token as login itself was successful.
+		// Depending on policy, you might choose to invalidate the token or return an error to the user here.
+		api.logger.Error().Err(err).Str("username", req.Username).Msg("Failed to register session after login")
+		// For now, we proceed to return the token, but this failure is logged.
+	}
+
+	api.logger.Info().Str("username", req.Username).Msg("User logged in successfully and session registered")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
 		"token":   tokenString,
@@ -286,4 +312,89 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+// authMiddleware creates a middleware handler for JWT authentication and session validation.
+func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			api.logger.Warn().Msg("Authorization header missing")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			api.logger.Warn().Msg("Invalid Authorization header format")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
+			return
+		}
+		tokenString := parts[1]
+
+		claims := &jwt.RegisteredClaims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return api.jwtKey, nil
+		})
+
+		if err != nil {
+			if err == jwt.ErrTokenExpired {
+				api.logger.Warn().Msg("JWT token expired")
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token expired"})
+			} else {
+				api.logger.Warn().Err(err).Msg("Invalid JWT token")
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			}
+			return
+		}
+
+		if !token.Valid {
+			api.logger.Warn().Msg("JWT token is invalid")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			return
+		}
+
+		// Locally validated, now check session existence via Raft
+		checkSessionCmd := &commands.CheckSessionExistsCommand{
+			JWTToken: tokenString,
+			JWTKey:   api.jwtKey, // Assuming the command needs the key for its own validation if any
+		}
+
+		queryCmd := &commands.Query_Command{
+			Command: &commands.Repository_Command{
+				CMD: checkSessionCmd,
+			},
+			Now: time.Now().UnixNano(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+		defer cancel()
+
+		resultBytes, err := api.node.Read(ctx, *queryCmd)
+		if err != nil {
+			api.logger.Error().Err(err).Msg("Failed to execute CheckSessionExistsCommand via Raft")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify session"})
+			return
+		}
+
+		sessionExists, err := utils.BytesToBool(resultBytes.([]byte))
+		if err != nil {
+			api.logger.Error().Err(err).Msg("CheckSessionExistsCommand returned unexpected result type")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to interpret session verification result"})
+			return
+		}
+
+		if !sessionExists {
+			api.logger.Warn().Str("token_subject", claims.Subject).Msg("Session does not exist or has been invalidated")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session is invalid or has expired"})
+			return
+		}
+
+		// Set user information in context if needed, e.g., c.Set("username", claims.Subject)
+		api.logger.Info().Str("username", claims.Subject).Msg("User authenticated successfully")
+		c.Next()
+	}
 }
