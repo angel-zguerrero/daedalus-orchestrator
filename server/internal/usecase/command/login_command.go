@@ -2,6 +2,7 @@ package command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/pkg/utils"
 	"encoding/gob"
 	"time"
 )
@@ -19,7 +20,7 @@ type LoginCommand struct {
 // Execute attempts to log in a user with the provided email and password.
 // It uses the UserRepository to validate credentials.
 // The IDGeneratorFactory is passed as nil to NewUserRepository as login itself doesn't generate new IDs.
-func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) (any, error) {
+func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, error) {
 	// It's mentioned that ID generation should use a deterministic generator if needed.
 	// For login, we are primarily validating credentials. NewUserRepository takes an IDGeneratorFactory.
 	// If the underlying operations within UserRepository for login were to create audit logs
@@ -40,5 +41,5 @@ func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) (any, error)
 		return nil, err
 	}
 
-	return loggedIn, nil
+	return utils.BoolToBytes(loggedIn), nil
 }

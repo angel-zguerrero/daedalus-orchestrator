@@ -4,6 +4,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	"fmt"
 	"net/http"
@@ -165,8 +166,8 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 		return
 	}
 
-	loggedIn, ok := result.(bool)
-	if !ok {
+	loggedIn, err := utils.BytesToBool(result.([]byte))
+	if err != nil {
 		api.logger.Error().Str("username", req.Username).Msg("Login command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (result type)"})
 		return

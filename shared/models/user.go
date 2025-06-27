@@ -23,6 +23,7 @@ func (User) TableName() string {
 // It includes the plain text password, which should be hashed before being stored
 // in the `User` struct's `PasswordHash` field.
 type CreateUser struct {
+	ID string
 	// Username is the desired username for the new user.
 	Username string
 	// Email is the email address for the new user.

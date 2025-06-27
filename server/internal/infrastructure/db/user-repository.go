@@ -41,6 +41,7 @@ func (r *UserRepository) CreateUser(input models.CreateUser) (string, error) {
 	}
 
 	user := &models.User{
+		ID:           input.ID,
 		Username:     input.Username,
 		Email:        input.Email,
 		PasswordHash: string(hash),

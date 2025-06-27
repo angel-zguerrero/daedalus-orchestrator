@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"bytes"
+	"encoding/binary"
 	"time"
 )
 
@@ -42,4 +44,19 @@ func Contains(list []string, target string) bool {
 func GetNowInInt() int64 {
 	now := time.Now()
 	return now.UnixNano()
+}
+
+func BoolToBytes(b bool) []byte {
+	if b {
+		return []byte{1}
+	}
+	return []byte{0}
+}
+func BytesToBool(data []byte) (bool, error) {
+	buf := bytes.NewReader(data)
+	var val byte
+	if err := binary.Read(buf, binary.LittleEndian, &val); err != nil {
+		return false, err
+	}
+	return val != 0, nil
 }

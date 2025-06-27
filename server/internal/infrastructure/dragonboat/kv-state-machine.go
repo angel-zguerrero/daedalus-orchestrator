@@ -171,7 +171,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			rwEntries = append(rwEntries, i)
 		case commands.MCL:
 			mclEntries = append(mclEntries, i)
-		case commands.SPECIALIZED:
+		case commands.REPOSITORY_COMMAND:
 			specializedEntries = append(specializedEntries, i)
 		default:
 			msg := fmt.Sprintf("unknown command type: %v", cmd.Type)

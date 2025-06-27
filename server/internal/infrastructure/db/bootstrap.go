@@ -39,6 +39,7 @@ func BootstrapRootUser(userRepository UserRepository, config config.Config) erro
 			Msg("🧑‍💻 Creating default root user")
 
 		_, err = userRepository.CreateUser(models.CreateUser{
+			ID:         "94adc9e9e1194d39aaf7f9cfc392ee48",
 			Username:   username,
 			Email:      "noemail@daedalus.com",
 			Password:   password,

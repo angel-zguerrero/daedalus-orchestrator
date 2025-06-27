@@ -28,7 +28,12 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 }
 
 func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) ([]byte, error) {
-	return nil, nil
+	bootstrapRootUserCmd, ok := cmd.(commands.BootstrapRootUserCommand)
+	if ok {
+		return bootstrapRootUserCmd.Execute(uow, now)
+	}
+
+	return nil, errors.New("invalid command type")
 }
 
 func NewMasterKVStateMachine(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {

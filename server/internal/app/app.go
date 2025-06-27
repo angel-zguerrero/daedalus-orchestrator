@@ -5,12 +5,15 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
 	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
 	"sync"
 	"time"
+
+	commands "deadalus-orch/server/internal/usecase/command"
 
 	dblog "github.com/lni/dragonboat/v4/logger"
 	"github.com/lni/goutils/syncutil"
@@ -196,6 +199,25 @@ func (app *Application) Run() {
 				app.MasterNodeIsReady = isReady
 				if isReady {
 					log.Info().Msg("✅ Node is ready for consensus.")
+					if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
+
+						bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
+
+						cmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  bootstrapRootUserCmd,
+						}
+
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+						defer cancel()
+						_, err := masterNode.Write(ctx, cmd)
+						log.Fatal().
+							Err(err).
+							Str("package", "app").
+							Str("func", "Run").
+							Msgf("❌ Failed to bootstrap root user")
+					}
 
 					if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
 						app.StartAdminAPI(masterNode)

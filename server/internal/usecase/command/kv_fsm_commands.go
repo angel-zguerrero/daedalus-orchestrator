@@ -146,7 +146,7 @@ const (
 	// MCL indicates a Maintenance Control Language command, detailed by MCLK_Command.
 	MCL
 
-	SPECIALIZED
+	REPOSITORY_COMMAND
 )
 
 // FSM_Command is the generic wrapper for any type of command sent through the Raft consensus.
