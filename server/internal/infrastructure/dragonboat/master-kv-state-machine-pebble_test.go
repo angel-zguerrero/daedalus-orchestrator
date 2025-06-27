@@ -6,8 +6,8 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
-	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/server/internal/pkg/utils"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/constants"
 	"encoding/binary"
 	"encoding/gob"
@@ -24,17 +24,17 @@ func setupKVMasterPebble(t *testing.T, engine string) *dragonboat.KVBaseStateMac
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := NewMasterKVStateMachine(1, 1).(*KVBaseStateMachine)
+	kv := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
 	return kv
 }
-func setupKV(t *testing.T, engine string) *KVBaseStateMachine { // Changed return type
+func setupKV(t *testing.T, engine string) *dragonboat.KVBaseStateMachine { // Changed return type
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := NewMasterKVStateMachine(1, 1).(*KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -186,7 +186,7 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := NewMasterKVStateMachine(1, 1).(*KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv2 := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -339,7 +339,7 @@ func TestPebble_Read_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: commands.RWK_Command") // Changed dragonboat.RWK_Command to commands.RWK_Command
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: command.RWK_Command") // Changed dragonboat.RWK_Command to commands.RWK_Command
 }
 func TestPebble_Update_PutWithTTL(t *testing.T) {
 	kv := setupKV(t, "pebble")
@@ -729,7 +729,7 @@ func TestPebble_RecoverFromSnapshot_InvalidData(t *testing.T) {
 }
 
 type failingImpl struct {
-	KVStateMachineImpl // Changed dragonboat.KVStateMachineImpl to KVStateMachineImpl
+	dragonboat.KVStateMachineImpl // Changed dragonboat.KVStateMachineImpl to KVStateMachineImpl
 }
 
 func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]commands.FSM_Command, error) { // Changed dragonboat.FSM_Command to commands.FSM_Command
@@ -748,9 +748,9 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 
 	// Insert some entries
 	entries := []commands.WK_Command{ // Changed dragonboat.WK_Command to commands.WK_Command
-		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp}, // Changed dragonboat.PutOp to commands.PutOp
-		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp}, // Changed dragonboat.PutOp to commands.PutOp
-		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp}, // Changed dragonboat.PutOp to commands.PutOp
+		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},   // Changed dragonboat.PutOp to commands.PutOp
+		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},   // Changed dragonboat.PutOp to commands.PutOp
+		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},   // Changed dragonboat.PutOp to commands.PutOp
 		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp}, // Changed dragonboat.PutOp to commands.PutOp
 	}
 
@@ -782,7 +782,7 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 
 	res, err := kv.Lookup(query)
 	require.NoError(t, err)
-	paged := res.(*PagedResultKV) // Changed dragonboat.PagedResultKV to PagedResultKV
+	paged := res.(*dragonboat.PagedResultKV) // Changed dragonboat.PagedResultKV to PagedResultKV
 	require.Len(t, paged.Data, 3)
 }
 
@@ -839,7 +839,7 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 
 	res, err := kv.Lookup(query)
 	require.NoError(t, err)
-	paged := res.(*PagedResultKV) // Changed dragonboat.PagedResultKV to PagedResultKV
+	paged := res.(*dragonboat.PagedResultKV) // Changed dragonboat.PagedResultKV to PagedResultKV
 	require.Len(t, paged.Data, 2)
 
 	validValues := []string{"v2", "v3"}

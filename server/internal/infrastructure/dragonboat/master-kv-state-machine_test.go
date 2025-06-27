@@ -6,8 +6,8 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
-	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/server/internal/pkg/utils"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/constants"
 	"encoding/binary"
 	"encoding/gob"
@@ -342,7 +342,7 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: commands.RWK_Command")
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: command.RWK_Command")
 }
 func TestUpdate_PutWithTTL(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")

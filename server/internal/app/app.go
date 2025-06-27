@@ -5,7 +5,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
 	"deadalus-orch/server/internal/pkg/config"
-	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
 	"fmt"

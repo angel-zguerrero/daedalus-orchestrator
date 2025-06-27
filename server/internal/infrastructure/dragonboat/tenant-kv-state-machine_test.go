@@ -24,7 +24,7 @@ func setupTenantKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup")
 
-	kv := NewTenantKVStateMachine(1, 2).(*KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv.Open(stopc)
 	require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	// Also ensure config is loaded for the second instance if it's path dependent
 	err = config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup (kv2)")
-	kv2 := NewTenantKVStateMachine(1, 2).(*KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv2 := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -339,7 +339,7 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: commands.RWK_Command") // Changed dragonboat.RWK_Command to commands.RWK_Command
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: command.RWK_Command") // Changed dragonboat.RWK_Command to commands.RWK_Command
 }
 func TestTenantUpdate_PutWithTTL(t *testing.T) {
 	kv := setupTenantKV(t)
