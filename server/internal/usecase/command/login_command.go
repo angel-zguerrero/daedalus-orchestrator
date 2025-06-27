@@ -47,7 +47,7 @@ func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, err
 
 	loggedIn, err := userRepo.Login(cmd.Email, cmd.Password)
 	if err != nil {
-		return nil, NewInfrastructureErrorWrap(err, "error during login process")
+		return nil, err
 	}
 
 	if !loggedIn {
