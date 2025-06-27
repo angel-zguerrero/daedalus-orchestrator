@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Config holds the application's configuration parameters.
 // These parameters are typically loaded from command-line flags, environment variables,
 // or a configuration file.

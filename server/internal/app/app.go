@@ -216,7 +216,7 @@ func (app *Application) Run() {
 							Err(err).
 							Str("package", "app").
 							Str("func", "Run").
-							Msgf("❌ Failed to bootstrap root user")
+							Msgf("❌ Failed to bootstrap root user", err)
 					}
 
 					if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
