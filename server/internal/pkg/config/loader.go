@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -32,6 +33,7 @@ Available Flags:
   --admin-api-jwt-expiration-hours JWT expiration time in hours for the Admin API. Default is 3 hours.
   --admin-host                 Host address for the Admin API. Overrides config file and environment variable.
   --admin-port                 Port for the Admin API. Overrides config file and environment variable.
+  --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -51,6 +53,7 @@ Environment Variables:
   ADMIN_LISTEN_ADDR_HOST       Host address for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrHost + `)
   ADMIN_LISTEN_ADDR_PORT       Port for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrPort + `)
   ADMIN_API_JWT_SECRET         JWT secret key for the Admin API. (Corresponds to ` + constants.EnvVarAdminAPIJWTSecret + `)
+  API_RAFT_TIMEOUT             Timeout for API to Raft node requests (e.g., "5s", "1m"). (Corresponds to ` + constants.EnvVarAPIRaftTimeout + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -75,6 +78,7 @@ Configuration File:
     admin_listen_addr_host
     admin_listen_addr_port
     admin_api_jwt_secret
+    api_raft_timeout               Timeout for API to Raft node requests in seconds (e.g., 5 for 5s).
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -120,6 +124,9 @@ var AdminListenAddrHostFlag = flag.String("admin-host", "", "Host address for th
 
 // AdminListenAddrPortFlag defines the --admin-port command-line flag for specifying the Admin API listen port.
 var AdminListenAddrPortFlag = flag.Int("admin-port", 0, "Port for the Admin API. Overrides config file and environment variable.")
+
+// ApiRaftTimeoutFlag defines the --api-raft-timeout command-line flag for specifying the API to Raft node request timeout.
+var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 5*time.Second, "Timeout for API to Raft node requests (e.g., 5s, 1m). Overrides config file and environment variable.")
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
@@ -264,6 +271,14 @@ func LoadDefaultConfiguration() error {
 		config.AdminAPIJWTSecret = envVal
 	}
 
+	if envVal := os.Getenv(constants.EnvVarAPIRaftTimeout); envVal != "" {
+		apiRaftTimeout, err := time.ParseDuration(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarAPIRaftTimeout, err)
+		}
+		config.ApiRaftTimeout = apiRaftTimeout
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -308,6 +323,14 @@ func LoadDefaultConfiguration() error {
 		config.AdminListenAddrPort = *AdminListenAddrPortFlag
 	}
 
+	// Note: ApiRaftTimeoutFlag is a time.Duration. If it's different from its default, it means it was set.
+	// The default value for the flag (5s) is applied if not overridden by env or file,
+	// or if the flag itself is not used.
+	// If ApiRaftTimeout is still zero duration here, it means it wasn't set by file or env.
+	// The flag's value (*ApiRaftTimeoutFlag) will then be used, which includes its own default.
+	// Assign flag value (user-set, or flag's own default e.g. 5s). This overrides env/file.
+	config.ApiRaftTimeout = *ApiRaftTimeoutFlag
+
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
@@ -333,6 +356,30 @@ func LoadDefaultConfiguration() error {
 	if config.AdminAPIJWTSecret == "" {
 		config.AdminAPIJWTSecret = "super-secret-default-jwt-key-please-change"
 		log.Warn().Msgf("⚠️ WARNING: Admin API JWT Secret is not set, using default insecure key. Please set the %s environment variable or the admin_api_jwt_secret key in your configuration file.", constants.EnvVarAdminAPIJWTSecret)
+	}
+
+	// Default for ApiRaftTimeout if not set by file, env, or flag (flag itself has a default of 5s)
+	// This ensures that if config file parsing of api_raft_timeout results in 0 (e.g. key not present or invalid),
+	// and env var is not set, and flag is not explicitly used, it still gets the flag's default value.
+	// The previous block for flags `if *ApiRaftTimeoutFlag != 0` correctly assigns the flag's value (which could be its default).
+	// So, if config.ApiRaftTimeout is *still* 0 here, it implies it wasn't set by config file (parsed to 0),
+	// not by env var (parsed to 0), and the flag assignment logic also resulted in 0 (which shouldn't happen for time.Duration unless explicitly set to 0s).
+	// A time.Duration field defaults to 0. The flag has a default of 5s.
+	// If ApiRaftTimeout is 0 after all loading stages, it means it was explicitly set to "0s" or 0 in the config.
+	// We'll rely on the flag's default being propagated correctly.
+	// If `config.ApiRaftTimeout` is zero (e.g. after `ConfigFromMapToConfig` if `api_raft_timeout` was 0 and not overridden by ENV or Flag)
+	// we should ensure it gets a sensible default. The flag `*ApiRaftTimeoutFlag` will carry its default of 5s if not changed.
+	// The assignment `config.ApiRaftTimeout = *ApiRaftTimeoutFlag` handles this.
+	// So, an explicit check here for `config.ApiRaftTimeout == 0` and setting it to a default is redundant if the flag logic is correct.
+	// Let's verify the order: Config file (parsed into int64 seconds, then to duration), then ENV (parsed as duration), then Flag (is a duration).
+	// If config file has api_raft_timeout = 0, then config.ApiRaftTimeout becomes 0.
+	// Then if ENV is not set, it remains 0.
+	// Then `config.ApiRaftTimeout = *ApiRaftTimeoutFlag` will set it to the flag's value (e.g. 5s default, or user-set value).
+	// This logic seems fine.
+
+	if config.ApiRaftTimeout <= 0 {
+		log.Warn().Msgf("API Raft Timeout was configured to %v, which is invalid or zero. Resetting to default 5s.", config.ApiRaftTimeout)
+		config.ApiRaftTimeout = 5 * time.Second
 	}
 
 	// Specific default logic for cluster setup
@@ -471,6 +518,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 			cfg.admin_listen_addr_port = p
 		case constants.ConfigAdminAPIJWTSecretKey:
 			cfg.admin_api_jwt_secret = v
+		case constants.ConfigAPIRaftTimeoutKey:
+			p, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.api_raft_timeout = p
 		}
 	}
 

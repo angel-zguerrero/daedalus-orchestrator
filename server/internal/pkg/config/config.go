@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Config holds the application's configuration parameters.
 // These parameters are typically loaded from command-line flags, environment variables,
 // or a configuration file.
@@ -38,6 +40,8 @@ type Config struct {
 	AdminListenAddrPort int
 	// AdminAPIJWTSecret is the JWT secret key for the Admin API.
 	AdminAPIJWTSecret string
+	// ApiRaftTimeout defines the timeout duration for requests from the API to the Raft node.
+	ApiRaftTimeout time.Duration
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
@@ -59,6 +63,7 @@ type ConfigFromMap struct {
 	admin_listen_addr_host         string
 	admin_listen_addr_port         int
 	admin_api_jwt_secret           string
+	api_raft_timeout               int64 // Timeout in seconds
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -86,6 +91,7 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		AdminListenAddrHost:        configFromMapInstance.admin_listen_addr_host,
 		AdminListenAddrPort:        configFromMapInstance.admin_listen_addr_port,
 		AdminAPIJWTSecret:          configFromMapInstance.admin_api_jwt_secret,
+		ApiRaftTimeout:             time.Duration(configFromMapInstance.api_raft_timeout) * time.Second,
 	}
 	return c
 }
