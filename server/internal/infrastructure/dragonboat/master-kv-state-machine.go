@@ -24,6 +24,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return loginCmd.Execute(uow, now)
 	}
 
+	checkSessionExistsCommand, ok := input.(commands.CheckSessionExistsCommand)
+	if ok {
+		return checkSessionExistsCommand.Execute(uow, now)
+	}
+
 	return nil, errors.New("invalid command type")
 }
 
@@ -31,6 +36,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	bootstrapRootUserCmd, ok := cmd.(commands.BootstrapRootUserCommand)
 	if ok {
 		return bootstrapRootUserCmd.Execute(uow, now)
+	}
+
+	registerSessionCommand, ok := cmd.(commands.RegisterSessionCommand)
+	if ok {
+		return registerSessionCommand.Execute(uow, now)
 	}
 
 	return nil, errors.New("invalid command type")
