@@ -3,6 +3,7 @@ package dragonboat
 import (
 	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/binary"
 	"encoding/gob"
 	"errors"
@@ -134,11 +135,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	batch := db.NewWriteBatch()
 	uow := db.NewUnitOfWork(kv_store, batch)
 
-	commands := make([]Command, len(ents))
+	fsm_commands := make([]commands.FSM_Command, len(ents))
 	parseErrors := make([]bool, len(ents))
 
 	for i, ent := range ents {
-		var cmd Command
+		var cmd commands.FSM_Command
 		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
 			parseErrors[i] = true
 			msg := fmt.Sprintf(
@@ -151,7 +152,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			}
 			continue
 		}
-		commands[i] = cmd
+		fsm_commands[i] = cmd
 	}
 
 	var dllFCEntries []int
@@ -159,18 +160,18 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	var mclEntries []int
 	var specializedEntries []int
 
-	for i, cmd := range commands {
+	for i, cmd := range fsm_commands {
 		if parseErrors[i] {
 			continue
 		}
 		switch cmd.Type {
-		case DDL_FC:
+		case commands.DDL_FC:
 			dllFCEntries = append(dllFCEntries, i)
-		case RW:
+		case commands.RW:
 			rwEntries = append(rwEntries, i)
-		case MCL:
+		case commands.MCL:
 			mclEntries = append(mclEntries, i)
-		case SPECIALIZED:
+		case commands.SPECIALIZED:
 			specializedEntries = append(specializedEntries, i)
 		default:
 			msg := fmt.Sprintf("unknown command type: %v", cmd.Type)
@@ -186,8 +187,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		if parseErrors[idx] {
 			continue
 		}
-		cmd := commands[idx]
-		ddlCmd, ok := cmd.CMD.(DDL_Command)
+		cmd := fsm_commands[idx]
+		ddlCmd, ok := cmd.CMD.(commands.DDL_Command)
 		if !ok {
 			msg := fmt.Sprintf("expected DDL_Command for DLL type, got %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
@@ -206,9 +207,9 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		if parseErrors[idx] {
 			continue
 		}
-		cmd := commands[idx]
+		cmd := fsm_commands[idx]
 		now := time.Unix(0, cmd.Now)
-		rwCmd, ok := cmd.CMD.(RWK_Command)
+		rwCmd, ok := cmd.CMD.(commands.RWK_Command)
 		if !ok {
 			msg := fmt.Sprintf("expected RWK_Command for RW type, got %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
@@ -218,15 +219,15 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			continue
 		}
 		switch rwCmd.Op {
-		case Read:
+		case commands.Read:
 			msg := fmt.Sprintf("Invalid read operation: %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
 				Value: uint64(len(ents[idx].Cmd)),
 				Data:  []byte(msg),
 			}
 			continue
-		case Write:
-			wCmd, ok := rwCmd.CMD.(WK_Command)
+		case commands.Write:
+			wCmd, ok := rwCmd.CMD.(commands.WK_Command)
 			if !ok {
 				msg := fmt.Sprintf("expected WK_Command for RW type, got %T", cmd.CMD)
 				ents[idx].Result = statemachine.Result{
@@ -236,11 +237,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 				continue
 			}
 			switch wCmd.Op {
-			case PutOp:
+			case commands.PutOp:
 				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, now)
-			case PutOpTTL:
+			case commands.PutOpTTL:
 				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL, now)
-			case DeleteOp, DeleteOpTTL:
+			case commands.DeleteOp, commands.DeleteOpTTL:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key, now)
 			default:
 				msg := fmt.Sprintf("unknown W Operation: %v", wCmd.Op)
@@ -265,8 +266,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		if parseErrors[idx] {
 			continue
 		}
-		cmd := commands[idx].CMD
-		now := time.Unix(0, commands[idx].Now)
+		cmd := fsm_commands[idx].CMD
+		now := time.Unix(0, fsm_commands[idx].Now)
 		result, err := s.stateMachineImpl.Update(cmd, uow, now)
 		if err != nil {
 			ents[idx].Result = statemachine.Result{
@@ -285,8 +286,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		if parseErrors[idx] {
 			continue
 		}
-		cmd := commands[idx]
-		mlcCmd, ok := cmd.CMD.(MCLK_Command)
+		cmd := fsm_commands[idx]
+		mlcCmd, ok := cmd.CMD.(commands.MCLK_Command)
 		if !ok {
 			msg := fmt.Sprintf("expected MCLK_Command for MCL type, got %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
@@ -296,8 +297,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			continue
 		}
 		switch mlcCmd.Op {
-		case ClearExpiredTTL:
-			now := time.Unix(0, commands[idx].Now)
+		case commands.ClearExpiredTTL:
+			now := time.Unix(0, fsm_commands[idx].Now)
 			err := kv_store.CleanExpiredKeys(now)
 			if err != nil {
 				ents[idx].Result = statemachine.Result{
@@ -338,19 +339,19 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	if kv_store != nil {
 
-		query, ok := query.(Query_Command)
+		query, ok := query.(commands.Query_Command)
 		if !ok {
 			return nil, fmt.Errorf("expected query to be Query_Command, got %T", query)
 		}
 
 		now := time.Unix(0, query.Now)
-		repo_command, ok := query.Command.(Repository_Command)
+		repo_command, ok := query.Command.(commands.Repository_Command)
 		uow := db.NewUnitOfWork(kv_store, nil)
 		if ok {
 			return s.stateMachineImpl.Lookup(repo_command.CMD, uow, now)
 		}
 
-		command, ok := query.Command.(RK_Command)
+		command, ok := query.Command.(commands.RK_Command)
 		if !ok {
 			return nil, fmt.Errorf("expected command to be RK_Command, got %T", query.Command)
 		}
@@ -361,7 +362,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 
 		switch command.Op {
 
-		case GetOp:
+		case commands.GetOp:
 			var data []byte
 
 			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
@@ -371,7 +372,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 			if data != nil {
 				return data, err
 			}
-		case Search:
+		case commands.Search:
 
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				command.ColumnFamilyName,
@@ -390,7 +391,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 			}
 			return result, nil
 
-		case GetOpTTL:
+		case commands.GetOpTTL:
 			var data []byte
 
 			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
@@ -400,7 +401,7 @@ func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
 			if data != nil {
 				return data, err
 			}
-		case SearchTTL:
+		case commands.SearchTTL:
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				command.ColumnFamilyName,
 				command.KeyPattern,

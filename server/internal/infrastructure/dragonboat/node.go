@@ -5,6 +5,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/utils"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -146,7 +147,7 @@ func (mn *RaftNode) Stop() {
 // Returns:
 //   - The result of the proposal from the state machine.
 //   - An error if marshaling fails or if SyncPropose encounters an error.
-func (mn *RaftNode) Write(ctx context.Context, comand Command) (statemachine.Result, error) {
+func (mn *RaftNode) Write(ctx context.Context, comand commands.FSM_Command) (statemachine.Result, error) { // Changed FSM_Command to commands.FSM_Command
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
 	if mn.stopped {
@@ -171,7 +172,7 @@ func (mn *RaftNode) Write(ctx context.Context, comand Command) (statemachine.Res
 // Returns:
 //   - The result of the read operation from the state machine.
 //   - An error if marshaling fails or if SyncRead encounters an error.
-func (mn *RaftNode) Read(ctx context.Context, cmd Query_Command) (interface{}, error) {
+func (mn *RaftNode) Read(ctx context.Context, cmd commands.Query_Command) (interface{}, error) { // Changed Query_Command to commands.Query_Command
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
 	if mn.stopped {
@@ -208,16 +209,16 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 		for {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-			cmd := Command{
+			cmd := commands.FSM_Command{
 				Now:  utils.GetNowInInt(),
-				Type: RW,
-				CMD: RWK_Command{
-					Op: Write,
-					CMD: WK_Command{
+				Type: commands.RW,
+				CMD: commands.RWK_Command{
+					Op: commands.Write,
+					CMD: commands.WK_Command{
 						Key:              "ready",
 						Value:            []byte(Int64ToBytes(time.Now().UnixMilli())),
 						ColumnFamilyName: db.MetaFC,
-						Op:               PutOp,
+						Op:               commands.PutOp,
 					},
 				},
 			}
