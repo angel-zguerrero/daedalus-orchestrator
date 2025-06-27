@@ -121,8 +121,9 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 			ColumnFamilyName: db.DefaultFC,
 		},
 	}
-
-	val, err := kv.Lookup(query)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query)
+	val, err := kv.Lookup(bufQ.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("lookup_value"), val)
 }
@@ -138,7 +139,10 @@ func TestTenantLookup_NonExistingKey(t *testing.T) {
 			ColumnFamilyName: db.DefaultFC,
 		},
 	}
-	val, err := kv.Lookup(query)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query)
+	val, err := kv.Lookup(bufQ.Bytes())
+
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -204,7 +208,10 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 			ColumnFamilyName: db.DefaultFC,
 		},
 	}
-	val, err := kv2.Lookup(query1)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query1)
+	val, err := kv2.Lookup(bufQ.Bytes())
+
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
@@ -215,7 +222,10 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 			ColumnFamilyName: db.MetaFC,
 		},
 	}
-	val, err = kv2.Lookup(query2)
+	var bufQ2 bytes.Buffer
+	gob.NewEncoder(&bufQ2).Encode(query2)
+	val, err = kv2.Lookup(bufQ2.Bytes())
+
 	require.NoError(t, err)
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }

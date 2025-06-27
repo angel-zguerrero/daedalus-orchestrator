@@ -333,15 +333,21 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	return ents, nil
 }
 
-func (s *KVBaseStateMachine) Lookup(query interface{}) (interface{}, error) {
+func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	if kv_store != nil {
-
-		query, ok := query.(commands.Query_Command)
+		data, ok := q.([]byte)
 		if !ok {
-			return nil, fmt.Errorf("expected query to be Query_Command, got %T", query)
+			return nil, fmt.Errorf("invalid query type: expected []byte, got %T", q)
+		}
+		if len(data) == 0 {
+			return nil, fmt.Errorf("empty query payload")
+		}
+		var query commands.Query_Command
+		if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&query); err != nil {
+			return nil, fmt.Errorf("failed to decode query command: %w", err)
 		}
 
 		now := time.Unix(0, query.Now)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
-	_ "deadalus-orch/server/internal/usecase/command" // Import for side effects if needed, or alias if types are used
+	commands "deadalus-orch/server/internal/usecase/command"
 	"fmt"
 	"net/http"
 	"time"
@@ -120,38 +120,69 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 		return
 	}
 
-	// Simulate authentication: In a real app, you'd check req.Username and req.Password against a store.
-	// For this task, we'll assume any provided username/password is valid for simulation purposes,
-	// but we need to ensure they are not empty as per binding:"required".
-	if req.Username == "" || req.Password == "" {
-		// This case should ideally be caught by `binding:"required"`, but as a safeguard:
-		api.logger.Warn().Msg("Login attempt with empty username or password")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username and password are required"})
+	// Instantiate the LoginCommand
+	loginCmd := &commands.LoginCommand{
+		Email:    req.Username, // Assuming username from request can be email
+		Password: req.Password,
+	}
+
+	// Wrap the LoginCommand in a Query_Command
+	// The Query_Command.Now field might be used by the state machine for its own timestamping if needed,
+	// but our Command.Execute method receives `now` explicitly from the Lookup method.
+	queryCommand := &commands.Query_Command{
+		Command: &commands.Repository_Command{
+			CMD: loginCmd,
+		},
+		Now: time.Now().UnixNano(), // Or handle as per specific requirements if Query_Command.Now is actively used
+	}
+
+	// Call the node's Read method (SyncRead)
+	// The task implies a Read method on the node. Assuming it's similar to Lookup/Propose
+	// and is responsible for routing to the MasterKVDBStateMachine.Lookup method.
+	// The actual method name on `api.node` might be `SyncRead` or similar.
+	// For this example, I'll use a hypothetical `api.node.Read` method.
+	// If the method is `Lookup`, we'd use `api.node.Lookup(c.Request.Context(), queryCommand)`.
+	// The problem states "call the node’s Read method ... passing the Query_Command".
+	// Let's assume a `Read` method exists that behaves like `Lookup` but is meant for synchronous queries.
+	// If `api.node` is of type `*dragonboat.Node`, it has `SyncRead(ctx context.Context, clusterID uint64, query interface{}) (interface{}, error)`
+	// We'd need the clusterID for this. Assuming master cluster ID.
+	// For now, let's use `api.node.Lookup` as its signature is `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
+	// which matches well if we assume it can handle Query_Command.
+	// The problem description for master-kv-state-machine.go's Lookup method is:
+	// `Lookup(cmd any, uow *db.UnitOfWork, now time.Time) (interface{}, error)`
+	// The `RaftNode` interface's `Lookup` method is:
+	// `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
+	// The `dragonboat.Node`'s `Lookup` is:
+	// `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
+	// This seems to be the most direct path. The `uow` and `now` for `MasterKVDBStateMachine.Lookup`
+	// are prepared internally by the `dragonboat.Node.Lookup`'s machinery before calling the state machine.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, err := api.node.Read(ctx, *queryCommand)
+	if err != nil {
+		api.logger.Error().Err(err).Str("username", req.Username).Msg("Login command execution failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed: " + err.Error()})
 		return
 	}
 
-	// Simulate node.Propose()
-	// In a real scenario, the proposal would contain information about the login attempt,
-	// e.g., to be recorded in a distributed log or to trigger some cluster-wide action.
-	// For now, we just simulate a successful proposal.
-	//proposalData := []byte(fmt.Sprintf(`{"action": "user_login", "username": "%s"}`, req.Username))
-	//_, err := api.node.Propose(c.Request.Context(), proposalData) // Using request context
+	loggedIn, ok := result.(bool)
+	if !ok {
+		api.logger.Error().Str("username", req.Username).Msg("Login command returned unexpected result type")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (result type)"})
+		return
+	}
 
-	//if err != nil {
-	// If Propose returns an error, it means the Raft operation failed.
-	//	api.logger.Error().Err(err).Str("username", req.Username).Msg("Raft Propose failed during login attempt")
-	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (proposal)"})
-	//	return
-	//}
+	if !loggedIn {
+		api.logger.Warn().Str("username", req.Username).Msg("Login attempt failed: invalid credentials")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		return
+	}
 
-	// Simulate successful proposal (as per requirement, Propose is emulated to always return true, error is nil)
-	// For now, we assume if err is nil, the proposal was "successful" for the purpose of JWT generation.
-
-	// Generate JWT token
+	// Credentials are valid, generate JWT token
 	tokenString, err := api.generateJWT(req.Username)
 	if err != nil {
 		api.logger.Error().Err(err).Str("username", req.Username).Msg("Failed to generate JWT token during login")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (token generation)"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login successful, but failed to generate token: " + err.Error()})
 		return
 	}
 
