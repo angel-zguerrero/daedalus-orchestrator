@@ -76,9 +76,9 @@ func (r *UserRepository) DeleteUser(username string) (bool, error) {
 	return r.repo.Delete(rootUser.ID, now)
 }
 
-func (r *UserRepository) Login(identifier, password string) (bool, error) {
+func (r *UserRepository) Login(usernameOrEmail, password string) (bool, error) {
 	now := time.Now()
-	user, err := r.repo.FindByField("Email", identifier, now)
+	user, err := r.repo.FindByField("Email", usernameOrEmail, now)
 	if err != nil {
 		// Error during email lookup
 		return false, err
@@ -86,7 +86,7 @@ func (r *UserRepository) Login(identifier, password string) (bool, error) {
 
 	if user == nil {
 		// User not found by email, try by username
-		user, err = r.repo.FindByField("Username", identifier, now)
+		user, err = r.repo.FindByField("Username", usernameOrEmail, now)
 		if err != nil {
 			// Error during username lookup
 			return false, err

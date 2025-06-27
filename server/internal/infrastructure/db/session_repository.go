@@ -67,17 +67,10 @@ func (r *SessionRepository) SessionExists(jwtToken string, now time.Time) (bool,
 	if userName == "" {
 		return false, fmt.Errorf("username not found in token claims")
 	}
-
-	// FindByField expects the value to search for.
-	// The generic repository handles searching by indexed fields.
-	// UserName is marked as `orm:"unique"`, so it will have a unique index.
-	fmt.Println("Checking for existing session for user:", userName)
 	existingSession, err := r.repo.FindByField("UserName", userName, now)
 	if err != nil {
 		return false, fmt.Errorf("error querying session for user %s: %w", userName, err)
 	}
-
-	fmt.Println("Existing session found:", existingSession)
 
 	if existingSession == nil || existingSession.CurrentToken != jwtToken {
 		return false, nil // No session found
@@ -106,8 +99,6 @@ func (r *SessionRepository) RegisterSession(jwtToken string, now time.Time) erro
 	}
 	sessionTTL := int64(time.Until(expiresAt.Time).Seconds())
 
-	fmt.Println("Registering session for user:", userName, "with TTL:", sessionTTL)
-
 	// Check if a session for this user already exists
 	existingSession, err := r.repo.FindByField("UserName", userName, now)
 	if err != nil {
@@ -117,7 +108,6 @@ func (r *SessionRepository) RegisterSession(jwtToken string, now time.Time) erro
 	}
 
 	if existingSession != nil {
-		fmt.Println("Updating existing session for user:", userName, sessionTTL)
 		existingSession.CurrentToken = jwtToken
 		existingSession.TTL = sessionTTL // Update with the new token's expiry
 
