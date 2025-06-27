@@ -157,7 +157,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	// `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
 	// This seems to be the most direct path. The `uow` and `now` for `MasterKVDBStateMachine.Lookup`
 	// are prepared internally by the `dragonboat.Node.Lookup`'s machinery before calling the state machine.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 	defer cancel()
 	result, err := api.node.Read(ctx, *queryCommand)
 	if err != nil {

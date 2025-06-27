@@ -47,6 +47,9 @@ const ConfigAdminListenAddrPortKey = "admin_listen_addr_port"
 // ConfigAdminAPIJWTSecretKey is the key for the Admin API JWT secret setting in the configuration file.
 const ConfigAdminAPIJWTSecretKey = "admin_api_jwt_secret"
 
+// ConfigAPIRaftTimeoutKey is the key for the API Raft timeout setting in the configuration file (in seconds).
+const ConfigAPIRaftTimeoutKey = "api_raft_timeout"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -100,6 +103,9 @@ const EnvVarAdminListenAddrPort = "ADMIN_LISTEN_ADDR_PORT"
 
 // EnvVarAdminAPIJWTSecret is the environment variable name for the Admin API JWT secret.
 const EnvVarAdminAPIJWTSecret = "ADMIN_API_JWT_SECRET"
+
+// EnvVarAPIRaftTimeout is the environment variable name for the API Raft timeout (e.g., "5s", "1m").
+const EnvVarAPIRaftTimeout = "API_RAFT_TIMEOUT"
 
 // OpenTelemetry specific environment variables.
 
