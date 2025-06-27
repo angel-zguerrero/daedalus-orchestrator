@@ -22,6 +22,9 @@ func NewUnitOfWork(kvStore KVStore, batch *WriteBatch) *UnitOfWork {
 }
 
 func (u *UnitOfWork) Commit() error {
+	defer func() {
+		u.batch.Data = []X{}
+	}()
 	return u.kvStore.Write(u.batch)
 }
 

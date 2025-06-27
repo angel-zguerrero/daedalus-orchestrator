@@ -958,7 +958,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		if changed {
 			dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 			// Marshal the modified currentEntityStored, which now contains the merged changes
-			dataBytes, err := json.Marshal(currentEntityStored)
+			dataBytes, err := json.Marshal(entity)
 			if err != nil {
 				return nil, err
 			}
