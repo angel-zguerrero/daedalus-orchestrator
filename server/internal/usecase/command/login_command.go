@@ -2,8 +2,13 @@ package command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"encoding/gob"
 	"time"
 )
+
+func init() {
+	gob.Register(LoginCommand{})
+}
 
 // LoginCommand represents a command to authenticate a user.
 type LoginCommand struct {

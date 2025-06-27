@@ -7,7 +7,6 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
 	"strconv"
 	"sync"
@@ -178,11 +177,11 @@ func (mn *RaftNode) Read(ctx context.Context, cmd commands.Query_Command) (inter
 	if mn.stopped {
 		return statemachine.Result{}, errors.New("raft node is stopped")
 	}
-	data, err := json.Marshal(cmd)
-	if err != nil {
-		return statemachine.Result{}, err
-	}
-	result, err := mn.NH.SyncRead(ctx, mn.ShardID, data)
+	var buf bytes.Buffer
+
+	gob.NewEncoder(&buf).Encode(cmd)
+
+	result, err := mn.NH.SyncRead(ctx, mn.ShardID, buf.Bytes())
 	return result, err
 }
 

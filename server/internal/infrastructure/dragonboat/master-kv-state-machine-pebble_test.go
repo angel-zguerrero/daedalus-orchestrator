@@ -124,7 +124,9 @@ func TestPebble_Lookup_ExistingKey(t *testing.T) {
 		},
 	}
 
-	val, err := kv.Lookup(query)
+	var buf3 bytes.Buffer
+	gob.NewEncoder(&buf3).Encode(query)
+	val, err := kv.Lookup(buf3.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("lookup_value"), val)
 }
@@ -140,7 +142,10 @@ func TestPebble_Lookup_NonExistingKey(t *testing.T) {
 			ColumnFamilyName: db.DefaultFC,
 		},
 	}
-	val, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query)
+
+	val, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -203,7 +208,10 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 		},
 	}
 
-	val, err := kv2.Lookup(query1)
+	var buf1 bytes.Buffer
+	gob.NewEncoder(&buf1).Encode(query1)
+
+	val, err := kv2.Lookup(buf1.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
@@ -215,7 +223,9 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 		},
 	}
 
-	val, err = kv2.Lookup(query2)
+	var buf2 bytes.Buffer
+	gob.NewEncoder(&buf2).Encode(query2)
+	val, err = kv2.Lookup(buf2.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
@@ -489,7 +499,10 @@ func TestPebble_PutTTLStoresWithExpiration(t *testing.T) {
 		},
 	}
 
-	val, err := kv.Lookup(query)
+	// Use gob to encode the query comman
+	var bufQuery bytes.Buffer
+	gob.NewEncoder(&bufQuery).Encode(query)
+	val, err := kv.Lookup(bufQuery.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("ttl_test_value"), val)
 }
@@ -533,7 +546,10 @@ func TestPebble_TTLExpirationRemovesKey(t *testing.T) {
 			Op:               commands.GetOpTTL,
 		},
 	}
-	val, err := kv.Lookup(query)
+	// Use gob to encode the query command
+	var bufQuery bytes.Buffer
+	gob.NewEncoder(&bufQuery).Encode(query)
+	val, err := kv.Lookup(bufQuery.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -596,7 +612,10 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 			Op:               commands.GetOpTTL,
 		},
 	}
-	val, err := kv.Lookup(query)
+	// Use gob to encode the query command
+	var bufQuery bytes.Buffer
+	gob.NewEncoder(&bufQuery).Encode(query)
+	val, err := kv.Lookup(bufQuery.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -656,7 +675,9 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 			Key:              key,
 		},
 	}
-	val, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query)
+	val, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -780,7 +801,9 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 		},
 	}
 
-	res, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query) // Encode the query command
+	res, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	paged := res.(*dragonboat.PagedResultKV) // Changed dragonboat.PagedResultKV to PagedResultKV
 	require.Len(t, paged.Data, 3)
@@ -837,7 +860,9 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 		},
 	}
 
-	res, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query) // Encode the query command
+	res, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	paged := res.(*dragonboat.PagedResultKV) // Changed dragonboat.PagedResultKV to PagedResultKV
 	require.Len(t, paged.Data, 2)
@@ -903,7 +928,9 @@ func TestSaveSnapshotAndRecoverPebbleToRocksDB(t *testing.T) {
 		},
 	}
 
-	val, err := kvRocksDB.Lookup(query1)
+	var buf2 bytes.Buffer
+	gob.NewEncoder(&buf2).Encode(query1)
+	val, err := kvRocksDB.Lookup(buf2.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
@@ -915,7 +942,9 @@ func TestSaveSnapshotAndRecoverPebbleToRocksDB(t *testing.T) {
 		},
 	}
 
-	val, err = kvRocksDB.Lookup(query2)
+	var buf3 bytes.Buffer
+	gob.NewEncoder(&buf3).Encode(query2)
+	val, err = kvRocksDB.Lookup(buf3.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, kvRocksDB.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }

@@ -2,9 +2,9 @@ package rest_api_admin
 
 import (
 	"context"
-	"deadalus-orch/server/internal/infrastructure/dragonboat" // Ensure this is the correct package for Query_Command
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
-	usecasecommand "deadalus-orch/server/internal/usecase/command"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"fmt"
 	"net/http"
 	"time"
@@ -121,7 +121,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	}
 
 	// Instantiate the LoginCommand
-	loginCmd := &usecasecommand.LoginCommand{
+	loginCmd := &commands.LoginCommand{
 		Email:    req.Username, // Assuming username from request can be email
 		Password: req.Password,
 	}
@@ -129,9 +129,11 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	// Wrap the LoginCommand in a Query_Command
 	// The Query_Command.Now field might be used by the state machine for its own timestamping if needed,
 	// but our Command.Execute method receives `now` explicitly from the Lookup method.
-	queryCommand := &dragonboat.Query_Command{
-		Command: loginCmd,
-		// Now: time.Now().UnixNano(), // Or handle as per specific requirements if Query_Command.Now is actively used
+	queryCommand := &commands.Query_Command{
+		Command: &commands.Repository_Command{
+			CMD: loginCmd,
+		},
+		Now: time.Now().UnixNano(), // Or handle as per specific requirements if Query_Command.Now is actively used
 	}
 
 	// Call the node's Read method (SyncRead)
@@ -154,8 +156,9 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	// `Lookup(ctx context.Context, query interface{}) (interface{}, error)`
 	// This seems to be the most direct path. The `uow` and `now` for `MasterKVDBStateMachine.Lookup`
 	// are prepared internally by the `dragonboat.Node.Lookup`'s machinery before calling the state machine.
-
-	result, err := api.node.Lookup(c.Request.Context(), queryCommand)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, err := api.node.Read(ctx, *queryCommand)
 	if err != nil {
 		api.logger.Error().Err(err).Str("username", req.Username).Msg("Login command execution failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed: " + err.Error()})

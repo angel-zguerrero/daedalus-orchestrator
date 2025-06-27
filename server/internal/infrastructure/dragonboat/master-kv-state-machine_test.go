@@ -121,8 +121,9 @@ func TestLookup_ExistingKey(t *testing.T) {
 			ColumnFamilyName: db.DefaultFC,
 		},
 	}
-
-	val, err := kv.Lookup(query)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query)
+	val, err := kv.Lookup(bufQ.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("lookup_value"), val)
 }
@@ -138,7 +139,10 @@ func TestLookup_NonExistingKey(t *testing.T) {
 			ColumnFamilyName: db.DefaultFC,
 		},
 	}
-	val, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query)
+
+	val, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -203,7 +207,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 		},
 	}
 
-	val, err := kv2.Lookup(query1)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query1)
+	val, err := kv2.Lookup(bufQ.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
@@ -216,7 +222,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 		},
 	}
 
-	val, err = kv2.Lookup(query2)
+	var buf2 bytes.Buffer
+	gob.NewEncoder(&buf2).Encode(query2)
+	val, err = kv2.Lookup(buf2.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
@@ -493,7 +501,9 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 		},
 	}
 
-	val, err := kv.Lookup(query)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query)
+	val, err := kv.Lookup(bufQ.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("ttl_test_value"), val)
 }
@@ -538,7 +548,9 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 			Op:               commands.GetOpTTL,
 		},
 	}
-	val, err := kv.Lookup(query)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query)
+	val, err := kv.Lookup(bufQ.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -602,7 +614,9 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 			Op:               commands.GetOpTTL,
 		},
 	}
-	val, err := kv.Lookup(query)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query)
+	val, err := kv.Lookup(bufQ.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -663,7 +677,9 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 			Key:              key,
 		},
 	}
-	val, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query)
+	val, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
@@ -787,7 +803,9 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 		},
 	}
 
-	res, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query)
+	res, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	paged := res.(*dragonboat.PagedResultKV)
 	require.Len(t, paged.Data, 3)
@@ -844,7 +862,10 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 		},
 	}
 
-	res, err := kv.Lookup(query)
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(query)
+
+	res, err := kv.Lookup(buf.Bytes())
 	require.NoError(t, err)
 	paged := res.(*dragonboat.PagedResultKV)
 	require.Len(t, paged.Data, 2)
@@ -910,8 +931,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 			ColumnFamilyName: db.DefaultFC,
 		},
 	}
-
-	val, err := kvPebble.Lookup(query1)
+	var bufQ bytes.Buffer
+	gob.NewEncoder(&bufQ).Encode(query1)
+	val, err := kvPebble.Lookup(bufQ.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
@@ -923,8 +945,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 			ColumnFamilyName: db.MetaFC,
 		},
 	}
-
-	val, err = kvPebble.Lookup(query2)
+	var bufQ2 bytes.Buffer
+	gob.NewEncoder(&bufQ2).Encode(query2)
+	val, err = kvPebble.Lookup(bufQ2.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, kvPebble.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
