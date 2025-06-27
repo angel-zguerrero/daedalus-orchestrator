@@ -4,6 +4,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
+	_ "deadalus-orch/server/internal/usecase/command" // Import for side effects if needed, or alias if types are used
 	"fmt"
 	"net/http"
 	"time"

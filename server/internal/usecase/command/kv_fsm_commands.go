@@ -1,4 +1,4 @@
-package dragonboat
+package command
 
 import (
 	"encoding/gob"

@@ -7,6 +7,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
+	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/constants"
 	"encoding/binary"
 	"encoding/gob"
@@ -52,16 +53,16 @@ func TestUpdate_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "foo",
 				Value:            []byte("bar"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.PutOp,
+				Op:               commands.PutOp,
 			},
 		},
 	}
@@ -91,16 +92,16 @@ func TestLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "lookup_key",
 				Value:            []byte("lookup_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.PutOp,
+				Op:               commands.PutOp,
 			},
 		},
 	}
@@ -113,9 +114,9 @@ func TestLookup_ExistingKey(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "lookup_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -130,9 +131,9 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "missing_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -154,16 +155,16 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.PutOp,
+				Op:               commands.PutOp,
 			},
 		},
 	}
@@ -194,9 +195,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query1 := dragonboat.Query_Command{
+	query1 := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -207,9 +208,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	require.Equal(t, []byte("snap_value"), val)
 
 	require.NoError(t, err)
-	query2 := dragonboat.Query_Command{
+	query2 := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              dragonboat.AppliedIndexKey,
 			ColumnFamilyName: db.MetaFC,
 		},
@@ -254,11 +255,11 @@ func TestUpdate_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
-		Type: dragonboat.DDL_FC,
-		CMD: dragonboat.DDL_Command{
+	cmd := commands.FSM_Command{
+		Type: commands.DDL_FC,
+		CMD: commands.DDL_Command{
 			ColumnFamilyName: "new_cf",
-			Op:               dragonboat.Add_CF_Op,
+			Op:               commands.Add_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -275,12 +276,12 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.FSM_Command{
-			Type: dragonboat.DDL_FC,
-			CMD: dragonboat.DDL_Command{
+		cmd := commands.FSM_Command{
+			Type: commands.DDL_FC,
+			CMD: commands.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               dragonboat.Add_CF_Op,
+				Op:               commands.Add_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -295,12 +296,12 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
-		Type: dragonboat.DDL_FC,
-		CMD: dragonboat.DDL_Command{
+	cmd := commands.FSM_Command{
+		Type: commands.DDL_FC,
+		CMD: commands.DDL_Command{
 
 			ColumnFamilyName: "to_delete_cf",
-			Op:               dragonboat.Remove_CF_Op,
+			Op:               commands.Remove_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -318,15 +319,15 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Read,
-			CMD: dragonboat.RK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Read,
+			CMD: commands.RK_Command{
 				Key:              "foo",
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.GetOp,
+				Op:               commands.GetOp,
 			},
 		},
 	}
@@ -341,24 +342,24 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: dragonboat.RWK_Command")
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: command.RWK_Command")
 }
 func TestUpdate_PutWithTTL(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -374,12 +375,12 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := dragonboat.FSM_Command{
-			Type: dragonboat.DDL_FC,
-			CMD: dragonboat.DDL_Command{
+		cmd := commands.FSM_Command{
+			Type: commands.DDL_FC,
+			CMD: commands.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               dragonboat.Add_TTL_CF_Op,
+				Op:               commands.Add_TTL_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -392,11 +393,11 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
-		Type: dragonboat.DDL_FC,
-		CMD: dragonboat.DDL_Command{
+	cmd := commands.FSM_Command{
+		Type: commands.DDL_FC,
+		CMD: commands.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
-			Op:               dragonboat.Remove_TTL_CF_Op,
+			Op:               commands.Remove_TTL_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -414,17 +415,17 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -436,16 +437,16 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = dragonboat.FSM_Command{
+	cmd = commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "ttl_key",
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               dragonboat.DeleteOpTTL,
+				Op:               commands.DeleteOpTTL,
 			},
 		},
 	}
@@ -461,17 +462,17 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "ttl_test_key",
 				Value:            []byte("ttl_test_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              10,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -483,12 +484,12 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "ttl_test_key",
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               dragonboat.GetOpTTL,
+			Op:               commands.GetOpTTL,
 		},
 	}
 
@@ -505,17 +506,17 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 
 	// Put TTL entry
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              key,
 				Value:            []byte("soon_gone"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              1,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -529,12 +530,12 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	require.NoError(t, err)
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              key,
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               dragonboat.GetOpTTL,
+			Op:               commands.GetOpTTL,
 		},
 	}
 	val, err := kv.Lookup(query)
@@ -550,17 +551,17 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Insert with TTL
 	var bufPut bytes.Buffer
-	cmdPut := dragonboat.FSM_Command{
+	cmdPut := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              key,
 				Value:            []byte("value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              60,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -573,15 +574,15 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Delete it
 	var bufDel bytes.Buffer
-	cmdDel := dragonboat.FSM_Command{
+	cmdDel := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              key,
 				ColumnFamilyName: db.MasterEventFC,
-				Op:               dragonboat.DeleteOpTTL,
+				Op:               commands.DeleteOpTTL,
 			},
 		},
 	}
@@ -593,12 +594,12 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              key,
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               dragonboat.GetOpTTL,
+			Op:               commands.GetOpTTL,
 		},
 	}
 	val, err := kv.Lookup(query)
@@ -613,17 +614,17 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	key := "expiredKey"
 	value := []byte("some-value")
 
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              key,
 				Value:            value,
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              1,
-				Op:               dragonboat.PutOpTTL,
+				Op:               commands.PutOpTTL,
 			},
 		},
 	}
@@ -638,10 +639,10 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	clearCmd := dragonboat.FSM_Command{
-		Type: dragonboat.MCL,
-		CMD: dragonboat.MCLK_Command{
-			Op: dragonboat.ClearExpiredTTL,
+	clearCmd := commands.FSM_Command{
+		Type: commands.MCL,
+		CMD: commands.MCLK_Command{
+			Op: commands.ClearExpiredTTL,
 		},
 	}
 	data = encodeCommandR(t, clearCmd)
@@ -654,10 +655,10 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	}
 
 	require.NoError(t, err)
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
-			Op:               dragonboat.GetOpTTL,
+		Command: commands.RK_Command{
+			Op:               commands.GetOpTTL,
 			ColumnFamilyName: db.MasterEventFC,
 			Key:              key,
 		},
@@ -666,7 +667,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
-func encodeCommandR(t *testing.T, cmd dragonboat.FSM_Command) []byte {
+func encodeCommandR(t *testing.T, cmd commands.FSM_Command) []byte {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	if err != nil {
@@ -678,7 +679,7 @@ func TestUpdate_UnknownCommandType(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Type: 999,
 		CMD:  nil,
 	}
@@ -698,12 +699,12 @@ func TestUpdate_UnknownWriteOp(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "badop",
 				Value:            []byte("x"),
 				ColumnFamilyName: db.DefaultFC,
@@ -738,11 +739,11 @@ type failingRocksdbImpl struct {
 	dragonboat.KVStateMachineImpl
 }
 
-func (f *failingRocksdbImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]dragonboat.FSM_Command, error) {
+func (f *failingRocksdbImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]commands.FSM_Command, error) {
 	return nil, errors.New("simulated update error")
 }
-func (f *failingRocksdbImpl) Lookup(key interface{}) (dragonboat.RK_Command, error) {
-	return dragonboat.RK_Command{}, nil
+func (f *failingRocksdbImpl) Lookup(key interface{}) (commands.RK_Command, error) {
+	return commands.RK_Command{}, nil
 }
 func (f *failingRocksdbImpl) OpenDB(string) (db.KVStore, error) {
 	return nil, nil
@@ -753,17 +754,17 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 	defer kv.Close()
 
 	// Insert some entries
-	entries := []dragonboat.WK_Command{
-		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
-		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
-		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
-		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: dragonboat.PutOp},
+	entries := []commands.WK_Command{
+		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
+		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
+		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
+		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
 	}
 
 	for _, entry := range entries {
-		cmd := dragonboat.FSM_Command{
-			Type: dragonboat.RW,
-			CMD:  dragonboat.RWK_Command{Op: dragonboat.Write, CMD: entry},
+		cmd := commands.FSM_Command{
+			Type: commands.RW,
+			CMD:  commands.RWK_Command{Op: commands.Write, CMD: entry},
 		}
 		data := encodeCommandR(t, cmd)
 
@@ -775,14 +776,14 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 
 	// Search with pattern "user:"
 
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			KeyPattern:       "user:*",
 			ColumnFamilyName: db.DefaultFC,
 			Cursor:           "",
 			Limit:            10,
-			Op:               dragonboat.Search,
+			Op:               commands.Search,
 		},
 	}
 
@@ -808,17 +809,17 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 
 	for _, e := range entries {
-		cmd := dragonboat.FSM_Command{
-			Type: dragonboat.RW,
+		cmd := commands.FSM_Command{
+			Type: commands.RW,
 			Now:  utils.GetNowInInt(),
-			CMD: dragonboat.RWK_Command{
-				Op: dragonboat.Write,
-				CMD: dragonboat.WK_Command{
+			CMD: commands.RWK_Command{
+				Op: commands.Write,
+				CMD: commands.WK_Command{
 					Key:              e.key,
 					Value:            []byte(e.value),
 					ColumnFamilyName: db.MasterEventFC,
 					TTL:              e.ttl,
-					Op:               dragonboat.PutOpTTL,
+					Op:               commands.PutOpTTL,
 				},
 			},
 		}
@@ -832,14 +833,14 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 	time.Sleep(2 * time.Second)
 
-	query := dragonboat.Query_Command{
+	query := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			KeyPattern:       "k:*",
 			ColumnFamilyName: db.MasterEventFC,
 			Cursor:           "",
 			Limit:            10,
-			Op:               dragonboat.SearchTTL,
+			Op:               commands.SearchTTL,
 		},
 	}
 
@@ -865,16 +866,16 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	kvRocksDB := setupKVMaster(t, "rocksdb")
 	var buf bytes.Buffer
-	cmd := dragonboat.FSM_Command{
+	cmd := commands.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: dragonboat.RW,
-		CMD: dragonboat.RWK_Command{
-			Op: dragonboat.Write,
-			CMD: dragonboat.WK_Command{
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               dragonboat.PutOp,
+				Op:               commands.PutOp,
 			},
 		},
 	}
@@ -902,9 +903,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query1 := dragonboat.Query_Command{
+	query1 := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -915,9 +916,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	require.Equal(t, []byte("snap_value"), val)
 
 	require.NoError(t, err)
-	query2 := dragonboat.Query_Command{
+	query2 := commands.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: dragonboat.RK_Command{
+		Command: commands.RK_Command{
 			Key:              dragonboat.AppliedIndexKey,
 			ColumnFamilyName: db.MetaFC,
 		},
