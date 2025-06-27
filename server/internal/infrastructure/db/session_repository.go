@@ -79,7 +79,7 @@ func (r *SessionRepository) SessionExists(jwtToken string, now time.Time) (bool,
 
 	fmt.Println("Existing session found:", existingSession)
 
-	if existingSession == nil {
+	if existingSession == nil || existingSession.CurrentToken != jwtToken {
 		return false, nil // No session found
 	}
 
