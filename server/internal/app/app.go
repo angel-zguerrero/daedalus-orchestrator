@@ -212,11 +212,14 @@ func (app *Application) Run() {
 						ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 						defer cancel()
 						_, err := masterNode.Write(ctx, cmd)
-						log.Fatal().
-							Err(err).
-							Str("package", "app").
-							Str("func", "Run").
-							Msgf("❌ Failed to bootstrap root user")
+						if err != nil {
+							log.Fatal().
+								Err(err).
+								Str("package", "app").
+								Str("func", "Run").
+								Msgf("❌ Failed to bootstrap root user")
+						}
+
 					}
 
 					if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
