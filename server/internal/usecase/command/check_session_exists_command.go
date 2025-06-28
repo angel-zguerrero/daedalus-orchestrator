@@ -29,7 +29,7 @@ func (cmd *CheckSessionExistsCommand) Execute(uow *db.UnitOfWork, now time.Time)
 		return nil, errors.New("JWTKey cannot be empty for CheckSessionExistsCommand")
 	}
 
-	idFactory := &db.DefaultIDGeneratorFactory{}
+	idFactory := &db.DeterministicIDGeneratorFactory{}
 
 	sessionRepo, err := db.NewSessionRepository(uow, idFactory, cmd.JWTKey)
 	if err != nil {

@@ -18,8 +18,8 @@ type LoginCommand struct {
 }
 
 func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, error) {
-
-	userRepo, err := db.NewUserRepository(uow, nil) // Passing nil for IDGeneratorFactory
+	idFactory := &db.DeterministicIDGeneratorFactory{}
+	userRepo, err := db.NewUserRepository(uow, idFactory) // Passing nil for IDGeneratorFactory
 	if err != nil {
 		return nil, err
 	}

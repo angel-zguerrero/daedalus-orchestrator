@@ -28,7 +28,7 @@ func (cmd *RegisterSessionCommand) Execute(uow *db.UnitOfWork, now time.Time) ([
 		return nil, errors.New("JWTKey cannot be empty for RegisterSessionCommand")
 	}
 
-	idFactory := &db.DefaultIDGeneratorFactory{}
+	idFactory := &db.DeterministicIDGeneratorFactory{}
 
 	sessionRepo, err := db.NewSessionRepository(uow, idFactory, cmd.JWTKey)
 	if err != nil {
