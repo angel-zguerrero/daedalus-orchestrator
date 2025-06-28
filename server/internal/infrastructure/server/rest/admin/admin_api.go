@@ -257,18 +257,6 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
-type responseInterceptor struct {
-	gin.ResponseWriter
-	status int
-}
-
-func (r *responseInterceptor) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
-// NewRateLimitMiddleware creates a Gin middleware for rate limiting.
-// keyStrategy can be "ip" or "token".
 func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode, keyStrategy string, Period time.Duration, Limit int64) gin.HandlerFunc {
 
 	rate := limiter.Rate{
