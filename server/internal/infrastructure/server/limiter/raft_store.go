@@ -32,6 +32,11 @@ func (s *RaftStore) fullKey(key string) string {
 	return s.keyspace + ":" + key
 }
 
+// Get returns the limit for given identifier.
+func (s *RaftStore) Get(ctx context.Context, key string, rate limiter.Rate) (limiter.Context, error) {
+	return s.Increment(ctx, key, 1, rate)
+}
+
 func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, rate limiter.Rate) (limiter.Context, error) {
 	fullKey := s.fullKey(key)
 	now := utils.GetNowInInt()
@@ -186,4 +191,47 @@ func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) erro
 
 	_, err := s.node.Write(ctx, writeCmd)
 	return err
+}
+
+func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (limiter.Context, error) {
+	fullKey := s.fullKey(key)
+	now := utils.GetNowInInt()
+
+	state := &models.RateLimitState{
+		Limit:     rate.Limit,
+		Remaining: rate.Limit,
+		Reset:     int64(s.ttl.Seconds()),
+		Reached:   false,
+	}
+
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(state); err != nil {
+		return limiter.Context{}, err
+	}
+
+	writeCmd := commands.FSM_Command{
+		Now:  now,
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
+				Key:              fullKey,
+				Value:            buf.Bytes(),
+				ColumnFamilyName: db.MasterEventFC,
+				TTL:              int(s.ttl.Seconds()),
+				Op:               commands.PutOpTTL,
+			},
+		},
+	}
+
+	if _, err := s.node.Write(ctx, writeCmd); err != nil {
+		return limiter.Context{}, err
+	}
+
+	return limiter.Context{
+		Limit:     state.Limit,
+		Remaining: state.Remaining,
+		Reset:     time.Now().Add(s.ttl).Unix(),
+		Reached:   state.Reached,
+	}, nil
 }
