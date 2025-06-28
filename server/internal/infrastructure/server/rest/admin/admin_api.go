@@ -3,6 +3,7 @@ package rest_api_admin
 import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	ratelimit "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
@@ -16,6 +17,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/ulule/limiter/v3"
+	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
 )
 
 // RestAdminAPI handles the administrative REST API endpoints.
@@ -63,6 +67,7 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 
 		tenantsGroup := adminAPIGroup.Group("/tenants")
 		tenantsGroup.Use(api.authMiddleware())
+		tenantsGroup.Use(NewRateLimitMiddleware(api.node))
 		{
 			tenantsGroup.GET("", api.getTenantsHandler)
 			tenantsGroup.POST("", api.createTenantHandler)
@@ -192,7 +197,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 // getTenantsHandler handles GET /admin-api/tenants
 func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
 
-	c.JSON(http.StatusOK, gin.H{"message": "Listing all tenants (dummy)", "tenants": []string{"tenantA", "tenantB"}})
+	c.JSON(http.StatusOK, gin.H{"message": "Listing all tenants (dummy)", "tenants": []string{"tenantA", "tenantttB", "tenantC"}})
 }
 
 // createTenantHandler handles POST /admin-api/tenants
@@ -246,6 +251,29 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+type responseInterceptor struct {
+	gin.ResponseWriter
+	status int
+}
+
+func (r *responseInterceptor) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
+	// Define rate: 20 requests por minuto
+	rate := limiter.Rate{
+		Period: 1 * time.Minute,
+		Limit:  20,
+	}
+
+	store := ratelimit.NewRaftStore(raftNode, "ratelimit", 1*time.Minute)
+
+	middleware := mgin.NewMiddleware(limiter.New(store, rate))
+	return middleware
 }
 
 // authMiddleware creates a middleware handler for JWT authentication and session validation.
