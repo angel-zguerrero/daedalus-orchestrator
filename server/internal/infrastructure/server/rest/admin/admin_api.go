@@ -253,16 +253,6 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
-type responseInterceptor struct {
-	gin.ResponseWriter
-	status int
-}
-
-func (r *responseInterceptor) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
 func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
 	// Define rate: 20 requests por minuto
 	rate := limiter.Rate{
