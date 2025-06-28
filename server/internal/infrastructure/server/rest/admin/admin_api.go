@@ -3,6 +3,7 @@ package rest_api_admin
 import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	ratelimit "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
@@ -16,6 +17,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/ulule/limiter/drivers/middleware/stdlib"
+	"github.com/ulule/limiter/v3"
 )
 
 // RestAdminAPI handles the administrative REST API endpoints.
@@ -246,6 +250,23 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
+	// Define rate: 20 requests por minuto
+	rate := limiter.Rate{
+		Period: 1 * time.Minute,
+		Limit:  20,
+	}
+
+	// Crear store personalizado
+	store := ratelimit.NewRaftStore(raftNode, "ratelimit", 1*time.Minute)
+
+	// Crear instancia del limiter
+	limiterInstance := limiter.New(store, rate)
+
+	// Crear middleware compatible con Gin
+	return stdlib.NewMiddleware(limiterInstance)
 }
 
 // authMiddleware creates a middleware handler for JWT authentication and session validation.
