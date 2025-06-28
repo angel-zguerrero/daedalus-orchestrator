@@ -64,14 +64,14 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 	adminAPIGroup := engine.Group("/admin-api")
 	{
 		// Apply IP-based rate limiting to the login route
-		ipRateLimiter := NewRateLimitMiddleware(api.node, "ip")
+		ipRateLimiter := NewRateLimitMiddleware(api.node, "ip", 1*time.Minute, 4)
 		adminAPIGroup.POST("/login", ipRateLimiter, api.loginHandler)
 
 		// Apply token-based rate limiting to the tenants group
-		tokenRateLimiter := NewRateLimitMiddleware(api.node, "token")
+		tokenRateLimiter := NewRateLimitMiddleware(api.node, "token", 1*time.Minute, 10)
 		tenantsGroup := adminAPIGroup.Group("/tenants")
 		tenantsGroup.Use(api.authMiddleware()) // Auth middleware runs first
-		tenantsGroup.Use(tokenRateLimiter)    // Then token-based rate limiting
+		tenantsGroup.Use(tokenRateLimiter)     // Then token-based rate limiting
 		{
 			tenantsGroup.GET("", api.getTenantsHandler)
 			tenantsGroup.POST("", api.createTenantHandler)
@@ -267,36 +267,16 @@ func (r *responseInterceptor) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
-func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
-	// Define rate: 20 requests por minuto
-	rate := limiter.Rate{
-		Period: 1 * time.Minute,
-		Limit:  20,
-	}
-
-	store := ratelimit.NewRaftStore(raftNode, "ratelimit", 1*time.Minute)
-
-	// Define a key getter function for the limiter
-	keyGetter := func(c *gin.Context) string {
-		// Default to IP address
-		key := c.ClientIP()
-		return key
-	}
-
-	middleware := mgin.NewMiddleware(limiter.New(store, rate), mgin.WithKeyGetter(keyGetter))
-	return middleware
-}
-
 // NewRateLimitMiddleware creates a Gin middleware for rate limiting.
 // keyStrategy can be "ip" or "token".
-func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode, keyStrategy string) gin.HandlerFunc {
-	// Define rate: 20 requests por minuto
+func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode, keyStrategy string, Period time.Duration, Limit int64) gin.HandlerFunc {
+
 	rate := limiter.Rate{
-		Period: 1 * time.Minute,
-		Limit:  20,
+		Period: Period,
+		Limit:  Limit,
 	}
 
-	store := ratelimit.NewRaftStore(raftNode, "ratelimit", 1*time.Minute)
+	store := ratelimit.NewRaftStore(raftNode, "ratelimit", Period)
 
 	var options mgin.Option
 	if keyStrategy == "token" {
