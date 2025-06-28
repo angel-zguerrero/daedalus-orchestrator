@@ -63,11 +63,15 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 	// Setup routes
 	adminAPIGroup := engine.Group("/admin-api")
 	{
-		adminAPIGroup.POST("/login", api.loginHandler)
+		// Apply IP-based rate limiting to the login route
+		ipRateLimiter := NewRateLimitMiddleware(api.node, "ip", 1*time.Minute, 4)
+		adminAPIGroup.POST("/login", ipRateLimiter, api.loginHandler)
 
+		// Apply token-based rate limiting to the tenants group
+		tokenRateLimiter := NewRateLimitMiddleware(api.node, "token", 1*time.Minute, 10)
 		tenantsGroup := adminAPIGroup.Group("/tenants")
-		tenantsGroup.Use(api.authMiddleware())
-		tenantsGroup.Use(NewRateLimitMiddleware(api.node))
+		tenantsGroup.Use(api.authMiddleware()) // Auth middleware runs first
+		tenantsGroup.Use(tokenRateLimiter)     // Then token-based rate limiting
 		{
 			tenantsGroup.GET("", api.getTenantsHandler)
 			tenantsGroup.POST("", api.createTenantHandler)
@@ -253,17 +257,41 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
-func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
-	// Define rate: 20 requests por minuto
+func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode, keyStrategy string, Period time.Duration, Limit int64) gin.HandlerFunc {
+
 	rate := limiter.Rate{
-		Period: 1 * time.Minute,
-		Limit:  20,
+		Period: Period,
+		Limit:  Limit,
 	}
 
-	store := ratelimit.NewRaftStore(raftNode, "ratelimit", 1*time.Minute)
+	store := ratelimit.NewRaftStore(raftNode, "ratelimit", Period)
 
-	middleware := mgin.NewMiddleware(limiter.New(store, rate))
-	return middleware
+	var options mgin.Option
+	if keyStrategy == "token" {
+		options = mgin.WithKeyGetter(func(c *gin.Context) string {
+			authHeader := c.GetHeader("Authorization")
+			if authHeader == "" {
+				log.Warn().Msg("Rate limiting by token: Authorization header missing, falling back to IP.")
+				return c.ClientIP() // Fallback to IP if no token
+			}
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+				log.Warn().Msg("Rate limiting by token: Invalid Authorization header format, falling back to IP.")
+				return c.ClientIP() // Fallback to IP if format is wrong
+			}
+			return parts[1] // Use token string as key
+		})
+	} else {
+		// Default IP-based strategy, mgin handles this by default if no KeyGetter or specific context key is set.
+		// Explicitly setting it for clarity.
+		options = mgin.WithKeyGetter(func(c *gin.Context) string {
+			return c.ClientIP()
+		})
+	}
+
+	// It's important to pass the options to NewMiddleware.
+	// If multiple options are needed in the future, they can be passed as additional arguments.
+	return mgin.NewMiddleware(limiter.New(store, rate), options)
 }
 
 // authMiddleware creates a middleware handler for JWT authentication and session validation.
