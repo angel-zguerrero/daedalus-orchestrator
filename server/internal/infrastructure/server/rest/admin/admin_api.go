@@ -19,7 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/ulule/limiter/v3"
-	"github.com/ulule/limiter/v3/drivers/middleware/stdlib"
+	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
 )
 
 // RestAdminAPI handles the administrative REST API endpoints.
@@ -67,6 +67,7 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 
 		tenantsGroup := adminAPIGroup.Group("/tenants")
 		tenantsGroup.Use(api.authMiddleware())
+		tenantsGroup.Use(NewRateLimitMiddleware(api.node))
 		{
 			tenantsGroup.GET("", api.getTenantsHandler)
 			tenantsGroup.POST("", api.createTenantHandler)
@@ -196,7 +197,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 // getTenantsHandler handles GET /admin-api/tenants
 func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
 
-	c.JSON(http.StatusOK, gin.H{"message": "Listing all tenants (dummy)", "tenants": []string{"tenantA", "tenantB"}})
+	c.JSON(http.StatusOK, gin.H{"message": "Listing all tenants (dummy)", "tenants": []string{"tenantA", "tenantttB", "tenantC"}})
 }
 
 // createTenantHandler handles POST /admin-api/tenants
@@ -252,6 +253,16 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
+type responseInterceptor struct {
+	gin.ResponseWriter
+	status int
+}
+
+func (r *responseInterceptor) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
 func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
 	// Define rate: 20 requests por minuto
 	rate := limiter.Rate{
@@ -259,24 +270,10 @@ func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
 		Limit:  20,
 	}
 
-	// Crear store personalizado
 	store := ratelimit.NewRaftStore(raftNode, "ratelimit", 1*time.Minute)
 
-	// Crear instancia del limiter
-	limiterInstance := limiter.New(store, rate)
-
-	// Crear middleware estilo stdlib
-	limiterMiddleware := stdlib.NewMiddleware(limiterInstance)
-
-	// Adaptarlo a gin.HandlerFunc
-	return func(c *gin.Context) {
-		// Adaptar gin context a http.Request y http.ResponseWriter
-		limiterMiddleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Pasar el control a Gin
-			c.Request = r
-			c.Next()
-		})).ServeHTTP(c.Writer, c.Request)
-	}
+	middleware := mgin.NewMiddleware(limiter.New(store, rate))
+	return middleware
 }
 
 // authMiddleware creates a middleware handler for JWT authentication and session validation.

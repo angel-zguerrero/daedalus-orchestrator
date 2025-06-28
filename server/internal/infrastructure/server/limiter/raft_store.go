@@ -5,6 +5,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
@@ -32,21 +33,22 @@ func (s *RaftStore) fullKey(key string) string {
 	return s.keyspace + ":" + key
 }
 
-// Get returns the limit for given identifier.
 func (s *RaftStore) Get(ctx context.Context, key string, rate limiter.Rate) (limiter.Context, error) {
 	return s.Increment(ctx, key, 1, rate)
 }
 
 func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, rate limiter.Rate) (limiter.Context, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+	defer cancel()
 	fullKey := s.fullKey(key)
-	now := utils.GetNowInInt()
+	now := time.Now().Unix()
 
 	readCmd := commands.Query_Command{
 		Command: commands.RK_Command{
 			Key:              fullKey,
 			ColumnFamilyName: db.MasterEventFC,
 		},
-		Now: now,
+		Now: utils.GetNowInInt(),
 	}
 
 	resp, err := s.node.Read(ctx, readCmd)
@@ -56,15 +58,14 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 
 	var state *models.RateLimitState
 	if resp == nil {
-		// No key exists yet
+		exp := now + int64(s.ttl.Seconds())
 		state = &models.RateLimitState{
 			Limit:     rate.Limit,
 			Remaining: rate.Limit - quantity,
-			Reset:     int64(s.ttl.Seconds()),
 			Reached:   quantity > rate.Limit,
+			ExpiredAt: exp,
 		}
 	} else {
-		// Decode gob
 		buf := bytes.NewBuffer(resp.([]byte))
 		dec := gob.NewDecoder(buf)
 		state = &models.RateLimitState{}
@@ -72,19 +73,30 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 			return limiter.Context{}, err
 		}
 
-		if state.Remaining > 0 {
-			if quantity >= state.Remaining {
-				state.Remaining = 0
-				state.Reached = true
-			} else {
-				state.Remaining -= quantity
-				state.Reached = false
-			}
+		if now >= state.ExpiredAt {
+			// La ventana expiró, reseteamos
+			state.Limit = rate.Limit
+			state.Remaining = rate.Limit - quantity
+			state.Reached = quantity > rate.Limit
+			state.ExpiredAt = now + int64(s.ttl.Seconds())
 		} else {
-			state.Reached = true
+			if state.Remaining > 0 {
+				if quantity >= state.Remaining {
+					state.Remaining = 0
+					state.Reached = true
+				} else {
+					state.Remaining -= quantity
+					state.Reached = false
+				}
+			} else {
+				state.Reached = true
+			}
 		}
+	}
 
-		state.Reset = int64(s.ttl.Seconds())
+	ttlRemaining := state.ExpiredAt - now
+	if ttlRemaining < 1 {
+		ttlRemaining = 1
 	}
 
 	var buf bytes.Buffer
@@ -93,7 +105,7 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 	}
 
 	writeCmd := commands.FSM_Command{
-		Now:  now,
+		Now:  utils.GetNowInInt(),
 		Type: commands.RW,
 		CMD: commands.RWK_Command{
 			Op: commands.Write,
@@ -101,7 +113,7 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 				Key:              fullKey,
 				Value:            buf.Bytes(),
 				ColumnFamilyName: db.MasterEventFC,
-				TTL:              int(s.ttl.Seconds()),
+				TTL:              int(ttlRemaining),
 				Op:               commands.PutOpTTL,
 			},
 		},
@@ -114,13 +126,16 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 	return limiter.Context{
 		Limit:     state.Limit,
 		Remaining: state.Remaining,
-		Reset:     time.Now().Add(s.ttl).Unix(),
+		Reset:     state.ExpiredAt,
 		Reached:   state.Reached,
 	}, nil
 }
 
 func (s *RaftStore) Peek(ctx context.Context, key string, rate limiter.Rate) (limiter.Context, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+	defer cancel()
 	fullKey := s.fullKey(key)
+	now := time.Now().Unix()
 
 	readCmd := commands.Query_Command{
 		Command: commands.RK_Command{
@@ -136,10 +151,11 @@ func (s *RaftStore) Peek(ctx context.Context, key string, rate limiter.Rate) (li
 	}
 
 	if resp == nil {
+		exp := now + int64(s.ttl.Seconds())
 		return limiter.Context{
 			Limit:     rate.Limit,
 			Remaining: rate.Limit,
-			Reset:     time.Now().Add(s.ttl).Unix(),
+			Reset:     exp,
 			Reached:   false,
 		}, nil
 	}
@@ -151,22 +167,34 @@ func (s *RaftStore) Peek(ctx context.Context, key string, rate limiter.Rate) (li
 		return limiter.Context{}, err
 	}
 
+	if now >= state.ExpiredAt {
+		return limiter.Context{
+			Limit:     rate.Limit,
+			Remaining: rate.Limit,
+			Reset:     now + int64(s.ttl.Seconds()),
+			Reached:   false,
+		}, nil
+	}
+
 	return limiter.Context{
 		Limit:     state.Limit,
 		Remaining: state.Remaining,
-		Reset:     time.Now().Add(s.ttl).Unix(),
+		Reset:     state.ExpiredAt,
 		Reached:   state.Remaining <= 0,
 	}, nil
 }
 
 func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+	defer cancel()
 	fullKey := s.fullKey(key)
+	now := time.Now().Unix()
 
 	state := &models.RateLimitState{
 		Limit:     c.Limit,
 		Remaining: c.Remaining,
-		Reset:     int64(s.ttl.Seconds()),
 		Reached:   c.Reached,
+		ExpiredAt: now + int64(s.ttl.Seconds()),
 	}
 
 	var buf bytes.Buffer
@@ -194,14 +222,16 @@ func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) erro
 }
 
 func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (limiter.Context, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+	defer cancel()
 	fullKey := s.fullKey(key)
-	now := utils.GetNowInInt()
+	now := time.Now().Unix()
 
 	state := &models.RateLimitState{
 		Limit:     rate.Limit,
 		Remaining: rate.Limit,
-		Reset:     int64(s.ttl.Seconds()),
 		Reached:   false,
+		ExpiredAt: now + int64(s.ttl.Seconds()),
 	}
 
 	var buf bytes.Buffer
@@ -210,7 +240,7 @@ func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (l
 	}
 
 	writeCmd := commands.FSM_Command{
-		Now:  now,
+		Now:  utils.GetNowInInt(),
 		Type: commands.RW,
 		CMD: commands.RWK_Command{
 			Op: commands.Write,
@@ -231,7 +261,7 @@ func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (l
 	return limiter.Context{
 		Limit:     state.Limit,
 		Remaining: state.Remaining,
-		Reset:     time.Now().Add(s.ttl).Unix(),
+		Reset:     state.ExpiredAt,
 		Reached:   state.Reached,
 	}, nil
 }

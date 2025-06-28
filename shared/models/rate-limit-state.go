@@ -5,4 +5,5 @@ type RateLimitState struct {
 	Remaining int64
 	Reset     int64
 	Reached   bool
+	ExpiredAt int64
 }
