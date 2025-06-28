@@ -18,8 +18,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/ulule/limiter/drivers/middleware/stdlib"
 	"github.com/ulule/limiter/v3"
+	"github.com/ulule/limiter/v3/drivers/middleware/stdlib"
 )
 
 // RestAdminAPI handles the administrative REST API endpoints.
@@ -265,8 +265,18 @@ func NewRateLimitMiddleware(raftNode *dragonboat.RaftNode) gin.HandlerFunc {
 	// Crear instancia del limiter
 	limiterInstance := limiter.New(store, rate)
 
-	// Crear middleware compatible con Gin
-	return stdlib.NewMiddleware(limiterInstance)
+	// Crear middleware estilo stdlib
+	limiterMiddleware := stdlib.NewMiddleware(limiterInstance)
+
+	// Adaptarlo a gin.HandlerFunc
+	return func(c *gin.Context) {
+		// Adaptar gin context a http.Request y http.ResponseWriter
+		limiterMiddleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Pasar el control a Gin
+			c.Request = r
+			c.Next()
+		})).ServeHTTP(c.Writer, c.Request)
+	}
 }
 
 // authMiddleware creates a middleware handler for JWT authentication and session validation.
