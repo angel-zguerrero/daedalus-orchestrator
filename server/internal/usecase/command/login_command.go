@@ -29,16 +29,5 @@ func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, err
 		return nil, err
 	}
 
-	if !loggedIn {
-
-		return []byte{}, nil
-	}
-
-	user, err := userRepo.GetUserByUsername(cmd.UsernameOrEmail) // Try with Email field as username
-	if err != nil || user == nil {
-
-		return utils.BoolToBytes(loggedIn), nil
-	}
-
 	return utils.BoolToBytes(loggedIn), nil
 }
