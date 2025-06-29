@@ -2,8 +2,12 @@ package command
 
 import (
 	"encoding/gob"
+	"errors"
 	"time"
 )
+
+// ErrMissingOrInvalidNowField is returned when the 'Now' field in a command is missing or invalid.
+var ErrMissingOrInvalidNowField = errors.New("'Now' field is missing or invalid")
 
 // init registers command structs with the gob package for serialization.
 // This is necessary for them to be transported over the network or persisted.
