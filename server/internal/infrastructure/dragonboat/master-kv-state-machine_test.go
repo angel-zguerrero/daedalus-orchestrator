@@ -764,6 +764,180 @@ func TestUpdate_UnknownWriteOp(t *testing.T) {
 	// Expect an error message in Result.Data
 	require.Contains(t, string(result[0].Result.Data), "unknown W Operation: 999")
 }
+
+func TestUpdate_InvalidNowField(t *testing.T) {
+	kv := setupKVMaster(t, "rocksdb")
+	defer kv.Close()
+
+	var buf bytes.Buffer
+	cmd := commands.FSM_Command{
+		Now:  0, // Invalid 'Now' field
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
+				Key:              "foo",
+				Value:            []byte("bar"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               commands.PutOp,
+			},
+		},
+	}
+
+	err := gob.NewEncoder(&buf).Encode(cmd)
+	require.NoError(t, err)
+
+	entries := []statemachine.Entry{
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+	}
+	result, err := kv.Update(entries)
+	require.NoError(t, err) // The Update method itself should not error for this validation
+	require.Len(t, result, 1)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+	require.Equal(t, commands.ErrMissingOrInvalidNowField.Error(), string(result[0].Result.Data))
+
+	// Verify that the data was not actually written
+	queryCmd := commands.Query_Command{
+		Now: utils.GetNowInInt(), // Use a valid 'Now' for lookup
+		Command: commands.RK_Command{
+			Key:              "foo",
+			ColumnFamilyName: db.DefaultFC,
+			Op:               commands.GetOp,
+		},
+	}
+	var queryBuf bytes.Buffer
+	err = gob.NewEncoder(&queryBuf).Encode(queryCmd)
+	require.NoError(t, err)
+
+	lookedUpValue, err := kv.Lookup(queryBuf.Bytes())
+	require.NoError(t, err)
+	require.Nil(t, lookedUpValue, "Data should not have been written due to invalid 'Now' field")
+}
+
+func TestLookup_InvalidNowField(t *testing.T) {
+	kv := setupKVMaster(t, "rocksdb")
+	defer kv.Close()
+
+	// Attempt to lookup a key with an invalid 'Now' field
+	queryCmd := commands.Query_Command{
+		Now: 0, // Invalid 'Now' field
+		Command: commands.RK_Command{
+			Key:              "any_key",
+			ColumnFamilyName: db.DefaultFC,
+			Op:               commands.GetOp,
+		},
+	}
+	var queryBuf bytes.Buffer
+	err := gob.NewEncoder(&queryBuf).Encode(queryCmd)
+	require.NoError(t, err)
+
+	_, err = kv.Lookup(queryBuf.Bytes())
+	require.Error(t, err)
+	require.Equal(t, commands.ErrMissingOrInvalidNowField, err)
+}
+
+func TestUpdate_ValidNowField(t *testing.T) {
+	kv := setupKVMaster(t, "rocksdb")
+	defer kv.Close()
+
+	validNow := utils.GetNowInInt()
+	require.Greater(t, validNow, int64(0), "Generated 'Now' should be valid")
+
+	var buf bytes.Buffer
+	cmd := commands.FSM_Command{
+		Now:  validNow, // Valid 'Now' field
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
+				Key:              "valid_now_key",
+				Value:            []byte("valid_now_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               commands.PutOp,
+			},
+		},
+	}
+
+	err := gob.NewEncoder(&buf).Encode(cmd)
+	require.NoError(t, err)
+
+	entries := []statemachine.Entry{
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+	}
+	result, err := kv.Update(entries)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
+	// For valid command, Data might be nil or empty, not an error message
+	if len(result[0].Result.Data) > 0 {
+		require.NotEqual(t, commands.ErrMissingOrInvalidNowField.Error(), string(result[0].Result.Data))
+	}
+
+	// Verify that the data was actually written
+	queryCmd := commands.Query_Command{
+		Now: utils.GetNowInInt(), // Use a valid 'Now' for lookup
+		Command: commands.RK_Command{
+			Key:              "valid_now_key",
+			ColumnFamilyName: db.DefaultFC,
+			Op:               commands.GetOp,
+		},
+	}
+	var queryBuf bytes.Buffer
+	err = gob.NewEncoder(&queryBuf).Encode(queryCmd)
+	require.NoError(t, err)
+
+	lookedUpValue, err := kv.Lookup(queryBuf.Bytes())
+	require.NoError(t, err)
+	require.Equal(t, []byte("valid_now_value"), lookedUpValue)
+}
+
+func TestLookup_ValidNowField(t *testing.T) {
+	kv := setupKVMaster(t, "rocksdb")
+	defer kv.Close()
+
+	// First, write a key to lookup
+	keyToLookup := "lookup_valid_now"
+	valueToLookup := "some_value_for_valid_now_lookup"
+	var writeBuf bytes.Buffer
+	writeCmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(), // Valid 'Now' for write
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
+				Key:              keyToLookup,
+				Value:            []byte(valueToLookup),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               commands.PutOp,
+			},
+		},
+	}
+	err := gob.NewEncoder(&writeBuf).Encode(writeCmd)
+	require.NoError(t, err)
+	_, err = kv.Update([]statemachine.Entry{{Cmd: writeBuf.Bytes(), Index: kv.GetLastApplied() + 1}})
+	require.NoError(t, err)
+
+	// Attempt to lookup the key with a valid 'Now' field
+	validNow := utils.GetNowInInt()
+	require.Greater(t, validNow, int64(0), "Generated 'Now' for lookup should be valid")
+
+	queryCmd := commands.Query_Command{
+		Now: validNow, // Valid 'Now' field
+		Command: commands.RK_Command{
+			Key:              keyToLookup,
+			ColumnFamilyName: db.DefaultFC,
+			Op:               commands.GetOp,
+		},
+	}
+	var queryBuf bytes.Buffer
+	err = gob.NewEncoder(&queryBuf).Encode(queryCmd)
+	require.NoError(t, err)
+
+	lookedUpValue, err := kv.Lookup(queryBuf.Bytes())
+	require.NoError(t, err)
+	require.Equal(t, []byte(valueToLookup), lookedUpValue)
+}
+
 func TestRecoverFromSnapshot_InvalidData(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
@@ -804,6 +978,7 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 
 	for _, entry := range entries {
 		cmd := commands.FSM_Command{
+			Now:  utils.GetNowInInt(),
 			Type: commands.RW,
 			CMD:  commands.RWK_Command{Op: commands.Write, CMD: entry},
 		}

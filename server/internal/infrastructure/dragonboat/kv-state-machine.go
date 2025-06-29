@@ -165,6 +165,25 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		if parseErrors[i] {
 			continue
 		}
+
+		if cmd.Now <= 0 {
+			if cmd.Type == commands.RW {
+				if rwCmd, ok := cmd.CMD.(commands.RWK_Command); ok && rwCmd.Op == commands.Write {
+					parseErrors[i] = true // Mark to prevent further processing in subsequent loops
+					ents[i].Result = statemachine.Result{
+						Value: uint64(len(ents[i].Cmd)), // As per convention for statemachine results
+						Data:  []byte(commands.ErrMissingOrInvalidNowField.Error()),
+					}
+					log.Warn(). // Changed to Warn as it's a client data validation issue
+							Uint64("raft_index", ents[i].Index).
+							Int64("provided_now", cmd.Now).
+							Str("command_type", "RW_Write").
+							Msgf("FSM_Command validation failed: %s", commands.ErrMissingOrInvalidNowField.Error())
+					continue // Move to the next command entry
+				}
+			}
+		}
+
 		switch cmd.Type {
 		case commands.DDL_FC:
 			dllFCEntries = append(dllFCEntries, i)
@@ -349,6 +368,14 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		var query commands.Query_Command
 		if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&query); err != nil {
 			return nil, fmt.Errorf("failed to decode query command: %w", err)
+		}
+
+		// Validate Query_Command.Now field.
+		if query.Now <= 0 {
+			log.Warn().
+				Int64("provided_now", query.Now).
+				Msgf("Query_Command validation failed: %s", commands.ErrMissingOrInvalidNowField.Error())
+			return nil, commands.ErrMissingOrInvalidNowField
 		}
 
 		now := time.Unix(0, query.Now)
