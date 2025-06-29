@@ -870,7 +870,6 @@ func TestUpdate_ValidNowField(t *testing.T) {
 		require.NotEqual(t, commands.ErrMissingOrInvalidNowField.Error(), string(result[0].Result.Data))
 	}
 
-
 	// Verify that the data was actually written
 	queryCmd := commands.Query_Command{
 		Now: utils.GetNowInInt(), // Use a valid 'Now' for lookup
@@ -936,7 +935,6 @@ func TestLookup_ValidNowField(t *testing.T) {
 	require.Equal(t, []byte(valueToLookup), lookedUpValue)
 }
 
-
 func TestRecoverFromSnapshot_InvalidData(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
@@ -977,6 +975,7 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 
 	for _, entry := range entries {
 		cmd := commands.FSM_Command{
+			Now:  utils.GetNowInInt(),
 			Type: commands.RW,
 			CMD:  commands.RWK_Command{Op: commands.Write, CMD: entry},
 		}

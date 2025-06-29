@@ -166,12 +166,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			continue
 		}
 
-		// Validate FSM_Command.Now field.
-		// If 'Now' is invalid (<=0) AND this is a Write operation,
-		// then record the error in the entry's result and skip further processing for this entry.
 		if cmd.Now <= 0 {
 			if cmd.Type == commands.RW {
-				// Type assertion to check the inner command op type
 				if rwCmd, ok := cmd.CMD.(commands.RWK_Command); ok && rwCmd.Op == commands.Write {
 					parseErrors[i] = true // Mark to prevent further processing in subsequent loops
 					ents[i].Result = statemachine.Result{
@@ -179,25 +175,19 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 						Data:  []byte(commands.ErrMissingOrInvalidNowField.Error()),
 					}
 					log.Warn(). // Changed to Warn as it's a client data validation issue
-						Uint64("raft_index", ents[i].Index).
-						Int64("provided_now", cmd.Now).
-						Str("command_type", "RW_Write").
-						Msgf("FSM_Command validation failed: %s", commands.ErrMissingOrInvalidNowField.Error())
+							Uint64("raft_index", ents[i].Index).
+							Int64("provided_now", cmd.Now).
+							Str("command_type", "RW_Write").
+							Msgf("FSM_Command validation failed: %s", commands.ErrMissingOrInvalidNowField.Error())
 					continue // Move to the next command entry
 				}
 			}
-			// If cmd.Now <= 0 but not a Write operation, we don't set ents[i].Result here.
-			// Other command types might use cmd.Now, and their specific handling applies later.
-			// For example, Read operations use cmd.Now via time.Unix(0, cmd.Now) but are part of Lookup.
-			// The requirement is to put errors in "ents" for Update (Write).
 		}
 
 		switch cmd.Type {
 		case commands.DDL_FC:
 			dllFCEntries = append(dllFCEntries, i)
 		case commands.RW:
-			// If parseErrors[i] is true (e.g. due to invalid 'Now' for a Write op),
-			// this entry will be skipped in the rwEntries processing loop later.
 			rwEntries = append(rwEntries, i)
 		case commands.MCL:
 			mclEntries = append(mclEntries, i)
