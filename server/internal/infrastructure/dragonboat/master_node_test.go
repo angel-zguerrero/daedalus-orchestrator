@@ -1,3 +1,6 @@
+//go:build rocksdb
+// +build rocksdb
+
 package dragonboat_test
 
 import (

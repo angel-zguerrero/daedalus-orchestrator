@@ -175,9 +175,9 @@ MIT — because control shouldn’t come with chains.
 
 ## Cluster example
 
-go run . -self-member-addr 127.0.0.1:5000 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 1 -admin-port 45001
+go run -tags rocksdb . -self-member-addr 127.0.0.1:5000 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 1 -admin-port 45001 -master-db-engine=rocksdb
 go run . -self-member-addr 127.0.0.1:5001 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 2  -admin-port 45002
-go run . -self-member-addr 127.0.0.1:5002 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 3  -admin-port 45003
+go run -tags rocksdb . -self-member-addr 127.0.0.1:5002 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 3  -admin-port 45003 -master-db-engine pebble
 
 go run . -self-member-addr 127.0.0.1:5003 -join true -replica 4 -role connector
 
