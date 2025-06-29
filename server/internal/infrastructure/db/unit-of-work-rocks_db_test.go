@@ -1,3 +1,6 @@
+//go:build rocksdb
+// +build rocksdb
+
 package db_test
 
 import (
