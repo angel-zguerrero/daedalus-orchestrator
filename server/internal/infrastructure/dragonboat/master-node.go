@@ -1,5 +1,7 @@
 package dragonboat
 
+import "deadalus-orch/server/internal/infrastructure/db"
+
 // InitRaftNodeFunc is a function variable that points to InitRaftNode by default.
 // It allows for replacing the actual Raft node initialization logic with a mock
 // implementation during testing. This is a common pattern for dependency injection in Go tests.
@@ -22,6 +24,6 @@ var InitRaftNodeFunc = InitRaftNode
 // Returns:
 //   - A pointer to the initialized RaftNode for the master shard.
 //   - An error if the Raft node initialization fails.
-func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole) (*RaftNode, error) {
-	return InitRaftNodeFunc(uint64(MasterShardID), ReplicaID, selfMember, initialMembers, join, roles, NewMasterKVStateMachine)
+func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, pathProvider db.PathProvider) (*RaftNode, error) {
+	return InitRaftNodeFunc(uint64(MasterShardID), ReplicaID, selfMember, initialMembers, join, roles, NewMasterKVStateMachine(pathProvider))
 }

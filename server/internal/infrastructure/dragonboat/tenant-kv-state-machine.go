@@ -28,8 +28,12 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	return nil, nil
 }
 
-func NewTenantKVStateMachine(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
-	return NewKVStateMachine(clusterID, nodeID, &TenantKVBaseStateMachine{}, KVBaseStateMachineConfig{
-		TTLInternalError: config.GlobalConfiguration.TTLInternalError,
-	})
+func NewTenantKVStateMachine(pathProvider db.PathProvider) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
+	return func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
+		return NewKVStateMachine(clusterID, nodeID, &TenantKVBaseStateMachine{}, KVBaseStateMachineConfig{
+			TTLInternalError: config.GlobalConfiguration.TTLInternalError,
+			PathProvider:     pathProvider,
+		})
+	}
+
 }

@@ -11,8 +11,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type TestPathProvider struct {
+	Path string
+}
+
+func (d TestPathProvider) GetDatabasePath() (string, error) {
+	return d.Path, nil
+}
+
 func TestGetNodeDBDirName(t *testing.T) {
-	path, err := getNodeDBDirName(1, 2)
+	path, err := getNodeDBDirName(1, 2, &TestPathProvider{Path: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}

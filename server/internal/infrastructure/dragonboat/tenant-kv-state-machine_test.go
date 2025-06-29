@@ -24,7 +24,7 @@ func setupTenantKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup")
 
-	kv := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv.Open(stopc)
 	require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	// Also ensure config is loaded for the second instance if it's path dependent
 	err = config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup (kv2)")
-	kv2 := dragonboat.NewTenantKVStateMachine(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv2 := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -237,7 +237,29 @@ func TestTenantSaveSnapshot_Cancelled(t *testing.T) {
 	done := make(chan struct{})
 	close(done)
 
-	err := kv.SaveSnapshot(nil, io.Discard, done)
+	var buf bytes.Buffer
+	cmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
+				Key:              "snap_key",
+				Value:            []byte("snap_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               commands.PutOp,
+			},
+		},
+	}
+
+	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
+
+	_, err := kv.Update([]statemachine.Entry{
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+	})
+	require.NoError(t, err)
+
+	err = kv.SaveSnapshot(nil, io.Discard, done)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "snapshot cancelled")
 }

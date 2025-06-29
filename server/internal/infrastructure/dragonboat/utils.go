@@ -30,9 +30,9 @@ import (
 // Returns:
 //   - The constructed directory path as a string.
 //   - An error if the base database path cannot be determined.
-func getNodeDBDirName(clusterID uint64, nodeID uint64) (string, error) {
+func getNodeDBDirName(clusterID uint64, nodeID uint64, pathProvider db.PathProvider) (string, error) {
 	part := fmt.Sprintf("%d_%d", clusterID, nodeID)
-	database_path, err := (&db.DefaultPathProvider{}).GetDatabasePath()
+	database_path, err := pathProvider.GetDatabasePath()
 	if err != nil {
 		return "", err
 	}
@@ -48,6 +48,7 @@ func getNodeDBDirName(clusterID uint64, nodeID uint64) (string, error) {
 //
 // Returns:
 //   - An error if stating the directory, opening it, or syncing it fails.
+//
 // Panics if `dir` is not a directory.
 func syncDir(dir string) (err error) { // good practice
 	if runtime.GOOS == "windows" {
@@ -115,6 +116,7 @@ func isNewRun(dir string) bool {
 // Returns:
 //   - The name of the current database directory.
 //   - An error if opening or reading the file fails, or if the content is corrupted.
+//
 // Panics if the file content is too short or if the checksum doesn't match.
 func getCurrentDBDirName(dir string) (string, error) {
 	fp := filepath.Join(dir, CurrentDBFilename)
@@ -209,6 +211,7 @@ func getNewRandomDBDirName(dir string) string {
 //
 // Returns:
 //   - An error if writing the checksum, directory name, or syncing the file/directory fails.
+//
 // Panics if closing the file or syncing the parent directory fails.
 func saveCurrentDBDirName(dir string, dbdir string) error {
 	h := md5.New()

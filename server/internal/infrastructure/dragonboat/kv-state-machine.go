@@ -30,6 +30,7 @@ type KVStateMachineImpl interface {
 type KVBaseStateMachineConfig struct {
 	// TTLInternalError specifies the Time-To-Live (in seconds) for internal error messages stored in the database.
 	TTLInternalError uint64
+	PathProvider     db.PathProvider
 }
 
 type KVBaseStateMachine struct {
@@ -61,7 +62,7 @@ func (s *KVBaseStateMachine) GetLastApplied() uint64 {
 }
 
 func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
-	dir, err := getNodeDBDirName(s.clusterID, s.nodeID)
+	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.config.PathProvider)
 	if err != nil {
 		panic(err)
 	}
@@ -491,7 +492,7 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 		panic("recover from snapshot called after Close()")
 	}
 
-	dir, err := getNodeDBDirName(s.clusterID, s.nodeID)
+	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.config.PathProvider)
 	if err != nil {
 		return err
 	}

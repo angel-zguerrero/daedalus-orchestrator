@@ -3,8 +3,6 @@ package dragonboat_test
 import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"errors"
-	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -20,13 +18,12 @@ func TestMasterNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	}()
 
 	var (
-		calledWithShardID            uint64
-		calledWithReplicaID          uint64
-		calledWithSelfMember         dragonboat.Member
-		calledWithInitialMembers     []dragonboat.Member
-		calledWithJoin               bool
-		calledWithRoles              []dragonboat.NodeRole
-		calledWithStateMachineConstr interface{} // Store as interface{} to compare function pointers later
+		calledWithShardID        uint64
+		calledWithReplicaID      uint64
+		calledWithSelfMember     dragonboat.Member
+		calledWithInitialMembers []dragonboat.Member
+		calledWithJoin           bool
+		calledWithRoles          []dragonboat.NodeRole
 	)
 
 	mockInitRaftNode := func(
@@ -44,7 +41,6 @@ func TestMasterNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 		calledWithInitialMembers = initialMembers
 		calledWithJoin = join
 		calledWithRoles = roles
-		calledWithStateMachineConstr = createStateMachine
 
 		return &dragonboat.RaftNode{}, nil
 	}
@@ -57,7 +53,7 @@ func TestMasterNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	testJoin := false
 	testRoles := []dragonboat.NodeRole{dragonboat.RoleConsensus, dragonboat.RoleScheduler}
 
-	_, err := dragonboat.InitMasterNode(testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles)
+	_, err := dragonboat.InitMasterNode(testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, &dragonboat.TestPathProvider{Path: t.TempDir()})
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(dragonboat.MasterShardID), calledWithShardID, "ShardID should be MasterShardID")
@@ -67,9 +63,6 @@ func TestMasterNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	assert.Equal(t, testJoin, calledWithJoin, "Join flag should match")
 	assert.Equal(t, testRoles, calledWithRoles, "Roles should match")
 
-	expectedStateMachineConstr := reflect.ValueOf(dragonboat.NewMasterKVStateMachine)
-	actualStateMachineConstr := reflect.ValueOf(calledWithStateMachineConstr)
-	assert.Equal(t, expectedStateMachineConstr.Pointer(), actualStateMachineConstr.Pointer(), "StateMachine constructor should be NewMasterKVRocksDBStateMachine")
 }
 
 func TestMasterNode_InitRaftNodeErrorPropagation(t *testing.T) {
@@ -93,7 +86,7 @@ func TestMasterNode_InitRaftNodeErrorPropagation(t *testing.T) {
 
 	dragonboat.InitRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil)
+	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
 	assert.Error(t, err)
 	assert.Equal(t, expectedError, err)
 }
@@ -115,18 +108,15 @@ func TestMasterNode_PassesCorrectStateMachineType(t *testing.T) {
 		roles []dragonboat.NodeRole,
 		createStateMachine func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine,
 	) (*dragonboat.RaftNode, error) {
-		fmt.Println("esto se debe llamar?????", createStateMachine != nil)
 		passedCreateFunc = createStateMachine
 		return &dragonboat.RaftNode{}, nil
 	}
 	dragonboat.InitRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil)
+	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
 	require.NoError(t, err)
 	time.Sleep(2 * time.Second)
 	if passedCreateFunc != nil {
-		fmt.Println("passedCreateFunc !!!!")
-		//fmt.Println(passedCreateFunc)
 		sm := passedCreateFunc(1, 1)
 		_, ok := sm.(statemachine.IOnDiskStateMachine)
 		assert.True(t, ok, "Passed function should return an IOnDiskStateMachine")

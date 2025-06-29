@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
 	"deadalus-orch/server/internal/pkg/config"
@@ -166,7 +167,7 @@ func (app *Application) Run() {
 		}
 	}
 
-	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles)
+	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{})
 	app.MasterNode = masterNode
 	if err != nil {
 		log.Fatal().

@@ -24,7 +24,7 @@ func setupKVMasterPebble(t *testing.T, engine string) *dragonboat.KVBaseStateMac
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine)
+	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -34,7 +34,7 @@ func setupKV(t *testing.T, engine string) *dragonboat.KVBaseStateMachine { // Ch
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -191,7 +191,7 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewMasterKVStateMachine(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv2 := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -237,7 +237,29 @@ func TestPebble_SaveSnapshot_Cancelled(t *testing.T) {
 	done := make(chan struct{})
 	close(done)
 
-	err := kv.SaveSnapshot(nil, io.Discard, done)
+	var buf bytes.Buffer
+	cmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.RW,
+		CMD: commands.RWK_Command{
+			Op: commands.Write,
+			CMD: commands.WK_Command{
+				Key:              "snap_key",
+				Value:            []byte("snap_value"),
+				ColumnFamilyName: db.DefaultFC,
+				Op:               commands.PutOp,
+			},
+		},
+	}
+
+	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
+
+	_, err := kv.Update([]statemachine.Entry{
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+	})
+	require.NoError(t, err)
+
+	err = kv.SaveSnapshot(nil, io.Discard, done)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "snapshot cancelled")
 }
