@@ -1,9 +1,60 @@
 # DaedalusOrchestrator 🧠⚙️
 
-before execute the example execute this command line 
+## Building the Application
 
-export CGO_CFLAGS="-I/opt/homebrew/include"                
-export CGO_LDFLAGS="-L/opt/homebrew/lib -lrocksdb"
+The application uses Go modules for dependency management.
+
+### Prerequisites
+
+- Go (version 1.19 or later recommended)
+- A C/C++ compiler toolchain (e.g., GCC or Clang) for Cgo support.
+
+### Standard Build
+
+To build the application with the default database engine (PebbleDB), run:
+
+```bash
+go build ./server/cmd/main.go
+```
+This will create a `main` executable in the current directory.
+
+### Building with RocksDB Support (Optional)
+
+DaedalusOrchestrator can use RocksDB as an alternative storage backend. To enable RocksDB support, you need to have the RocksDB library and headers installed on your system.
+
+**Installation (macOS Example using Homebrew):**
+```bash
+brew install rocksdb
+```
+For other operating systems, please refer to the official RocksDB installation documentation.
+
+Once RocksDB is installed, set the following environment variables (adjust paths if your installation differs):
+```bash
+export CGO_CFLAGS="-I/opt/homebrew/include"                # Or your RocksDB include path
+export CGO_LDFLAGS="-L/opt/homebrew/lib -lrocksdb"         # Or your RocksDB library path
+```
+
+Then, build the application with the `rocksdb` build tag:
+```bash
+go build -tags rocksdb ./server/cmd/main.go
+```
+
+If you build with the `rocksdb` tag, you can then configure the application to use RocksDB via the `MASTER_DB_ENGINE` and `TENANT_DB_ENGINE` environment variables or corresponding configuration file settings (see "Configuration Sources and Precedence" below). If you attempt to configure RocksDB without building with the tag, the application will default to PebbleDB and log an error.
+
+### Running Tests
+
+To run tests for the default build:
+```bash
+cd server
+go test ./...
+```
+
+To run tests including RocksDB-specific tests (ensure RocksDB is installed and CGO flags are set as above):
+```bash
+cd server
+go test -tags rocksdb ./...
+```
+
 
 # Environment Variables
 

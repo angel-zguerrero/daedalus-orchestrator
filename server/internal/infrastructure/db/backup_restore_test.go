@@ -1,3 +1,6 @@
+//go:build rocksdb
+// +build rocksdb
+
 package db_test
 
 // Ensure time is here, remove separate import "time" later
