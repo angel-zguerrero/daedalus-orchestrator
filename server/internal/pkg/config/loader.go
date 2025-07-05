@@ -464,13 +464,12 @@ func LoadDefaultConfiguration() error {
 		config.ReplicaID = 1
 		// Construct InitialMembers from SelfMemberHost and ClusterBasePort if not specified
 		if config.InitialMembers == "" {
-			config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort)
+			config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort+int(config.ReplicaID))
 		}
 	} else if !config.Join && config.SelfMemberHost != "" && config.ClusterBasePort != 0 && config.InitialMembers == "" && config.ReplicaID != 0 {
 		// If host and port are set, and replica ID is set, but initial members is not, default initial members to self.
-		config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort)
+		config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort+int(config.ReplicaID))
 	}
-
 
 	// Apply default for MaxTenants if not set by any source
 	if config.MaxTenants == 0 {

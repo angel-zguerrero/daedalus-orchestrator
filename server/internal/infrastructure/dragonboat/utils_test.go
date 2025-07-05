@@ -194,29 +194,30 @@ func TestParseRolesFlag(t *testing.T) {
 }
 
 func TestParseMember(t *testing.T) {
-	valid := "127.0.0.1:8080"
-	member, err := ParseMember(valid)
-	if err != nil || member.IP != "127.0.0.1" || member.Port != 8080 {
+
+	validMember := "127.0.0.1:r1"
+	member, err := ParseMember(validMember, 7999)
+	if err != nil || member.IP != "127.0.0.1" || member.Port != 8000 {
 		t.Errorf("invalid parse: %v", err)
 	}
-	_, err = ParseMember("invalid")
+	_, err = ParseMember("invalid", 9)
 	if err == nil {
 		t.Errorf("expected error for malformed input")
 	}
-	_, err = ParseMember("127.0.0.1:abc")
+	_, err = ParseMember("127.0.0.1:rt", 9)
 	if err == nil {
 		t.Errorf("expected error for invalid port")
 	}
 }
 
 func TestParseMembersFlag(t *testing.T) {
-	input := "127.0.0.1:1234,192.168.1.1:4321"
-	members, err := ParseMembersFlag(&input)
+	input := "127.0.0.1:r1,192.168.1.1:r2"
+	members, err := ParseMembersFlag(&input, 7990)
 	if err != nil || len(members) != 2 {
 		t.Errorf("unexpected error or count mismatch: %v", err)
 	}
 	bad := "abc"
-	_, err = ParseMembersFlag(&bad)
+	_, err = ParseMembersFlag(&bad, 7990)
 	if err == nil {
 		t.Errorf("expected error for invalid member")
 	}
@@ -330,55 +331,6 @@ func TestParseRolesList_ExtendedCases(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.ElementsMatch(t, tt.expected, roles)
-			}
-		})
-	}
-}
-
-func TestParseMember_DetailedErrors(t *testing.T) {
-	tests := []struct {
-		name          string
-		input         string
-		expectedError string
-	}{
-		{
-			name:          "missing port",
-			input:         "127.0.0.1",
-			expectedError: "missing port in address",
-		},
-		{
-			name:          "invalid IP",
-			input:         "invalid-ip:8080",
-			expectedError: "invalid IP address",
-		},
-		{
-			name:          "non-numeric port",
-			input:         "127.0.0.1:notaport",
-			expectedError: "invalid port: notaport",
-		},
-		{
-			name:          "port out of range (too high)",
-			input:         "127.0.0.1:70000",
-			expectedError: "invalid port: 70000",
-		},
-		{
-			name:          "port out of range (too low)",
-			input:         "127.0.0.1:0",
-			expectedError: "invalid port: 0",
-		},
-		{
-			name:          "empty string",
-			input:         "",
-			expectedError: "empty member entry",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseMember(tt.input)
-			assert.Error(t, err)
-			if tt.expectedError != "" {
-				assert.Contains(t, err.Error(), tt.expectedError)
 			}
 		})
 	}

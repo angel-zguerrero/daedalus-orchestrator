@@ -329,13 +329,14 @@ func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 // Returns:
 //   - A Member struct.
 //   - An error if the format is invalid, IP is invalid, or port is out of range.
-func ParseMember(raw string) (Member, error) {
+func ParseMember(raw string, ClusterBasePort int) (Member, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return Member{}, errors.New("empty member entry")
 	}
 
-	host, portStr, err := net.SplitHostPort(raw)
+	// Espera un formato como: 127.0.0.1:r1
+	host, label, err := net.SplitHostPort(raw)
 	if err != nil {
 		return Member{}, fmt.Errorf("invalid member format '%s': %v", raw, err)
 	}
@@ -345,9 +346,20 @@ func ParseMember(raw string) (Member, error) {
 		return Member{}, fmt.Errorf("invalid IP address: %s", host)
 	}
 
-	port, err := strconv.Atoi(portStr)
-	if err != nil || port <= 0 || port > 65535 {
-		return Member{}, fmt.Errorf("invalid port: %s", portStr)
+	// Espera una etiqueta como r1
+	if !strings.HasPrefix(label, "r") {
+		return Member{}, fmt.Errorf("invalid port label: %s (expected format 'r<number>')", label)
+	}
+
+	offsetStr := strings.TrimPrefix(label, "r")
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		return Member{}, fmt.Errorf("invalid port offset: %s", offsetStr)
+	}
+
+	port := ClusterBasePort + offset
+	if port <= 0 || port > 65535 {
+		return Member{}, fmt.Errorf("resulting port out of range: %d", port)
 	}
 
 	return Member{
@@ -365,7 +377,7 @@ func ParseMember(raw string) (Member, error) {
 // Returns:
 //   - A slice of Member structs.
 //   - An error if any member string cannot be parsed (via ParseMember).
-func ParseMembersFlag(membersFlag *string) ([]Member, error) {
+func ParseMembersFlag(membersFlag *string, ClusterBasePort int) ([]Member, error) {
 	if *membersFlag == "" {
 		return []Member{}, nil
 	}
@@ -374,7 +386,7 @@ func ParseMembersFlag(membersFlag *string) ([]Member, error) {
 	members := make([]Member, 0, len(rawParts))
 
 	for _, raw := range rawParts {
-		member, err := ParseMember(raw)
+		member, err := ParseMember(raw, ClusterBasePort)
 		if err != nil {
 			return nil, err
 		}

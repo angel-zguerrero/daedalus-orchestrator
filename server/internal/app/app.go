@@ -94,8 +94,8 @@ func (app *Application) Run() {
 		_ = tp.Shutdown(ctx)
 	}()
 
-	selfMemberAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.SelfMemberHost, config.GlobalConfiguration.ClusterBasePort+int(config.GlobalConfiguration.ReplicaID))
-	selfMember, err := dragonboat.ParseMember(selfMemberAddr)
+	selfMemberAddr := fmt.Sprintf("%s:r%d", config.GlobalConfiguration.SelfMemberHost, config.GlobalConfiguration.ReplicaID)
+	selfMember, err := dragonboat.ParseMember(selfMemberAddr, int(config.GlobalConfiguration.ClusterBasePort))
 
 	if err != nil {
 		log.Fatal().
@@ -105,7 +105,7 @@ func (app *Application) Run() {
 			Msgf("❌ Failed parsing self member")
 	}
 
-	initialMembers, err := dragonboat.ParseMembersFlag(&config.GlobalConfiguration.InitialMembers)
+	initialMembers, err := dragonboat.ParseMembersFlag(&config.GlobalConfiguration.InitialMembers, config.GlobalConfiguration.ClusterBasePort)
 	if err != nil {
 		log.Fatal().
 			Err(err).
