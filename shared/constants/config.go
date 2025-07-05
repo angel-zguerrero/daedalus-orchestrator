@@ -50,6 +50,12 @@ const ConfigAdminAPIJWTSecretKey = "admin_api_jwt_secret"
 // ConfigAPIRaftTimeoutKey is the key for the API Raft timeout setting in the configuration file (in seconds).
 const ConfigAPIRaftTimeoutKey = "api_raft_timeout"
 
+// ConfigTenantPortRangeKey is the key for the tenant port range setting in the configuration file.
+const ConfigTenantPortRangeKey = "tenant_port_range"
+
+// ConfigMaxTenantsKey is the key for the maximum number of tenants setting in the configuration file.
+const ConfigMaxTenantsKey = "max_tenants"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -107,6 +113,12 @@ const EnvVarAdminAPIJWTSecret = "ADMIN_API_JWT_SECRET"
 // EnvVarAPIRaftTimeout is the environment variable name for the API Raft timeout (e.g., "5s", "1m").
 const EnvVarAPIRaftTimeout = "API_RAFT_TIMEOUT"
 
+// EnvVarTenantPortRange is the environment variable name for the tenant port range.
+const EnvVarTenantPortRange = "TENANT_PORT_RANGE"
+
+// EnvVarMaxTenants is the environment variable name for the maximum number of tenants.
+const EnvVarMaxTenants = "MAX_TENANTS"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -147,3 +159,9 @@ const MasterDBEngineFlagName = "master-db-engine"
 
 // TenantDBEngineFlagName is the command-line flag name for the tenant database engine.
 const TenantDBEngineFlagName = "tenant-db-engine"
+
+// TenantPortRangeFlagName is the command-line flag name for the tenant port range.
+const TenantPortRangeFlagName = "tenant-port-range"
+
+// MaxTenantsFlagName is the command-line flag name for the maximum number of tenants.
+const MaxTenantsFlagName = "max-tenants"

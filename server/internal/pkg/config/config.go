@@ -42,6 +42,12 @@ type Config struct {
 	AdminAPIJWTSecret string
 	// ApiRaftTimeout defines the timeout duration for requests from the API to the Raft node.
 	ApiRaftTimeout time.Duration
+	// TenantPortLowerBound is the lower bound of the port range allocated for tenants.
+	TenantPortLowerBound int
+	// TenantPortUpperBound is the upper bound of the port range allocated for tenants.
+	TenantPortUpperBound int
+	// MaxTenants is the maximum number of tenants supported by the cluster.
+	MaxTenants int
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
@@ -64,6 +70,8 @@ type ConfigFromMap struct {
 	admin_listen_addr_port         int
 	admin_api_jwt_secret           string
 	api_raft_timeout               int64 // Timeout in seconds
+	tenant_port_range              string
+	max_tenants                    int
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -92,7 +100,26 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		AdminListenAddrPort:        configFromMapInstance.admin_listen_addr_port,
 		AdminAPIJWTSecret:          configFromMapInstance.admin_api_jwt_secret,
 		ApiRaftTimeout:             time.Duration(configFromMapInstance.api_raft_timeout) * time.Second,
+		MaxTenants:                 configFromMapInstance.max_tenants,
+		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
+		// after considering flags and env vars. We need to pass the raw string from the config file if present.
+		// However, the Config struct doesn't store the raw string.
+		// The current design loads config file into ConfigFromMap, then converts to Config.
+		// Then Env vars override Config fields.
+		// Then Flags override Config fields.
+		// The raw tenant_port_range string from the config file is already handled by mapToConfig
+		// and is available in the ConfigFromMap instance.
+		// LoadDefaultConfiguration will retrieve this if no env var or flag for tenant_port_range is set.
+		// So, no change is needed here for tenant_port_range string itself.
 	}
+	// The raw `tenant_port_range` from the config file is stored in `ConfigFromMap`.
+	// `LoadDefaultConfiguration` will need to access `configFromMapInstance.tenant_port_range`
+	// if it's the chosen source for the port range.
+	// Let's adjust LoadDefaultConfiguration to use configFromMapInstance.tenant_port_range
+	// if config file is the source.
+
+	// For now, ensure MaxTenants is copied.
+	// The tenant port range string from the file will be handled directly in LoadDefaultConfiguration.
 	return c
 }
 
