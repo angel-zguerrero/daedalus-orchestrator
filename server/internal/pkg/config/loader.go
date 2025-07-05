@@ -2,8 +2,8 @@ package config
 
 import (
 	"bufio"
-	"deadalus-orch/shared/constants"
 	"deadalus-orch/server/internal/pkg/utils" // Added for IsValidPort
+	"deadalus-orch/shared/constants"
 	"flag"
 	"fmt"
 	"os"
@@ -166,7 +166,6 @@ func LoadDefaultConfiguration() error {
 	}
 
 	config := &Config{}
-	var configFromFileValues *ConfigFromMap // To store values read from config file
 
 	env := os.Getenv(constants.EnvVarEnvKey)
 	if env == "" {
@@ -195,8 +194,6 @@ func LoadDefaultConfiguration() error {
 					Msg("⚠️ Failed to load map from config file")
 				return err
 			}
-			// Set rawTenantPortRange from file first. It might be overridden by ENV or Flag later.
-			rawTenantPortRange = configMap[constants.ConfigTenantPortRangeKey]
 
 			cfgFromMapIntermediate, err := mapToConfig(configMap)
 			if err != nil {
@@ -323,7 +320,7 @@ func LoadDefaultConfiguration() error {
 	// TenantPortRange from environment variable - will be parsed later
 	// We store the raw string for now and parse it after flags are processed
 	// to ensure correct precedence and availability of MaxTenants.
-	rawTenantPortRange := os.Getenv(constants.EnvVarTenantPortRange)
+	rawTenantPortRange = os.Getenv(constants.EnvVarTenantPortRange)
 
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
@@ -465,9 +462,7 @@ func LoadDefaultConfiguration() error {
 	// Parse and validate TenantPortRange
 	// This is done after MaxTenants is finalized to allow validation against it.
 	if rawTenantPortRange == "" {
-		// If no port range is specified, we cannot operate.
-		log.Fatal().Msg("❌ Tenant port range (--tenant-port-range, TENANT_PORT_RANGE, or tenant_port_range in config) is required.")
-		return fmt.Errorf("tenant port range is required")
+		rawTenantPortRange = "9000-9009"
 	}
 
 	parts := strings.Split(rawTenantPortRange, "-")
