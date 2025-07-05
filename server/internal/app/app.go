@@ -94,7 +94,7 @@ func (app *Application) Run() {
 		_ = tp.Shutdown(ctx)
 	}()
 
-	selfMemberAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.SelfMemberHost, config.GlobalConfiguration.ClusterBasePort)
+	selfMemberAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.SelfMemberHost, config.GlobalConfiguration.ClusterBasePort+int(config.GlobalConfiguration.ReplicaID))
 	selfMember, err := dragonboat.ParseMember(selfMemberAddr)
 
 	if err != nil {
