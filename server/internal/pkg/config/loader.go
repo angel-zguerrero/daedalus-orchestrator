@@ -28,7 +28,8 @@ Available Flags:
   --join			 Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.
   --replica			 Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.
   --role			 Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.
-  --self-member-addr The network address (in ip:port format) that this node will use for communication with other members in the cluster.
+  --self-member-host The IP address or hostname that this node will use for communication with other members in the cluster. (e.g., 127.0.0.1)
+  --cluster-base-port The base port number that this node will use for communication with other members in the cluster. (e.g., 5000)
   --master-db-engine         The database engine for the master database (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --admin-api-jwt-expiration-hours JWT expiration time in hours for the Admin API. Default is 3 hours.
@@ -45,7 +46,8 @@ Environment Variables:
   DEFAULT_ROOT_PASSWORD        Default root password for the application.
   REPLICA_ID                   Node's replica ID.
   ROLES                        Comma-separated node roles.
-  SELF_MEMBER_ADDR             Node's own member address (ip:port).
+  SELF_MEMBER_HOST             Node's own member host (e.g., 127.0.0.1). (Corresponds to ` + constants.EnvVarSelfMemberHost + `)
+  CLUSTER_BASE_PORT            Node's own cluster base port (e.g., 5000). (Corresponds to ` + constants.EnvVarClusterBasePort + `)
   INITIAL_MEMBERS              Initial members of the cluster (ip:port,ip:port,...).
   JOIN                         Set to "true" if the node is joining an existing cluster.
   CONNECTOR_PORT               Port for the connector service.
@@ -73,7 +75,8 @@ Configuration File:
     default_root_password
     replica_id
     roles
-    self_member_addr
+    self_member_host
+    cluster_base_port
     initial_members
     join
     ttl_internal_error
@@ -106,7 +109,13 @@ var RoleFlag = flag.String("role", "", "Comma-separated list of roles for this n
 var InitialMembersFlag = flag.String("initial-members", "", "Comma-separated list of initial member addresses (in ip:port format) for bootstrapping a new cluster. Required when creating a cluster and not using the --join flag.")
 
 // SelfMemberAddrFlag defines the --self-member-addr command-line flag for specifying the node's own Raft address.
-var SelfMemberAddrFlag = flag.String("self-member-addr", "", "The network address (in ip:port format) that this node will use for communication with other members in the cluster.")
+// var SelfMemberAddrFlag = flag.String("self-member-addr", "", "The network address (in ip:port format) that this node will use for communication with other members in the cluster.") // Deprecated
+
+// SelfMemberHostFlag defines the --self-member-host command-line flag.
+var SelfMemberHostFlag = flag.String(constants.SelfMemberHostFlagName, "", "The IP address or hostname that this node will use for communication with other members in the cluster.")
+
+// ClusterBasePortFlag defines the --cluster-base-port command-line flag.
+var ClusterBasePortFlag = flag.Int(constants.ClusterBasePortFlagName, 0, "The base port number that this node will use for communication with other members in the cluster.")
 
 // JoinFlag defines the --join command-line flag to indicate if the node should join an existing cluster.
 var JoinFlag = flag.Bool("join", false, "Set this flag to true if this node should attempt to join an existing cluster. When joining, --initial-members should specify addresses of nodes in the existing cluster.")
@@ -228,8 +237,15 @@ func LoadDefaultConfiguration() error {
 		config.Roles = envVal
 	}
 
-	if envVal := os.Getenv(constants.EnvVarSelfMemberAddr); envVal != "" {
-		config.SelfMemberAddr = envVal
+	if envVal := os.Getenv(constants.EnvVarSelfMemberHost); envVal != "" {
+		config.SelfMemberHost = envVal
+	}
+	if envVal := os.Getenv(constants.EnvVarClusterBasePort); envVal != "" {
+		port, err := strconv.Atoi(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarClusterBasePort, err)
+		}
+		config.ClusterBasePort = port
 	}
 
 	if envVal := os.Getenv(constants.EnvVarInitialMembers); envVal != "" {
@@ -335,8 +351,11 @@ func LoadDefaultConfiguration() error {
 		config.InitialMembers = *InitialMembersFlag
 	}
 
-	if *SelfMemberAddrFlag != "" {
-		config.SelfMemberAddr = *SelfMemberAddrFlag
+	if *SelfMemberHostFlag != "" {
+		config.SelfMemberHost = *SelfMemberHostFlag
+	}
+	if *ClusterBasePortFlag != 0 {
+		config.ClusterBasePort = *ClusterBasePortFlag
 	}
 
 	if *ReplicaIDFlag != 0 {
@@ -435,13 +454,23 @@ func LoadDefaultConfiguration() error {
 	}
 
 	// Specific default logic for cluster setup
-	if !config.Join && config.SelfMemberAddr == "" && config.InitialMembers == "" && config.ReplicaID == 0 {
-		if config.SelfMemberAddr == "" {
-			config.SelfMemberAddr = "127.0.0.1:7001"
+	if !config.Join && config.SelfMemberHost == "" && config.ClusterBasePort == 0 && config.InitialMembers == "" && config.ReplicaID == 0 {
+		if config.SelfMemberHost == "" {
+			config.SelfMemberHost = "127.0.0.1"
+		}
+		if config.ClusterBasePort == 0 {
+			config.ClusterBasePort = 7001
 		}
 		config.ReplicaID = 1
-		config.InitialMembers = "127.0.0.1:7001"
+		// Construct InitialMembers from SelfMemberHost and ClusterBasePort if not specified
+		if config.InitialMembers == "" {
+			config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort)
+		}
+	} else if !config.Join && config.SelfMemberHost != "" && config.ClusterBasePort != 0 && config.InitialMembers == "" && config.ReplicaID != 0 {
+		// If host and port are set, and replica ID is set, but initial members is not, default initial members to self.
+		config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort)
 	}
+
 
 	// Apply default for MaxTenants if not set by any source
 	if config.MaxTenants == 0 {
@@ -620,8 +649,16 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 		case constants.ConfigRolesKey:
 			cfg.roles = v
 
-		case constants.ConfigSelfMemberAddrKey:
-			cfg.self_member_addr = v
+		// case constants.ConfigSelfMemberAddrKey: // Deprecated
+		//	cfg.self_member_addr = v
+		case constants.ConfigSelfMemberHostKey:
+			cfg.self_member_host = v
+		case constants.ConfigClusterBasePortKey:
+			p, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.cluster_base_port = p
 
 		case constants.ConfigInitialMembersKey:
 			cfg.initial_members = v
