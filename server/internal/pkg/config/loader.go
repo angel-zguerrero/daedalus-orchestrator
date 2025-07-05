@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"deadalus-orch/shared/constants"
+	"deadalus-orch/server/internal/pkg/utils" // Added for IsValidPort
 	"flag"
 	"fmt"
 	"os"
@@ -34,6 +35,8 @@ Available Flags:
   --admin-host                 Host address for the Admin API. Overrides config file and environment variable.
   --admin-port                 Port for the Admin API. Overrides config file and environment variable.
   --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
+  --tenant-port-range        The port range for tenants (e.g., "4000-4100"). Overrides config file and environment variable. The range size must match --max-tenants.
+  --max-tenants                Maximum number of tenants (default 10, max 10000). Overrides config file and environment variable.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -54,6 +57,8 @@ Environment Variables:
   ADMIN_LISTEN_ADDR_PORT       Port for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrPort + `)
   ADMIN_API_JWT_SECRET         JWT secret key for the Admin API. (Corresponds to ` + constants.EnvVarAdminAPIJWTSecret + `)
   API_RAFT_TIMEOUT             Timeout for API to Raft node requests (e.g., "5s", "1m"). (Corresponds to ` + constants.EnvVarAPIRaftTimeout + `)
+  TENANT_PORT_RANGE            Port range for tenants, format: port-port (e.g., "4000-4100"). (Corresponds to ` + constants.EnvVarTenantPortRange + `)
+  MAX_TENANTS                  Maximum number of tenants. (Corresponds to ` + constants.EnvVarMaxTenants + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -79,6 +84,8 @@ Configuration File:
     admin_listen_addr_port
     admin_api_jwt_secret
     api_raft_timeout               Timeout for API to Raft node requests in seconds (e.g., 5 for 5s).
+    tenant_port_range              Tenant port range (e.g., "4000-4100").
+    max_tenants                    Maximum number of tenants.
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -128,6 +135,12 @@ var AdminListenAddrPortFlag = flag.Int("admin-port", 0, "Port for the Admin API.
 // ApiRaftTimeoutFlag defines the --api-raft-timeout command-line flag for specifying the API to Raft node request timeout.
 var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 5*time.Second, "Timeout for API to Raft node requests (e.g., 5s, 1m). Overrides config file and environment variable.")
 
+// TenantPortRangeFlag defines the --tenant-port-range command-line flag.
+var TenantPortRangeFlag = flag.String(constants.TenantPortRangeFlagName, "", "Port range for tenants (e.g., \"4000-4100\"). The range size must match --max-tenants.")
+
+// MaxTenantsFlag defines the --max-tenants command-line flag.
+var MaxTenantsFlag = flag.Int(constants.MaxTenantsFlagName, 0, "Maximum number of tenants (default 10, max 10000).")
+
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
 
@@ -153,6 +166,8 @@ func LoadDefaultConfiguration() error {
 	}
 
 	config := &Config{}
+	var configFromFileValues *ConfigFromMap // To store values read from config file
+
 	env := os.Getenv(constants.EnvVarEnvKey)
 	if env == "" {
 		env = string(constants.DEVELOPMENT)
@@ -163,20 +178,37 @@ func LoadDefaultConfiguration() error {
 		configFilePath = *ConfigFilePathFlag
 	}
 
+	// This will hold the tenant_port_range string from the config file, if present.
+	rawTenantPortRange := "" // Initialize, will be populated from file, then env, then flag.
+
 	if configFilePath != "" {
 		if _, err := os.Stat(configFilePath); err == nil {
 			log.Info().
 				Str("path", configFilePath).
 				Msg("✅ Using config file")
-			cfgFromFile, err := LoadConfigFromPath(configFilePath) // Changed variable name to avoid conflict
+
+			configMap, err := loadMapFromPath(configFilePath)
 			if err != nil {
 				log.Error().
 					Str("path", configFilePath).
 					Err(err).
-					Msg("⚠️ Failed to load config file")
+					Msg("⚠️ Failed to load map from config file")
 				return err
 			}
-			config = cfgFromFile // Assign to the main config object
+			// Set rawTenantPortRange from file first. It might be overridden by ENV or Flag later.
+			rawTenantPortRange = configMap[constants.ConfigTenantPortRangeKey]
+
+			cfgFromMapIntermediate, err := mapToConfig(configMap)
+			if err != nil {
+				log.Error().
+					Str("path", configFilePath).
+					Err(err).
+					Msg("⚠️ Failed to parse config file data into struct")
+				return err
+			}
+			// Apply all other values from config file to the main config object
+			config = ConfigFromMapToConfig(*cfgFromMapIntermediate)
+
 		} else {
 			log.Error().
 				Str("path", configFilePath).
@@ -186,7 +218,7 @@ func LoadDefaultConfiguration() error {
 		}
 	}
 
-	// Environment variables override config file
+	// Environment variables override config file values (except for rawTenantPortRange which is handled specially)
 	if envVal := os.Getenv(constants.EnvVarReplicaId); envVal != "" {
 		replicaID, err := strconv.ParseUint(envVal, 10, 64)
 		if err != nil {
@@ -279,6 +311,20 @@ func LoadDefaultConfiguration() error {
 		config.ApiRaftTimeout = apiRaftTimeout
 	}
 
+	// MaxTenants from environment variable
+	if envVal := os.Getenv(constants.EnvVarMaxTenants); envVal != "" {
+		maxTenants, err := strconv.Atoi(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarMaxTenants, err)
+		}
+		config.MaxTenants = maxTenants
+	}
+
+	// TenantPortRange from environment variable - will be parsed later
+	// We store the raw string for now and parse it after flags are processed
+	// to ensure correct precedence and availability of MaxTenants.
+	rawTenantPortRange := os.Getenv(constants.EnvVarTenantPortRange)
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -330,6 +376,15 @@ func LoadDefaultConfiguration() error {
 	// The flag's value (*ApiRaftTimeoutFlag) will then be used, which includes its own default.
 	// Assign flag value (user-set, or flag's own default e.g. 5s). This overrides env/file.
 	config.ApiRaftTimeout = *ApiRaftTimeoutFlag
+
+	if *MaxTenantsFlag != 0 {
+		config.MaxTenants = *MaxTenantsFlag
+	}
+
+	// If TenantPortRangeFlag is set, it takes precedence
+	if *TenantPortRangeFlag != "" {
+		rawTenantPortRange = *TenantPortRangeFlag
+	}
 
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
@@ -391,12 +446,82 @@ func LoadDefaultConfiguration() error {
 		config.InitialMembers = "127.0.0.1:7001"
 	}
 
+	// Apply default for MaxTenants if not set by any source
+	if config.MaxTenants == 0 {
+		config.MaxTenants = 10 // Default to 10 tenants
+		log.Info().Msgf("Max tenants not specified, defaulting to %d", config.MaxTenants)
+	}
+
+	// Validate MaxTenants
+	if config.MaxTenants > 10000 {
+		log.Error().Msgf("❌ Max tenants (%d) exceeds the maximum allowed (10000). Capping at 10000.", config.MaxTenants)
+		config.MaxTenants = 10000
+	}
+	if config.MaxTenants <= 0 {
+		log.Fatal().Msgf("❌ Max tenants must be a positive integer. Current value: %d", config.MaxTenants)
+		return fmt.Errorf("max tenants must be a positive integer. Current value: %d", config.MaxTenants)
+	}
+
+	// Parse and validate TenantPortRange
+	// This is done after MaxTenants is finalized to allow validation against it.
+	if rawTenantPortRange == "" {
+		// If no port range is specified, we cannot operate.
+		log.Fatal().Msg("❌ Tenant port range (--tenant-port-range, TENANT_PORT_RANGE, or tenant_port_range in config) is required.")
+		return fmt.Errorf("tenant port range is required")
+	}
+
+	parts := strings.Split(rawTenantPortRange, "-")
+	if len(parts) != 2 {
+		log.Fatal().Msgf("❌ Invalid tenant port range format: %s. Expected format: lowerPort-upperPort", rawTenantPortRange)
+		return fmt.Errorf("invalid tenant port range format: %s. Expected format: lowerPort-upperPort", rawTenantPortRange)
+	}
+
+	lowerPort, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("❌ Invalid lower port value in tenant port range: %s", parts[0])
+		return fmt.Errorf("invalid lower port value in tenant port range '%s': %w", parts[0], err)
+	}
+
+	upperPort, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("❌ Invalid upper port value in tenant port range: %s", parts[1])
+		return fmt.Errorf("invalid upper port value in tenant port range '%s': %w", parts[1], err)
+	}
+
+	if !utils.IsValidPort(lowerPort) {
+		log.Fatal().Msgf("❌ Lower tenant port %d is not a valid port (1024-65535).", lowerPort)
+		return fmt.Errorf("lower tenant port %d is not a valid port (1024-65535)", lowerPort)
+	}
+	if !utils.IsValidPort(upperPort) {
+		log.Fatal().Msgf("❌ Upper tenant port %d is not a valid port (1024-65535).", upperPort)
+		return fmt.Errorf("upper tenant port %d is not a valid port (1024-65535)", upperPort)
+	}
+
+	if lowerPort >= upperPort {
+		log.Fatal().Msgf("❌ Lower tenant port %d must be strictly less than upper tenant port %d.", lowerPort, upperPort)
+		return fmt.Errorf("lower tenant port %d must be strictly less than upper tenant port %d", lowerPort, upperPort)
+	}
+
+	config.TenantPortLowerBound = lowerPort
+	config.TenantPortUpperBound = upperPort
+
+	// Validate port range size against MaxTenants
+	// The number of available ports is Upper - Lower + 1
+	portRangeSize := config.TenantPortUpperBound - config.TenantPortLowerBound + 1
+	if portRangeSize != config.MaxTenants {
+		log.Fatal().Msgf("❌ Tenant port range size (%d ports from %d-%d) does not match max_tenants (%d). The range must accommodate exactly max_tenants.",
+			portRangeSize, config.TenantPortLowerBound, config.TenantPortUpperBound, config.MaxTenants)
+		return fmt.Errorf("tenant port range size (%d) must exactly match max_tenants (%d)", portRangeSize, config.MaxTenants)
+	}
+
+	log.Info().Msgf("✅ Tenant configuration: MaxTenants=%d, PortRange=%d-%d", config.MaxTenants, config.TenantPortLowerBound, config.TenantPortUpperBound)
+
 	GlobalConfiguration = config
 	return nil
 }
 
-// LoadConfigFromPath reads a configuration file from the given path, parses its key-value pairs,
-// and converts them into a Config struct.
+// loadMapFromPath reads a configuration file from the given path and parses its key-value pairs
+// into a map[string]string.
 // Lines starting with '#' are treated as comments and ignored.
 // Empty lines are also ignored. Each line should be in 'key=value' format.
 //
@@ -404,9 +529,9 @@ func LoadDefaultConfiguration() error {
 //   - path: The file system path to the configuration file.
 //
 // Returns:
-//   - A pointer to a Config struct populated from the file.
-//   - An error if opening the file, reading it, or parsing its content fails.
-func LoadConfigFromPath(path string) (*Config, error) {
+//   - A map[string]string containing configuration key-value pairs from the file.
+//   - An error if opening the file or reading it fails.
+func loadMapFromPath(path string) (map[string]string, error) {
 	configMap := make(map[string]string)
 
 	file, err := os.Open(path)
@@ -424,20 +549,43 @@ func LoadConfigFromPath(path string) (*Config, error) {
 
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
+			// Optionally log a warning for malformed lines
+			log.Warn().Msgf("Skipping malformed line in config file %s: %s", path, line)
 			continue
 		}
 
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		if key != "" && value != "" {
+		if key != "" { // Allow empty values
 			configMap[key] = value
 		}
 	}
-	config, err := mapToConfig(configMap)
+	return configMap, scanner.Err()
+}
+
+// LoadConfigFromPath reads a configuration file from the given path, parses its key-value pairs,
+// and converts them into a Config struct.
+// Lines starting with '#' are treated as comments and ignored.
+// Empty lines are also ignored. Each line should be in 'key=value' format.
+//
+// Parameters:
+//   - path: The file system path to the configuration file.
+//
+// Returns:
+//   - A pointer to a Config struct populated from the file.
+//   - An error if opening the file, reading it, or parsing its content fails.
+func LoadConfigFromPath(path string) (*Config, error) {
+	configMap, err := loadMapFromPath(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error loading map from path %s: %w", path, err)
 	}
-	return ConfigFromMapToConfig(*config), scanner.Err()
+
+	configFromMap, err := mapToConfig(configMap)
+	if err != nil {
+		return nil, fmt.Errorf("error converting map to configFromMap for path %s: %w", path, err)
+	}
+
+	return ConfigFromMapToConfig(*configFromMap), nil
 }
 
 // mapToConfig converts a map of string key-value pairs (typically parsed from a config file)
@@ -524,6 +672,14 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.api_raft_timeout = p
+		case constants.ConfigTenantPortRangeKey:
+			cfg.tenant_port_range = v // Keep as string, parsed later
+		case constants.ConfigMaxTenantsKey:
+			mt, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.max_tenants = mt
 		}
 	}
 
