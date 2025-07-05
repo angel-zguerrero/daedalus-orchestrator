@@ -1,8 +1,7 @@
 package config
 
 import (
-	"bufio"
-	"deadalus-orch/server/internal/pkg/utils" // Added for IsValidPort
+	"bufio" // Added for IsValidPort
 	"deadalus-orch/shared/constants"
 	"flag"
 	"fmt"
@@ -36,7 +35,6 @@ Available Flags:
   --admin-host                 Host address for the Admin API. Overrides config file and environment variable.
   --admin-port                 Port for the Admin API. Overrides config file and environment variable.
   --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
-  --tenant-port-range        The port range for tenants (e.g., "4000-4100"). Overrides config file and environment variable. The range size must match --max-tenants.
   --max-tenants                Maximum number of tenants (default 10, max 10000). Overrides config file and environment variable.
 
 Environment Variables:
@@ -59,7 +57,6 @@ Environment Variables:
   ADMIN_LISTEN_ADDR_PORT       Port for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrPort + `)
   ADMIN_API_JWT_SECRET         JWT secret key for the Admin API. (Corresponds to ` + constants.EnvVarAdminAPIJWTSecret + `)
   API_RAFT_TIMEOUT             Timeout for API to Raft node requests (e.g., "5s", "1m"). (Corresponds to ` + constants.EnvVarAPIRaftTimeout + `)
-  TENANT_PORT_RANGE            Port range for tenants, format: port-port (e.g., "4000-4100"). (Corresponds to ` + constants.EnvVarTenantPortRange + `)
   MAX_TENANTS                  Maximum number of tenants. (Corresponds to ` + constants.EnvVarMaxTenants + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
@@ -144,9 +141,6 @@ var AdminListenAddrPortFlag = flag.Int("admin-port", 0, "Port for the Admin API.
 // ApiRaftTimeoutFlag defines the --api-raft-timeout command-line flag for specifying the API to Raft node request timeout.
 var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 5*time.Second, "Timeout for API to Raft node requests (e.g., 5s, 1m). Overrides config file and environment variable.")
 
-// TenantPortRangeFlag defines the --tenant-port-range command-line flag.
-var TenantPortRangeFlag = flag.String(constants.TenantPortRangeFlagName, "", "Port range for tenants (e.g., \"4000-4100\"). The range size must match --max-tenants.")
-
 // MaxTenantsFlag defines the --max-tenants command-line flag.
 var MaxTenantsFlag = flag.Int(
 	constants.MaxTenantsFlagName,
@@ -195,9 +189,6 @@ func LoadDefaultConfiguration() error {
 	if configFilePath == "" {
 		configFilePath = *ConfigFilePathFlag
 	}
-
-	// This will hold the tenant_port_range string from the config file, if present.
-	rawTenantPortRange := "" // Initialize, will be populated from file, then env, then flag.
 
 	if configFilePath != "" {
 		if _, err := os.Stat(configFilePath); err == nil {
@@ -343,11 +334,6 @@ func LoadDefaultConfiguration() error {
 		config.MaxTenants = maxTenants
 	}
 
-	// TenantPortRange from environment variable - will be parsed later
-	// We store the raw string for now and parse it after flags are processed
-	// to ensure correct precedence and availability of MaxTenants.
-	rawTenantPortRange = os.Getenv(constants.EnvVarTenantPortRange)
-
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -405,11 +391,6 @@ func LoadDefaultConfiguration() error {
 
 	if *MaxTenantsFlag != 0 {
 		config.MaxTenants = *MaxTenantsFlag
-	}
-
-	// If TenantPortRangeFlag is set, it takes precedence
-	if *TenantPortRangeFlag != "" {
-		rawTenantPortRange = *TenantPortRangeFlag
 	}
 
 	// Apply defaults if values are not set by any source
@@ -515,58 +496,6 @@ func LoadDefaultConfiguration() error {
 
 	validateClusterBasePort(config)
 	validateAdminPortAgainstClusterBasePort(config.AdminListenAddrPort, config.ClusterBasePort)
-
-	// Parse and validate TenantPortRange
-	// This is done after MaxTenants is finalized to allow validation against it.
-	if rawTenantPortRange == "" {
-		rawTenantPortRange = "9000-9009"
-	}
-
-	parts := strings.Split(rawTenantPortRange, "-")
-	if len(parts) != 2 {
-		log.Fatal().Msgf("❌ Invalid tenant port range format: %s. Expected format: lowerPort-upperPort", rawTenantPortRange)
-		return fmt.Errorf("invalid tenant port range format: %s. Expected format: lowerPort-upperPort", rawTenantPortRange)
-	}
-
-	lowerPort, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("❌ Invalid lower port value in tenant port range: %s", parts[0])
-		return fmt.Errorf("invalid lower port value in tenant port range '%s': %w", parts[0], err)
-	}
-
-	upperPort, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("❌ Invalid upper port value in tenant port range: %s", parts[1])
-		return fmt.Errorf("invalid upper port value in tenant port range '%s': %w", parts[1], err)
-	}
-
-	if !utils.IsValidPort(lowerPort) {
-		log.Fatal().Msgf("❌ Lower tenant port %d is not a valid port (1024-65535).", lowerPort)
-		return fmt.Errorf("lower tenant port %d is not a valid port (1024-65535)", lowerPort)
-	}
-	if !utils.IsValidPort(upperPort) {
-		log.Fatal().Msgf("❌ Upper tenant port %d is not a valid port (1024-65535).", upperPort)
-		return fmt.Errorf("upper tenant port %d is not a valid port (1024-65535)", upperPort)
-	}
-
-	if lowerPort >= upperPort {
-		log.Fatal().Msgf("❌ Lower tenant port %d must be strictly less than upper tenant port %d.", lowerPort, upperPort)
-		return fmt.Errorf("lower tenant port %d must be strictly less than upper tenant port %d", lowerPort, upperPort)
-	}
-
-	config.TenantPortLowerBound = lowerPort
-	config.TenantPortUpperBound = upperPort
-
-	// Validate port range size against MaxTenants
-	// The number of available ports is Upper - Lower + 1
-	portRangeSize := config.TenantPortUpperBound - config.TenantPortLowerBound + 1
-	if portRangeSize != config.MaxTenants {
-		log.Fatal().Msgf("❌ Tenant port range size (%d ports from %d-%d) does not match max_tenants (%d). The range must accommodate exactly max_tenants.",
-			portRangeSize, config.TenantPortLowerBound, config.TenantPortUpperBound, config.MaxTenants)
-		return fmt.Errorf("tenant port range size (%d) must exactly match max_tenants (%d)", portRangeSize, config.MaxTenants)
-	}
-
-	log.Info().Msgf("✅ Tenant configuration: MaxTenants=%d, PortRange=%d-%d", config.MaxTenants, config.TenantPortLowerBound, config.TenantPortUpperBound)
 
 	GlobalConfiguration = config
 	return nil
@@ -732,8 +661,6 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.api_raft_timeout = p
-		case constants.ConfigTenantPortRangeKey:
-			cfg.tenant_port_range = v // Keep as string, parsed later
 		case constants.ConfigMaxTenantsKey:
 			mt, err := strconv.Atoi(v)
 			if err != nil {

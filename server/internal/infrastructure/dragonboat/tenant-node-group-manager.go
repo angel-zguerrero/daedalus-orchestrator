@@ -16,8 +16,8 @@ func StartTentantNodes(
 	MaxTenants := config.GlobalConfiguration.MaxTenants
 	for shardID := 0; shardID < MaxTenants; shardID++ {
 		tenantMember := Member{
-			IP:   selfMember.IP,
-			Port: config.GlobalConfiguration.TenantPortLowerBound + shardID,
+			IP: selfMember.IP,
+			//Port: config.GlobalConfiguration.TenantPortLowerBound + shardID,
 		}
 		_, err := InitTenantNode(uint64(shardID+MasterShardID), replicaID, tenantMember, initialMembers, join, roles, pathProvider)
 		if err != nil {
