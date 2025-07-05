@@ -13,7 +13,11 @@ type Config struct {
 	// It's typically a comma-separated string.
 	Roles string
 	// SelfMemberAddr is the network address (IP:port) that this node uses for Raft communication.
-	SelfMemberAddr string
+	// SelfMemberAddr string // Deprecated: use SelfMemberHost and ClusterBasePort
+	// SelfMemberHost is the IP address or hostname that this node uses for Raft communication.
+	SelfMemberHost string
+	// ClusterBasePort is the base port number that this node uses for Raft communication.
+	ClusterBasePort int
 	// InitialMembers is a comma-separated list of Raft addresses for all members in a new cluster.
 	// This is used when bootstrapping the cluster.
 	InitialMembers string
@@ -48,15 +52,19 @@ type Config struct {
 	TenantPortUpperBound int
 	// MaxTenants is the maximum number of tenants supported by the cluster.
 	MaxTenants int
+
+	Env string
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
 // configuration data from a map (e.g., from a JSON or YAML file parsed into a map).
 // Its fields are lowercase and use underscores, matching common conventions for map keys from config files.
 type ConfigFromMap struct {
-	replica_id                     uint64
-	roles                          string
-	self_member_addr               string
+	replica_id uint64
+	roles      string
+	// self_member_addr               string // Deprecated
+	self_member_host               string
+	cluster_base_port              int
 	initial_members                string
 	join                           bool
 	connector_port                 int
@@ -84,9 +92,11 @@ type ConfigFromMap struct {
 //   - A pointer to a Config struct populated with values from configFromMapInstance.
 func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 	c := &Config{
-		ReplicaID:                  configFromMapInstance.replica_id,
-		Roles:                      configFromMapInstance.roles,
-		SelfMemberAddr:             configFromMapInstance.self_member_addr,
+		ReplicaID: configFromMapInstance.replica_id,
+		Roles:     configFromMapInstance.roles,
+		// SelfMemberAddr:             configFromMapInstance.self_member_addr, // Deprecated
+		SelfMemberHost:             configFromMapInstance.self_member_host,
+		ClusterBasePort:            configFromMapInstance.cluster_base_port,
 		InitialMembers:             configFromMapInstance.initial_members,
 		Join:                       configFromMapInstance.join,
 		ConnectorPort:              configFromMapInstance.connector_port,

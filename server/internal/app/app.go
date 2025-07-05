@@ -38,7 +38,7 @@ import (
 //     - OTEL_TRACER_SERVICE_NAME: Defines the service name for traces.
 //     - A tracer provider is initialized and its shutdown is deferred.
 //  3. Dragonboat Node: Sets up the local Dragonboat node for distributed consensus.
-//     - Parses the current node's address (SelfMemberAddr from global configuration).
+//     - Constructs the current node's address from SelfMemberHost and ClusterBasePort (from global configuration).
 //     - Parses the list of initial members for the cluster (InitialMembers from global configuration).
 //     - Parses the roles assigned to this node (Roles from global configuration).
 //     - Performs validation checks based on whether the node is joining an existing cluster or creating a new one,
@@ -94,7 +94,8 @@ func (app *Application) Run() {
 		_ = tp.Shutdown(ctx)
 	}()
 
-	selfMember, err := dragonboat.ParseMember(config.GlobalConfiguration.SelfMemberAddr)
+	selfMemberAddr := fmt.Sprintf("%s:r%d", config.GlobalConfiguration.SelfMemberHost, config.GlobalConfiguration.ReplicaID)
+	selfMember, err := dragonboat.ParseMember(selfMemberAddr, int(config.GlobalConfiguration.ClusterBasePort))
 
 	if err != nil {
 		log.Fatal().
@@ -104,7 +105,7 @@ func (app *Application) Run() {
 			Msgf("❌ Failed parsing self member")
 	}
 
-	initialMembers, err := dragonboat.ParseMembersFlag(&config.GlobalConfiguration.InitialMembers)
+	initialMembers, err := dragonboat.ParseMembersFlag(&config.GlobalConfiguration.InitialMembers, config.GlobalConfiguration.ClusterBasePort)
 	if err != nil {
 		log.Fatal().
 			Err(err).
