@@ -502,6 +502,17 @@ func LoadDefaultConfiguration() error {
 		config.MaxTenants = 10
 	}
 
+	var MaxReplicaId int
+	if env == string(constants.PRODUCTION) {
+		MaxReplicaId = constants.MaxReplicationInProduction
+	} else {
+		MaxReplicaId = constants.MaxReplicationInNonProduction
+	}
+
+	if int(config.ReplicaID) > MaxReplicaId {
+		log.Fatal().Msgf("❌ Replica ID (%d) exceeds the maximum allowed (%d)", config.ReplicaID, MaxReplicaId)
+	}
+
 	// Parse and validate TenantPortRange
 	// This is done after MaxTenants is finalized to allow validation against it.
 	if rawTenantPortRange == "" {
