@@ -432,7 +432,7 @@ func LoadDefaultConfiguration() error {
 		config.AdminListenAddrHost = "0.0.0.0"
 	}
 	if config.AdminListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
-		config.AdminListenAddrPort = 4500
+		config.AdminListenAddrPort = 3000
 	}
 	if config.AdminAPIJWTSecret == "" {
 		config.AdminAPIJWTSecret = "super-secret-default-jwt-key-please-change"
@@ -469,16 +469,16 @@ func LoadDefaultConfiguration() error {
 			config.SelfMemberHost = "127.0.0.1"
 		}
 		if config.ClusterBasePort == 0 {
-			config.ClusterBasePort = 7001
+			config.ClusterBasePort = 5000
 		}
 		config.ReplicaID = 1
 		// Construct InitialMembers from SelfMemberHost and ClusterBasePort if not specified
 		if config.InitialMembers == "" {
-			config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort+int(config.ReplicaID))
+			config.InitialMembers = fmt.Sprintf("%s:r%d", config.SelfMemberHost, config.ReplicaID)
 		}
 	} else if !config.Join && config.SelfMemberHost != "" && config.ClusterBasePort != 0 && config.InitialMembers == "" && config.ReplicaID != 0 {
 		// If host and port are set, and replica ID is set, but initial members is not, default initial members to self.
-		config.InitialMembers = fmt.Sprintf("%s:%d", config.SelfMemberHost, config.ClusterBasePort+int(config.ReplicaID))
+		config.InitialMembers = fmt.Sprintf("%s:r%d", config.SelfMemberHost, config.ReplicaID)
 	}
 
 	// Apply default for MaxTenants if not set by any source
@@ -512,6 +512,9 @@ func LoadDefaultConfiguration() error {
 	if int(config.ReplicaID) > MaxReplicaId {
 		log.Fatal().Msgf("❌ Replica ID (%d) exceeds the maximum allowed (%d)", config.ReplicaID, MaxReplicaId)
 	}
+
+	validateClusterBasePort(config)
+	validateAdminPortAgainstClusterBasePort(config.AdminListenAddrPort, config.ClusterBasePort)
 
 	// Parse and validate TenantPortRange
 	// This is done after MaxTenants is finalized to allow validation against it.
@@ -741,4 +744,39 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 	}
 
 	return cfg, nil
+}
+
+func validateClusterBasePort(config *Config) {
+	clusterBasePort := config.ClusterBasePort
+	env := config.Env
+	maxTenants := config.MaxTenants
+
+	if clusterBasePort < constants.MinSafePort || clusterBasePort > constants.MaxPort {
+		log.Panic().Msgf("❌ ClusterBasePort (%d) must be between %d and %d",
+			clusterBasePort, constants.MinSafePort, constants.MaxPort)
+	}
+
+	var maxUsedPort int
+
+	if env != string(constants.PRODUCTION) {
+		maxReplicaID := constants.MaxReplicationInNonProduction
+		portSpan := maxReplicaID*maxReplicaID*constants.MaxReplicationInNonProduction + maxTenants - 1
+		maxUsedPort = clusterBasePort + portSpan
+	} else {
+		portSpan := maxTenants - 1
+		maxUsedPort = clusterBasePort + portSpan
+	}
+
+	if maxUsedPort > constants.MaxPort {
+		log.Panic().Msgf("❌ ClusterBasePort (%d) with max tenants (%d) exceeds maximum allowed port %d. "+
+			"Please adjust the ClusterBasePort or reduce the number of tenants.",
+			clusterBasePort, maxTenants, constants.MaxPort)
+	}
+}
+
+func validateAdminPortAgainstClusterBasePort(adminPort int, clusterBasePort int) {
+	if adminPort >= clusterBasePort-constants.AdminPortSafeDistance {
+		log.Panic().Msgf("❌ Admin API port (%d) must be at least %d ports below ClusterBasePort (%d) to avoid conflicts. "+
+			"Please choose a lower admin port.", adminPort, constants.AdminPortSafeDistance, clusterBasePort)
+	}
 }

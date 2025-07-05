@@ -176,9 +176,9 @@ MIT — because control shouldn’t come with chains.
 
 ## Cluster example
 
-go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 1 -admin-port 45001 -master-db-engine=rocksdb
-go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 2  -admin-port 45002
-go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 3  -admin-port 45003 -master-db-engine pebble
+go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 1 -admin-port 3001 -master-db-engine=rocksdb
+go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 2  -admin-port 3002
+go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 3  -admin-port 3003 -master-db-engine pebble
 
 go run . -self-member-host 127.0.0.1 -cluster-base-port 5003 -join true -replica 4 -role connector
 
