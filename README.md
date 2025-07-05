@@ -79,7 +79,8 @@ The application accepts command-line parameters for configuration, often related
 | Flag                 | Type   | Description                                                                                                   | Default Value                                  | Required / Optional |
 | -------------------- | ------ | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------- |
 | `-config`            | string | Path to a configuration file. If provided, other command-line flags might be overridden by the file's content. | (none)                                         | Optional            |
-| `-self-member-addr`  | string | The IP address and port for this node to listen on for cluster communication (e.g., `127.0.0.1:5000`).         | (none)                                         | Required            |
+| `-self-member-host`  | string | The IP address or hostname for this node to listen on for cluster communication (e.g., `127.0.0.1`).             | (none)                                         | Required            |
+| `-cluster-base-port` | int    | The base port for this node to listen on for cluster communication (e.g., `5000`).                             | `0` (must be specified)                        | Required            |
 | `-initial-members`   | string | A comma-separated list of member addresses (IP:port) for bootstrapping a new cluster.                         | (none)                                         | Required for new cluster |
 | `-replica`           | uint64 | The unique ID for this replica within its Raft shard.                                                         | `0` (must be specified if creating/joining)    | Required            |
 | `-join`              | bool   | If `true`, the node will attempt to join an existing cluster specified by `-initial-members` (or other means). | `false`                                        | Optional            |
@@ -175,11 +176,11 @@ MIT — because control shouldn’t come with chains.
 
 ## Cluster example
 
-go run -tags rocksdb . -self-member-addr 127.0.0.1:5000 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 1 -admin-port 45001 -master-db-engine=rocksdb
-go run . -self-member-addr 127.0.0.1:5001 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 2  -admin-port 45002
-go run -tags rocksdb . -self-member-addr 127.0.0.1:5002 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 3  -admin-port 45003 -master-db-engine pebble
+go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 1 -admin-port 45001 -master-db-engine=rocksdb
+go run . -self-member-host 127.0.0.1 -cluster-base-port 5001 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 2  -admin-port 45002
+go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5002 -initial-members=127.0.0.1:5000,127.0.0.1:5001,127.0.0.1:5002 -replica 3  -admin-port 45003 -master-db-engine pebble
 
-go run . -self-member-addr 127.0.0.1:5003 -join true -replica 4 -role connector
+go run . -self-member-host 127.0.0.1 -cluster-base-port 5003 -join true -replica 4 -role connector
 
 Tests:
 

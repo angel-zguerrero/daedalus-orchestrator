@@ -12,7 +12,13 @@ const ConfigReplicaIDKey = "replica_id"
 const ConfigRolesKey = "roles"
 
 // ConfigSelfMemberAddrKey is the key for the self member address setting in the configuration file.
-const ConfigSelfMemberAddrKey = "self_member_addr"
+// const ConfigSelfMemberAddrKey = "self_member_addr" // Deprecated
+
+// ConfigSelfMemberHostKey is the key for the self member host setting in the configuration file.
+const ConfigSelfMemberHostKey = "self_member_host"
+
+// ConfigClusterBasePortKey is the key for the cluster base port setting in the configuration file.
+const ConfigClusterBasePortKey = "cluster_base_port"
 
 // ConfigInitialMembersKey is the key for the initial members list setting in the configuration file.
 const ConfigInitialMembersKey = "initial_members"
@@ -78,7 +84,13 @@ const EnvVarReplicaId = "REPLICA_ID"
 const EnvVarRoles = "ROLES"
 
 // EnvVarSelfMemberAddr is the environment variable name for the self member address.
-const EnvVarSelfMemberAddr = "SELF_MEMBER_ADDR"
+// const EnvVarSelfMemberAddr = "SELF_MEMBER_ADDR" // Deprecated
+
+// EnvVarSelfMemberHost is the environment variable name for the self member host.
+const EnvVarSelfMemberHost = "SELF_MEMBER_HOST"
+
+// EnvVarClusterBasePort is the environment variable name for the cluster base port.
+const EnvVarClusterBasePort = "CLUSTER_BASE_PORT"
 
 // EnvVarInitialMembers is the environment variable name for the initial members list (comma-separated).
 const EnvVarInitialMembers = "INITIAL_MEMBERS"
@@ -165,3 +177,9 @@ const TenantPortRangeFlagName = "tenant-port-range"
 
 // MaxTenantsFlagName is the command-line flag name for the maximum number of tenants.
 const MaxTenantsFlagName = "max-tenants"
+
+// SelfMemberHostFlagName is the command-line flag name for the self member host.
+const SelfMemberHostFlagName = "self-member-host"
+
+// ClusterBasePortFlagName is the command-line flag name for the cluster base port.
+const ClusterBasePortFlagName = "cluster-base-port"
