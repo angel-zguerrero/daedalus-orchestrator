@@ -148,7 +148,15 @@ var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 5*time.Second, "Timeo
 var TenantPortRangeFlag = flag.String(constants.TenantPortRangeFlagName, "", "Port range for tenants (e.g., \"4000-4100\"). The range size must match --max-tenants.")
 
 // MaxTenantsFlag defines the --max-tenants command-line flag.
-var MaxTenantsFlag = flag.Int(constants.MaxTenantsFlagName, 0, "Maximum number of tenants (default 10, max 10000).")
+var MaxTenantsFlag = flag.Int(
+	constants.MaxTenantsFlagName,
+	0,
+	fmt.Sprintf(
+		"Maximum number of tenants (default: 10, max: %d in production, %d in non-production environments).",
+		constants.MaxTenantsInProduction,
+		constants.MaxTenantsInNonProduction,
+	),
+)
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
@@ -180,6 +188,8 @@ func LoadDefaultConfiguration() error {
 	if env == "" {
 		env = string(constants.DEVELOPMENT)
 	}
+
+	config.Env = env
 
 	configFilePath := os.Getenv(constants.EnvVarConfigPath)
 	if configFilePath == "" {
@@ -477,14 +487,19 @@ func LoadDefaultConfiguration() error {
 		log.Info().Msgf("Max tenants not specified, defaulting to %d", config.MaxTenants)
 	}
 
-	// Validate MaxTenants
-	if config.MaxTenants > 10000 {
-		log.Error().Msgf("❌ Max tenants (%d) exceeds the maximum allowed (10000). Capping at 10000.", config.MaxTenants)
-		config.MaxTenants = 10000
+	var MaxTenants int
+	if env == string(constants.PRODUCTION) {
+		MaxTenants = constants.MaxTenantsInProduction
+	} else {
+		MaxTenants = constants.MaxTenantsInNonProduction
+	}
+
+	if config.MaxTenants > MaxTenants {
+		log.Error().Msgf("❌ Max tenants (%d) exceeds the maximum allowed (%d). Capping at %d.", config.MaxTenants, MaxTenants, MaxTenants)
+		config.MaxTenants = MaxTenants
 	}
 	if config.MaxTenants <= 0 {
-		log.Fatal().Msgf("❌ Max tenants must be a positive integer. Current value: %d", config.MaxTenants)
-		return fmt.Errorf("max tenants must be a positive integer. Current value: %d", config.MaxTenants)
+		config.MaxTenants = 10
 	}
 
 	// Parse and validate TenantPortRange

@@ -52,14 +52,16 @@ type Config struct {
 	TenantPortUpperBound int
 	// MaxTenants is the maximum number of tenants supported by the cluster.
 	MaxTenants int
+
+	Env string
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
 // configuration data from a map (e.g., from a JSON or YAML file parsed into a map).
 // Its fields are lowercase and use underscores, matching common conventions for map keys from config files.
 type ConfigFromMap struct {
-	replica_id                     uint64
-	roles                          string
+	replica_id uint64
+	roles      string
 	// self_member_addr               string // Deprecated
 	self_member_host               string
 	cluster_base_port              int
@@ -90,8 +92,8 @@ type ConfigFromMap struct {
 //   - A pointer to a Config struct populated with values from configFromMapInstance.
 func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 	c := &Config{
-		ReplicaID:                  configFromMapInstance.replica_id,
-		Roles:                      configFromMapInstance.roles,
+		ReplicaID: configFromMapInstance.replica_id,
+		Roles:     configFromMapInstance.roles,
 		// SelfMemberAddr:             configFromMapInstance.self_member_addr, // Deprecated
 		SelfMemberHost:             configFromMapInstance.self_member_host,
 		ClusterBasePort:            configFromMapInstance.cluster_base_port,
