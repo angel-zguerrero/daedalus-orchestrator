@@ -20,11 +20,11 @@ func (d TestPathProvider) GetDatabasePath() (string, error) {
 }
 
 func TestGetNodeDBDirName(t *testing.T) {
-	path, err := getNodeDBDirName(1, 2, &TestPathProvider{Path: t.TempDir()})
+	path, err := getNodeDBDirName(1, 2, 3000, &TestPathProvider{Path: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(path, "1_2") {
+	if !strings.Contains(path, "1_2_3000") {
 		t.Errorf("expected path to contain clusterID and nodeID: %s", path)
 	}
 }

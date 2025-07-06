@@ -54,7 +54,8 @@ import (
 
 type Application struct {
 	MasterNodeIsReady       bool
-	MasterNode              *dragonboat.RaftNode // This is a struct from the dragonboat package that was NOT moved
+	MasterNode              *dragonboat.RaftNode
+	TenantNodes             []*dragonboat.RaftNode
 	RestAdminAPI            *rest_api_admin.RestAdminAPI
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
@@ -177,6 +178,16 @@ func (app *Application) Run() {
 			Str("func", "Run").
 			Msgf("❌ Failed Init raft Master node")
 	}
+
+	tenantNodes, err := dragonboat.StartTentantNodes(config.GlobalConfiguration.ReplicaID, selfMember, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{})
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed Init raft Tenat nodes")
+	}
+	app.TenantNodes = tenantNodes
 
 	log.Info().Interface("", roles).Msg("This node has these roles")
 

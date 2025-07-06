@@ -464,7 +464,7 @@ func LoadDefaultConfiguration() error {
 
 	// Apply default for MaxTenants if not set by any source
 	if config.MaxTenants == 0 {
-		config.MaxTenants = 10 // Default to 10 tenants
+		config.MaxTenants = constants.MaxTenantsInNonProduction
 		log.Info().Msgf("Max tenants not specified, defaulting to %d", config.MaxTenants)
 	}
 

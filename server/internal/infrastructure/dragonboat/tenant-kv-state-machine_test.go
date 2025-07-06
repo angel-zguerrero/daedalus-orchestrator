@@ -24,7 +24,7 @@ func setupTenantKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup")
 
-	kv := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, 3000)(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv.Open(stopc)
 	require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	// Also ensure config is loaded for the second instance if it's path dependent
 	err = config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup (kv2)")
-	kv2 := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv2 := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, 3000)(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
