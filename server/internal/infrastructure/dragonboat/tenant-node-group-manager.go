@@ -3,6 +3,7 @@ package dragonboat
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
+	"sync"
 
 	"github.com/lni/dragonboat/v4"
 )
@@ -18,16 +19,50 @@ func StartTentantNodes(
 ) ([]*RaftNode, error) {
 	MaxTenants := config.GlobalConfiguration.MaxTenants
 
-	var tenantNodes []*RaftNode
+	var (
+		tenantNodes []*RaftNode
+		mu          sync.Mutex
+		wg          sync.WaitGroup
+		errOnce     sync.Once
+		firstErr    error
+		semaphore   = make(chan struct{}, 20)
+	)
 
 	for shardID := 0; shardID < MaxTenants; shardID++ {
+		wg.Add(1)
 
-		node, err := InitTenantNode(uint64(shardID+MasterShardID)+1, replicaID, selfMember, initialMembers, join, roles, NH, pathProvider)
-		if err != nil {
-			return nil, err
-		}
+		go func(shardID int) {
+			defer wg.Done()
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
 
-		tenantNodes = append(tenantNodes, node)
+			node, err := InitTenantNode(
+				uint64(shardID+MasterShardID)+1,
+				replicaID,
+				selfMember,
+				initialMembers,
+				join,
+				roles,
+				NH,
+				pathProvider,
+			)
+			if err != nil {
+				errOnce.Do(func() {
+					firstErr = err
+				})
+				return
+			}
+
+			mu.Lock()
+			tenantNodes = append(tenantNodes, node)
+			mu.Unlock()
+		}(shardID)
+	}
+
+	wg.Wait()
+
+	if firstErr != nil {
+		return nil, firstErr
 	}
 
 	return tenantNodes, nil

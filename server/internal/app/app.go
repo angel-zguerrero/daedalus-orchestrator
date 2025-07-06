@@ -182,11 +182,11 @@ func (app *Application) Run() {
 			Msgf("❌ Getting database path")
 	}
 
-	//log.Info().Msg(base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + strconv.Itoa(mn.SelfMember.Port))
+	RTTMillisecond := RecommendRTTMillisecond()
 	NH, err := dragonboatV4.NewNodeHost(dragonboatV4Config.NodeHostConfig{
 		WALDir:         base_path + "/wal/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
 		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
-		RTTMillisecond: 200,
+		RTTMillisecond: RTTMillisecond,
 		RaftAddress:    dragonboat.MemmberToAddr(selfMember),
 	})
 	app.NH = NH
@@ -255,6 +255,9 @@ func (app *Application) Run() {
 						if !ok {
 							log.Warn().Int("tenant", i).Msg("🛑 Tenant node watcher closed.")
 							return
+						}
+						if !ready && app.MasterNodeIsReady {
+							log.Warn().Int("tenant", i).Msg("⚠️ Tenant node does not respond.")
 						}
 						readyMap[i] = ready
 					default:
@@ -442,6 +445,26 @@ func (app *Application) CloseAdminAPI() {
 		app.RestAdminAPI = nil
 	} else {
 		log.Warn().Msg("No Admin API to close.")
+	}
+}
+func RecommendRTTMillisecond() uint64 {
+	shardCount := config.GlobalConfiguration.MaxTenants
+	switch {
+	case shardCount <= 50:
+		return 200
+	case shardCount <= 100:
+		return 250
+	case shardCount <= 200:
+		return 350
+	case shardCount <= 400:
+		return 375
+	case shardCount <= 800:
+		return 450
+	case shardCount <= 1600:
+		return 500
+
+	default:
+		return 300
 	}
 }
 func NewApplication() *Application {
