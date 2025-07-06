@@ -63,6 +63,7 @@ func (s *KVBaseStateMachine) GetLastApplied() uint64 {
 
 func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.config.PathProvider)
+
 	if err != nil {
 		panic(err)
 	}

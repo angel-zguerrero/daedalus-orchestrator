@@ -11,11 +11,14 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	commands "deadalus-orch/server/internal/usecase/command"
 
+	dragonboatV4 "github.com/lni/dragonboat/v4"
+	dragonboatV4Config "github.com/lni/dragonboat/v4/config"
 	dblog "github.com/lni/dragonboat/v4/logger"
 	"github.com/lni/goutils/syncutil"
 	"github.com/rs/zerolog"
@@ -54,10 +57,12 @@ import (
 
 type Application struct {
 	MasterNodeIsReady       bool
-	MasterNode              *dragonboat.RaftNode // This is a struct from the dragonboat package that was NOT moved
+	MasterNode              *dragonboat.RaftNode
+	TenantNodes             []*dragonboat.RaftNode
 	RestAdminAPI            *rest_api_admin.RestAdminAPI
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
+	NH                      *dragonboatV4.NodeHost
 }
 
 func (app *Application) Run() {
@@ -168,7 +173,32 @@ func (app *Application) Run() {
 		}
 	}
 
-	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{})
+	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Getting database path")
+	}
+
+	RTTMillisecond := RecommendRTTMillisecond()
+	NH, err := dragonboatV4.NewNodeHost(dragonboatV4Config.NodeHostConfig{
+		WALDir:         base_path + "/wal/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+		RTTMillisecond: RTTMillisecond,
+		RaftAddress:    dragonboat.MemmberToAddr(selfMember),
+	})
+	app.NH = NH
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Staring node host")
+	}
+
+	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, NH)
 	app.MasterNode = masterNode
 	if err != nil {
 		log.Fatal().
@@ -178,11 +208,30 @@ func (app *Application) Run() {
 			Msgf("❌ Failed Init raft Master node")
 	}
 
+	tenantNodes, err := dragonboat.StartTentantNodes(config.GlobalConfiguration.ReplicaID, selfMember, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, initialMembers, NH)
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Failed Init raft Tenat nodes")
+	}
+	app.TenantNodes = tenantNodes
+
 	log.Info().Interface("", roles).Msg("This node has these roles")
 
 	app.NodeReadyWatcherStopper.RunWorker(func() {
 		interval := 3 * time.Second
-		readyUpdates := masterNode.StartNodeReadyWatcher(interval)
+		masterReadyCh := masterNode.StartNodeReadyWatcher(interval)
+
+		tenantReadyChs := make([]<-chan bool, len(app.TenantNodes))
+		for i, node := range app.TenantNodes {
+			tenantReadyChs[i] = node.StartNodeReadyWatcher(interval)
+		}
+
+		readyMap := make(map[int]bool) // key -1 for master, 0..N-1 for tenants
+		const masterKey = -1
+
 		defer func() {
 			if app.RestAdminAPI != nil {
 				log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
@@ -192,59 +241,80 @@ func (app *Application) Run() {
 
 		for {
 			select {
-			case isReady, ok := <-readyUpdates:
+			case isReady, ok := <-masterReadyCh:
 				if !ok {
-					log.Info().Msg("✅ NodeReadyWatcher channel closed.")
+					log.Warn().Msg("🛑 Master node watcher closed.")
 					return
 				}
+				readyMap[masterKey] = isReady
 
-				app.MasterNodeIsReady = isReady
-				if isReady {
-					log.Info().Msg("✅ Node is ready for consensus.")
-					if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
-
-						bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
-
-						cmd := commands.FSM_Command{
-							Now:  utils.GetNowInInt(),
-							Type: commands.REPOSITORY_COMMAND,
-							CMD:  bootstrapRootUserCmd,
+			default:
+				for i, ch := range tenantReadyChs {
+					select {
+					case ready, ok := <-ch:
+						if !ok {
+							log.Warn().Int("tenant", i).Msg("🛑 Tenant node watcher closed.")
+							return
 						}
-
-						ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-						defer cancel()
-						_, err := masterNode.Write(ctx, cmd)
-						if err != nil {
-							log.Fatal().
-								Err(err).
-								Str("package", "app").
-								Str("func", "Run").
-								Msgf("❌ Failed to bootstrap root user")
+						if !ready && app.MasterNodeIsReady {
+							log.Warn().Int("tenant", i).Msg("⚠️ Tenant node does not respond.")
 						}
+						readyMap[i] = ready
+					default:
+					}
+				}
+			}
 
+			allReady := readyMap[masterKey]
+			for i := range tenantReadyChs {
+				if !readyMap[i] {
+					allReady = false
+					break
+				}
+			}
+
+			if allReady && !app.MasterNodeIsReady {
+				log.Info().Msg("✅ Master + all tenants ready for consensus.")
+				app.MasterNodeIsReady = true
+
+				if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
+					bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
+					cmd := commands.FSM_Command{
+						Now:  utils.GetNowInInt(),
+						Type: commands.REPOSITORY_COMMAND,
+						CMD:  bootstrapRootUserCmd,
 					}
 
-					if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
-						app.StartAdminAPI(masterNode)
-					} else {
-
-						app.CloseAdminAPI()
-						app.RestAdminAPI = nil
-					}
-				} else {
-					log.Info().Msg("⚠️ Node is NOT ready for consensus.")
-					if app.RestAdminAPI != nil {
-						log.Info().Msg("🔌 Node not ready, shutting down Admin API...")
-						app.CloseAdminAPI()
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+					defer cancel()
+					_, err := masterNode.Write(ctx, cmd)
+					if err != nil {
+						log.Fatal().
+							Err(err).
+							Str("package", "app").
+							Str("func", "Run").
+							Msgf("❌ Failed to bootstrap root user")
 					}
 				}
 
-			case <-app.NodeReadyWatcherStopper.ShouldStop():
+				if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
+					app.StartAdminAPI(masterNode)
+				} else {
+					app.CloseAdminAPI()
+				}
+			}
 
+			if !allReady && app.MasterNodeIsReady {
+				log.Warn().Msg("⚠️ One or more nodes are not ready. Marking node as not ready.")
+				app.MasterNodeIsReady = false
+				app.CloseAdminAPI()
+			}
+
+			select {
+			case <-app.NodeReadyWatcherStopper.ShouldStop():
 				log.Info().Msg("🛑 NodeReadyWatcher received stop signal.")
 				return
 			case <-time.After(interval):
-
 			}
 		}
 	})
@@ -256,35 +326,72 @@ func (app *Application) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Stop Master Node
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if app.MasterNode != nil {
-			log.Info().Msg("Stopping Master Node...")
+			log.Info().Msg("🛑 Stopping Master Node...")
 			app.MasterNode.Stop()
-			log.Info().Msg("Master Node stopped.")
+			log.Info().Msg("✅ Master Node stopped.")
 		} else {
-			log.Warn().Msg("No Master Node to stop.")
+			log.Warn().Msg("⚠ No Master Node to stop.")
 		}
 	}()
 
+	// Stop Tenant Nodes in parallel
+	for i, tenantNode := range app.TenantNodes {
+		if tenantNode != nil {
+			wg.Add(1)
+			go func(i int, node *dragonboat.RaftNode) {
+				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.Error().
+							Interface("recover", r).
+							Int("tenantIndex", i).
+							Msg("❌ Panic while stopping tenant node")
+					}
+				}()
+				log.Info().Int("tenantIndex", i).Msg("🛑 Stopping Tenant Node...")
+				node.Stop()
+				log.Info().Int("tenantIndex", i).Msg("✅ Tenant Node stopped.")
+			}(i, tenantNode)
+		}
+	}
+
+	// Stop Admin API
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if app.RestAdminAPI != nil {
 			app.CloseAdminAPI()
 		} else {
-			log.Warn().Msg("No Admin API to stop.")
+			log.Warn().Msg("⚠ No Admin API to stop.")
 		}
+	}()
+
+	// Stop Watcher
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.NodeReadyWatcherStopper.Stop()
+		log.Info().Msg("⛔ NodeReadyWatcher stopped.")
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		app.NodeReadyWatcherStopper.Stop()
-		log.Info().Msg("NodeReadyWatcher stopped.")
+		if app.MasterNode != nil {
+			log.Info().Msg("🛑 Stopping Node Host...")
+			app.NH.Close()
+			log.Info().Msg("✅ Node Host stopped.")
+		} else {
+			log.Warn().Msg("⚠ No Node Host to stop.")
+		}
 	}()
 
+	// Wait with timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -298,6 +405,7 @@ func (app *Application) Stop() {
 		log.Warn().Msg("⚠ Stop operation timed out. Some components may not have stopped.")
 	}
 }
+
 func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 	app.ApiLock.Lock()
 	defer app.ApiLock.Unlock()
@@ -337,6 +445,26 @@ func (app *Application) CloseAdminAPI() {
 		app.RestAdminAPI = nil
 	} else {
 		log.Warn().Msg("No Admin API to close.")
+	}
+}
+func RecommendRTTMillisecond() uint64 {
+	shardCount := config.GlobalConfiguration.MaxTenants
+	switch {
+	case shardCount <= 50:
+		return 200
+	case shardCount <= 100:
+		return 250
+	case shardCount <= 200:
+		return 350
+	case shardCount <= 400:
+		return 375
+	case shardCount <= 800:
+		return 450
+	case shardCount <= 1600:
+		return 500
+
+	default:
+		return 300
 	}
 }
 func NewApplication() *Application {

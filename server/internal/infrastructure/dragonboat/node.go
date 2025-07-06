@@ -8,7 +8,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"errors"
-	"strconv"
+	"math"
 	"sync"
 	"time"
 
@@ -17,6 +17,8 @@ import (
 	"github.com/lni/dragonboat/v4/config"
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/rs/zerolog/log"
+
+	appConfig "deadalus-orch/server/internal/pkg/config"
 )
 
 // RaftNode represents a single node (replica) participating in a Dragonboat Raft consensus group (shard).
@@ -34,6 +36,74 @@ type RaftNode struct {
 	stopped        bool
 }
 
+type RaftTuningParams struct {
+	ElectionRTT        int
+	HeartbeatRTT       int
+	SnapshotEntries    uint64
+	CompactionOverhead uint64
+}
+
+func RecommendRaftParamsForShards() RaftTuningParams {
+	numShards := appConfig.GlobalConfiguration.MaxTenants
+	// Base values
+	var heartbeatRTT int
+	switch {
+	case numShards <= 100:
+		heartbeatRTT = 2
+	case numShards <= 200:
+		heartbeatRTT = 3
+	case numShards <= 300:
+		heartbeatRTT = 4
+	case numShards <= 600:
+		heartbeatRTT = 5
+	case numShards <= 1000:
+		heartbeatRTT = 7
+	default:
+		heartbeatRTT = 7
+	}
+	var electionRTT int
+
+	// ElectionRTT should grow as shard count increases, to avoid split votes.
+	if numShards <= 100 {
+		electionRTT = 20
+	} else if numShards <= 300 {
+		electionRTT = 40
+	} else if numShards <= 600 {
+		electionRTT = 80
+	} else if numShards <= 1000 {
+		electionRTT = 150
+	} else {
+		electionRTT = 300
+	}
+
+	// SnapshotEntries determines how often full snapshots are taken.
+	// Higher shard count = less frequent snapshots to reduce IO pressure.
+	var snapshotEntries uint64
+	switch {
+	case numShards <= 100:
+		snapshotEntries = 2000
+	case numShards <= 300:
+		snapshotEntries = 5000
+	case numShards <= 600:
+		snapshotEntries = 10000
+	case numShards <= 1000:
+		snapshotEntries = 20000
+	default:
+		snapshotEntries = 40000
+	}
+
+	// CompactionOverhead is how many extra entries to retain after snapshot.
+	// Higher values help avoid replays from scratch during restore.
+	compactionOverhead := uint64(math.Min(512, float64(snapshotEntries/4)))
+
+	return RaftTuningParams{
+		ElectionRTT:        electionRTT,
+		HeartbeatRTT:       heartbeatRTT,
+		SnapshotEntries:    snapshotEntries,
+		CompactionOverhead: compactionOverhead,
+	}
+}
+
 // StartReplica initializes and starts the Raft replica on the NodeHost.
 // It configures the replica based on RaftNode fields, sets up WAL and NodeHost directories,
 // creates a new NodeHost instance if not already present (though typically NH is created by InitRaftNode),
@@ -41,16 +111,16 @@ type RaftNode struct {
 //
 // Returns:
 //   - An error if any step fails, such as directory creation, NodeHost initialization, or starting the replica.
-func (mn *RaftNode) StartReplica() error {
-
+func (mn *RaftNode) StartReplica(NH *dragonboat.NodeHost) error {
+	recommendedCfg := RecommendRaftParamsForShards()
 	cfg := config.Config{
 		ReplicaID:          mn.ReplicaID,
 		ShardID:            mn.ShardID,
 		CheckQuorum:        true,
-		ElectionRTT:        10,
-		HeartbeatRTT:       1,
-		SnapshotEntries:    1000,
-		CompactionOverhead: 500,
+		ElectionRTT:        uint64(recommendedCfg.ElectionRTT),
+		HeartbeatRTT:       uint64(recommendedCfg.HeartbeatRTT),
+		SnapshotEntries:    uint64(recommendedCfg.SnapshotEntries),
+		CompactionOverhead: uint64(recommendedCfg.CompactionOverhead),
 		IsNonVoting:        !ContainsRole(mn.Roles, RoleConsensus),
 	}
 
@@ -58,21 +128,7 @@ func (mn *RaftNode) StartReplica() error {
 	// 	return NewMasterKVRocksDBStateMachine(clusterID, nodeID)
 	// }
 
-	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
-	if err != nil {
-		return err
-	}
-
-	log.Info().Msg(base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + strconv.Itoa(mn.SelfMember.Port))
-	mn.NH, err = dragonboat.NewNodeHost(config.NodeHostConfig{
-		WALDir:         base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
-		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
-		RTTMillisecond: 200,
-		RaftAddress:    MemmberToAddr(mn.SelfMember),
-	})
-	if err != nil {
-		return err
-	}
+	mn.NH = NH
 
 	if !mn.Join && !IsMemberInMemberArray(mn.SelfMember, mn.InitialMembers) {
 		return errors.New("the node itself must be inside initial-members")
@@ -131,7 +187,6 @@ func (mn *RaftNode) GetClient() *client.Session {
 func (mn *RaftNode) Stop() {
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
-	mn.NH.Close()
 	mn.stopped = true
 }
 
@@ -223,7 +278,6 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 			}
 
 			_, err := mn.Write(ctx, cmd)
-
 			cancel()
 
 			currentReady := (err == nil)
@@ -259,7 +313,7 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 // Returns:
 //   - A pointer to the initialized and started RaftNode.
 //   - An error if starting the replica fails.
-func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, stateMachineFn func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine) (*RaftNode, error) {
+func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, NH *dragonboat.NodeHost, stateMachineFn func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine) (*RaftNode, error) {
 	raftNode := &RaftNode{}
 	raftNode.ReplicaID = ReplicaID
 	raftNode.ShardID = ShardID
@@ -282,7 +336,7 @@ func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMe
 	// The specific call from `InitTenantNode` (presumably in tenant-node.go) would pass `NewTenantKVRocksDBStateMachine`.
 	// So, the `stateMachineFn` parameter IS being used correctly to instantiate the appropriate SM.
 
-	err := raftNode.StartReplica()
+	err := raftNode.StartReplica(NH)
 	if err != nil {
 		return nil, err
 	}

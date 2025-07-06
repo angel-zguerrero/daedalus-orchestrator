@@ -1,6 +1,3 @@
-//go:build rocksdb
-// +build rocksdb
-
 package dragonboat_test
 
 import (
@@ -906,7 +903,7 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 		require.True(t, found, "missing value %s", expected)
 	}
 }
-func TestSaveSnapshotAndRecoverPebbleToRocksDB(t *testing.T) {
+func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 	kvPebble := setupKVMasterPebble(t, "pebble")
 	var buf bytes.Buffer
 	cmd := commands.FSM_Command{
@@ -938,11 +935,11 @@ func TestSaveSnapshotAndRecoverPebbleToRocksDB(t *testing.T) {
 	require.NoError(t, err)
 
 	_ = kvPebble.Close()
-	kvRocksDB := setupKVMasterPebble(t, "rocksdb")
+	pebbleDB := setupKVMasterPebble(t, "pebble")
 	require.NoError(t, err)
-	defer kvRocksDB.Close()
+	defer pebbleDB.Close()
 
-	err = kvRocksDB.RecoverFromSnapshot(&snap, ctx.Done())
+	err = pebbleDB.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
 	query1 := commands.Query_Command{
@@ -955,7 +952,7 @@ func TestSaveSnapshotAndRecoverPebbleToRocksDB(t *testing.T) {
 
 	var buf2 bytes.Buffer
 	gob.NewEncoder(&buf2).Encode(query1)
-	val, err := kvRocksDB.Lookup(buf2.Bytes())
+	val, err := pebbleDB.Lookup(buf2.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
@@ -969,7 +966,7 @@ func TestSaveSnapshotAndRecoverPebbleToRocksDB(t *testing.T) {
 
 	var buf3 bytes.Buffer
 	gob.NewEncoder(&buf3).Encode(query2)
-	val, err = kvRocksDB.Lookup(buf3.Bytes())
+	val, err = pebbleDB.Lookup(buf3.Bytes())
 	require.NoError(t, err)
-	require.Equal(t, kvRocksDB.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
+	require.Equal(t, pebbleDB.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
