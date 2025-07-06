@@ -62,6 +62,7 @@ type Application struct {
 	RestAdminAPI            *rest_api_admin.RestAdminAPI
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
+	NH                      *dragonboatV4.NodeHost
 }
 
 func (app *Application) Run() {
@@ -188,6 +189,7 @@ func (app *Application) Run() {
 		RTTMillisecond: 200,
 		RaftAddress:    dragonboat.MemmberToAddr(selfMember),
 	})
+	app.NH = NH
 	if err != nil {
 		log.Fatal().
 			Err(err).
@@ -372,6 +374,18 @@ func (app *Application) Stop() {
 		defer wg.Done()
 		app.NodeReadyWatcherStopper.Stop()
 		log.Info().Msg("⛔ NodeReadyWatcher stopped.")
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if app.MasterNode != nil {
+			log.Info().Msg("🛑 Stopping Node Host...")
+			app.NH.Close()
+			log.Info().Msg("✅ Node Host stopped.")
+		} else {
+			log.Warn().Msg("⚠ No Node Host to stop.")
+		}
 	}()
 
 	// Wait with timeout

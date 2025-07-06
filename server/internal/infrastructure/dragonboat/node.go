@@ -116,7 +116,6 @@ func (mn *RaftNode) GetClient() *client.Session {
 func (mn *RaftNode) Stop() {
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
-	mn.NH.Close()
 	mn.stopped = true
 }
 
