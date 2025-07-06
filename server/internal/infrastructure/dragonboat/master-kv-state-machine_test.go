@@ -34,7 +34,7 @@ func setupKVMaster(t *testing.T, engine string) *dragonboat.KVBaseStateMachine {
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, 3000)(1, 1).(*dragonboat.KVBaseStateMachine)
+	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, 3000)(1, 1).(*dragonboat.KVBaseStateMachine)
+	kv2 := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)

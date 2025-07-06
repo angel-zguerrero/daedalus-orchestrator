@@ -3,7 +3,8 @@ package dragonboat
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/shared/constants"
+
+	"github.com/lni/dragonboat/v4"
 )
 
 func StartTentantNodes(
@@ -12,38 +13,16 @@ func StartTentantNodes(
 	join bool,
 	roles []NodeRole,
 	pathProvider db.PathProvider,
+	initialMembers []Member,
+	NH *dragonboat.NodeHost,
 ) ([]*RaftNode, error) {
 	MaxTenants := config.GlobalConfiguration.MaxTenants
-
-	var MaxReplicaId int
-	if config.GlobalConfiguration.Env == string(constants.PRODUCTION) {
-		MaxReplicaId = constants.MaxReplicationInProduction
-	} else {
-		MaxReplicaId = constants.MaxReplicationInNonProduction
-	}
-
-	localOffset := 0
-	if config.GlobalConfiguration.Env != string(constants.PRODUCTION) {
-		localOffset = constants.MaxReplicationInNonProduction
-	}
 
 	var tenantNodes []*RaftNode
 
 	for shardID := 0; shardID < MaxTenants; shardID++ {
-		tenantBasePort := shardID*localOffset + MaxReplicaId + 1 + config.GlobalConfiguration.ClusterBasePort + shardID
-		port := tenantBasePort + int(replicaID)
 
-		tenantMember := Member{
-			IP:   selfMember.IP,
-			Port: port,
-		}
-
-		initialMembers, err := ParseMembersFlag(&config.GlobalConfiguration.InitialMembers, tenantBasePort)
-		if err != nil {
-			return nil, err
-		}
-
-		node, err := InitTenantNode(uint64(shardID+MasterShardID)+1, replicaID, tenantMember, initialMembers, join, roles, pathProvider)
+		node, err := InitTenantNode(uint64(shardID+MasterShardID)+1, replicaID, selfMember, initialMembers, join, roles, NH, pathProvider)
 		if err != nil {
 			return nil, err
 		}

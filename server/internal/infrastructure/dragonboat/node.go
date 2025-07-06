@@ -8,7 +8,6 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"errors"
-	"strconv"
 	"sync"
 	"time"
 
@@ -41,7 +40,7 @@ type RaftNode struct {
 //
 // Returns:
 //   - An error if any step fails, such as directory creation, NodeHost initialization, or starting the replica.
-func (mn *RaftNode) StartReplica() error {
+func (mn *RaftNode) StartReplica(NH *dragonboat.NodeHost) error {
 
 	cfg := config.Config{
 		ReplicaID:          mn.ReplicaID,
@@ -58,21 +57,7 @@ func (mn *RaftNode) StartReplica() error {
 	// 	return NewMasterKVRocksDBStateMachine(clusterID, nodeID)
 	// }
 
-	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
-	if err != nil {
-		return err
-	}
-
-	//log.Info().Msg(base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + strconv.Itoa(mn.SelfMember.Port))
-	mn.NH, err = dragonboat.NewNodeHost(config.NodeHostConfig{
-		WALDir:         base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
-		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + mn.SelfMember.IP + "-" + strconv.Itoa(mn.SelfMember.Port),
-		RTTMillisecond: 200,
-		RaftAddress:    MemmberToAddr(mn.SelfMember),
-	})
-	if err != nil {
-		return err
-	}
+	mn.NH = NH
 
 	if !mn.Join && !IsMemberInMemberArray(mn.SelfMember, mn.InitialMembers) {
 		return errors.New("the node itself must be inside initial-members")
@@ -259,7 +244,7 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 // Returns:
 //   - A pointer to the initialized and started RaftNode.
 //   - An error if starting the replica fails.
-func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, stateMachineFn func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine) (*RaftNode, error) {
+func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, NH *dragonboat.NodeHost, stateMachineFn func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine) (*RaftNode, error) {
 	raftNode := &RaftNode{}
 	raftNode.ReplicaID = ReplicaID
 	raftNode.ShardID = ShardID
@@ -282,7 +267,7 @@ func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMe
 	// The specific call from `InitTenantNode` (presumably in tenant-node.go) would pass `NewTenantKVRocksDBStateMachine`.
 	// So, the `stateMachineFn` parameter IS being used correctly to instantiate the appropriate SM.
 
-	err := raftNode.StartReplica()
+	err := raftNode.StartReplica(NH)
 	if err != nil {
 		return nil, err
 	}

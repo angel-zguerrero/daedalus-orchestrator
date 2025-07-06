@@ -11,11 +11,14 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	commands "deadalus-orch/server/internal/usecase/command"
 
+	dragonboatV4 "github.com/lni/dragonboat/v4"
+	dragonboatV4Config "github.com/lni/dragonboat/v4/config"
 	dblog "github.com/lni/dragonboat/v4/logger"
 	"github.com/lni/goutils/syncutil"
 	"github.com/rs/zerolog"
@@ -169,7 +172,31 @@ func (app *Application) Run() {
 		}
 	}
 
-	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{})
+	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Getting database path")
+	}
+
+	//log.Info().Msg(base_path + "/wal/" + strconv.FormatUint(mn.ReplicaID, 10) + "/" + strconv.Itoa(mn.SelfMember.Port))
+	NH, err := dragonboatV4.NewNodeHost(dragonboatV4Config.NodeHostConfig{
+		WALDir:         base_path + "/wal/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+		RTTMillisecond: 200,
+		RaftAddress:    dragonboat.MemmberToAddr(selfMember),
+	})
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Str("package", "app").
+			Str("func", "Run").
+			Msgf("❌ Staring node host")
+	}
+
+	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, NH)
 	app.MasterNode = masterNode
 	if err != nil {
 		log.Fatal().
@@ -179,7 +206,7 @@ func (app *Application) Run() {
 			Msgf("❌ Failed Init raft Master node")
 	}
 
-	tenantNodes, err := dragonboat.StartTentantNodes(config.GlobalConfiguration.ReplicaID, selfMember, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{})
+	tenantNodes, err := dragonboat.StartTentantNodes(config.GlobalConfiguration.ReplicaID, selfMember, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, initialMembers, NH)
 	if err != nil {
 		log.Fatal().
 			Err(err).

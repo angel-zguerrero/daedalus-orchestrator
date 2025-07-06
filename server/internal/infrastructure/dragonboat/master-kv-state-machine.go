@@ -46,9 +46,9 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	return nil, errors.New("invalid command type")
 }
 
-func NewMasterKVStateMachine(pathProvider db.PathProvider, port int) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
+func NewMasterKVStateMachine(pathProvider db.PathProvider) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
 	return func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
-		return NewKVStateMachine(clusterID, nodeID, port, &MasterKVDBStateMachine{}, KVBaseStateMachineConfig{
+		return NewKVStateMachine(clusterID, nodeID, &MasterKVDBStateMachine{}, KVBaseStateMachineConfig{
 			TTLInternalError: config.GlobalConfiguration.TTLInternalError,
 			PathProvider:     pathProvider,
 		})

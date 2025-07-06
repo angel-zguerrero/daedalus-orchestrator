@@ -36,7 +36,6 @@ type KVBaseStateMachineConfig struct {
 type KVBaseStateMachine struct {
 	clusterID uint64 // The ID of the Raft cluster.
 	nodeID    uint64 // The ID of this node in the Raft cluster.
-	port      int    // The ID of this node in the Raft cluster.
 	// lastApplied is the Raft index of the last entry successfully applied to the state machine.
 	// It's crucial for consistency and recovery.
 	lastApplied      uint64
@@ -48,11 +47,10 @@ type KVBaseStateMachine struct {
 	config           KVBaseStateMachineConfig // Configuration for the state machine.
 }
 
-func NewKVStateMachine(clusterID uint64, nodeID uint64, port int, stateMachineImpl KVStateMachineImpl, config KVBaseStateMachineConfig) statemachine.IOnDiskStateMachine {
+func NewKVStateMachine(clusterID uint64, nodeID uint64, stateMachineImpl KVStateMachineImpl, config KVBaseStateMachineConfig) statemachine.IOnDiskStateMachine {
 	return &KVBaseStateMachine{
 		clusterID:        clusterID,
 		nodeID:           nodeID,
-		port:             port,
 		stateMachineImpl: stateMachineImpl,
 		config:           config,
 	}
@@ -64,7 +62,7 @@ func (s *KVBaseStateMachine) GetLastApplied() uint64 {
 }
 
 func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
-	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.port, s.config.PathProvider)
+	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.config.PathProvider)
 
 	if err != nil {
 		panic(err)
@@ -522,7 +520,7 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 		panic("recover from snapshot called after Close()")
 	}
 
-	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.port, s.config.PathProvider)
+	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.config.PathProvider)
 	if err != nil {
 		return err
 	}

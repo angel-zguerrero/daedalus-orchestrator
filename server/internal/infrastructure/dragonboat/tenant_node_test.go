@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	db4 "github.com/lni/dragonboat/v4"
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,7 @@ func TestTenantNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 		initialMembers []dragonboat.Member,
 		join bool,
 		roles []dragonboat.NodeRole,
+		NH *db4.NodeHost,
 		createStateMachine func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine,
 	) (*dragonboat.RaftNode, error) {
 		calledWithShardID = shardID
@@ -56,7 +58,7 @@ func TestTenantNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	testJoin := false
 	testRoles := []dragonboat.NodeRole{dragonboat.RoleConsensus, dragonboat.RoleScheduler}
 
-	_, err := dragonboat.InitTenantNode(TenantShardID, testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, &dragonboat.TestPathProvider{Path: t.TempDir()})
+	_, err := dragonboat.InitTenantNode(TenantShardID, testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
 	require.NoError(t, err)
 	fmt.Println("calledWithShardID ")
 	fmt.Println(calledWithShardID)
@@ -83,6 +85,7 @@ func TestTenantNode_InitRaftNodeErrorPropagation(t *testing.T) {
 		initialMembers []dragonboat.Member,
 		join bool,
 		roles []dragonboat.NodeRole,
+		NH *db4.NodeHost,
 		createStateMachine func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine,
 	) (*dragonboat.RaftNode, error) {
 		return nil, expectedError
@@ -90,7 +93,7 @@ func TestTenantNode_InitRaftNodeErrorPropagation(t *testing.T) {
 
 	dragonboat.InitTenantRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
+	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
 	assert.Error(t, err)
 	assert.Equal(t, expectedError, err)
 }
@@ -110,6 +113,7 @@ func TestTenantNode_PassesCorrectStateMachineType(t *testing.T) {
 		initialMembers []dragonboat.Member,
 		join bool,
 		roles []dragonboat.NodeRole,
+		NH *db4.NodeHost,
 		createStateMachine func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine,
 	) (*dragonboat.RaftNode, error) {
 		passedCreateFunc = createStateMachine
@@ -117,7 +121,7 @@ func TestTenantNode_PassesCorrectStateMachineType(t *testing.T) {
 	}
 	dragonboat.InitTenantRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
+	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
 	require.NoError(t, err)
 	time.Sleep(2 * time.Second)
 	if passedCreateFunc != nil {

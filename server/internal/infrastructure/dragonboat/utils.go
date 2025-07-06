@@ -30,8 +30,8 @@ import (
 // Returns:
 //   - The constructed directory path as a string.
 //   - An error if the base database path cannot be determined.
-func getNodeDBDirName(clusterID uint64, nodeID uint64, port int, pathProvider db.PathProvider) (string, error) {
-	part := fmt.Sprintf("%d_%d_%d", clusterID, nodeID, port)
+func getNodeDBDirName(clusterID uint64, nodeID uint64, pathProvider db.PathProvider) (string, error) {
+	part := fmt.Sprintf("%d_%d", clusterID, nodeID)
 	database_path, err := pathProvider.GetDatabasePath()
 	if err != nil {
 		return "", err
