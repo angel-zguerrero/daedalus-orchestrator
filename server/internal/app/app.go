@@ -220,7 +220,16 @@ func (app *Application) Run() {
 
 	app.NodeReadyWatcherStopper.RunWorker(func() {
 		interval := 3 * time.Second
-		readyUpdates := masterNode.StartNodeReadyWatcher(interval)
+		masterReadyCh := masterNode.StartNodeReadyWatcher(interval)
+
+		tenantReadyChs := make([]<-chan bool, len(app.TenantNodes))
+		for i, node := range app.TenantNodes {
+			tenantReadyChs[i] = node.StartNodeReadyWatcher(interval)
+		}
+
+		readyMap := make(map[int]bool) // key -1 for master, 0..N-1 for tenants
+		const masterKey = -1
+
 		defer func() {
 			if app.RestAdminAPI != nil {
 				log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
@@ -230,59 +239,77 @@ func (app *Application) Run() {
 
 		for {
 			select {
-			case isReady, ok := <-readyUpdates:
+			case isReady, ok := <-masterReadyCh:
 				if !ok {
-					log.Info().Msg("✅ NodeReadyWatcher channel closed.")
+					log.Warn().Msg("🛑 Master node watcher closed.")
 					return
 				}
+				readyMap[masterKey] = isReady
 
-				app.MasterNodeIsReady = isReady
-				if isReady {
-					log.Info().Msg("✅ Node is ready for consensus.")
-					if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
-
-						bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
-
-						cmd := commands.FSM_Command{
-							Now:  utils.GetNowInInt(),
-							Type: commands.REPOSITORY_COMMAND,
-							CMD:  bootstrapRootUserCmd,
+			default:
+				for i, ch := range tenantReadyChs {
+					select {
+					case ready, ok := <-ch:
+						if !ok {
+							log.Warn().Int("tenant", i).Msg("🛑 Tenant node watcher closed.")
+							return
 						}
+						readyMap[i] = ready
+					default:
+					}
+				}
+			}
 
-						ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-						defer cancel()
-						_, err := masterNode.Write(ctx, cmd)
-						if err != nil {
-							log.Fatal().
-								Err(err).
-								Str("package", "app").
-								Str("func", "Run").
-								Msgf("❌ Failed to bootstrap root user")
-						}
+			allReady := readyMap[masterKey]
+			for i := range tenantReadyChs {
+				if !readyMap[i] {
+					allReady = false
+					break
+				}
+			}
 
+			if allReady && !app.MasterNodeIsReady {
+				log.Info().Msg("✅ Master + all tenants ready for consensus.")
+				app.MasterNodeIsReady = true
+
+				if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
+					bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
+					cmd := commands.FSM_Command{
+						Now:  utils.GetNowInInt(),
+						Type: commands.REPOSITORY_COMMAND,
+						CMD:  bootstrapRootUserCmd,
 					}
 
-					if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
-						app.StartAdminAPI(masterNode)
-					} else {
-
-						app.CloseAdminAPI()
-						app.RestAdminAPI = nil
-					}
-				} else {
-					log.Info().Msg("⚠️ Node is NOT ready for consensus.")
-					if app.RestAdminAPI != nil {
-						log.Info().Msg("🔌 Node not ready, shutting down Admin API...")
-						app.CloseAdminAPI()
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+					defer cancel()
+					_, err := masterNode.Write(ctx, cmd)
+					if err != nil {
+						log.Fatal().
+							Err(err).
+							Str("package", "app").
+							Str("func", "Run").
+							Msgf("❌ Failed to bootstrap root user")
 					}
 				}
 
-			case <-app.NodeReadyWatcherStopper.ShouldStop():
+				if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
+					app.StartAdminAPI(masterNode)
+				} else {
+					app.CloseAdminAPI()
+				}
+			}
 
+			if !allReady && app.MasterNodeIsReady {
+				log.Warn().Msg("⚠️ One or more nodes are not ready. Marking node as not ready.")
+				app.MasterNodeIsReady = false
+				app.CloseAdminAPI()
+			}
+
+			select {
+			case <-app.NodeReadyWatcherStopper.ShouldStop():
 				log.Info().Msg("🛑 NodeReadyWatcher received stop signal.")
 				return
 			case <-time.After(interval):
-
 			}
 		}
 	})
@@ -294,35 +321,60 @@ func (app *Application) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Stop Master Node
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if app.MasterNode != nil {
-			log.Info().Msg("Stopping Master Node...")
+			log.Info().Msg("🛑 Stopping Master Node...")
 			app.MasterNode.Stop()
-			log.Info().Msg("Master Node stopped.")
+			log.Info().Msg("✅ Master Node stopped.")
 		} else {
-			log.Warn().Msg("No Master Node to stop.")
+			log.Warn().Msg("⚠ No Master Node to stop.")
 		}
 	}()
 
+	// Stop Tenant Nodes in parallel
+	for i, tenantNode := range app.TenantNodes {
+		if tenantNode != nil {
+			wg.Add(1)
+			go func(i int, node *dragonboat.RaftNode) {
+				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.Error().
+							Interface("recover", r).
+							Int("tenantIndex", i).
+							Msg("❌ Panic while stopping tenant node")
+					}
+				}()
+				log.Info().Int("tenantIndex", i).Msg("🛑 Stopping Tenant Node...")
+				node.Stop()
+				log.Info().Int("tenantIndex", i).Msg("✅ Tenant Node stopped.")
+			}(i, tenantNode)
+		}
+	}
+
+	// Stop Admin API
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if app.RestAdminAPI != nil {
 			app.CloseAdminAPI()
 		} else {
-			log.Warn().Msg("No Admin API to stop.")
+			log.Warn().Msg("⚠ No Admin API to stop.")
 		}
 	}()
 
+	// Stop Watcher
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		app.NodeReadyWatcherStopper.Stop()
-		log.Info().Msg("NodeReadyWatcher stopped.")
+		log.Info().Msg("⛔ NodeReadyWatcher stopped.")
 	}()
 
+	// Wait with timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -336,6 +388,7 @@ func (app *Application) Stop() {
 		log.Warn().Msg("⚠ Stop operation timed out. Some components may not have stopped.")
 	}
 }
+
 func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 	app.ApiLock.Lock()
 	defer app.ApiLock.Unlock()
