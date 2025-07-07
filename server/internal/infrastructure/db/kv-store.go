@@ -140,4 +140,8 @@ type KVStore interface {
 	Close() error
 
 	CleanExpiredKeys(now time.Time) error
+
+	CreateColumnFamily(columnFamilyName string, isTtl bool) error
+	DeleteColumnFamily(columnFamilyName string) error
+	ExistsColumnFamily(columnFamilyName string) (bool, bool, error)
 }
