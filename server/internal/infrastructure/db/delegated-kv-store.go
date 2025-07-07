@@ -98,3 +98,15 @@ func (d *DelegatedKVStore) Close() error {
 func (d *DelegatedKVStore) CleanExpiredKeys(now time.Time) error {
 	return d.base.CleanExpiredKeys(now)
 }
+
+func (d *DelegatedKVStore) CreateColumnFamily(columnFamilyName string, isTtl bool) error {
+	return d.base.CreateColumnFamily(columnFamilyName, isTtl)
+}
+
+func (d *DelegatedKVStore) DeleteColumnFamily(columnFamilyName string) error {
+	return d.base.DeleteColumnFamily(columnFamilyName)
+}
+
+func (d *DelegatedKVStore) ExistsColumnFamily(columnFamilyName string) (bool, bool, error) {
+	return d.base.ExistsColumnFamily(columnFamilyName)
+}
