@@ -488,3 +488,87 @@ func TestPebbleRepository_TTL_BulkCreateExpiration(t *testing.T) {
 		assert.Nil(t, idxBytes, "General ID index key should be nil for ID %s", createdID)
 	}
 }
+
+func TestPebbleStore_ColumnFamilyOperations(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreatePebbleStore(tmpDir, []string{DefaultFC}, nil)
+	require.NoError(t, err)
+	defer store.Close()
+
+	cfName := "new_cf"
+	cfNameTTL := "new_cf_ttl"
+
+	// 1. ExistsColumnFamily - initially not found
+	exists, isTTL, err := store.ExistsColumnFamily(cfName)
+	require.NoError(t, err)
+	assert.False(t, exists)
+	assert.False(t, isTTL)
+
+	// 2. CreateColumnFamily - non-TTL
+	err = store.CreateColumnFamily(cfName, false)
+	require.NoError(t, err)
+
+	// 3. ExistsColumnFamily - non-TTL should exist
+	exists, isTTL, err = store.ExistsColumnFamily(cfName)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.False(t, isTTL)
+
+	// 4. CreateColumnFamily - TTL
+	err = store.CreateColumnFamily(cfNameTTL, true)
+	require.NoError(t, err)
+
+	// 5. ExistsColumnFamily - TTL should exist
+	exists, isTTL, err = store.ExistsColumnFamily(cfNameTTL)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.True(t, isTTL)
+
+	// 6. CreateColumnFamily - already exists
+	err = store.CreateColumnFamily(cfName, false)
+	require.Error(t, err) // Should error
+
+	// 7. Put/Get in new non-TTL CF
+	key1, val1 := "key1", []byte("val1")
+	err = store.Put(cfName, key1, val1, 0, time.Now())
+	require.NoError(t, err)
+	retVal1, err := store.Get(cfName, key1, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, val1, retVal1)
+
+	// 8. Put/Get in new TTL CF
+	key2, val2 := "key2", []byte("val2")
+	err = store.Put(cfNameTTL, key2, val2, 3600, time.Now())
+	require.NoError(t, err)
+	retVal2, err := store.Get(cfNameTTL, key2, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, val2, retVal2)
+
+	// 9. DeleteColumnFamily - non-TTL
+	err = store.DeleteColumnFamily(cfName)
+	require.NoError(t, err)
+
+	// 10. ExistsColumnFamily - non-TTL should not exist
+	exists, isTTL, err = store.ExistsColumnFamily(cfName)
+	require.NoError(t, err)
+	assert.False(t, exists)
+	assert.False(t, isTTL)
+
+	// 11. Get from deleted non-TTL CF should fail or return not found (implementation specific, check for error)
+	_, err = store.Get(cfName, key1, time.Now())
+	require.Error(t, err) // Expect an error as CF is gone
+
+	// 12. DeleteColumnFamily - TTL
+	err = store.DeleteColumnFamily(cfNameTTL)
+	require.NoError(t, err)
+
+	// 13. ExistsColumnFamily - TTL should not exist
+	exists, isTTL, err = store.ExistsColumnFamily(cfNameTTL)
+	require.NoError(t, err)
+	assert.False(t, exists)
+	assert.False(t, isTTL)
+
+	// 14. DeleteColumnFamily - already deleted / not found
+	err = store.DeleteColumnFamily(cfName)
+	require.Error(t, err) // Should error
+}

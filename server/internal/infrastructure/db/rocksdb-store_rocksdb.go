@@ -799,6 +799,80 @@ func (r *RocksdbStore) Close() error {
 	return nil
 }
 
+// CreateColumnFamily creates a new column family in the RocksDB store.
+// If the column family already exists, it returns an error.
+// Parameters:
+//   - columnFamilyName: The name of the column family to create.
+//   - isTtl: A boolean indicating whether the new column family should be a TTL column family.
+// Returns:
+//   - An error if the column family already exists or if any RocksDB error occurs.
+func (r *RocksdbStore) CreateColumnFamily(columnFamilyName string, isTtl bool) error {
+	if _, exists := r.currentCFs[columnFamilyName]; exists {
+		return fmt.Errorf("column family %s already exists", columnFamilyName)
+	}
+
+	opts := grocksdb.NewDefaultOptions()
+	defer opts.Destroy()
+
+	cfHandle, err := r.DB.CreateColumnFamily(opts, columnFamilyName)
+	if err != nil {
+		return fmt.Errorf("failed to create column family %s: %w", columnFamilyName, err)
+	}
+
+	if isTtl {
+		r.TTLColumnFamilyHandles[columnFamilyName] = cfHandle
+	} else {
+		r.ColumnFamilyHandles[columnFamilyName] = cfHandle
+	}
+	r.currentCFs[columnFamilyName] = true
+	return nil
+}
+
+// DeleteColumnFamily deletes a column family from the RocksDB store.
+// Parameters:
+//   - columnFamilyName: The name of the column family to delete.
+// Returns:
+//   - An error if the column family does not exist or if any RocksDB error occurs.
+func (r *RocksdbStore) DeleteColumnFamily(columnFamilyName string) error {
+	cfHandle, isTtl, err := r.resolveColumnFamily(columnFamilyName)
+	if err != nil {
+		return err // Column family not found
+	}
+
+	err = r.DB.DropColumnFamily(cfHandle)
+	if err != nil {
+		return fmt.Errorf("failed to delete column family %s: %w", columnFamilyName, err)
+	}
+
+	// Remove from internal tracking
+	if isTtl {
+		delete(r.TTLColumnFamilyHandles, columnFamilyName)
+	} else {
+		delete(r.ColumnFamilyHandles, columnFamilyName)
+	}
+	delete(r.currentCFs, columnFamilyName)
+	cfHandle.Destroy() // Release the handle after dropping
+	return nil
+}
+
+// ExistsColumnFamily checks if a column family exists in the RocksDB store.
+// Parameters:
+//   - columnFamilyName: The name of the column family to check.
+// Returns:
+//   - A boolean indicating whether the column family exists.
+//   - A boolean indicating whether it is a TTL column family.
+//   - An error if any RocksDB error occurs.
+func (r *RocksdbStore) ExistsColumnFamily(columnFamilyName string) (bool, bool, error) {
+	_, isTtl, err := r.resolveColumnFamily(columnFamilyName)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return false, false, nil
+		}
+		return false, false, err // Other error
+	}
+	return true, isTtl, nil
+}
+
 func (r *RocksdbStore) CleanExpiredKeys(now time.Time) error {
 	for name, handle := range r.TTLColumnFamilyHandles {
 		err := cleanExpiredKeys(r.DB, handle, now)

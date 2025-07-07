@@ -108,6 +108,21 @@ func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string,
 	return s, "", args.Error(2)
 }
 
+func (m *MockKVStore) CreateColumnFamily(columnFamilyName string, isTtl bool) error {
+	args := m.Called(columnFamilyName, isTtl)
+	return args.Error(0)
+}
+
+func (m *MockKVStore) DeleteColumnFamily(columnFamilyName string) error {
+	args := m.Called(columnFamilyName)
+	return args.Error(0)
+}
+
+func (m *MockKVStore) ExistsColumnFamily(columnFamilyName string) (bool, bool, error) {
+	args := m.Called(columnFamilyName)
+	return args.Bool(0), args.Bool(1), args.Error(2)
+}
+
 type TestIDGeneratorFactory struct {
 	ids   []string
 	index int
