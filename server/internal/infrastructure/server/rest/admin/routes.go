@@ -14,12 +14,11 @@ func setupRoutes(engine *gin.Engine, api *RestAdminAPI) {
 
 		tenantsGroup := adminAPIGroup.Group("/tenants")
 		tenantsGroup.Use(api.authMiddleware())
-		tenantsGroup.Use(api.rateLimitMiddleware("token", 1*time.Minute, 10))
+		tenantsGroup.Use(api.rateLimitMiddleware("token", 1*time.Minute, 20))
 		{
 			tenantsGroup.GET("", api.getTenantsHandler)
 			tenantsGroup.POST("", api.createTenantHandler)
 			tenantsGroup.GET("/:id", api.getTenantHandler)
-			tenantsGroup.PUT("/:id", api.updateTenantHandler)
 			tenantsGroup.DELETE("/:id", api.deleteTenantHandler)
 		}
 	}

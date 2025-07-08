@@ -22,17 +22,23 @@ func NewTenantInMasterRepository(uow *UnitOfWork, factory IDGeneratorFactory) (*
 	return &TenantInMasterRepository{repo: repo}, nil
 }
 
-func (r *TenantInMasterRepository) CreateTenantInMaster(input models.TenantInMaster, now time.Time) (string, error) {
-	input.IsAssignedToShard = false
-	return r.repo.Create(&input, now)
+func (r *TenantInMasterRepository) CreateTenantInMaster(input *models.TenantInMaster, now time.Time) (string, error) {
+	input.Status = models.PendingForAssign
+	input.CreatedAt = now
+	input.UpdatedAt = now
+	return r.repo.Create(input, now)
 }
 
 func (r *TenantInMasterRepository) UpdateTenantInMaster(input models.TenantInMaster, now time.Time) (bool, error) {
+	input.UpdatedAt = now
 	return r.repo.Update(&input, now)
 }
 
-func (r *TenantInMasterRepository) GetTenantInMasterByTenantCode(code string) (*models.TenantInMaster, error) {
-	return r.repo.FindByField("Code", code, time.Now())
+func (r *TenantInMasterRepository) GetTenantInMasterByTenantCode(code string, now time.Time) (*models.TenantInMaster, error) {
+	return r.repo.FindByField("Code", code, now)
+}
+func (r *TenantInMasterRepository) GetTenantInMasterByTenantId(id string, now time.Time) (*models.TenantInMaster, error) {
+	return r.repo.FindByField("ID", id, now)
 }
 
 func (r *TenantInMasterRepository) PaginateTenant(pageSize int, cursor string, now time.Time) (*FindResult[models.TenantInMaster], error) {
@@ -49,4 +55,8 @@ func (r *TenantInMasterRepository) DeleteTenantInMasterByCode(code string, now t
 	}
 
 	return r.repo.Delete(rootTenantInMaster.ID, now)
+}
+
+func (r *TenantInMasterRepository) DeleteTenantInMasterById(id string, now time.Time) (bool, error) {
+	return r.repo.Delete(id, now)
 }

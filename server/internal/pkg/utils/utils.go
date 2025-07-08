@@ -43,7 +43,7 @@ func Contains(list []string, target string) bool {
 	return false
 }
 func GetNowInInt() int64 {
-	now := time.Now()
+	now := time.Now().UTC()
 	return now.UnixNano()
 }
 
@@ -68,9 +68,9 @@ func BytesToInt(data []byte) (int, error) {
 }
 
 func IntToBytes(num int) ([]byte, error) {
-	bytes := make([]byte, 4) // 4 bytes para uint32
+	bytes := make([]byte, 4)
 
-	binary.BigEndian.PutUint32(bytes, uint32(num)) // También puedes usar LittleEndian
+	binary.BigEndian.PutUint32(bytes, uint32(num))
 	return bytes, nil
 }
 func ErrorToGobBytes(err error) ([]byte, error) {

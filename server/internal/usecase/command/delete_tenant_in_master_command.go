@@ -2,24 +2,20 @@ package command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"time"
 )
 
 func init() {
-	gob.Register(PaginateTenantsCommand{})
-	gob.Register(db.FindResult[models.TenantInMaster]{})
-
+	gob.Register(DeleteTenantInMasterCommand{})
 }
 
-// PaginateTenantsCommand represents a command to authenticate a user.
-type PaginateTenantsCommand struct {
-	Cursor   string
-	PageSize int
+// DeleteTenantInMasterCommand represents a command to authenticate a user.
+type DeleteTenantInMasterCommand struct {
+	TenantId string
 }
 
-func (cmd *PaginateTenantsCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
+func (cmd *DeleteTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
 	commandResult := &CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
@@ -29,12 +25,13 @@ func (cmd *PaginateTenantsCommand) Execute(uow *db.UnitOfWork, now time.Time) Co
 		return *commandResult
 	}
 
-	tenantInMasterFound, err := tenantInMasterRepo.PaginateTenant(cmd.PageSize, cmd.Cursor, now)
+	_, err = tenantInMasterRepo.DeleteTenantInMasterById(cmd.TenantId, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
-	commandResult.Result = tenantInMasterFound
+
+	commandResult.Result = true
 
 	return *commandResult
 }

@@ -28,6 +28,17 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 }
 
 func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
+
+	createColumnFamilyCommand, ok := cmd.(commands.CreateColumnFamilyCommand)
+	if ok {
+		return createColumnFamilyCommand.Execute(uow, now)
+	}
+
+	deleteColumnFamilyCommand, ok := cmd.(commands.DeleteColumnFamilyCommand)
+	if ok {
+		return deleteColumnFamilyCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult

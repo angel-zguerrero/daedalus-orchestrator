@@ -8,15 +8,15 @@ import (
 )
 
 func init() {
-	gob.Register(AssignToShardTenantInMasterCommand{})
+	gob.Register(MarkToDeletionTenantInMasterCommand{})
 }
 
-// AssignToShardTenantInMasterCommand represents a command to authenticate a user.
-type AssignToShardTenantInMasterCommand struct {
-	TenantCode string
+// MarkToDeletionTenantInMasterCommand represents a command to authenticate a user.
+type MarkToDeletionTenantInMasterCommand struct {
+	TenantId string
 }
 
-func (cmd *AssignToShardTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
+func (cmd *MarkToDeletionTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
 	commandResult := &CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
@@ -26,7 +26,7 @@ func (cmd *AssignToShardTenantInMasterCommand) Execute(uow *db.UnitOfWork, now t
 		return *commandResult
 	}
 
-	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantCode(cmd.TenantCode, now)
+	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantId(cmd.TenantId, now)
 
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -38,7 +38,7 @@ func (cmd *AssignToShardTenantInMasterCommand) Execute(uow *db.UnitOfWork, now t
 		return *commandResult
 	}
 
-	tenantInMasterFound.Status = models.Assigned
+	tenantInMasterFound.Status = models.PendingForDeletion
 	_, err = tenantInMasterRepo.UpdateTenantInMaster(*tenantInMasterFound, now)
 	if err != nil {
 		commandResult.Error = err.Error()

@@ -503,37 +503,73 @@ func (app *Application) StartAssignTenants() {
 				if app.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
 					tenantNode = app.TenantNodes[i]
 
-					createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
-						Name: tenant.ID,
+					if tenant.Status == models.PendingForAssign {
+						createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
+							Name: tenant.ID,
+						}
+
+						ccfCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  createColumnFamilyCommand,
+						}
+
+						result, err = tenantNode.Write(writeCtx, ccfCmd)
+						if err != nil {
+
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+						}
+
+						assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
+							TenantCode: tenant.Code,
+						}
+
+						atstCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  assignToShardTenantInMasterCommand,
+						}
+
+						result, err = app.MasterNode.Write(writeCtx, atstCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+						}
 					}
 
-					ccfCmd := commands.FSM_Command{
-						Now:  utils.GetNowInInt(),
-						Type: commands.REPOSITORY_COMMAND,
-						CMD:  createColumnFamilyCommand,
-					}
+					if tenant.Status == models.PendingForDeletion {
+						createColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
+							Name: tenant.ID,
+						}
 
-					result, err = tenantNode.Write(writeCtx, ccfCmd)
-					if err != nil {
+						ccfCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  createColumnFamilyCommand,
+						}
 
-						log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+						result, err = tenantNode.Write(writeCtx, ccfCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete column family")
 
-					}
+						}
 
-					assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
-						TenantCode: tenant.Code,
-					}
+						deleteTenantInMasterCommand := &commands.DeleteTenantInMasterCommand{
+							TenantId: tenant.ID,
+						}
 
-					atstCmd := commands.FSM_Command{
-						Now:  utils.GetNowInInt(),
-						Type: commands.REPOSITORY_COMMAND,
-						CMD:  assignToShardTenantInMasterCommand,
-					}
+						atstCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  deleteTenantInMasterCommand,
+						}
 
-					result, err = app.MasterNode.Write(writeCtx, atstCmd)
-					if err != nil {
-						log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+						result, err = app.MasterNode.Write(writeCtx, atstCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
 
+						}
 					}
 
 					break

@@ -32,6 +32,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return paginateTenantsCommand.Execute(uow, now)
 	}
 
+	findTenantCommand, ok := input.(commands.FindTenantCommand)
+	if ok {
+		return findTenantCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 
@@ -57,6 +62,16 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	assignToShardTenantInMasterCommand, ok := cmd.(commands.AssignToShardTenantInMasterCommand)
 	if ok {
 		return assignToShardTenantInMasterCommand.Execute(uow, now)
+	}
+
+	markToDeletionTenantInMasterCommand, ok := cmd.(commands.MarkToDeletionTenantInMasterCommand)
+	if ok {
+		return markToDeletionTenantInMasterCommand.Execute(uow, now)
+	}
+
+	deleteTenantInMasterCommand, ok := cmd.(commands.DeleteTenantInMasterCommand)
+	if ok {
+		return deleteTenantInMasterCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

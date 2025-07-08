@@ -1,11 +1,12 @@
 package rest_api_admin
 
 import (
+	"bytes"
 	"context"
 	ratelimit "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	"encoding/gob"
 	"fmt"
 	"net/http"
 	"strings"
@@ -76,19 +77,23 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 		defer cancel()
 
-		resultBytes, err := api.MasterNode.Read(ctx, *queryCmd)
+		result, err := api.MasterNode.Read(ctx, *queryCmd)
 		if err != nil {
 			api.logger.Error().Err(err).Msg("Failed to execute CheckSessionExistsCommand via Raft")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify session"})
 			return
 		}
 
-		sessionExists, err := utils.BytesToBool(resultBytes.([]byte))
-		if err != nil {
-			api.logger.Error().Err(err).Msg("CheckSessionExistsCommand returned unexpected result type")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to interpret session verification result"})
+		buf := bytes.NewBuffer(result.([]byte))
+		dec := gob.NewDecoder(buf)
+		parsedResult := &commands.CommandResult{}
+		if err := dec.Decode(parsedResult); err != nil {
+			api.logger.Error().Err(err).Msg("Paginate tenants command failed")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Paginate tenants command failed"})
 			return
 		}
+
+		sessionExists := parsedResult.Result.(bool)
 
 		if !sessionExists {
 			api.logger.Warn().Str("token_subject", claims.Subject).Msg("Session does not exist or has been invalidated")

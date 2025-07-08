@@ -28,24 +28,28 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
+
 	if lastShardIdBytes == nil {
-		lastShardIdBytes, err = utils.IntToBytes(0)
+		lastShardIdBytes, err = utils.IntToBytes(config.GlobalConfiguration.MaxTenants + 1)
+
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
 	}
 	lastShardId, err := utils.BytesToInt(lastShardIdBytes)
+
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
 	lastShardId++
-	if lastShardId > config.GlobalConfiguration.MaxTenants {
-		lastShardId = 0
+	if lastShardId > config.GlobalConfiguration.MaxTenants+1 {
+		lastShardId = 2
 	}
 
 	nextShardIdInBytes, err := utils.IntToBytes(lastShardId)
+
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -63,7 +67,7 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 
-	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantCode(cmd.TenantCode)
+	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantCode(cmd.TenantCode, now)
 
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -80,7 +84,8 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		Code:    cmd.TenantCode,
 		ShardId: lastShardId,
 	}
-	_, err = tenantInMasterRepo.CreateTenantInMaster(tenantInMaster, now)
+
+	_, err = tenantInMasterRepo.CreateTenantInMaster(&tenantInMaster, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

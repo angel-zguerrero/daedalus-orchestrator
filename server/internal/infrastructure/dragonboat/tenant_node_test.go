@@ -3,7 +3,6 @@ package dragonboat_test
 import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -60,8 +59,7 @@ func TestTenantNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 
 	_, err := dragonboat.InitTenantNode(TenantShardID, testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
 	require.NoError(t, err)
-	fmt.Println("calledWithShardID ")
-	fmt.Println(calledWithShardID)
+
 	assert.Equal(t, TenantShardID, calledWithShardID, "ShardID should be TenantShardID")
 	assert.Equal(t, testReplicaID, calledWithReplicaID, "ReplicaID should match")
 	assert.Equal(t, testSelfMember, calledWithSelfMember, "SelfMember should match")
