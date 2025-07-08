@@ -495,12 +495,47 @@ func (app *Application) StartAssignTenants() {
 		}
 
 		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
-
+		writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
+		defer writeCancel()
 		for _, tenant := range tenantsResult.Entities {
 			var tenantNode *dragonboat.RaftNode
 			for i := range app.TenantNodes {
 				if app.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
 					tenantNode = app.TenantNodes[i]
+
+					createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
+						Name: tenant.ID,
+					}
+
+					ccfCmd := commands.FSM_Command{
+						Now:  utils.GetNowInInt(),
+						Type: commands.REPOSITORY_COMMAND,
+						CMD:  createColumnFamilyCommand,
+					}
+
+					result, err = tenantNode.Write(writeCtx, ccfCmd)
+					if err != nil {
+
+						log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+					}
+
+					assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
+						TenantCode: tenant.Code,
+					}
+
+					atstCmd := commands.FSM_Command{
+						Now:  utils.GetNowInInt(),
+						Type: commands.REPOSITORY_COMMAND,
+						CMD:  assignToShardTenantInMasterCommand,
+					}
+
+					result, err = app.MasterNode.Write(writeCtx, atstCmd)
+					if err != nil {
+						log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+					}
+
 					break
 				}
 			}
