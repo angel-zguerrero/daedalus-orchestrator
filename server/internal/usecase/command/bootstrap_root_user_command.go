@@ -15,13 +15,18 @@ func init() {
 type BootstrapRootUserCommand struct {
 }
 
-func (cmd *BootstrapRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, error) {
+func (cmd *BootstrapRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
+	commandResult := &CommandResult{}
 	userRepo, err := db.NewUserRepository(uow, &db.DeterministicIDGeneratorFactory{}) // Passing nil for IDGeneratorFactory
 	if err != nil {
-		return nil, err
+		commandResult.Error = err.Error()
+		return *commandResult
 	}
 
 	err = db.BootstrapRootUser(*userRepo, *config.GlobalConfiguration)
-
-	return nil, err
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+	return *commandResult
 }

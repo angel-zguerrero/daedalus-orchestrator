@@ -7,7 +7,7 @@ import (
 type UnitOfWork struct {
 	batch   *WriteBatch
 	repos   map[string]interface{}
-	kvStore KVStore
+	KVStore KVStore
 }
 
 func NewUnitOfWork(kvStore KVStore, batch *WriteBatch) *UnitOfWork {
@@ -17,7 +17,7 @@ func NewUnitOfWork(kvStore KVStore, batch *WriteBatch) *UnitOfWork {
 	return &UnitOfWork{
 		batch:   batch,
 		repos:   make(map[string]interface{}),
-		kvStore: kvStore,
+		KVStore: kvStore,
 	}
 }
 
@@ -25,7 +25,7 @@ func (u *UnitOfWork) Commit() error {
 	defer func() {
 		u.batch.Data = []X{}
 	}()
-	return u.kvStore.Write(u.batch)
+	return u.KVStore.Write(u.batch)
 }
 
 func GetRepository[T ORMEntity](uow *UnitOfWork, cf string, schema string, factory IDGeneratorFactory) (*Repository[T], error) {
@@ -33,7 +33,7 @@ func GetRepository[T ORMEntity](uow *UnitOfWork, cf string, schema string, facto
 	if repo, ok := uow.repos[key]; ok {
 		return repo.(*Repository[T]), nil
 	}
-	repo, err := NewRepositoryWithBatch[T](uow.kvStore, cf, schema, factory, uow.batch)
+	repo, err := NewRepositoryWithBatch[T](uow.KVStore, cf, schema, factory, uow.batch)
 	if err != nil {
 		return nil, err
 	}

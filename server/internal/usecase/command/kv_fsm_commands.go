@@ -20,7 +20,6 @@ func init() {
 	gob.Register(MCLK_Command{})
 	gob.Register(time.Time{})
 	gob.Register(Repository_Command{})
-
 }
 
 // ---- Read/Write (RW) Command Types ----

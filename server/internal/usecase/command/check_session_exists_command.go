@@ -2,9 +2,7 @@ package command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/pkg/utils"
 	"encoding/gob"
-	"errors"
 	"time"
 	// "fmt" // Will be needed if we add logging or more complex error handling
 )
@@ -21,25 +19,31 @@ type CheckSessionExistsCommand struct {
 	JWTKey []byte
 }
 
-func (cmd *CheckSessionExistsCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, error) {
+func (cmd *CheckSessionExistsCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
+	commandResult := &CommandResult{}
 	if cmd.JWTToken == "" {
-		return nil, errors.New("JWTToken cannot be empty for CheckSessionExistsCommand")
+		commandResult.Error = "JWTToken cannot be empty for CheckSessionExistsCommand"
+		return *commandResult
 	}
 	if len(cmd.JWTKey) == 0 {
-		return nil, errors.New("JWTKey cannot be empty for CheckSessionExistsCommand")
+
+		commandResult.Error = "JWTKey cannot be empty for CheckSessionExistsCommand"
+		return *commandResult
 	}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 
 	sessionRepo, err := db.NewSessionRepository(uow, idFactory, cmd.JWTKey)
 	if err != nil {
-		return nil, err
+		commandResult.Error = err.Error()
+		return *commandResult
 	}
 
 	exists, err := sessionRepo.SessionExists(cmd.JWTToken, now)
 	if err != nil {
-		return nil, err
+		commandResult.Error = err.Error()
+		return *commandResult
 	}
-
-	return utils.BoolToBytes(exists), nil
+	commandResult.Result = exists
+	return *commandResult
 }
