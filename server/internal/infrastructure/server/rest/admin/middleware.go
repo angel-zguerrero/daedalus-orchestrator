@@ -76,7 +76,7 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 		defer cancel()
 
-		resultBytes, err := api.node.Read(ctx, *queryCmd)
+		resultBytes, err := api.MasterNode.Read(ctx, *queryCmd)
 		if err != nil {
 			api.logger.Error().Err(err).Msg("Failed to execute CheckSessionExistsCommand via Raft")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify session"})
@@ -106,7 +106,7 @@ func (api *RestAdminAPI) rateLimitMiddleware(keyStrategy string, Period time.Dur
 		Limit:  Limit,
 	}
 
-	store := ratelimit.NewRaftStore(api.node, "ratelimit", Period)
+	store := ratelimit.NewRaftStore(api.MasterNode, "ratelimit", Period)
 
 	var options mgin.Option
 	if keyStrategy == "token" {

@@ -42,7 +42,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 	defer cancel()
-	result, err := api.node.Read(ctx, *queryCommand)
+	result, err := api.MasterNode.Read(ctx, *queryCommand)
 	if err != nil {
 		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Login command execution failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed: " + err.Error()})
@@ -92,7 +92,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
 	defer writeCancel()
 
-	_, err = api.node.Write(writeCtx, fsmCmd)
+	_, err = api.MasterNode.Write(writeCtx, fsmCmd)
 	if err != nil {
 
 		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Failed to register session after login")

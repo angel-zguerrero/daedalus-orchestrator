@@ -59,6 +59,7 @@ type Application struct {
 	MasterNodeIsReady       bool
 	MasterNode              *dragonboat.RaftNode
 	TenantNodes             []*dragonboat.RaftNode
+	TenantNodesDictionary   map[string]*dragonboat.RaftNode
 	RestAdminAPI            *rest_api_admin.RestAdminAPI
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
@@ -416,7 +417,7 @@ func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 		log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
 		// Pass the global log.Logger instance, which is configured in app.Run()
-		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration, log.Logger)
+		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(app.MasterNode, app.TenantNodes, app.TenantNodesDictionary, jwtSecret, jwtDuration, log.Logger)
 
 		adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 		go func() {
@@ -473,5 +474,7 @@ func NewApplication() *Application {
 		MasterNode:              nil,
 		RestAdminAPI:            nil,
 		NodeReadyWatcherStopper: syncutil.NewStopper(),
+		TenantNodes:             make([]*dragonboat.RaftNode, 0),
+		TenantNodesDictionary:   make(map[string]*dragonboat.RaftNode),
 	}
 }

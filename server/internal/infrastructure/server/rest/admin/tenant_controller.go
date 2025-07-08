@@ -6,6 +6,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"net/http"
 	"strings"
@@ -47,7 +48,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
 	defer writeCancel()
 
-	result, err := api.node.Write(writeCtx, fsmCmd)
+	result, err := api.MasterNode.Write(writeCtx, fsmCmd)
 	if err != nil {
 
 		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
@@ -70,7 +71,14 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 		return
 	}
 
-	tenantInMaster := parsedResult.Result
+	tenantInMaster := parsedResult.Result.(models.TenantInMaster)
+
+	tenantNode := api.SetTenantNode(tenantInMaster.ShardId, tenantInMaster.ID)
+
+	if tenantNode == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant node not found"})
+		return
+	}
 
 	api.logger.Info().Str("code", req.Code).Msg("new tenant created successfully")
 	c.JSON(http.StatusOK, gin.H{
