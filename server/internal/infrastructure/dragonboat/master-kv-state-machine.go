@@ -27,6 +27,10 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 	if ok {
 		return checkSessionExistsCommand.Execute(uow, now)
 	}
+	paginateTenantsCommand, ok := input.(commands.PaginateTenantsCommand)
+	if ok {
+		return paginateTenantsCommand.Execute(uow, now)
+	}
 
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"

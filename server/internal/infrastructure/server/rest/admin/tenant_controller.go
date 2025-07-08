@@ -9,17 +9,13 @@ import (
 	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
-
-// getTenantsHandler handles GET /admin-api/tenants
-func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
-
-	c.JSON(http.StatusOK, gin.H{"message": "Listing all tenants (dummy)", "tenants": []string{"tenantA", "tenantttB", "tenantC"}})
-}
 
 type createTenantInMasterRequest struct {
 	Code string `json:"code" binding:"required"`
@@ -160,4 +156,54 @@ func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Tenant " + tenantID + " deleted (dummy)"})
+}
+
+func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
+	pageParam := c.Query("page")
+	page, err := strconv.Atoi(pageParam)
+	if err != nil || page < 2 {
+		page = 50
+	} else if page > 1000 {
+		page = 1000
+	}
+	paginateTenantsCommand := &commands.PaginateTenantsCommand{
+		Cursor:   c.Query("cursor"),
+		PageSize: page,
+	}
+
+	queryCommand := &commands.Query_Command{
+		Command: &commands.Repository_Command{
+			CMD: paginateTenantsCommand,
+		},
+		Now: time.Now().UnixNano(), // Or handle as per specific requirements if Query_Command.Now is actively used
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+	defer cancel()
+	result, err := api.MasterNode.Read(ctx, *queryCommand)
+	if err != nil {
+		api.logger.Error().Err(err).Msg("Paginate tenants command failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed: " + err.Error()})
+		return
+	}
+
+	buf := bytes.NewBuffer(result.([]byte))
+	dec := gob.NewDecoder(buf)
+	parsedResult := &commands.CommandResult{}
+	if err := dec.Decode(parsedResult); err != nil {
+		api.logger.Error().Err(err).Msg("Paginate tenants command failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Paginate tenants command failed"})
+		return
+	}
+
+	if parsedResult.Error != "" {
+		api.logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate tenants command failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Paginate tenants command failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Tenant list",
+		"result":  parsedResult.Result,
+	})
 }

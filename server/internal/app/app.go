@@ -448,6 +448,11 @@ func (app *Application) CloseAdminAPI() {
 		log.Warn().Msg("No Admin API to close.")
 	}
 }
+
+func (app *Application) StartAssignTenants() {
+
+}
+
 func RecommendRTTMillisecond() uint64 {
 	shardCount := config.GlobalConfiguration.MaxTenants
 	switch {

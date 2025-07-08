@@ -35,6 +35,10 @@ func (r *TenantInMasterRepository) GetTenantInMasterByTenantCode(code string) (*
 	return r.repo.FindByField("Code", code, time.Now())
 }
 
+func (r *TenantInMasterRepository) PaginateTenant(pageSize int, cursor string, now time.Time) (*FindResult[models.TenantInMaster], error) {
+	return r.repo.Find("ID != 0", pageSize, cursor, now) // ID != 0 Workaround
+}
+
 func (r *TenantInMasterRepository) DeleteTenantInMasterByCode(code string, now time.Time) (bool, error) {
 	rootTenantInMaster, err := r.repo.FindByField("Code", code, now)
 	if err != nil || rootTenantInMaster == nil {
