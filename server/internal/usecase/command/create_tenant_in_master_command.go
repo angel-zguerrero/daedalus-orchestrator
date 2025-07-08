@@ -57,9 +57,21 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 	idFactory := &db.DeterministicIDGeneratorFactory{}
-	userRepo, err := db.NewTenantInMasterRepository(uow, idFactory) // Passing nil for IDGeneratorFactory
+	tenantInMasterRepo, err := db.NewTenantInMasterRepository(uow, idFactory) // Passing nil for IDGeneratorFactory
 	if err != nil {
 		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantCode(cmd.TenantCode)
+
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	if tenantInMasterFound != nil {
+		commandResult.Result = tenantInMasterFound
 		return *commandResult
 	}
 
@@ -68,7 +80,7 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		Code:    cmd.TenantCode,
 		ShardId: lastShardId,
 	}
-	_, err = userRepo.CreateTenantInMaster(tenantInMaster, now)
+	_, err = tenantInMasterRepo.CreateTenantInMaster(tenantInMaster, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

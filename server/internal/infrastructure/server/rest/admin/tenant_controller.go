@@ -60,7 +60,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type!")
+		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant creation command returned unexpected error"})
 		return
 	}
@@ -80,11 +80,65 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 		return
 	}
 
+	createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
+		Name: tenantInMaster.ID,
+	}
+
+	ccfCmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.REPOSITORY_COMMAND,
+		CMD:  createColumnFamilyCommand,
+	}
+
+	result, err = tenantNode.Write(writeCtx, ccfCmd)
+	if err != nil {
+
+		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new tenant: " + err.Error()})
+		return
+	}
+
+	assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
+		TenantCode: req.Code,
+	}
+
+	atstCmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.REPOSITORY_COMMAND,
+		CMD:  assignToShardTenantInMasterCommand,
+	}
+
+	result, err = api.MasterNode.Write(writeCtx, atstCmd)
+	if err != nil {
+
+		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new tenant: " + err.Error()})
+		return
+	}
+
+	buf = bytes.NewBuffer(result.Data)
+	dec = gob.NewDecoder(buf)
+
+	if err := dec.Decode(parsedResult); err != nil {
+		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant creation command returned unexpected error"})
+		return
+	}
+
+	possibleErr = parsedResult.Error
+	if possibleErr != "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new tenant error: " + possibleErr})
+		return
+	}
+
+	tenantInMaster.IsAssignedToShard = parsedResult.Result.(bool)
+
 	api.logger.Info().Str("code", req.Code).Msg("new tenant created successfully")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Tenant was created",
 		"result":  tenantInMaster,
 	})
+
 }
 
 // getTenantHandler handles GET /admin-api/tenants/:id

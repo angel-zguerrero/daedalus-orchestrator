@@ -27,6 +27,10 @@ func (r *TenantInMasterRepository) CreateTenantInMaster(input models.TenantInMas
 	return r.repo.Create(&input, now)
 }
 
+func (r *TenantInMasterRepository) UpdateTenantInMaster(input models.TenantInMaster, now time.Time) (bool, error) {
+	return r.repo.Update(&input, now)
+}
+
 func (r *TenantInMasterRepository) GetTenantInMasterByTenantCode(code string) (*models.TenantInMaster, error) {
 	return r.repo.FindByField("Code", code, time.Now())
 }
