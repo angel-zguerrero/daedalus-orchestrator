@@ -933,3 +933,82 @@ func prefixRangeEnd(prefix []byte) []byte {
 	// Si todos los bytes eran 0xFF, no hay un límite superior válido.
 	return nil
 }
+
+// CreateColumnFamily creates a new column family.
+// In PebbleStore, this means adding a new prefix to cfPrefixes or ttlCfPrefixes.
+func (ps *PebbleStore) CreateColumnFamily(columnFamilyName string, isTtl bool) error {
+	if _, exists := ps.cfPrefixes[columnFamilyName]; exists {
+		return fmt.Errorf("column family %s already exists", columnFamilyName)
+	}
+	if _, exists := ps.ttlCfPrefixes[columnFamilyName]; exists {
+		return fmt.Errorf("column family %s already exists as TTL", columnFamilyName)
+	}
+
+	// Ensure the CF name doesn't create prefix conflicts, e.g. "a" and "ab"
+	// This is a basic check; more sophisticated prefix management might be needed for complex cases.
+	newPrefix := []byte(columnFamilyName + ":")
+	for _, existingPrefix := range ps.cfPrefixes {
+		if bytes.HasPrefix(newPrefix, existingPrefix) || bytes.HasPrefix(existingPrefix, newPrefix) {
+			return fmt.Errorf("new column family name %s conflicts with existing prefix %s", columnFamilyName, string(existingPrefix))
+		}
+	}
+	for _, existingPrefix := range ps.ttlCfPrefixes {
+		if bytes.HasPrefix(newPrefix, existingPrefix) || bytes.HasPrefix(existingPrefix, newPrefix) {
+			return fmt.Errorf("new column family name %s conflicts with existing TTL prefix %s", columnFamilyName, string(existingPrefix))
+		}
+	}
+
+	if isTtl {
+		ps.ttlCfPrefixes[columnFamilyName] = newPrefix
+	} else {
+		ps.cfPrefixes[columnFamilyName] = newPrefix
+	}
+	return nil
+}
+
+// DeleteColumnFamily removes a column family.
+// In PebbleStore, this means removing the prefix and deleting all associated data.
+func (ps *PebbleStore) DeleteColumnFamily(columnFamilyName string) error {
+	var cfPrefix []byte
+	var isTtl bool
+	var exists bool
+
+	if prefix, ok := ps.ttlCfPrefixes[columnFamilyName]; ok {
+		cfPrefix = prefix
+		isTtl = true
+		exists = true
+	} else if prefix, ok := ps.cfPrefixes[columnFamilyName]; ok {
+		cfPrefix = prefix
+		isTtl = false
+		exists = true
+	}
+
+	if !exists {
+		return fmt.Errorf("column family %s not found", columnFamilyName)
+	}
+
+	// Delete all keys associated with this column family
+	err := ps.db.DeleteRange(cfPrefix, prefixRangeEnd(cfPrefix), pebble.Sync)
+	if err != nil {
+		return fmt.Errorf("failed to delete data for column family %s: %w", columnFamilyName, err)
+	}
+
+	// Remove from internal tracking
+	if isTtl {
+		delete(ps.ttlCfPrefixes, columnFamilyName)
+	} else {
+		delete(ps.cfPrefixes, columnFamilyName)
+	}
+	return nil
+}
+
+// ExistsColumnFamily checks if a column family exists.
+func (ps *PebbleStore) ExistsColumnFamily(columnFamilyName string) (bool, bool, error) {
+	if _, exists := ps.ttlCfPrefixes[columnFamilyName]; exists {
+		return true, true, nil
+	}
+	if _, exists := ps.cfPrefixes[columnFamilyName]; exists {
+		return true, false, nil
+	}
+	return false, false, nil
+}

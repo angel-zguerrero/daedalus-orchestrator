@@ -85,3 +85,18 @@ func (s *RocksdbStore) Close() error {
 func (s *RocksdbStore) CleanExpiredKeys(now time.Time) error {
 	return fmt.Errorf("RocksDB not supported in this build")
 }
+
+// CreateColumnFamily is a placeholder method for RocksdbStore.
+func (s *RocksdbStore) CreateColumnFamily(columnFamilyName string, isTtl bool) error {
+	return fmt.Errorf("RocksDB not supported in this build")
+}
+
+// DeleteColumnFamily is a placeholder method for RocksdbStore.
+func (s *RocksdbStore) DeleteColumnFamily(columnFamilyName string) error {
+	return fmt.Errorf("RocksDB not supported in this build")
+}
+
+// ExistsColumnFamily is a placeholder method for RocksdbStore.
+func (s *RocksdbStore) ExistsColumnFamily(columnFamilyName string) (bool, bool, error) {
+	return false, false, fmt.Errorf("RocksDB not supported in this build")
+}
