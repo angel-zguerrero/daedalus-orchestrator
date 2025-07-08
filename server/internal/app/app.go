@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -9,6 +10,8 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
+	"deadalus-orch/shared/models"
+	"encoding/gob"
 	"fmt"
 	"os"
 	"strconv"
@@ -278,6 +281,7 @@ func (app *Application) Run() {
 				log.Info().Msg("✅ Master + all tenants ready for consensus.")
 				app.MasterNodeIsReady = true
 
+				app.StartAssignTenants()
 				if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
 					bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
 					cmd := commands.FSM_Command{
@@ -435,7 +439,7 @@ func (app *Application) CloseAdminAPI() {
 	app.ApiLock.Lock()
 	defer app.ApiLock.Unlock()
 	if app.RestAdminAPI != nil {
-		log.Info().Msg("Closing Admin API...")
+		log.Info().Msg("Closing Admin app...")
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelShutdown()
 		if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
@@ -450,6 +454,65 @@ func (app *Application) CloseAdminAPI() {
 }
 
 func (app *Application) StartAssignTenants() {
+	cursor := ""
+	pageSize := 10
+
+	for {
+		paginateTenantsCommand := &commands.PaginateTenantsCommand{
+			Cursor:   cursor,
+			PageSize: pageSize,
+		}
+
+		queryCommand := &commands.Query_Command{
+			Command: &commands.Repository_Command{
+				CMD: paginateTenantsCommand,
+			},
+			Now: time.Now().UnixNano(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+		defer cancel()
+
+		result, err := app.MasterNode.Read(ctx, *queryCommand)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Paginate tenants command failed")
+
+			return
+		}
+
+		buf := bytes.NewBuffer(result.([]byte))
+		dec := gob.NewDecoder(buf)
+		parsedResult := &commands.CommandResult{}
+		if err := dec.Decode(parsedResult); err != nil {
+			log.Fatal().Err(err).Msg("Paginate tenants command failed (decode)")
+
+			return
+		}
+
+		if parsedResult.Error != "" {
+			log.Fatal().Str("error", parsedResult.Error).Msg("Paginate tenants command failed (business error)")
+			return
+		}
+
+		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
+
+		for _, tenant := range tenantsResult.Entities {
+			var tenantNode *dragonboat.RaftNode
+			for i := range app.TenantNodes {
+				if app.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+					tenantNode = app.TenantNodes[i]
+					break
+				}
+			}
+			app.TenantNodesDictionary[tenant.ID] = tenantNode
+		}
+
+		if tenantsResult.Cursor == "" {
+			break
+		}
+
+		cursor = tenantsResult.Cursor
+	}
 
 }
 
