@@ -539,20 +539,19 @@ func (app *Application) StartAssignTenants() {
 					}
 
 					if tenant.Status == models.PendingForDeletion {
-						createColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
+						deleteColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
 							Name: tenant.ID,
 						}
 
 						ccfCmd := commands.FSM_Command{
 							Now:  utils.GetNowInInt(),
 							Type: commands.REPOSITORY_COMMAND,
-							CMD:  createColumnFamilyCommand,
+							CMD:  deleteColumnFamilyCommand,
 						}
 
 						result, err = tenantNode.Write(writeCtx, ccfCmd)
 						if err != nil {
 							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete column family")
-
 						}
 
 						deleteTenantInMasterCommand := &commands.DeleteTenantInMasterCommand{
@@ -568,7 +567,6 @@ func (app *Application) StartAssignTenants() {
 						result, err = app.MasterNode.Write(writeCtx, atstCmd)
 						if err != nil {
 							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
-
 						}
 					}
 

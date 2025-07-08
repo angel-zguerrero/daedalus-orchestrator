@@ -265,13 +265,51 @@ func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
 
 	possibleErr := parsedResult.Error
 	if possibleErr != "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant error: " + possibleErr})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to delete tenant error: " + possibleErr})
+		return
+	}
+
+	deleteColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
+		Name: tenantID,
+	}
+
+	ccfCmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.REPOSITORY_COMMAND,
+		CMD:  deleteColumnFamilyCommand,
+	}
+
+	tenantNode := api.TenantNodesDictionary[tenantID]
+	if tenantNode == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant error: Tenant node not found"})
+		return
+	}
+
+	result, err = tenantNode.Write(writeCtx, ccfCmd)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant error: " + err.Error()})
+		return
+	}
+
+	deleteTenantInMasterCommand := &commands.DeleteTenantInMasterCommand{
+		TenantId: tenantID,
+	}
+
+	atstCmd = commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.REPOSITORY_COMMAND,
+		CMD:  deleteTenantInMasterCommand,
+	}
+
+	result, err = api.MasterNode.Write(writeCtx, atstCmd)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant error: " + err.Error()})
 		return
 	}
 
 	api.logger.Info().Str("TenantID", tenantID).Msg("new tenant deleted successfully")
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Tenant " + tenantID + " has been marked for deletion",
+		"message": "Tenant " + tenantID + " was deleted",
 		"result":  parsedResult.Result,
 	})
 }
