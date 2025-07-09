@@ -3,7 +3,6 @@ package command
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"encoding/gob"
-	"errors"
 	"time"
 	// "fmt" // Will be needed if we add logging or more complex error handling
 )
@@ -20,25 +19,30 @@ type RegisterSessionCommand struct {
 	JWTKey []byte
 }
 
-func (cmd *RegisterSessionCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, error) {
+func (cmd *RegisterSessionCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
+	commandResult := &CommandResult{}
 	if cmd.JWTToken == "" {
-		return nil, errors.New("JWTToken cannot be empty for RegisterSessionCommand")
+		commandResult.Error = "JWTToken cannot be empty for RegisterSessionCommand"
+		return *commandResult
 	}
 	if len(cmd.JWTKey) == 0 {
-		return nil, errors.New("JWTKey cannot be empty for RegisterSessionCommand")
+		commandResult.Error = "JWTKey cannot be empty for RegisterSessionCommand"
+		return *commandResult
 	}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 
 	sessionRepo, err := db.NewSessionRepository(uow, idFactory, cmd.JWTKey)
 	if err != nil {
-		return nil, err
+		commandResult.Error = err.Error()
+		return *commandResult
 	}
 
 	err = sessionRepo.RegisterSession(cmd.JWTToken, now)
 	if err != nil {
-		return nil, err
+		commandResult.Error = err.Error()
+		return *commandResult
 	}
 
-	return nil, nil
+	return *commandResult
 }

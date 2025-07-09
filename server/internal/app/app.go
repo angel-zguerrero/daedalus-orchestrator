@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -9,6 +10,8 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
+	"deadalus-orch/shared/models"
+	"encoding/gob"
 	"fmt"
 	"os"
 	"strconv"
@@ -59,6 +62,7 @@ type Application struct {
 	MasterNodeIsReady       bool
 	MasterNode              *dragonboat.RaftNode
 	TenantNodes             []*dragonboat.RaftNode
+	TenantNodesDictionary   map[string]*dragonboat.RaftNode
 	RestAdminAPI            *rest_api_admin.RestAdminAPI
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
@@ -277,6 +281,7 @@ func (app *Application) Run() {
 				log.Info().Msg("✅ Master + all tenants ready for consensus.")
 				app.MasterNodeIsReady = true
 
+				app.StartAssignTenants()
 				if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
 					bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
 					cmd := commands.FSM_Command{
@@ -416,7 +421,7 @@ func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 		log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
 		// Pass the global log.Logger instance, which is configured in app.Run()
-		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(masterNode, jwtSecret, jwtDuration, log.Logger)
+		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(app.MasterNode, app.TenantNodes, app.TenantNodesDictionary, jwtSecret, jwtDuration, log.Logger)
 
 		adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 		go func() {
@@ -434,7 +439,7 @@ func (app *Application) CloseAdminAPI() {
 	app.ApiLock.Lock()
 	defer app.ApiLock.Unlock()
 	if app.RestAdminAPI != nil {
-		log.Info().Msg("Closing Admin API...")
+		log.Info().Msg("Closing Admin app...")
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelShutdown()
 		if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
@@ -447,6 +452,139 @@ func (app *Application) CloseAdminAPI() {
 		log.Warn().Msg("No Admin API to close.")
 	}
 }
+
+func (app *Application) StartAssignTenants() {
+	cursor := ""
+	pageSize := 10
+
+	for {
+		paginateTenantsCommand := &commands.PaginateTenantsCommand{
+			Cursor:   cursor,
+			PageSize: pageSize,
+		}
+
+		queryCommand := &commands.Query_Command{
+			Command: &commands.Repository_Command{
+				CMD: paginateTenantsCommand,
+			},
+			Now: time.Now().UnixNano(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+		defer cancel()
+
+		result, err := app.MasterNode.Read(ctx, *queryCommand)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Paginate tenants command failed")
+
+			return
+		}
+
+		buf := bytes.NewBuffer(result.([]byte))
+		dec := gob.NewDecoder(buf)
+		parsedResult := &commands.CommandResult{}
+		if err := dec.Decode(parsedResult); err != nil {
+			log.Fatal().Err(err).Msg("Paginate tenants command failed (decode)")
+
+			return
+		}
+
+		if parsedResult.Error != "" {
+			log.Fatal().Str("error", parsedResult.Error).Msg("Paginate tenants command failed (business error)")
+			return
+		}
+
+		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
+		writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
+		defer writeCancel()
+		for _, tenant := range tenantsResult.Entities {
+			var tenantNode *dragonboat.RaftNode
+			for i := range app.TenantNodes {
+				if app.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+					tenantNode = app.TenantNodes[i]
+
+					if tenant.Status == models.PendingForAssign {
+						createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
+							Name: tenant.ID,
+						}
+
+						ccfCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  createColumnFamilyCommand,
+						}
+
+						result, err = tenantNode.Write(writeCtx, ccfCmd)
+						if err != nil {
+
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+						}
+
+						assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
+							TenantCode: tenant.Code,
+						}
+
+						atstCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  assignToShardTenantInMasterCommand,
+						}
+
+						result, err = app.MasterNode.Write(writeCtx, atstCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+						}
+					}
+
+					if tenant.Status == models.PendingForDeletion {
+						deleteColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
+							Name: tenant.ID,
+						}
+
+						ccfCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  deleteColumnFamilyCommand,
+						}
+
+						result, err = tenantNode.Write(writeCtx, ccfCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete column family")
+						}
+
+						deleteTenantInMasterCommand := &commands.DeleteTenantInMasterCommand{
+							TenantId: tenant.ID,
+						}
+
+						atstCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  deleteTenantInMasterCommand,
+						}
+
+						result, err = app.MasterNode.Write(writeCtx, atstCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+						}
+					}
+
+					break
+				}
+			}
+			app.TenantNodesDictionary[tenant.ID] = tenantNode
+		}
+
+		if tenantsResult.Cursor == "" {
+			break
+		}
+
+		cursor = tenantsResult.Cursor
+	}
+
+}
+
 func RecommendRTTMillisecond() uint64 {
 	shardCount := config.GlobalConfiguration.MaxTenants
 	switch {
@@ -473,5 +611,7 @@ func NewApplication() *Application {
 		MasterNode:              nil,
 		RestAdminAPI:            nil,
 		NodeReadyWatcherStopper: syncutil.NewStopper(),
+		TenantNodes:             make([]*dragonboat.RaftNode, 0),
+		TenantNodesDictionary:   make(map[string]*dragonboat.RaftNode),
 	}
 }

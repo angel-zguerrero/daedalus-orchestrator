@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,12 +14,15 @@ import (
 
 // RestAdminAPI handles the administrative REST API endpoints.
 type RestAdminAPI struct {
-	node        *dragonboat.RaftNode // Interface for Raft node interaction
-	ginEngine   *gin.Engine
-	jwtKey      []byte
-	jwtDuration time.Duration
-	server      *http.Server
-	logger      zerolog.Logger
+	MasterNode            *dragonboat.RaftNode
+	TenantNodes           []*dragonboat.RaftNode
+	TenantNodesDictionary map[string]*dragonboat.RaftNode
+	TenantNodesLock       sync.Mutex
+	ginEngine             *gin.Engine
+	jwtKey                []byte
+	jwtDuration           time.Duration
+	server                *http.Server
+	logger                zerolog.Logger
 }
 type zerologAdapter struct {
 	logger zerolog.Logger
@@ -30,8 +34,8 @@ func (z zerologAdapter) Write(p []byte) (n int, err error) {
 }
 
 // NewRestAdminAPI creates a new instance of RestAdminAPI.
-func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDuration time.Duration, logger zerolog.Logger) *RestAdminAPI {
-	if node == nil {
+func NewRestAdminAPI(MasterNode *dragonboat.RaftNode, TenantNodes []*dragonboat.RaftNode, TenantNodesDictionary map[string]*dragonboat.RaftNode, jwtSecretKey string, jwtAuthDuration time.Duration, logger zerolog.Logger) *RestAdminAPI {
+	if MasterNode == nil {
 		logger.Fatal().Msg("Admin API: Raft node cannot be nil")
 	}
 	if jwtSecretKey == "" {
@@ -42,11 +46,13 @@ func NewRestAdminAPI(node *dragonboat.RaftNode, jwtSecretKey string, jwtAuthDura
 	engine := gin.Default()
 
 	api := &RestAdminAPI{
-		node:        node,
-		ginEngine:   engine,
-		jwtKey:      []byte(jwtSecretKey),
-		jwtDuration: jwtAuthDuration,
-		logger:      logger,
+		MasterNode:            MasterNode,
+		TenantNodes:           TenantNodes,
+		TenantNodesDictionary: TenantNodesDictionary,
+		ginEngine:             engine,
+		jwtKey:                []byte(jwtSecretKey),
+		jwtDuration:           jwtAuthDuration,
+		logger:                logger,
 	}
 
 	setupRoutes(engine, api)
@@ -81,4 +87,22 @@ func (api *RestAdminAPI) Shutdown(ctx context.Context) error {
 		return api.server.Shutdown(ctx)
 	}
 	return nil
+}
+
+func (api *RestAdminAPI) SetTenantNode(shardID int, tenantId string) *dragonboat.RaftNode {
+	var tenant *dragonboat.RaftNode
+
+	api.TenantNodesLock.Lock()
+	for i := range api.TenantNodes {
+		if api.TenantNodes[i].ShardID == uint64(shardID) {
+			tenant = api.TenantNodes[i]
+			break
+		}
+	}
+	api.TenantNodesLock.Unlock()
+
+	api.TenantNodesLock.Lock()
+	api.TenantNodesDictionary[tenantId] = tenant
+	api.TenantNodesLock.Unlock()
+	return tenant
 }

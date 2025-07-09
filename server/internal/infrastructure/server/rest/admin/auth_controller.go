@@ -1,10 +1,12 @@
 package rest_api_admin
 
 import (
+	"bytes"
 	"context"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	"encoding/gob"
 	"net/http"
 	"time"
 
@@ -40,19 +42,28 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 	defer cancel()
-	result, err := api.node.Read(ctx, *queryCommand)
+	result, err := api.MasterNode.Read(ctx, *queryCommand)
 	if err != nil {
 		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Login command execution failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed: " + err.Error()})
 		return
 	}
 
-	loggedIn, err := utils.BytesToBool(result.([]byte))
-	if err != nil {
-		api.logger.Error().Str("username", req.UsernameOrEmail).Msg("Login command returned unexpected result type")
+	buf := bytes.NewBuffer(result.([]byte))
+	dec := gob.NewDecoder(buf)
+	parsedResult := &commands.CommandResult{}
+	if err := dec.Decode(parsedResult); err != nil {
+		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Login command returned unexpected result type")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error"})
+		return
+	}
+
+	if parsedResult.Error != "" {
+		api.logger.Error().Str("username", req.UsernameOrEmail).Str("error", parsedResult.Error).Msg("Login command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (result type)"})
 		return
 	}
+	loggedIn := parsedResult.Result.(bool)
 
 	if !loggedIn {
 		api.logger.Warn().Str("username", req.UsernameOrEmail).Msg("Login attempt failed: invalid credentials")
@@ -81,7 +92,7 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
 	defer writeCancel()
 
-	_, err = api.node.Write(writeCtx, fsmCmd)
+	_, err = api.MasterNode.Write(writeCtx, fsmCmd)
 	if err != nil {
 
 		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Failed to register session after login")

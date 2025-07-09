@@ -2,7 +2,6 @@ package command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/pkg/utils"
 	"encoding/gob"
 	"time"
 )
@@ -17,17 +16,21 @@ type LoginCommand struct {
 	Password        string
 }
 
-func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) ([]byte, error) {
+func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
+	commandResult := &CommandResult{}
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 	userRepo, err := db.NewUserRepository(uow, idFactory) // Passing nil for IDGeneratorFactory
 	if err != nil {
-		return nil, err
+		commandResult.Error = err.Error()
+		return *commandResult
 	}
 
 	loggedIn, err := userRepo.Login(cmd.UsernameOrEmail, cmd.Password)
 	if err != nil {
-		return nil, err
+		commandResult.Error = err.Error()
+		return *commandResult
 	}
+	commandResult.Result = loggedIn
 
-	return utils.BoolToBytes(loggedIn), nil
+	return *commandResult
 }

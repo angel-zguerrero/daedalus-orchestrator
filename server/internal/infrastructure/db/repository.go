@@ -391,7 +391,7 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string, now time.T
 		end = len(matchedIDs)
 	}
 	selectedIDs := matchedIDs[start:end]
-	var results []T
+	results := []T{}
 	for _, id := range selectedIDs {
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 		dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey, now)

@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"time"
 )
 
@@ -42,7 +43,7 @@ func Contains(list []string, target string) bool {
 	return false
 }
 func GetNowInInt() int64 {
-	now := time.Now()
+	now := time.Now().UTC()
 	return now.UnixNano()
 }
 
@@ -59,4 +60,24 @@ func BytesToBool(data []byte) (bool, error) {
 		return false, err
 	}
 	return val != 0, nil
+}
+
+func BytesToInt(data []byte) (int, error) {
+	num := int(binary.BigEndian.Uint32(data)) // U
+	return num, nil
+}
+
+func IntToBytes(num int) ([]byte, error) {
+	bytes := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(bytes, uint32(num))
+	return bytes, nil
+}
+func ErrorToGobBytes(err error) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if encodeErr := enc.Encode(err); encodeErr != nil {
+		return nil, encodeErr
+	}
+	return buf.Bytes(), nil
 }

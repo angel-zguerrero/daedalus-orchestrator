@@ -3,6 +3,7 @@ package dragonboat
 import (
 	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/binary"
 	"encoding/gob"
@@ -23,9 +24,9 @@ import (
 type KVStateMachineImpl interface {
 	OpenDB(dbPath string) (db.KVStore, error)
 
-	Update(cmd any, uow *db.UnitOfWork, now time.Time) ([]byte, error)
+	Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult
 
-	Lookup(cmd any, uow *db.UnitOfWork, now time.Time) (interface{}, error)
+	Lookup(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult
 }
 type KVBaseStateMachineConfig struct {
 	// TTLInternalError specifies the Time-To-Live (in seconds) for internal error messages stored in the database.
@@ -289,17 +290,26 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		}
 		cmd := fsm_commands[idx].CMD
 		now := time.Unix(0, fsm_commands[idx].Now)
-		result, err := s.stateMachineImpl.Update(cmd, uow, now)
+		result := s.stateMachineImpl.Update(cmd, uow, now)
+		var buf bytes.Buffer
+
+		err := gob.NewEncoder(&buf).Encode(result)
+
 		if err != nil {
+			b, e := utils.ErrorToGobBytes(err)
+			if e != nil {
+				b = []byte(err.Error())
+			}
 			ents[idx].Result = statemachine.Result{
 				Value: uint64(len(ents[idx].Cmd)),
-				Data:  []byte(err.Error()),
+				Data:  b,
 			}
 			continue
 		}
+
 		ents[idx].Result = statemachine.Result{
 			Value: uint64(len(ents[idx].Cmd)),
-			Data:  result,
+			Data:  buf.Bytes(),
 		}
 	}
 
@@ -383,7 +393,14 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		repo_command, ok := query.Command.(commands.Repository_Command)
 		uow := db.NewUnitOfWork(kv_store, nil)
 		if ok {
-			return s.stateMachineImpl.Lookup(repo_command.CMD, uow, now)
+
+			var buf bytes.Buffer
+			result := s.stateMachineImpl.Lookup(repo_command.CMD, uow, now)
+			err := gob.NewEncoder(&buf).Encode(result)
+			if err != nil {
+				return nil, err
+			}
+			return buf.Bytes(), nil
 		}
 
 		command, ok := query.Command.(commands.RK_Command)

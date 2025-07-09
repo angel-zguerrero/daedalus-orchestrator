@@ -4,7 +4,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
-	"errors"
 	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -17,7 +16,7 @@ func (r *MasterKVDBStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
 	return db.OpenMasterDB(dbPath)
 }
 
-func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.Time) (interface{}, error) {
+func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
 
 	loginCmd, ok := input.(commands.LoginCommand)
 	if ok {
@@ -28,11 +27,23 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 	if ok {
 		return checkSessionExistsCommand.Execute(uow, now)
 	}
+	paginateTenantsCommand, ok := input.(commands.PaginateTenantsCommand)
+	if ok {
+		return paginateTenantsCommand.Execute(uow, now)
+	}
 
-	return nil, errors.New("invalid command type")
+	findTenantCommand, ok := input.(commands.FindTenantCommand)
+	if ok {
+		return findTenantCommand.Execute(uow, now)
+	}
+
+	commandResult := &commands.CommandResult{}
+	commandResult.Error = "invalid command type"
+
+	return *commandResult
 }
 
-func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) ([]byte, error) {
+func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
 	bootstrapRootUserCmd, ok := cmd.(commands.BootstrapRootUserCommand)
 	if ok {
 		return bootstrapRootUserCmd.Execute(uow, now)
@@ -43,7 +54,29 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return registerSessionCommand.Execute(uow, now)
 	}
 
-	return nil, errors.New("invalid command type")
+	createTenantInMasterCommand, ok := cmd.(commands.CreateTenantInMasterCommand)
+	if ok {
+		return createTenantInMasterCommand.Execute(uow, now)
+	}
+
+	assignToShardTenantInMasterCommand, ok := cmd.(commands.AssignToShardTenantInMasterCommand)
+	if ok {
+		return assignToShardTenantInMasterCommand.Execute(uow, now)
+	}
+
+	markToDeletionTenantInMasterCommand, ok := cmd.(commands.MarkToDeletionTenantInMasterCommand)
+	if ok {
+		return markToDeletionTenantInMasterCommand.Execute(uow, now)
+	}
+
+	deleteTenantInMasterCommand, ok := cmd.(commands.DeleteTenantInMasterCommand)
+	if ok {
+		return deleteTenantInMasterCommand.Execute(uow, now)
+	}
+
+	commandResult := &commands.CommandResult{}
+	commandResult.Error = "invalid command type"
+	return *commandResult
 }
 
 func NewMasterKVStateMachine(pathProvider db.PathProvider) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {

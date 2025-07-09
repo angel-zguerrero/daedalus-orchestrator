@@ -12,6 +12,7 @@ const (
 )
 
 func OpenMasterDB(dbPath string) (KVStore, error) {
+	log.Info().Str("master-db-path", dbPath).Msg("Opening master DB in path")
 	engine := config.GlobalConfiguration.MasterDBEngine
 	switch engine {
 	case "rocksdb":
