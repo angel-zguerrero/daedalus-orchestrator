@@ -45,7 +45,7 @@ func NewRestServer(config *common.RestServerConfing) *RestServer {
 // Start starts the Gin HTTP server for the admin API.
 func (s *RestServer) Start(listenAddr string) error {
 	if s.GinEngine == nil {
-		return fmt.Errorf("Admin API Gin engine not initialized")
+		return fmt.Errorf("admin API Gin engine not initialized")
 	}
 	s.Config.Logger.Info().Str("address", listenAddr).Msg("🚀 Starting Admin REST API server...")
 
