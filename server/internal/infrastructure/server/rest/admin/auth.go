@@ -19,11 +19,11 @@ type loginRequest struct {
 	Password        string `json:"password" binding:"required"`
 }
 
-// loginHandler handles the /admin-api/login endpoint.
-func (api *RestAdminAPI) loginHandler(c *gin.Context) {
+// LoginHandler handles the /admin-api/login endpoint.
+func (ctrl *AdminController) LoginHandler(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.logger.Warn().Err(err).Msg("Login attempt with invalid payload")
+		ctrl.Config.Logger.Warn().Err(err).Msg("Login attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
@@ -42,9 +42,9 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 	defer cancel()
-	result, err := api.MasterNode.Read(ctx, *queryCommand)
+	result, err := ctrl.Config.MasterNode.Read(ctx, *queryCommand)
 	if err != nil {
-		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Login command execution failed")
+		ctrl.Config.Logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Login command execution failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed: " + err.Error()})
 		return
 	}
@@ -53,34 +53,34 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Login command returned unexpected result type")
+		ctrl.Config.Logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Login command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error"})
 		return
 	}
 
 	if parsedResult.Error != "" {
-		api.logger.Error().Str("username", req.UsernameOrEmail).Str("error", parsedResult.Error).Msg("Login command returned unexpected result type")
+		ctrl.Config.Logger.Error().Str("username", req.UsernameOrEmail).Str("error", parsedResult.Error).Msg("Login command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed due to an internal error (result type)"})
 		return
 	}
 	loggedIn := parsedResult.Result.(bool)
 
 	if !loggedIn {
-		api.logger.Warn().Str("username", req.UsernameOrEmail).Msg("Login attempt failed: invalid credentials")
+		ctrl.Config.Logger.Warn().Str("username", req.UsernameOrEmail).Msg("Login attempt failed: invalid credentials")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
 
-	tokenString, err := api.generateJWT(req.UsernameOrEmail)
+	tokenString, err := ctrl.generateJWT(req.UsernameOrEmail)
 	if err != nil {
-		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Failed to generate JWT token during login")
+		ctrl.Config.Logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Failed to generate JWT token during login")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login successful, but failed to generate token: " + err.Error()})
 		return
 	}
 
 	registerSessionCmd := &commands.RegisterSessionCommand{
 		JWTToken: tokenString,
-		JWTKey:   api.jwtKey,
+		JWTKey:   ctrl.Config.JwtKey,
 	}
 
 	fsmCmd := commands.FSM_Command{
@@ -92,15 +92,15 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
 	defer writeCancel()
 
-	_, err = api.MasterNode.Write(writeCtx, fsmCmd)
+	_, err = ctrl.Config.MasterNode.Write(writeCtx, fsmCmd)
 	if err != nil {
 
-		api.logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Failed to register session after login")
+		ctrl.Config.Logger.Error().Err(err).Str("username", req.UsernameOrEmail).Msg("Failed to register session after login")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register session after login: " + err.Error()})
 		return
 	}
 
-	api.logger.Info().Str("username", req.UsernameOrEmail).Msg("User logged in successfully and session registered")
+	ctrl.Config.Logger.Info().Str("username", req.UsernameOrEmail).Msg("User logged in successfully and session registered")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
 		"token":   tokenString,
@@ -109,8 +109,8 @@ func (api *RestAdminAPI) loginHandler(c *gin.Context) {
 
 // generateJWT generates a new JWT token.
 // This is a placeholder and will be properly implemented in the login handler.
-func (api *RestAdminAPI) generateJWT(username string) (string, error) {
-	expirationTime := time.Now().Add(api.jwtDuration)
+func (ctrl *AdminController) generateJWT(username string) (string, error) {
+	expirationTime := time.Now().Add(ctrl.Config.JwtDuration)
 	claims := &jwt.RegisteredClaims{
 		Subject:   username,
 		ExpiresAt: jwt.NewNumericDate(expirationTime),
@@ -118,7 +118,7 @@ func (api *RestAdminAPI) generateJWT(username string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(api.jwtKey)
+	tokenString, err := token.SignedString(ctrl.Config.JwtKey)
 	if err != nil {
 		return "", err
 	}

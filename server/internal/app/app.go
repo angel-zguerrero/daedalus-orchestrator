@@ -5,7 +5,8 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
-	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
+	rest_server "deadalus-orch/server/internal/infrastructure/server/rest"
+	"deadalus-orch/server/internal/infrastructure/server/rest/common"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
@@ -63,7 +64,7 @@ type Application struct {
 	MasterNode              *dragonboat.RaftNode
 	TenantNodes             []*dragonboat.RaftNode
 	TenantNodesDictionary   map[string]*dragonboat.RaftNode
-	RestAdminAPI            *rest_api_admin.RestAdminAPI
+	RestAPI                 *rest_server.RestServer
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
 	NH                      *dragonboatV4.NodeHost
@@ -237,7 +238,7 @@ func (app *Application) Run() {
 		const masterKey = -1
 
 		defer func() {
-			if app.RestAdminAPI != nil {
+			if app.RestAPI != nil {
 				log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
 				app.CloseAdminAPI()
 			}
@@ -369,7 +370,7 @@ func (app *Application) Stop() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if app.RestAdminAPI != nil {
+		if app.RestAPI != nil {
 			app.CloseAdminAPI()
 		} else {
 			log.Warn().Msg("⚠ No Admin API to stop.")
@@ -414,40 +415,48 @@ func (app *Application) Stop() {
 func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 	app.ApiLock.Lock()
 	defer app.ApiLock.Unlock()
-	if app.RestAdminAPI == nil {
+	if app.RestAPI == nil {
 		jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
 		jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
 
 		log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
 		// Pass the global log.Logger instance, which is configured in app.Run()
-		app.RestAdminAPI = rest_api_admin.NewRestAdminAPI(app.MasterNode, app.TenantNodes, app.TenantNodesDictionary, jwtSecret, jwtDuration, log.Logger)
+		restConfig := &common.RestServerConfing{
+			MasterNode:            app.MasterNode,
+			TenantNodes:           app.TenantNodes,
+			TenantNodesDictionary: app.TenantNodesDictionary,
+			JwtKey:                []byte(jwtSecret),
+			JwtDuration:           jwtDuration,
+			Logger:                log.Logger,
+		}
+		app.RestAPI = rest_server.NewRestServer(restConfig)
 
 		adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 		go func() {
-			if err := app.RestAdminAPI.Start(adminListenAddr); err != nil {
+			if err := app.RestAPI.Start(adminListenAddr); err != nil {
 				log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
 			}
 		}()
 		log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
 
-	} else if app.RestAdminAPI != nil {
+	} else if app.RestAPI != nil {
 		log.Info().Msg("Admin API already running or was previously started.")
 	}
 }
 func (app *Application) CloseAdminAPI() {
 	app.ApiLock.Lock()
 	defer app.ApiLock.Unlock()
-	if app.RestAdminAPI != nil {
+	if app.RestAPI != nil {
 		log.Info().Msg("Closing Admin app...")
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelShutdown()
-		if err := app.RestAdminAPI.Shutdown(shutdownCtx); err != nil {
+		if err := app.RestAPI.Shutdown(shutdownCtx); err != nil {
 			log.Error().Err(err).Msg("❌ Error during Admin API shutdown")
 		} else {
 			log.Info().Msg("✅ Admin API closed successfully.")
 		}
-		app.RestAdminAPI = nil
+		app.RestAPI = nil
 	} else {
 		log.Warn().Msg("No Admin API to close.")
 	}
@@ -609,7 +618,7 @@ func NewApplication() *Application {
 	return &Application{
 		MasterNodeIsReady:       false,
 		MasterNode:              nil,
-		RestAdminAPI:            nil,
+		RestAPI:                 nil,
 		NodeReadyWatcherStopper: syncutil.NewStopper(),
 		TenantNodes:             make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary:   make(map[string]*dragonboat.RaftNode),

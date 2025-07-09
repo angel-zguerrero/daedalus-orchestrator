@@ -23,11 +23,11 @@ type createTenantInMasterRequest struct {
 	Code string `json:"code" binding:"required"`
 }
 
-// createTenantHandler handles POST /admin-api/tenants
-func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
+// CreateTenantHandler handles POST /admin-api/tenants
+func (ctrl *AdminController) CreateTenantHandler(c *gin.Context) {
 	var req createTenantInMasterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.logger.Warn().Err(err).Msg("craete tenant attempt with invalid payload")
+		ctrl.Config.Logger.Warn().Err(err).Msg("craete tenant attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
@@ -46,10 +46,10 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
 	defer writeCancel()
 
-	result, err := api.MasterNode.Write(writeCtx, fsmCmd)
+	result, err := ctrl.Config.MasterNode.Write(writeCtx, fsmCmd)
 	if err != nil {
 
-		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
+		ctrl.Config.Logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new tenant: " + err.Error()})
 		return
 	}
@@ -58,7 +58,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
+		ctrl.Config.Logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant creation command returned unexpected error"})
 		return
 	}
@@ -71,7 +71,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 
 	tenantInMaster := parsedResult.Result.(models.TenantInMaster)
 
-	tenantNode := api.SetTenantNode(tenantInMaster.ShardId, tenantInMaster.ID)
+	tenantNode := ctrl.SetTenantNode(tenantInMaster.ShardId, tenantInMaster.ID)
 
 	if tenantNode == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant node not found"})
@@ -91,7 +91,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	result, err = tenantNode.Write(writeCtx, ccfCmd)
 	if err != nil {
 
-		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
+		ctrl.Config.Logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new tenant: " + err.Error()})
 		return
 	}
@@ -100,7 +100,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	dec = gob.NewDecoder(buf)
 
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
+		ctrl.Config.Logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant creation command returned unexpected error"})
 		return
 	}
@@ -121,10 +121,10 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 		CMD:  assignToShardTenantInMasterCommand,
 	}
 
-	result, err = api.MasterNode.Write(writeCtx, atstCmd)
+	result, err = ctrl.Config.MasterNode.Write(writeCtx, atstCmd)
 	if err != nil {
 
-		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
+		ctrl.Config.Logger.Error().Err(err).Str("Code", req.Code).Msg("Failed to create new tenant")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new tenant: " + err.Error()})
 		return
 	}
@@ -133,7 +133,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 	dec = gob.NewDecoder(buf)
 
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
+		ctrl.Config.Logger.Error().Err(err).Str("Code", req.Code).Msg("Tenant creation command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant creation command returned unexpected error"})
 		return
 	}
@@ -148,7 +148,7 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 		tenantInMaster.Status = models.Assigned
 	}
 
-	api.logger.Info().Str("code", req.Code).Msg("new tenant created successfully")
+	ctrl.Config.Logger.Info().Str("code", req.Code).Msg("new tenant created successfully")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Tenant was created",
 		"result":  tenantInMaster,
@@ -156,8 +156,8 @@ func (api *RestAdminAPI) createTenantHandler(c *gin.Context) {
 
 }
 
-// getTenantHandler handles GET /admin-api/tenants/:id
-func (api *RestAdminAPI) getTenantHandler(c *gin.Context) {
+// GetTenantHandler handles GET /admin-api/tenants/:id
+func (ctrl *AdminController) GetTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
 	findTenantCommand := &commands.FindTenantCommand{
 		TenantID: tenantID,
@@ -172,14 +172,14 @@ func (api *RestAdminAPI) getTenantHandler(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 	defer cancel()
-	result, err := api.MasterNode.Read(ctx, *queryCommand)
+	result, err := ctrl.Config.MasterNode.Read(ctx, *queryCommand)
 	if err != nil {
 		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
 			return
 		}
 
-		api.logger.Error().Err(err).Msg("Find tenants command failed")
+		ctrl.Config.Logger.Error().Err(err).Msg("Find tenants command failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Find tenants command failed: " + err.Error()})
 		return
 	}
@@ -188,26 +188,26 @@ func (api *RestAdminAPI) getTenantHandler(c *gin.Context) {
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Msg("Find tenants command failed")
+		ctrl.Config.Logger.Error().Err(err).Msg("Find tenants command failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Find tenants command failed"})
 		return
 	}
 
 	if parsedResult.Error != "" {
-		api.logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
+		ctrl.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Find tenants command failed"})
 		return
 	}
 
 	if parsedResult.Result == nil {
-		api.logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
+		ctrl.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
 		return
 	}
 
 	tenantInMaster := parsedResult.Result.(models.TenantInMaster)
 
-	node := api.TenantNodesDictionary[tenantInMaster.ID]
+	node := ctrl.Config.TenantNodesDictionary[tenantInMaster.ID]
 
 	if node == nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -231,7 +231,7 @@ func (api *RestAdminAPI) getTenantHandler(c *gin.Context) {
 
 }
 
-func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
+func (ctrl *AdminController) DeleteTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
 
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
@@ -246,10 +246,10 @@ func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
 		CMD:  markToDeletionTenantInMasterCommand,
 	}
 
-	result, err := api.MasterNode.Write(writeCtx, atstCmd)
+	result, err := ctrl.Config.MasterNode.Write(writeCtx, atstCmd)
 	if err != nil {
 
-		api.logger.Error().Err(err).Str("TenantID", tenantID).Msg("Failed to delete tenant")
+		ctrl.Config.Logger.Error().Err(err).Str("TenantID", tenantID).Msg("Failed to delete tenant")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant: " + err.Error()})
 		return
 	}
@@ -258,7 +258,7 @@ func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Str("TenantID", tenantID).Msg("Tenant deletion command returned unexpected result type")
+		ctrl.Config.Logger.Error().Err(err).Str("TenantID", tenantID).Msg("Tenant deletion command returned unexpected result type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant deletion command returned unexpected error"})
 		return
 	}
@@ -279,7 +279,7 @@ func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
 		CMD:  deleteColumnFamilyCommand,
 	}
 
-	tenantNode := api.TenantNodesDictionary[tenantID]
+	tenantNode := ctrl.Config.TenantNodesDictionary[tenantID]
 	if tenantNode == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant error: Tenant node not found"})
 		return
@@ -301,20 +301,20 @@ func (api *RestAdminAPI) deleteTenantHandler(c *gin.Context) {
 		CMD:  deleteTenantInMasterCommand,
 	}
 
-	result, err = api.MasterNode.Write(writeCtx, atstCmd)
+	result, err = ctrl.Config.MasterNode.Write(writeCtx, atstCmd)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tenant error: " + err.Error()})
 		return
 	}
 
-	api.logger.Info().Str("TenantID", tenantID).Msg("new tenant deleted successfully")
+	ctrl.Config.Logger.Info().Str("TenantID", tenantID).Msg("new tenant deleted successfully")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Tenant " + tenantID + " was deleted",
 		"result":  parsedResult.Result,
 	})
 }
 
-func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
+func (ctrl *AdminController) GetTenantsHandler(c *gin.Context) {
 	pageParam := c.Query("page")
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {
@@ -336,9 +336,9 @@ func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 	defer cancel()
-	result, err := api.MasterNode.Read(ctx, *queryCommand)
+	result, err := ctrl.Config.MasterNode.Read(ctx, *queryCommand)
 	if err != nil {
-		api.logger.Error().Err(err).Msg("Paginate tenants command failed")
+		ctrl.Config.Logger.Error().Err(err).Msg("Paginate tenants command failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed: " + err.Error()})
 		return
 	}
@@ -347,13 +347,13 @@ func (api *RestAdminAPI) getTenantsHandler(c *gin.Context) {
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		api.logger.Error().Err(err).Msg("Paginate tenants command failed")
+		ctrl.Config.Logger.Error().Err(err).Msg("Paginate tenants command failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Paginate tenants command failed"})
 		return
 	}
 
 	if parsedResult.Error != "" {
-		api.logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate tenants command failed")
+		ctrl.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate tenants command failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Paginate tenants command failed"})
 		return
 	}

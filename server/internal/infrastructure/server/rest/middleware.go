@@ -1,8 +1,9 @@
-package rest_api_admin
+package rest_server
 
 import (
 	"bytes"
 	"context"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	ratelimit "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
@@ -14,23 +15,24 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/ulule/limiter/v3"
 	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
 )
 
-func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
+func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtKey []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			api.logger.Warn().Msg("Authorization header missing")
+			logger.Warn().Msg("Authorization header missing")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
 			return
 		}
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			api.logger.Warn().Msg("Invalid Authorization header format")
+			logger.Warn().Msg("Invalid Authorization header format")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
 			return
 		}
@@ -41,22 +43,22 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return api.jwtKey, nil
+			return jwtKey, nil
 		})
 
 		if err != nil {
 			if err == jwt.ErrTokenExpired {
-				api.logger.Warn().Msg("JWT token expired")
+				logger.Warn().Msg("JWT token expired")
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token expired"})
 			} else {
-				api.logger.Warn().Err(err).Msg("Invalid JWT token")
+				logger.Warn().Err(err).Msg("Invalid JWT token")
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			}
 			return
 		}
 
 		if !token.Valid {
-			api.logger.Warn().Msg("JWT token is invalid")
+			logger.Warn().Msg("JWT token is invalid")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
@@ -64,7 +66,7 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 		// Locally validated, now check session existence via Raft
 		checkSessionCmd := &commands.CheckSessionExistsCommand{
 			JWTToken: tokenString,
-			JWTKey:   api.jwtKey, // Assuming the command needs the key for its own validation if any
+			JWTKey:   jwtKey, // Assuming the command needs the key for its own validation if any
 		}
 
 		queryCmd := &commands.Query_Command{
@@ -77,9 +79,9 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 		defer cancel()
 
-		result, err := api.MasterNode.Read(ctx, *queryCmd)
+		result, err := MasterNode.Read(ctx, *queryCmd)
 		if err != nil {
-			api.logger.Error().Err(err).Msg("Failed to execute CheckSessionExistsCommand via Raft")
+			logger.Error().Err(err).Msg("Failed to execute CheckSessionExistsCommand via Raft")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify session"})
 			return
 		}
@@ -88,7 +90,7 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 		dec := gob.NewDecoder(buf)
 		parsedResult := &commands.CommandResult{}
 		if err := dec.Decode(parsedResult); err != nil {
-			api.logger.Error().Err(err).Msg("Paginate tenants command failed")
+			logger.Error().Err(err).Msg("Paginate tenants command failed")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Paginate tenants command failed"})
 			return
 		}
@@ -96,7 +98,7 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 		sessionExists := parsedResult.Result.(bool)
 
 		if !sessionExists {
-			api.logger.Warn().Str("token_subject", claims.Subject).Msg("Session does not exist or has been invalidated")
+			logger.Warn().Str("token_subject", claims.Subject).Msg("Session does not exist or has been invalidated")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session is invalid or has expired"})
 			return
 		}
@@ -104,14 +106,14 @@ func (api *RestAdminAPI) authMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-func (api *RestAdminAPI) rateLimitMiddleware(keyStrategy string, Period time.Duration, Limit int64) gin.HandlerFunc {
+func rateLimitMiddleware(MasterNode *dragonboat.RaftNode, keyStrategy string, Period time.Duration, Limit int64) gin.HandlerFunc {
 
 	rate := limiter.Rate{
 		Period: Period,
 		Limit:  Limit,
 	}
 
-	store := ratelimit.NewRaftStore(api.MasterNode, "ratelimit", Period)
+	store := ratelimit.NewRaftStore(MasterNode, "ratelimit", Period)
 
 	var options mgin.Option
 	if keyStrategy == "token" {
