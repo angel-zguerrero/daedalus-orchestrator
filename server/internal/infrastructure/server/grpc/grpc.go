@@ -14,7 +14,13 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
+	"time"
+
 	"google.golang.org/grpc"
+
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
+
+	"github.com/rs/zerolog"
 )
 
 // ListenerFunc is a function type that abstracts the creation of a net.Listener.
@@ -49,12 +55,6 @@ type GRPCServer interface {
 	RegisterService(sd *grpc.ServiceDesc, ss interface{})
 }
 
-	"time"
-
-	"deadalus-orch/server/internal/infrastructure/dragonboat"
-	"github.com/rs/zerolog"
-)
-
 // GRPCServerFactory is a function type that creates and returns an instance of GRPCServer.
 // This allows for customizing the gRPC server creation, for example, to include interceptors or options.
 type GRPCServerFactory func(
@@ -80,13 +80,6 @@ func DefaultListener(network, address string) (net.Listener, error) {
 	return net.Listen(network, address)
 }
 
-	"time"
-
-	"deadalus-orch/server/internal/infrastructure/dragonboat"
-	grpc_middleware "deadalus-orch/server/internal/infrastructure/server/grpc/middleware" // Alias to avoid name collision
-	"github.com/rs/zerolog"
-)
-
 // DefaultGRPCServerFactory is the default implementation of GRPCServerFactory.
 // It creates a standard grpc.Server with OpenTelemetry gRPC server stats handler enabled
 // and configured unary interceptors for auth and rate limiting.
@@ -105,8 +98,8 @@ func DefaultGRPCServerFactory(
 	otelHandler := otelgrpc.NewServerHandler()
 
 	// Setup our interceptors
-	authInterceptor := grpc_middleware.UnaryAuthInterceptor(masterNode, logger, jwtKey)
-	rateLimitInterceptor := grpc_middleware.UnaryRateLimitInterceptor(masterNode, logger, rateLimitStrategy, rateLimitPeriod, rateLimitCount)
+	authInterceptor := UnaryAuthInterceptor(masterNode, logger, jwtKey)
+	rateLimitInterceptor := UnaryRateLimitInterceptor(masterNode, logger, rateLimitStrategy, rateLimitPeriod, rateLimitCount)
 
 	return grpc.NewServer(
 		grpc.StatsHandler(otelHandler),
@@ -135,13 +128,9 @@ func StartGRPC(
 	serverConfig *common.RestServerConfing, // Use existing config struct
 	listen ListenerFunc,
 	gprcServerFactory GRPCServerFactory,
-	grpcPort int, // Added grpcPort
-	rateLimitStrategy string, // Added rate limit params
-	rateLimitPeriod time.Duration,
-	rateLimitCount int64,
 ) error {
 
-	port := grpcPort // Use passed gRPC port
+	port := 2000 // Use passed gRPC port
 
 	lis, err := listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -154,9 +143,9 @@ func StartGRPC(
 		serverConfig.MasterNode,
 		serverConfig.Logger,
 		serverConfig.JwtKey,
-		rateLimitStrategy,
-		rateLimitPeriod,
-		rateLimitCount,
+		"token",
+		1*time.Minute,
+		20,
 	)
 	defer s.GracefulStop()
 
@@ -165,7 +154,7 @@ func StartGRPC(
 	metricsSrv := healthmetrics.NewMetricsServer() // main or follower
 	pb.RegisterMetricsServiceServer(s, metricsSrv)
 
-	tenantSrv := tenant.NewTenantService(config) // main or follower
+	tenantSrv := tenant.NewTenantService(serverConfig) // main or follower
 	pbT.RegisterTenantServiceServer(s, tenantSrv)
 
 	log.Info().

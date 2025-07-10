@@ -1,4 +1,4 @@
-package grpc_server
+package server
 
 import (
 	"context"
@@ -14,13 +14,14 @@ import (
 	"fmt"
 	"strings"
 
+	"net"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
 	"github.com/ulule/limiter/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"net"
 
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
@@ -199,11 +200,4 @@ func UnaryRateLimitInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.L
 
 		return handler(ctx, req)
 	}
-}
-
-// Helper function to get JWT key from config (if not passed directly)
-// This is a placeholder, actual key management might be different
-func getJWTKeyFromConfig() []byte {
-	// In a real scenario, this would come from a secure configuration source
-	return []byte(config.GlobalConfiguration.JWTSecret)
 }
