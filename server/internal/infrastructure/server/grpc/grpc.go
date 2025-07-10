@@ -14,7 +14,13 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
+	"time"
+
 	"google.golang.org/grpc"
+
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
+
+	"github.com/rs/zerolog"
 )
 
 // ListenerFunc is a function type that abstracts the creation of a net.Listener.
@@ -51,10 +57,14 @@ type GRPCServer interface {
 
 // GRPCServerFactory is a function type that creates and returns an instance of GRPCServer.
 // This allows for customizing the gRPC server creation, for example, to include interceptors or options.
-//
-// Returns:
-//   - An instance of GRPCServer.
-type GRPCServerFactory func() GRPCServer
+type GRPCServerFactory func(
+	masterNode *dragonboat.RaftNode,
+	logger zerolog.Logger,
+	jwtKey []byte,
+	rateLimitStrategy string,
+	rateLimitPeriod time.Duration,
+	rateLimitCount int64,
+) GRPCServer
 
 // DefaultListener is the default implementation of ListenerFunc.
 // It uses net.Listen to create a standard network listener.
@@ -71,14 +81,34 @@ func DefaultListener(network, address string) (net.Listener, error) {
 }
 
 // DefaultGRPCServerFactory is the default implementation of GRPCServerFactory.
-// It creates a standard grpc.Server with OpenTelemetry gRPC server stats handler enabled.
+// It creates a standard grpc.Server with OpenTelemetry gRPC server stats handler enabled
+// and configured unary interceptors for auth and rate limiting.
 //
 // Returns:
 //   - A GRPCServer instance (which is a *grpc.Server).
-func DefaultGRPCServerFactory() GRPCServer {
+func DefaultGRPCServerFactory(
+	masterNode *dragonboat.RaftNode,
+	logger zerolog.Logger,
+	jwtKey []byte,
+	rateLimitStrategy string,
+	rateLimitPeriod time.Duration,
+	rateLimitCount int64,
+) GRPCServer {
 	// Enable OpenTelemetry instrumentation for the gRPC server.
-	handler := otelgrpc.NewServerHandler()
-	return grpc.NewServer(grpc.StatsHandler(handler))
+	otelHandler := otelgrpc.NewServerHandler()
+
+	// Setup our interceptors
+	authInterceptor := UnaryAuthInterceptor(masterNode, logger, jwtKey)
+	rateLimitInterceptor := UnaryRateLimitInterceptor(masterNode, logger, rateLimitStrategy, rateLimitPeriod, rateLimitCount)
+
+	return grpc.NewServer(
+		grpc.StatsHandler(otelHandler),
+		grpc.ChainUnaryInterceptor(
+			authInterceptor,
+			rateLimitInterceptor,
+			// Add other interceptors here if needed in the future
+		),
+	)
 }
 
 // StartGRPC initializes and starts the gRPC server.
@@ -95,13 +125,12 @@ func DefaultGRPCServerFactory() GRPCServer {
 //   - An error if starting the listener or serving fails. Returns nil if the server
 //     starts and shuts down gracefully without serving errors.
 func StartGRPC(
-	config *common.RestServerConfing,
+	serverConfig *common.RestServerConfing, // Use existing config struct
 	listen ListenerFunc,
 	gprcServerFactory GRPCServerFactory,
 ) error {
 
-	// TODO: Port should be configurable via the `config_app` parameter.
-	port := 2000 // Default port for the gRPC server.
+	port := 2000 // Use passed gRPC port
 
 	lis, err := listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -109,7 +138,15 @@ func StartGRPC(
 	}
 	defer lis.Close()
 
-	s := gprcServerFactory()
+	// Pass dependencies to the factory
+	s := gprcServerFactory(
+		serverConfig.MasterNode,
+		serverConfig.Logger,
+		serverConfig.JwtKey,
+		"token",
+		1*time.Minute,
+		20,
+	)
 	defer s.GracefulStop()
 
 	// registration gRPC implementations
@@ -117,7 +154,7 @@ func StartGRPC(
 	metricsSrv := healthmetrics.NewMetricsServer() // main or follower
 	pb.RegisterMetricsServiceServer(s, metricsSrv)
 
-	tenantSrv := tenant.NewTenantService(config) // main or follower
+	tenantSrv := tenant.NewTenantService(serverConfig) // main or follower
 	pbT.RegisterTenantServiceServer(s, tenantSrv)
 
 	log.Info().
