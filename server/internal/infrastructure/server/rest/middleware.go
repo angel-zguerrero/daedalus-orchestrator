@@ -90,8 +90,8 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 		dec := gob.NewDecoder(buf)
 		parsedResult := &commands.CommandResult{}
 		if err := dec.Decode(parsedResult); err != nil {
-			logger.Error().Err(err).Msg("Paginate tenants command failed")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Paginate tenants command failed"})
+			logger.Error().Err(err).Msg("Session does not exist or has been invalidated")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Session does not exist or has been invalidated"})
 			return
 		}
 
