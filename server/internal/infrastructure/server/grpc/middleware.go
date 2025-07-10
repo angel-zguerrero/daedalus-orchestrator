@@ -195,7 +195,27 @@ func UnaryRateLimitInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.L
 
 		if limiterCtx.Reached {
 			logger.Warn().Str("key", key).Int64("limit", limiterCtx.Limit).Msg("UnaryRateLimitInterceptor: Rate limit reached")
+			// Also set headers when rate limit is reached
+			headers := metadata.New(map[string]string{
+				"x-ratelimit-limit":     fmt.Sprintf("%d", limiterCtx.Limit),
+				"x-ratelimit-remaining": fmt.Sprintf("%d", limiterCtx.Remaining),
+				"x-ratelimit-reset":     fmt.Sprintf("%d", limiterCtx.Reset),
+			})
+			if err := grpc.SetHeader(ctx, headers); err != nil {
+				logger.Error().Err(err).Msg("UnaryRateLimitInterceptor: Failed to set rate limit headers on rate limit reached")
+			}
 			return nil, status.Errorf(codes.ResourceExhausted, "too many requests, please try again later")
+		}
+
+		// Set rate limit headers
+		headers := metadata.New(map[string]string{
+			"x-ratelimit-limit":     fmt.Sprintf("%d", limiterCtx.Limit),
+			"x-ratelimit-remaining": fmt.Sprintf("%d", limiterCtx.Remaining),
+			"x-ratelimit-reset":     fmt.Sprintf("%d", limiterCtx.Reset),
+		})
+		if err := grpc.SetHeader(ctx, headers); err != nil {
+			// Log the error but don't fail the request, as header setting is secondary to request processing.
+			logger.Error().Err(err).Msg("UnaryRateLimitInterceptor: Failed to set rate limit headers")
 		}
 
 		return handler(ctx, req)
