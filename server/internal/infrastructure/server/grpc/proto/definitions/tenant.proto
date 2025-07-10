@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package tenant;
+
+option go_package = "pb/tenant;tenant";
+
+service TenantService {
+  rpc GetTenantInfo (TenantInfoRequest) returns (TenantInfoResponse);
+}
+
+message TenantInfoRequest {
+   string ID = 1;
+}
+
+message TenantInfoResponse {
+  string ID = 1;
+  string Code = 2;
+  int64 ShardId = 3;
+  string Status = 4;
+  string CreatedAt = 5;
+  string UpdatedAt = 6;
+}
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/tenant.proto

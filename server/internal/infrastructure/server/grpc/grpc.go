@@ -1,14 +1,16 @@
 package server
 
 import (
-	"deadalus-orch/server/internal/pkg/config"
 	"fmt"
 	"net"
 
 	"github.com/rs/zerolog/log"
 
+	"deadalus-orch/server/internal/infrastructure/server/common"
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
+	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
@@ -93,7 +95,7 @@ func DefaultGRPCServerFactory() GRPCServer {
 //   - An error if starting the listener or serving fails. Returns nil if the server
 //     starts and shuts down gracefully without serving errors.
 func StartGRPC(
-	config_app config.Config, // Renamed to avoid conflict with package name 'config'
+	config *common.RestServerConfing,
 	listen ListenerFunc,
 	gprcServerFactory GRPCServerFactory,
 ) error {
@@ -114,6 +116,9 @@ func StartGRPC(
 
 	metricsSrv := healthmetrics.NewMetricsServer() // main or follower
 	pb.RegisterMetricsServiceServer(s, metricsSrv)
+
+	tenantSrv := tenant.NewTenantService(config) // main or follower
+	pbT.RegisterTenantServiceServer(s, tenantSrv)
 
 	log.Info().
 		Int("port", port).

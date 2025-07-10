@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/infrastructure/server/rest/common"
+	"deadalus-orch/server/internal/infrastructure/server/common"
+
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"

@@ -2,7 +2,7 @@ package rest_api_admin
 
 import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
-	"deadalus-orch/server/internal/infrastructure/server/rest/common"
+	"deadalus-orch/server/internal/infrastructure/server/common"
 )
 
 // AdminController handles the administrative REST API endpoints.

@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"deadalus-orch/server/internal/infrastructure/server/rest/common"
+	"deadalus-orch/server/internal/infrastructure/server/common"
 	"net/http"
 	"os"
 	"time"

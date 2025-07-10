@@ -5,8 +5,9 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/infrastructure/server/common"
+	server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	rest_server "deadalus-orch/server/internal/infrastructure/server/rest"
-	"deadalus-orch/server/internal/infrastructure/server/rest/common"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
@@ -422,7 +423,7 @@ func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 		log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
 		// Pass the global log.Logger instance, which is configured in app.Run()
-		restConfig := &common.RestServerConfing{
+		serverConfig := &common.RestServerConfing{
 			MasterNode:            app.MasterNode,
 			TenantNodes:           app.TenantNodes,
 			TenantNodesDictionary: app.TenantNodesDictionary,
@@ -430,7 +431,7 @@ func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 			JwtDuration:           jwtDuration,
 			Logger:                log.Logger,
 		}
-		app.RestAPI = rest_server.NewRestServer(restConfig)
+		app.RestAPI = rest_server.NewRestServer(serverConfig)
 
 		adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 		go func() {
@@ -438,6 +439,18 @@ func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 				log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
 			}
 		}()
+
+		go func() {
+			if err := server.StartGRPC(
+				serverConfig,
+				server.DefaultListener,
+				server.DefaultGRPCServerFactory,
+			); err != nil {
+				log.Error().Err(err).Msg("❌ failed to start gRPC server")
+
+			}
+		}()
+
 		log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
 
 	} else if app.RestAPI != nil {
