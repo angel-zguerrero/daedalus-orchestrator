@@ -112,7 +112,7 @@ func StartGRPC(
 
 	// registration gRPC implementations
 
-	metricsSrv := healthmetrics.NewMetricsServer("main") // main or follower
+	metricsSrv := healthmetrics.NewMetricsServer() // main or follower
 	pb.RegisterMetricsServiceServer(s, metricsSrv)
 
 	log.Info().

@@ -17,7 +17,6 @@ import (
 type MetricsServer struct {
 	pb.UnimplementedMetricsServiceServer           // Embeds the unimplemented server for forward compatibility.
 	startTime                            time.Time // The time when the MetricsServer was instantiated, used to calculate uptime.
-	NodeType                             string    // Type of the node (e.g., "main", "follower") this metrics server is running on.
 }
 
 // NewMetricsServer creates a new instance of MetricsServer.
@@ -28,10 +27,9 @@ type MetricsServer struct {
 //
 // Returns:
 //   - A pointer to the newly created MetricsServer.
-func NewMetricsServer(nodeType string) *MetricsServer {
+func NewMetricsServer() *MetricsServer {
 	return &MetricsServer{
 		startTime: time.Now(),
-		NodeType:  nodeType,
 	}
 }
 
@@ -67,7 +65,6 @@ func (s *MetricsServer) GetSystemMetrics(ctx context.Context, _ *pb.SystemMetric
 		MemoryFreeBytes:  vmStat.Free,
 		UptimeSeconds:    uint64(time.Since(s.startTime).Seconds()),
 		Hostname:         hostname,
-		NodeType:         s.NodeType,
 		Timestamp:        time.Now().Unix(),
 	}, nil
 }

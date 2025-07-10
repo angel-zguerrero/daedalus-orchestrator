@@ -1,9 +1,10 @@
-package rest_api_admin
+package tenant
 
 import (
 	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/server/rest/common"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
@@ -14,17 +15,51 @@ import (
 	"strings"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/lni/dragonboat/v4"
+	db4 "github.com/lni/dragonboat/v4"
 )
+
+type TenantController struct {
+	Config *common.RestServerConfing
+}
+
+// NewTenantController creates a new instance of RestAdminAPI.
+func NewTenantController(Config *common.RestServerConfing) *TenantController {
+
+	api := &TenantController{
+		Config: Config,
+	}
+
+	return api
+}
+
+func (c *TenantController) SetTenantNode(shardID int, tenantId string) *dragonboat.RaftNode {
+	var tenant *dragonboat.RaftNode
+
+	c.Config.TenantNodesLock.Lock()
+	for i := range c.Config.TenantNodes {
+		if c.Config.TenantNodes[i].ShardID == uint64(shardID) {
+			tenant = c.Config.TenantNodes[i]
+			break
+		}
+	}
+	c.Config.TenantNodesLock.Unlock()
+
+	c.Config.TenantNodesLock.Lock()
+	c.Config.TenantNodesDictionary[tenantId] = tenant
+	c.Config.TenantNodesLock.Unlock()
+	return tenant
+}
 
 type createTenantInMasterRequest struct {
 	Code string `json:"code" binding:"required"`
 }
 
 // CreateTenantHandler handles POST /admin-api/tenants
-func (ctrl *AdminController) CreateTenantHandler(c *gin.Context) {
+func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 	var req createTenantInMasterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ctrl.Config.Logger.Warn().Err(err).Msg("craete tenant attempt with invalid payload")
@@ -157,7 +192,7 @@ func (ctrl *AdminController) CreateTenantHandler(c *gin.Context) {
 }
 
 // GetTenantHandler handles GET /admin-api/tenants/:id
-func (ctrl *AdminController) GetTenantHandler(c *gin.Context) {
+func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
 	findTenantCommand := &commands.FindTenantCommand{
 		TenantID: tenantID,
@@ -215,7 +250,7 @@ func (ctrl *AdminController) GetTenantHandler(c *gin.Context) {
 			"result":  parsedResult.Result,
 		})
 	} else {
-		nodeHostInfoOption := &dragonboat.NodeHostInfoOption{SkipLogInfo: true}
+		nodeHostInfoOption := &db4.NodeHostInfoOption{SkipLogInfo: true}
 		NodeHostInfo := node.NH.GetNodeHostInfo(*nodeHostInfoOption)
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Tenant",
@@ -231,7 +266,7 @@ func (ctrl *AdminController) GetTenantHandler(c *gin.Context) {
 
 }
 
-func (ctrl *AdminController) DeleteTenantHandler(c *gin.Context) {
+func (ctrl *TenantController) DeleteTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
 
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
@@ -314,7 +349,7 @@ func (ctrl *AdminController) DeleteTenantHandler(c *gin.Context) {
 	})
 }
 
-func (ctrl *AdminController) GetTenantsHandler(c *gin.Context) {
+func (ctrl *TenantController) GetTenantsHandler(c *gin.Context) {
 	pageParam := c.Query("page")
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {

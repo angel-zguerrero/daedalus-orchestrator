@@ -3,6 +3,7 @@ package rest_server
 import (
 	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
+	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +13,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 	adminController := rest_api_admin.NewAdminController(s.Config)
 	metricsController := metrics.NewMetricsController(s.Config)
+	tenantController := tenant.NewTenantController(s.Config)
 
 	adminAPIGroup := engine.Group("/admin-api")
 	{
@@ -22,10 +24,10 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 20))
 		{
-			tenantsGroup.GET("", adminController.GetTenantsHandler)
-			tenantsGroup.POST("", adminController.CreateTenantHandler)
-			tenantsGroup.GET("/:id", adminController.GetTenantHandler)
-			tenantsGroup.DELETE("/:id", adminController.DeleteTenantHandler)
+			tenantsGroup.GET("", tenantController.GetTenantsHandler)
+			tenantsGroup.POST("", tenantController.CreateTenantHandler)
+			tenantsGroup.GET("/:id", tenantController.GetTenantHandler)
+			tenantsGroup.DELETE("/:id", tenantController.DeleteTenantHandler)
 		}
 	}
 	metricsAPIGroup := engine.Group("/metrics")
