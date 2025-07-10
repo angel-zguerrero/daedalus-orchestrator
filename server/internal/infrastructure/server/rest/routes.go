@@ -2,6 +2,7 @@ package rest_server
 
 import (
 	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
+	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,7 @@ import (
 func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 	adminController := rest_api_admin.NewAdminController(s.Config)
+	metricsController := metrics.NewMetricsController(s.Config)
 
 	adminAPIGroup := engine.Group("/admin-api")
 	{
@@ -26,4 +28,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.DELETE("/:id", adminController.DeleteTenantHandler)
 		}
 	}
+	metricsAPIGroup := engine.Group("/metrics")
+	metricsAPIGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+	metricsAPIGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 20))
+	metricsAPIGroup.GET("/", metricsController.GetSystemMetricsHandler)
 }
