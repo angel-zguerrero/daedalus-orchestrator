@@ -7,8 +7,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	pb "deadalus-orch/server/internal/infrastructure/common/proto/health/metrics"
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/health"
+	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 

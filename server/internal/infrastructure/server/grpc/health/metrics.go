@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	pb "deadalus-orch/server/internal/infrastructure/common/proto/health/metrics"
+	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
@@ -15,7 +15,7 @@ import (
 // It provides gRPC methods to retrieve system metrics such as CPU usage,
 // memory usage, uptime, hostname, and node type.
 type MetricsServer struct {
-	pb.UnimplementedMetricsServiceServer      // Embeds the unimplemented server for forward compatibility.
+	pb.UnimplementedMetricsServiceServer           // Embeds the unimplemented server for forward compatibility.
 	startTime                            time.Time // The time when the MetricsServer was instantiated, used to calculate uptime.
 	NodeType                             string    // Type of the node (e.g., "main", "follower") this metrics server is running on.
 }
