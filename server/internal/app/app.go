@@ -7,7 +7,6 @@ import (
 	grpc_server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	rest_server "deadalus-orch/server/internal/infrastructure/server/rest"
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
 	"deadalus-orch/server/internal/telemetry"
 	"deadalus-orch/shared/constants"
 	"fmt"
@@ -15,8 +14,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	commands "deadalus-orch/server/internal/usecase/command"
 
 	dragonboatV4 "github.com/lni/dragonboat/v4"
 	dragonboatV4Config "github.com/lni/dragonboat/v4/config"
@@ -224,116 +221,7 @@ func (app *Application) Run() {
 
 	log.Info().Interface("", roles).Msg("This node has these roles")
 
-	app.NodeReadyWatcherStopper.RunWorker(func() {
-		interval := 3 * time.Second
-		masterReadyCh := masterNode.StartNodeReadyWatcher(interval)
-
-		tenantReadyChs := make([]<-chan bool, len(app.TenantNodes))
-		for i, node := range app.TenantNodes {
-			tenantReadyChs[i] = node.StartNodeReadyWatcher(interval)
-		}
-
-		readyMap := make(map[int]bool) // key -1 for master, 0..N-1 for tenants
-		const masterKey = -1
-
-		defer func() {
-			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
-			app.CloseAdminAPI()
-		}()
-
-		defer func() {
-			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring grpc API is shutdown...")
-			app.CloseGrpcAPI()
-		}()
-
-		for {
-			select {
-			case isReady, ok := <-masterReadyCh:
-				if !ok {
-					log.Warn().Msg("🛑 Master node watcher closed.")
-					return
-				}
-				readyMap[masterKey] = isReady
-
-			default:
-				for i, ch := range tenantReadyChs {
-					select {
-					case ready, ok := <-ch:
-						if !ok {
-							log.Warn().Int("tenant", i).Msg("🛑 Tenant node watcher closed.")
-							return
-						}
-						if !ready && app.MasterNodeIsReady {
-							log.Warn().Int("tenant", i).Msg("⚠️ Tenant node does not respond.")
-						}
-						readyMap[i] = ready
-					default:
-					}
-				}
-			}
-
-			allReady := readyMap[masterKey]
-			for i := range tenantReadyChs {
-				if !readyMap[i] {
-					allReady = false
-					break
-				}
-			}
-
-			if allReady && !app.MasterNodeIsReady {
-				log.Info().Msg("✅ Master + all tenants ready for consensus.")
-				app.MasterNodeIsReady = true
-
-				app.StartAssignTenants()
-				if dragonboat.ContainsRole(roles, dragonboat.RoleConsensus) {
-					bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
-					cmd := commands.FSM_Command{
-						Now:  utils.GetNowInInt(),
-						Type: commands.REPOSITORY_COMMAND,
-						CMD:  bootstrapRootUserCmd,
-					}
-
-					ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-					defer cancel()
-					_, err := masterNode.Write(ctx, cmd)
-					if err != nil {
-						log.Fatal().
-							Err(err).
-							Str("package", "app").
-							Str("func", "Run").
-							Msgf("❌ Failed to bootstrap root user")
-					}
-				}
-
-				if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
-					app.StartAdminAPI()
-				} else {
-					app.CloseAdminAPI()
-				}
-
-				if dragonboat.ContainsRole(roles, dragonboat.RoleConnector) {
-					app.StartGrpcAPI()
-				} else {
-					app.CloseGrpcAPI()
-				}
-
-			}
-
-			if !allReady && app.MasterNodeIsReady {
-				log.Warn().Msg("⚠️ One or more nodes are not ready. Marking node as not ready.")
-				app.MasterNodeIsReady = false
-				app.CloseAdminAPI()
-				app.CloseGrpcAPI()
-			}
-
-			select {
-			case <-app.NodeReadyWatcherStopper.ShouldStop():
-				log.Info().Msg("🛑 NodeReadyWatcher received stop signal.")
-				return
-			case <-time.After(interval):
-			}
-		}
-	})
+	app.StartNodeReadyWatcherWorker(3 * time.Second)
 
 }
 
