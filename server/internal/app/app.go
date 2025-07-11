@@ -6,7 +6,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
-	server "deadalus-orch/server/internal/infrastructure/server/grpc"
+	grpc_server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	rest_server "deadalus-orch/server/internal/infrastructure/server/rest"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
@@ -66,8 +66,10 @@ type Application struct {
 	TenantNodes             []*dragonboat.RaftNode
 	TenantNodesDictionary   map[string]*dragonboat.RaftNode
 	RestAPI                 *rest_server.RestServer
+	GrpcAPI                 *grpc_server.GrpcServer
 	NodeReadyWatcherStopper *syncutil.Stopper
 	ApiLock                 sync.Mutex
+	GrpcLock                sync.Mutex
 	NH                      *dragonboatV4.NodeHost
 }
 
@@ -239,10 +241,13 @@ func (app *Application) Run() {
 		const masterKey = -1
 
 		defer func() {
-			if app.RestAPI != nil {
-				log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
-				app.CloseAdminAPI()
-			}
+			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
+			app.CloseAdminAPI()
+		}()
+
+		defer func() {
+			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring grpc API is shutdown...")
+			app.CloseGrpcAPI()
 		}()
 
 		for {
@@ -309,12 +314,20 @@ func (app *Application) Run() {
 				} else {
 					app.CloseAdminAPI()
 				}
+
+				if dragonboat.ContainsRole(roles, dragonboat.RoleConnector) {
+					app.StartGrpcAPI(masterNode)
+				} else {
+					app.CloseGrpcAPI()
+				}
+
 			}
 
 			if !allReady && app.MasterNodeIsReady {
 				log.Warn().Msg("⚠️ One or more nodes are not ready. Marking node as not ready.")
 				app.MasterNodeIsReady = false
 				app.CloseAdminAPI()
+				app.CloseGrpcAPI()
 			}
 
 			select {
@@ -378,6 +391,16 @@ func (app *Application) Stop() {
 		}
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if app.GrpcAPI != nil {
+			app.CloseGrpcAPI()
+		} else {
+			log.Warn().Msg("⚠ No Grpc API to stop.")
+		}
+	}()
+
 	// Stop Watcher
 	wg.Add(1)
 	go func() {
@@ -433,28 +456,45 @@ func (app *Application) StartAdminAPI(masterNode *dragonboat.RaftNode) {
 		}
 		app.RestAPI = rest_server.NewRestServer(serverConfig)
 
-		adminListenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
 		go func() {
-			if err := app.RestAPI.Start(adminListenAddr); err != nil {
+			if err := app.RestAPI.Start(); err != nil {
 				log.Error().Err(err).Msg("❌ Admin API server failed to start or shut down with error")
 			}
 		}()
 
-		go func() {
-			if err := server.StartGRPC(
-				serverConfig,
-				server.DefaultListener,
-				server.DefaultGRPCServerFactory,
-			); err != nil {
-				log.Error().Err(err).Msg("❌ failed to start gRPC server")
+	} else if app.RestAPI != nil {
+		log.Info().Msg("Admin API already running or was previously started.")
+	}
+}
+func (app *Application) StartGrpcAPI(masterNode *dragonboat.RaftNode) {
+	app.GrpcLock.Lock()
+	defer app.GrpcLock.Unlock()
+	if app.GrpcAPI == nil {
+		jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
+		jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
 
+		log.Info().Msg("grpc API JWT Expiration: " + jwtDuration.String())
+
+		// Pass the global log.Logger instance, which is configured in app.Run()
+		serverConfig := &common.RestServerConfing{
+			MasterNode:            app.MasterNode,
+			TenantNodes:           app.TenantNodes,
+			TenantNodesDictionary: app.TenantNodesDictionary,
+			JwtKey:                []byte(jwtSecret),
+			JwtDuration:           jwtDuration,
+			Logger:                log.Logger,
+		}
+		grpcAPI, _ := grpc_server.NewGrpcServer(serverConfig)
+		app.GrpcAPI = grpcAPI
+
+		go func() {
+			if err := app.GrpcAPI.Start(); err != nil {
+				log.Error().Err(err).Msg("❌ grpc API server failed to start or shut down with error")
 			}
 		}()
 
-		log.Info().Str("address", adminListenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
-
-	} else if app.RestAPI != nil {
-		log.Info().Msg("Admin API already running or was previously started.")
+	} else if app.GrpcAPI != nil {
+		log.Info().Msg("grpc API already running or was previously started.")
 	}
 }
 func (app *Application) CloseAdminAPI() {
@@ -462,9 +502,8 @@ func (app *Application) CloseAdminAPI() {
 	defer app.ApiLock.Unlock()
 	if app.RestAPI != nil {
 		log.Info().Msg("Closing Admin app...")
-		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancelShutdown()
-		if err := app.RestAPI.Shutdown(shutdownCtx); err != nil {
+
+		if err := app.RestAPI.Shutdown(); err != nil {
 			log.Error().Err(err).Msg("❌ Error during Admin API shutdown")
 		} else {
 			log.Info().Msg("✅ Admin API closed successfully.")
@@ -472,6 +511,20 @@ func (app *Application) CloseAdminAPI() {
 		app.RestAPI = nil
 	} else {
 		log.Warn().Msg("No Admin API to close.")
+	}
+}
+
+func (app *Application) CloseGrpcAPI() {
+	app.GrpcLock.Lock()
+	defer app.GrpcLock.Unlock()
+	if app.GrpcAPI != nil {
+		log.Info().Msg("Closing grpc api ...")
+
+		app.GrpcAPI.Shutdown()
+		log.Info().Msg("✅ grpc API closed successfully.")
+		app.GrpcAPI = nil
+	} else {
+		log.Warn().Msg("No grpc API to close.")
 	}
 }
 
