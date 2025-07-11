@@ -48,6 +48,10 @@ type Config struct {
 	ApiRaftTimeout time.Duration
 	// MaxTenants is the maximum number of tenants supported by the cluster.
 	MaxTenants int
+	// GrpcServerListenAddrHost is the host address for the gRPC server.
+	GrpcServerListenAddrHost string
+	// GrpcServerListenAddrPort is the port for the gRPC server.
+	GrpcServerListenAddrPort int
 
 	Env string
 }
@@ -75,6 +79,8 @@ type ConfigFromMap struct {
 	admin_api_jwt_secret           string
 	api_raft_timeout               int64 // Timeout in seconds
 	max_tenants                    int
+	grpc_server_listen_addr_host   string
+	grpc_server_listen_addr_port   int
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -106,6 +112,8 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		AdminAPIJWTSecret:          configFromMapInstance.admin_api_jwt_secret,
 		ApiRaftTimeout:             time.Duration(configFromMapInstance.api_raft_timeout) * time.Second,
 		MaxTenants:                 configFromMapInstance.max_tenants,
+		GrpcServerListenAddrHost:   configFromMapInstance.grpc_server_listen_addr_host,
+		GrpcServerListenAddrPort:   configFromMapInstance.grpc_server_listen_addr_port,
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
 		// after considering flags and env vars. We need to pass the raw string from the config file if present.
 		// However, the Config struct doesn't store the raw string.
