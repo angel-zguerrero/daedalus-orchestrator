@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, input } from '@angular/core';
 
-import packageJson from '../../../package.json';
 import { IconDirective } from '@coreui/icons-angular';
 import { RouterLink } from '@angular/router';
 import { NavComponent, NavItemComponent, NavLinkDirective } from '@coreui/angular';
@@ -22,8 +21,8 @@ export class DocsExampleComponent {
   readonly fragment = input<string>();
 
   readonly href = computed(() => {
-    const version = packageJson?.config?.coreui_library_short_version;
-    const docsUrl = packageJson?.config?.coreui_library_docs_url ?? 'https://coreui.io/angular/';
+    const version = "1";
+    const docsUrl = 'https://coreui.io/angular/';
     const href = this.hrefInput();
     // const path: string = version ? `${version}/${href}` : `${href}`;
     const path: string = href;

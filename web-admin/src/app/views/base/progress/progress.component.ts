@@ -9,12 +9,12 @@ import {
   ProgressStackedComponent,
   RowComponent
 } from '@coreui/angular';
-import { DocsComponentsComponent, DocsExampleComponent } from '@docs-components/public-api';
+
 
 @Component({
   selector: 'app-progress',
   templateUrl: './progress.component.html',
-  imports: [RowComponent, ColComponent, CardComponent, CardHeaderComponent, CardBodyComponent, DocsExampleComponent, ProgressStackedComponent, ProgressComponent, ProgressBarComponent, DocsComponentsComponent]
+  imports: [RowComponent, ColComponent, CardComponent, CardHeaderComponent, CardBodyComponent, ProgressStackedComponent, ProgressComponent, ProgressBarComponent]
 })
 export class AppProgressComponent {
 
