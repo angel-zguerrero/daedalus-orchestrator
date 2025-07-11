@@ -57,6 +57,7 @@ func (c *TenantController) SetTenantNode(shardID int, tenantId string) *dragonbo
 
 type createTenantInMasterRequest struct {
 	Code string `json:"code" binding:"required"`
+	Name string `json:"name" binding:"required"`
 }
 
 // CreateTenantHandler handles POST /admin-api/tenants
@@ -71,6 +72,7 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 	createTenantInMasterCommand := &commands.CreateTenantInMasterCommand{
 		TenantId:   strings.ReplaceAll(uuid.New().String(), "-", ""),
 		TenantCode: req.Code,
+		TenantName: req.Name,
 	}
 
 	fsmCmd := commands.FSM_Command{
@@ -184,7 +186,7 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 		tenantInMaster.Status = models.Assigned
 	}
 
-	ctrl.Config.Logger.Info().Str("code", req.Code).Msg("new tenant created successfully")
+	ctrl.Config.Logger.Info().Str("code", req.Code).Msg("tenant asserted successfully")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Tenant was created",
 		"result":  tenantInMaster,

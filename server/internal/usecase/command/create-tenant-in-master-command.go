@@ -18,6 +18,7 @@ func init() {
 type CreateTenantInMasterCommand struct {
 	TenantId   string
 	TenantCode string
+	TenantName string
 }
 
 func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
@@ -74,15 +75,23 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 
-	if tenantInMasterFound != nil {
-		commandResult.Result = tenantInMasterFound
-		return *commandResult
-	}
-
 	tenantInMaster := models.TenantInMaster{
 		ID:      cmd.TenantId,
 		Code:    cmd.TenantCode,
 		ShardId: lastShardId,
+		Name:    cmd.TenantName,
+	}
+	if tenantInMasterFound != nil {
+		tenantInMaster.ID = tenantInMasterFound.ID
+		tenantInMaster.CreatedAt = tenantInMasterFound.CreatedAt
+		tenantInMaster.ShardId = tenantInMasterFound.ShardId
+		_, err = tenantInMasterRepo.UpdateTenantInMaster(&tenantInMaster, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		commandResult.Result = tenantInMaster
+		return *commandResult
 	}
 
 	_, err = tenantInMasterRepo.CreateTenantInMaster(&tenantInMaster, now)

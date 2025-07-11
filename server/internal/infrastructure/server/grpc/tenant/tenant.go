@@ -8,14 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
-	"deadalus-orch/server/internal/infrastructure/dragonboat"
 
 	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
+
 	"github.com/google/uuid"
 )
 
@@ -54,6 +55,7 @@ func (ctrl *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantR
 	createTenantInMasterCommand := &commands.CreateTenantInMasterCommand{
 		TenantId:   strings.ReplaceAll(uuid.New().String(), "-", ""),
 		TenantCode: r.Code,
+		TenantName: r.Name,
 	}
 
 	fsmCmd := commands.FSM_Command{
@@ -157,9 +159,10 @@ func (ctrl *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantR
 		tenantInMaster.Status = models.Assigned
 	}
 
-	ctrl.Config.Logger.Info().Str("code", r.Code).Msg("new tenant created successfully")
+	ctrl.Config.Logger.Info().Str("code", r.Code).Msg("tenant asserted successfully")
 	return &pb.AssertTenantResponse{
 		ID:        tenantInMaster.ID,
+		Name:      tenantInMaster.Name,
 		ShardId:   int64(tenantInMaster.ShardId),
 		Code:      tenantInMaster.Code,
 		Status:    string(tenantInMaster.Status),

@@ -11,8 +11,8 @@ const (
 )
 
 type TenantInMaster struct {
-	ID string `orm:"primary-key"`
-
+	ID   string `orm:"primary-key"`
+	Name string
 	Code string `orm:"unique"`
 
 	ShardId int
