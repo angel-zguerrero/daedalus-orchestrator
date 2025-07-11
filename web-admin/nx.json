@@ -7,8 +7,10 @@
         "^build"
       ],
       "inputs": [
+        "development",
         "production",
-        "^production"
+        "^production",
+        "^development"
       ]
     },
     "test": {
@@ -31,6 +33,9 @@
       "!{projectRoot}/tsconfig.spec.json",
       "!{projectRoot}/**/*.spec.[jt]s",
       "!{projectRoot}/karma.conf.js"
+    ],
+    "development": [
+      "default"
     ]
   }
 }
