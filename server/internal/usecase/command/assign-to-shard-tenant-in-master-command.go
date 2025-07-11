@@ -39,7 +39,7 @@ func (cmd *AssignToShardTenantInMasterCommand) Execute(uow *db.UnitOfWork, now t
 	}
 
 	tenantInMasterFound.Status = models.Assigned
-	_, err = tenantInMasterRepo.UpdateTenantInMaster(*tenantInMasterFound, now)
+	_, err = tenantInMasterRepo.UpdateTenantInMaster(tenantInMasterFound, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

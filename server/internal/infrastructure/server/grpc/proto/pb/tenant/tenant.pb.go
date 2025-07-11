@@ -68,11 +68,12 @@ func (x *TenantInfoRequest) GetID() string {
 type TenantInfoResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Code          string                 `protobuf:"bytes,2,opt,name=Code,proto3" json:"Code,omitempty"`
-	ShardId       int64                  `protobuf:"varint,3,opt,name=ShardId,proto3" json:"ShardId,omitempty"`
-	Status        string                 `protobuf:"bytes,4,opt,name=Status,proto3" json:"Status,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,5,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,6,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
+	Code          string                 `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
+	ShardId       int64                  `protobuf:"varint,4,opt,name=ShardId,proto3" json:"ShardId,omitempty"`
+	Status        string                 `protobuf:"bytes,5,opt,name=Status,proto3" json:"Status,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -114,6 +115,13 @@ func (x *TenantInfoResponse) GetID() string {
 	return ""
 }
 
+func (x *TenantInfoResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 func (x *TenantInfoResponse) GetCode() string {
 	if x != nil {
 		return x.Code
@@ -149,22 +157,179 @@ func (x *TenantInfoResponse) GetUpdatedAt() string {
 	return ""
 }
 
+type AssertTenantRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssertTenantRequest) Reset() {
+	*x = AssertTenantRequest{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssertTenantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssertTenantRequest) ProtoMessage() {}
+
+func (x *AssertTenantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssertTenantRequest.ProtoReflect.Descriptor instead.
+func (*AssertTenantRequest) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AssertTenantRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *AssertTenantRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type AssertTenantResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
+	Code          string                 `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
+	ShardId       int64                  `protobuf:"varint,4,opt,name=ShardId,proto3" json:"ShardId,omitempty"`
+	Status        string                 `protobuf:"bytes,5,opt,name=Status,proto3" json:"Status,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssertTenantResponse) Reset() {
+	*x = AssertTenantResponse{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssertTenantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssertTenantResponse) ProtoMessage() {}
+
+func (x *AssertTenantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssertTenantResponse.ProtoReflect.Descriptor instead.
+func (*AssertTenantResponse) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AssertTenantResponse) GetID() string {
+	if x != nil {
+		return x.ID
+	}
+	return ""
+}
+
+func (x *AssertTenantResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AssertTenantResponse) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *AssertTenantResponse) GetShardId() int64 {
+	if x != nil {
+		return x.ShardId
+	}
+	return 0
+}
+
+func (x *AssertTenantResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AssertTenantResponse) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *AssertTenantResponse) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
 var File_internal_infrastructure_server_grpc_proto_definitions_tenant_proto protoreflect.FileDescriptor
 
 const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDesc = "" +
 	"\n" +
 	"Binternal/infrastructure/server/grpc/proto/definitions/tenant.proto\x12\x06tenant\"#\n" +
 	"\x11TenantInfoRequest\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\tR\x02ID\"\xa6\x01\n" +
+	"\x02ID\x18\x01 \x01(\tR\x02ID\"\xba\x01\n" +
 	"\x12TenantInfoResponse\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
-	"\x04Code\x18\x02 \x01(\tR\x04Code\x12\x18\n" +
-	"\aShardId\x18\x03 \x01(\x03R\aShardId\x12\x16\n" +
-	"\x06Status\x18\x04 \x01(\tR\x06Status\x12\x1c\n" +
-	"\tCreatedAt\x18\x05 \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\x06 \x01(\tR\tUpdatedAt2W\n" +
+	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +
+	"\x04Code\x18\x03 \x01(\tR\x04Code\x12\x18\n" +
+	"\aShardId\x18\x04 \x01(\x03R\aShardId\x12\x16\n" +
+	"\x06Status\x18\x05 \x01(\tR\x06Status\x12\x1c\n" +
+	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\"=\n" +
+	"\x13AssertTenantRequest\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xbc\x01\n" +
+	"\x14AssertTenantResponse\x12\x0e\n" +
+	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
+	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +
+	"\x04Code\x18\x03 \x01(\tR\x04Code\x12\x18\n" +
+	"\aShardId\x18\x04 \x01(\x03R\aShardId\x12\x16\n" +
+	"\x06Status\x18\x05 \x01(\tR\x06Status\x12\x1c\n" +
+	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt2\xa2\x01\n" +
 	"\rTenantService\x12F\n" +
-	"\rGetTenantInfo\x12\x19.tenant.TenantInfoRequest\x1a\x1a.tenant.TenantInfoResponseB\x12Z\x10pb/tenant;tenantb\x06proto3"
+	"\rGetTenantInfo\x12\x19.tenant.TenantInfoRequest\x1a\x1a.tenant.TenantInfoResponse\x12I\n" +
+	"\fAssertTenant\x12\x1b.tenant.AssertTenantRequest\x1a\x1c.tenant.AssertTenantResponseB\x12Z\x10pb/tenant;tenantb\x06proto3"
 
 var (
 	file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescOnce sync.Once
@@ -178,16 +343,20 @@ func file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_raw
 	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_goTypes = []any{
-	(*TenantInfoRequest)(nil),  // 0: tenant.TenantInfoRequest
-	(*TenantInfoResponse)(nil), // 1: tenant.TenantInfoResponse
+	(*TenantInfoRequest)(nil),    // 0: tenant.TenantInfoRequest
+	(*TenantInfoResponse)(nil),   // 1: tenant.TenantInfoResponse
+	(*AssertTenantRequest)(nil),  // 2: tenant.AssertTenantRequest
+	(*AssertTenantResponse)(nil), // 3: tenant.AssertTenantResponse
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_depIdxs = []int32{
 	0, // 0: tenant.TenantService.GetTenantInfo:input_type -> tenant.TenantInfoRequest
-	1, // 1: tenant.TenantService.GetTenantInfo:output_type -> tenant.TenantInfoResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: tenant.TenantService.AssertTenant:input_type -> tenant.AssertTenantRequest
+	1, // 2: tenant.TenantService.GetTenantInfo:output_type -> tenant.TenantInfoResponse
+	3, // 3: tenant.TenantService.AssertTenant:output_type -> tenant.AssertTenantResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -204,7 +373,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ini
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -39,7 +39,7 @@ func (cmd *MarkToDeletionTenantInMasterCommand) Execute(uow *db.UnitOfWork, now 
 	}
 
 	tenantInMasterFound.Status = models.PendingForDeletion
-	_, err = tenantInMasterRepo.UpdateTenantInMaster(*tenantInMasterFound, now)
+	_, err = tenantInMasterRepo.UpdateTenantInMaster(tenantInMasterFound, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
