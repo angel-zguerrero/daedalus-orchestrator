@@ -2,19 +2,22 @@ package rest_server
 
 import (
 	"context"
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"deadalus-orch/server/internal/pkg/config"
-	"time"
-
+	"deadalus-orch/shared/constants"
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"runtime"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
 
 type RestServer struct {
-	Config    *common.RestServerConfing
+	Config    *common.ServerConfing
 	GinEngine *gin.Engine
 }
 type zerologAdapter struct {
@@ -27,7 +30,7 @@ func (z zerologAdapter) Write(p []byte) (n int, err error) {
 }
 
 // NewRestServer creates a new instance of RestServer.
-func NewRestServer(config *common.RestServerConfing) *RestServer {
+func NewRestServer(config *common.ServerConfing) *RestServer {
 	if config.MasterNode == nil {
 		config.Logger.Fatal().Msg("Admin API: Raft node cannot be nil")
 	}
@@ -36,6 +39,14 @@ func NewRestServer(config *common.RestServerConfing) *RestServer {
 	gin.DefaultErrorWriter = zerologAdapter{config.Logger}
 	engine := gin.Default()
 
+	// Ruta para servir archivos estáticos
+	staticPath := resolveAngularDistPath(config)
+	engine.Static("/admin/", staticPath)
+
+	engine.NoRoute(func(c *gin.Context) {
+		c.File(filepath.Join(staticPath, "index.html"))
+	})
+
 	server := &RestServer{
 		Config:    config,
 		GinEngine: engine,
@@ -43,6 +54,44 @@ func NewRestServer(config *common.RestServerConfing) *RestServer {
 
 	server.setupRoutes(engine)
 	return server
+}
+
+func resolveAngularDistPath(restServerConfing *common.ServerConfing) string {
+
+	if config.GlobalConfiguration.Env == string(constants.DEVELOPMENT) {
+		_, filename, _, ok := runtime.Caller(0)
+		if !ok {
+			restServerConfing.Logger.Fatal().
+				Str("package", "rest_server").
+				Str("func", "resolveAngularDistPath").
+				Msgf("❌ Cannot resolve current file path")
+		}
+
+		baseDir := filepath.Dir(filename)
+		var staticPath string
+		staticPath = filepath.Join(baseDir, "../../../../../web-admin/dist/daedalus-web-admin/browser")
+		absPath, err := filepath.Abs(staticPath)
+		if err != nil {
+			restServerConfing.Logger.Fatal().
+				Err(err).
+				Str("package", "rest_server").
+				Str("func", "resolveAngularDistPath").
+				Msgf("❌ Cannot resolve absolute path to Angular dist")
+		}
+
+		return absPath
+	} else {
+		base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
+		if err != nil {
+			restServerConfing.Logger.Fatal().
+				Err(err).
+				Str("package", "rest_server").
+				Str("func", "resolveAngularDistPath").
+				Msgf("❌ Getting admin web application path")
+		}
+		return base_path
+	}
+
 }
 
 // Start starts the Gin HTTP server for the admin API.

@@ -23,10 +23,10 @@ import (
 type TenantService struct {
 	pb.UnimplementedTenantServiceServer           // Embeds the unimplemented server for forward compatibility.
 	startTime                           time.Time // The time when the TenantServer was instantiated, used to calculate uptime.
-	Config                              *common.RestServerConfing
+	Config                              *common.ServerConfing
 }
 
-func NewTenantService(config *common.RestServerConfing) *TenantService {
+func NewTenantService(config *common.ServerConfing) *TenantService {
 	return &TenantService{
 		startTime: time.Now(),
 		Config:    config,

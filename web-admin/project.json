@@ -1,0 +1,111 @@
+{
+  "$schema": "node_modules/nx/schemas/project-schema.json",
+  "name": "daedalus-web-admin",
+  "projectType": "application",
+  "generators": {
+    "@schematics/angular:component": {
+      "style": "scss"
+    },
+    "@schematics/angular:application": {
+      "strict": true
+    }
+  },
+  "sourceRoot": "web-admin/src",
+  "prefix": "app",
+  "targets": {
+    "build": {
+      "executor": "@angular/build:application",
+      "options": {
+        "outputPath": "web-admin/dist/daedalus-web-admin",
+        "index": "web-admin/src/index.html",
+        "browser": "web-admin/src/main.ts",
+        "polyfills": [
+          "@angular/localize/init",
+          "zone.js"
+        ],
+        "tsConfig": "web-admin/tsconfig.app.json",
+        "inlineStyleLanguage": "scss",
+        "preserveSymlinks": true,
+        "assets": [
+          "web-admin/src/assets/favicon.ico",
+          "web-admin/src/assets"
+        ],
+        "styles": [
+          "web-admin/src/scss/styles.scss"
+        ],
+        "scripts": [],
+        "allowedCommonJsDependencies": [],
+        "stylePreprocessorOptions": {
+          "sass": {
+            "silenceDeprecations": []
+          }
+        }
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "7mb",
+              "maximumError": "8mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "2kb",
+              "maximumError": "4kb"
+            }
+          ],
+          "outputHashing": "all"
+        },
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true
+        }
+      },
+      "defaultConfiguration": "production",
+      "outputs": [
+        "{options.outputPath}"
+      ]
+    },
+    "serve": {
+      "executor": "@angular/build:dev-server",
+      "configurations": {
+        "production": {
+          "buildTarget": "daedalus-web-admin:build:production"
+        },
+        "development": {
+          "buildTarget": "daedalus-web-admin:build:development"
+        }
+      },
+      "defaultConfiguration": "development"
+    },
+    "extract-i18n": {
+      "executor": "@angular/build:extract-i18n",
+      "options": {
+        "buildTarget": "daedalus-web-admin:build"
+      }
+    },
+    "test": {
+      "executor": "@angular/build:karma",
+      "options": {
+        "polyfills": [
+          "zone.js",
+          "zone.js/testing",
+          "@angular/localize/init"
+        ],
+        "tsConfig": "tsconfig.spec.json",
+        "karmaConfig": "karma.conf.js",
+        "inlineStyleLanguage": "scss",
+        "assets": [
+          "web-admin/src/favicon.ico",
+          "web-admin/src/assets"
+        ],
+        "styles": [
+          "web-admin/src/scss/styles.scss"
+        ],
+        "scripts": []
+      }
+    }
+  }
+}

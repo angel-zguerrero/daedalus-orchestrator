@@ -24,11 +24,11 @@ import (
 )
 
 type TenantController struct {
-	Config *common.RestServerConfing
+	Config *common.ServerConfing
 }
 
 // NewTenantController creates a new instance of RestAdminAPI.
-func NewTenantController(Config *common.RestServerConfing) *TenantController {
+func NewTenantController(Config *common.ServerConfing) *TenantController {
 
 	api := &TenantController{
 		Config: Config,

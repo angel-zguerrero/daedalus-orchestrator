@@ -7,11 +7,11 @@ import (
 
 // AdminController handles the administrative REST API endpoints.
 type AdminController struct {
-	Config *common.RestServerConfing
+	Config *common.ServerConfing
 }
 
 // NewAdminController creates a new instance of RestAdminAPI.
-func NewAdminController(Config *common.RestServerConfing) *AdminController {
+func NewAdminController(Config *common.ServerConfing) *AdminController {
 
 	api := &AdminController{
 		Config: Config,

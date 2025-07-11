@@ -175,6 +175,7 @@ Got ideas? Pull requests? War stories from other orchestrators? Hit us up.
 MIT — because control shouldn’t come with chains. 
 
 ## Cluster example
+go to folder server/cmd and run:
 
 go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 1 -admin-port 3001 -grpc-port 4001 -master-db-engine=rocksdb
 go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 2  -admin-port 3002 -grpc-port 4002
@@ -182,6 +183,24 @@ go run -tags rocksdb . -self-member-host 127.0.0.1 -cluster-base-port 5000 -init
 
 go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -replica 4  -admin-port 3004 -join true
 
+
+
+## With NX:
+
+* build web-admin and run server:
+```bash
+nx run server:serve-admin
+```
+
+* run only server:
+```bash
+nx run server:serve
+```
+
+* build only web-admin:
+```bash
+nx run daedalus-web-admin:build:development
+```
 Tests:
 
 LOGGER_FORMAT=pretty go test -v  ./... 
