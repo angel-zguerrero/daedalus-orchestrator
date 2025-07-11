@@ -1,14 +1,16 @@
 import { Routes } from '@angular/router';
+import { authGuardFn } from './auth/auth.guard'; // Import the functional auth guard
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'dashboard',
+    redirectTo: 'dashboard', // This will be caught by the guard if not authenticated
     pathMatch: 'full'
   },
   {
-    path: '',
+    path: '', // This route group contains all authenticated pages
     loadComponent: () => import('./layout').then(m => m.DefaultLayoutComponent),
+    canActivate: [authGuardFn], // Apply AuthGuard here
     data: {
       title: 'Home'
     },
@@ -48,11 +50,11 @@ export const routes: Routes = [
       {
         path: 'charts',
         loadChildren: () => import('./views/charts/routes').then((m) => m.routes)
-      },
-      {
-        path: 'pages',
-        loadChildren: () => import('./views/pages/routes').then((m) => m.routes)
       }
+      // Note: 'pages' (like login, register, 404, 500) are usually not children of DefaultLayoutComponent
+      // and should not be protected by this guard. They are defined as separate top-level routes.
+      // The existing 'pages' route was removed from here as it typically contains public pages.
+      // If there are specific pages under 'pages' that need auth, they should be structured accordingly.
     ]
   },
   {
@@ -83,5 +85,13 @@ export const routes: Routes = [
       title: 'Register Page'
     }
   },
-  { path: '**', redirectTo: 'dashboard' }
+  // The 'pages' route that was previously a child of DefaultLayoutComponent seems to define
+  // login, register, 404, 500. These are typically standalone.
+  // If there's a separate '/pages' path that needs to exist and be protected, it should be defined within the guarded DefaultLayoutComponent.
+  // For now, I am assuming the individual page routes (login, register, 404, 500) are sufficient as top-level.
+  {
+    path: 'pages', // This path seems to be for non-auth pages based on its typical content
+    loadChildren: () => import('./views/pages/routes').then((m) => m.routes)
+  },
+  { path: '**', redirectTo: 'dashboard' } // If not logged in, guard on 'dashboard' (via DefaultLayout) will redirect to login.
 ];
