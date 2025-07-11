@@ -55,6 +55,7 @@ import (
 
 type Application struct {
 	MasterNodeIsReady          bool
+	MasterNodeIsLeader         bool
 	MasterNode                 *dragonboat.RaftNode
 	TenantNodes                []*dragonboat.RaftNode
 	TenantNodesDictionary      map[string]*dragonboat.RaftNode

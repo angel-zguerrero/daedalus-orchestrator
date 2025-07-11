@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	"time"
@@ -65,6 +66,15 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 					break
 				}
 			}
+
+			go func() {
+				leaderID, _, valid, _ := app.MasterNode.NH.GetLeaderID(uint64(dragonboat.MasterShardID))
+				if valid && leaderID == config.GlobalConfiguration.ReplicaID {
+					app.MasterNodeIsLeader = true
+				} else {
+					app.MasterNodeIsLeader = false
+				}
+			}()
 
 			if allReady && !app.MasterNodeIsReady {
 				log.Info().Msg("✅ Master + all tenants ready for consensus.")

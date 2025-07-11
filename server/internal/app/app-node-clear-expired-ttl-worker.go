@@ -35,6 +35,11 @@ func (app *Application) StartNodeClearExpiredTTLWorker(interval time.Duration, b
 						return
 					}
 
+					if !app.MasterNodeIsLeader {
+						log.Warn().Msg("only leader can delete ttl keys")
+						return
+					}
+
 					select {
 					case <-app.NodeClearExpiredTTLStopper.ShouldStop():
 						log.Info().Msg("🛑 TTL cleaner received stop signal before starting")
