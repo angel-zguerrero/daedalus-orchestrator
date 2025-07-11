@@ -1,0 +1,36 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "server",
+  "projectType": "application",
+  "sourceRoot": "server",
+  
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "go run cmd/main.go"
+          }
+        ],
+        "parallel": false,
+        "cwd": "server"
+      }
+    },
+    "serve-admin": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "nx run daedalus-web-admin:build:development"
+          },
+          {
+            "command": "go run cmd/main.go"
+          }
+        ],
+        "parallel": false,
+        "cwd": "server"
+      }
+    }
+  }
+}
