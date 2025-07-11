@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { NgStyle } from '@angular/common';
+import { CommonModule, NgStyle } from '@angular/common';
 import { IconDirective } from '@coreui/icons-angular';
 import {
   ButtonDirective,
@@ -41,7 +41,8 @@ import { AuthService } from '../../../auth/auth.service'; // Import AuthService
     FormsModule, // Add FormsModule here
     RouterLink,
     TextColorDirective,
-    AlertComponent
+    AlertComponent,
+    CommonModule
   ]
 })
 export class LoginComponent {
