@@ -6,6 +6,7 @@ option go_package = "pb/tenant;tenant";
 
 service TenantService {
   rpc GetTenantInfo (TenantInfoRequest) returns (TenantInfoResponse);
+  rpc AssertTenant (AssertTenantRequest) returns (AssertTenantResponse);
 }
 
 message TenantInfoRequest {
@@ -13,6 +14,19 @@ message TenantInfoRequest {
 }
 
 message TenantInfoResponse {
+  string ID = 1;
+  string Code = 2;
+  int64 ShardId = 3;
+  string Status = 4;
+  string CreatedAt = 5;
+  string UpdatedAt = 6;
+}
+
+message AssertTenantRequest {
+  string code = 1;
+}
+
+message AssertTenantResponse {
   string ID = 1;
   string Code = 2;
   int64 ShardId = 3;
