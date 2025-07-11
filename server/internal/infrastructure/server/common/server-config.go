@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type RestServerConfing struct {
+type ServerConfing struct {
 	MasterNode            *dragonboat.RaftNode
 	TenantNodes           []*dragonboat.RaftNode
 	TenantNodesDictionary map[string]*dragonboat.RaftNode

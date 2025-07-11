@@ -13,11 +13,11 @@ import (
 
 // MetricsController handles the administrative REST API endpoints.
 type MetricsController struct {
-	Config *common.RestServerConfing
+	Config *common.ServerConfing
 }
 
 // NewMetricsController creates a new instance of RestAdminAPI.
-func NewMetricsController(Config *common.RestServerConfing) *MetricsController {
+func NewMetricsController(Config *common.ServerConfing) *MetricsController {
 
 	api := &MetricsController{
 		Config: Config,

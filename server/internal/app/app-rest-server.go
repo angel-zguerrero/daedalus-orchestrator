@@ -19,7 +19,7 @@ func (app *Application) StartAdminAPI() {
 		log.Info().Msg("Admin API JWT Expiration: " + jwtDuration.String())
 
 		// Pass the global log.Logger instance, which is configured in app.Run()
-		serverConfig := &common.RestServerConfing{
+		serverConfig := &common.ServerConfing{
 			MasterNode:            app.MasterNode,
 			TenantNodes:           app.TenantNodes,
 			TenantNodesDictionary: app.TenantNodesDictionary,

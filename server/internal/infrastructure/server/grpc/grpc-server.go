@@ -17,12 +17,12 @@ import (
 )
 
 type GrpcServer struct {
-	Config     *common.RestServerConfing
+	Config     *common.ServerConfing
 	grpcServer *grpc.Server
 	listener   net.Listener
 }
 
-func NewGrpcServer(cfg *common.RestServerConfing) (*GrpcServer, error) {
+func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	if cfg.MasterNode == nil {
 		cfg.Logger.Fatal().Msg("gRPC: Raft node cannot be nil")
 	}
