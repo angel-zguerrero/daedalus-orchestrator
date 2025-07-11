@@ -54,16 +54,17 @@ import (
 // These components might be integrated in future versions of the application.
 
 type Application struct {
-	MasterNodeIsReady       bool
-	MasterNode              *dragonboat.RaftNode
-	TenantNodes             []*dragonboat.RaftNode
-	TenantNodesDictionary   map[string]*dragonboat.RaftNode
-	RestAPI                 *rest_server.RestServer
-	GrpcAPI                 *grpc_server.GrpcServer
-	NodeReadyWatcherStopper *syncutil.Stopper
-	ApiLock                 sync.Mutex
-	GrpcLock                sync.Mutex
-	NH                      *dragonboatV4.NodeHost
+	MasterNodeIsReady          bool
+	MasterNode                 *dragonboat.RaftNode
+	TenantNodes                []*dragonboat.RaftNode
+	TenantNodesDictionary      map[string]*dragonboat.RaftNode
+	RestAPI                    *rest_server.RestServer
+	GrpcAPI                    *grpc_server.GrpcServer
+	NodeReadyWatcherStopper    *syncutil.Stopper
+	NodeClearExpiredTTLStopper *syncutil.Stopper
+	ApiLock                    sync.Mutex
+	GrpcLock                   sync.Mutex
+	NH                         *dragonboatV4.NodeHost
 }
 
 func (app *Application) Run() {
@@ -223,6 +224,8 @@ func (app *Application) Run() {
 
 	app.StartNodeReadyWatcherWorker(3 * time.Second)
 
+	app.StartNodeClearExpiredTTLWorker(1*time.Minute, 10)
+
 }
 
 func (app *Application) Stop() {
@@ -293,6 +296,14 @@ func (app *Application) Stop() {
 		log.Info().Msg("⛔ NodeReadyWatcher stopped.")
 	}()
 
+	// Stop Watcher
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.NodeClearExpiredTTLStopper.Stop()
+		log.Info().Msg("⛔ NodeClearExpiredTTLStopper stopped.")
+	}()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -322,11 +333,12 @@ func (app *Application) Stop() {
 
 func NewApplication() *Application {
 	return &Application{
-		MasterNodeIsReady:       false,
-		MasterNode:              nil,
-		RestAPI:                 nil,
-		NodeReadyWatcherStopper: syncutil.NewStopper(),
-		TenantNodes:             make([]*dragonboat.RaftNode, 0),
-		TenantNodesDictionary:   make(map[string]*dragonboat.RaftNode),
+		MasterNodeIsReady:          false,
+		MasterNode:                 nil,
+		RestAPI:                    nil,
+		NodeReadyWatcherStopper:    syncutil.NewStopper(),
+		NodeClearExpiredTTLStopper: syncutil.NewStopper(),
+		TenantNodes:                make([]*dragonboat.RaftNode, 0),
+		TenantNodesDictionary:      make(map[string]*dragonboat.RaftNode),
 	}
 }
