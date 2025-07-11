@@ -1,0 +1,148 @@
+package app
+
+import (
+	"bytes"
+	"context"
+	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/server/internal/pkg/utils"
+	commands "deadalus-orch/server/internal/usecase/command"
+	"deadalus-orch/shared/models"
+	"encoding/gob"
+	"time"
+
+	"github.com/rs/zerolog/log"
+)
+
+func (app *Application) StartAssignTenants() {
+	cursor := ""
+	pageSize := 10
+
+	for {
+		paginateTenantsCommand := &commands.PaginateTenantsCommand{
+			Cursor:   cursor,
+			PageSize: pageSize,
+		}
+
+		queryCommand := &commands.Query_Command{
+			Command: &commands.Repository_Command{
+				CMD: paginateTenantsCommand,
+			},
+			Now: time.Now().UnixNano(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+		defer cancel()
+
+		result, err := app.MasterNode.Read(ctx, *queryCommand)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Paginate tenants command failed")
+
+			return
+		}
+
+		buf := bytes.NewBuffer(result.([]byte))
+		dec := gob.NewDecoder(buf)
+		parsedResult := &commands.CommandResult{}
+		if err := dec.Decode(parsedResult); err != nil {
+			log.Fatal().Err(err).Msg("Paginate tenants command failed (decode)")
+
+			return
+		}
+
+		if parsedResult.Error != "" {
+			log.Fatal().Str("error", parsedResult.Error).Msg("Paginate tenants command failed (business error)")
+			return
+		}
+
+		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
+		writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
+		defer writeCancel()
+		for _, tenant := range tenantsResult.Entities {
+			var tenantNode *dragonboat.RaftNode
+			for i := range app.TenantNodes {
+				if app.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+					tenantNode = app.TenantNodes[i]
+
+					if tenant.Status == models.PendingForAssign {
+						createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
+							Name: tenant.ID,
+						}
+
+						ccfCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  createColumnFamilyCommand,
+						}
+
+						result, err = tenantNode.Write(writeCtx, ccfCmd)
+						if err != nil {
+
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+						}
+
+						assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
+							TenantCode: tenant.Code,
+						}
+
+						atstCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  assignToShardTenantInMasterCommand,
+						}
+
+						result, err = app.MasterNode.Write(writeCtx, atstCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
+
+						}
+					}
+
+					if tenant.Status == models.PendingForDeletion {
+						deleteColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
+							Name: tenant.ID,
+						}
+
+						ccfCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  deleteColumnFamilyCommand,
+						}
+
+						result, err = tenantNode.Write(writeCtx, ccfCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete column family")
+						}
+
+						deleteTenantInMasterCommand := &commands.DeleteTenantInMasterCommand{
+							TenantId: tenant.ID,
+						}
+
+						atstCmd := commands.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: commands.REPOSITORY_COMMAND,
+							CMD:  deleteTenantInMasterCommand,
+						}
+
+						result, err = app.MasterNode.Write(writeCtx, atstCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+						}
+					}
+
+					break
+				}
+			}
+			app.TenantNodesDictionary[tenant.ID] = tenantNode
+		}
+
+		if tenantsResult.Cursor == "" {
+			break
+		}
+
+		cursor = tenantsResult.Cursor
+	}
+
+}
