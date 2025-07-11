@@ -10,7 +10,7 @@
       "strict": true
     }
   },
-  "sourceRoot": "src",
+  "sourceRoot": "web-admin/src",
   "prefix": "app",
   "targets": {
     "build": {
@@ -27,8 +27,8 @@
         "inlineStyleLanguage": "scss",
         "preserveSymlinks": true,
         "assets": [
-          "src/assets/favicon.ico",
-          "src/assets"
+          "web-admin/src/assets/favicon.ico",
+          "web-admin/src/assets"
         ],
         "styles": [
           "web-admin/src/scss/styles.scss"
