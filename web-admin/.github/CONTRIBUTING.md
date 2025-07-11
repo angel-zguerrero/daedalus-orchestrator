@@ -9,7 +9,7 @@ patches and features.
 
 ## Using the issue tracker
 
-The [issue tracker](https://github.com/coreui/coreui-free-angular-admin-template/issues) is
+The [issue tracker](https://github.com/coreui/daedalus-web-admin/issues) is
 the preferred channel for [bug reports](#bug-reports), [features requests](#feature-requests)
 and [submitting pull requests](#pull-requests), but please respect the following
 restrictions:

@@ -9,9 +9,9 @@ assignees: ''
 
 Before opening:
 
-- [Search for duplicate or closed issues](https://github.com/coreui/coreui-free-angular-admin-template/issues?utf8=%E2%9C%93&q=is%3Aissue)
+- [Search for duplicate or closed issues](https://github.com/coreui/daedalus-web-admin/issues?utf8=%E2%9C%93&q=is%3Aissue)
 - [Validate](https://html5.validator.nu/) any HTML to avoid common problems
-- Read the [contributing guidelines](https://github.com/coreui/coreui-free-angular-admin-template/blob/v4-dev/.github/CONTRIBUTING.md)
+- Read the [contributing guidelines](https://github.com/coreui/daedalus-web-admin/blob/v4-dev/.github/CONTRIBUTING.md)
 
 Bug reports must include:
 

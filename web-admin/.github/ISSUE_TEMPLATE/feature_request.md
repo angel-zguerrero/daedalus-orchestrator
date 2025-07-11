@@ -9,8 +9,8 @@ assignees: ''
 
 Before opening:
 
-- [Search for duplicate or closed issues](https://github.com/coreui/coreui-free-angular-admin-template/issues?utf8=%E2%9C%93&q=is%3Aissue)
-- Read the [contributing guidelines](https://github.com/coreui/coreui-free-angular-admin-template/blob/main/.github/CONTRIBUTING.md)
+- [Search for duplicate or closed issues](https://github.com/coreui/daedalus-web-admin/issues?utf8=%E2%9C%93&q=is%3Aissue)
+- Read the [contributing guidelines](https://github.com/coreui/daedalus-web-admin/blob/main/.github/CONTRIBUTING.md)
 
 Feature requests must include:
 
