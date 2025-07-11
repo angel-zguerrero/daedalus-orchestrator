@@ -44,7 +44,7 @@ func (app *Application) CloseAdminAPI() {
 	app.ApiLock.Lock()
 	defer app.ApiLock.Unlock()
 	if app.RestAPI != nil {
-		log.Info().Msg("Closing Admin app...")
+		log.Info().Msg("Closing Admin app.")
 
 		if err := app.RestAPI.Shutdown(); err != nil {
 			log.Error().Err(err).Msg("❌ Error during Admin API shutdown")
@@ -52,7 +52,5 @@ func (app *Application) CloseAdminAPI() {
 			log.Info().Msg("✅ Admin API closed successfully.")
 		}
 		app.RestAPI = nil
-	} else {
-		log.Warn().Msg("No Admin API to close.")
 	}
 }

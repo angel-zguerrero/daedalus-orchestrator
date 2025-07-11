@@ -45,12 +45,10 @@ func (app *Application) CloseGrpcAPI() {
 	app.GrpcLock.Lock()
 	defer app.GrpcLock.Unlock()
 	if app.GrpcAPI != nil {
-		log.Info().Msg("Closing grpc api ...")
+		log.Info().Msg("Closing grpc api .")
 
 		app.GrpcAPI.Shutdown()
 		log.Info().Msg("✅ grpc API closed successfully.")
 		app.GrpcAPI = nil
-	} else {
-		log.Warn().Msg("No grpc API to close.")
 	}
 }

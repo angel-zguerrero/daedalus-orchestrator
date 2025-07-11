@@ -213,7 +213,7 @@ func LoadDefaultConfiguration() error {
 				log.Error().
 					Str("path", configFilePath).
 					Err(err).
-					Msg("⚠️ Failed to load map from config file")
+					Msg("⚠️️ Failed to load map from config file")
 				return err
 			}
 
@@ -222,7 +222,7 @@ func LoadDefaultConfiguration() error {
 				log.Error().
 					Str("path", configFilePath).
 					Err(err).
-					Msg("⚠️ Failed to parse config file data into struct")
+					Msg("⚠️️ Failed to parse config file data into struct")
 				return err
 			}
 			// Apply all other values from config file to the main config object
@@ -232,7 +232,7 @@ func LoadDefaultConfiguration() error {
 			log.Error().
 				Str("path", configFilePath).
 				Err(err).
-				Msg("⚠️ Failed to load config file")
+				Msg("⚠️️ Failed to load config file")
 			return err
 		}
 	}
@@ -448,7 +448,7 @@ func LoadDefaultConfiguration() error {
 	}
 	if config.AdminAPIJWTSecret == "" {
 		config.AdminAPIJWTSecret = "super-secret-default-jwt-key-please-change"
-		log.Warn().Msgf("⚠️ WARNING: Admin API JWT Secret is not set, using default insecure key. Please set the %s environment variable or the admin_api_jwt_secret key in your configuration file.", constants.EnvVarAdminAPIJWTSecret)
+		log.Warn().Msgf("⚠️️ WARNING: Admin API JWT Secret is not set, using default insecure key. Please set the %s environment variable or the admin_api_jwt_secret key in your configuration file.", constants.EnvVarAdminAPIJWTSecret)
 	}
 
 	if config.GrpcServerListenAddrHost == "" {

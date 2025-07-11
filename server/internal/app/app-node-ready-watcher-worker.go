@@ -23,12 +23,12 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 		const masterKey = -1
 
 		defer func() {
-			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown...")
+			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown.")
 			app.CloseAdminAPI()
 		}()
 
 		defer func() {
-			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring grpc API is shutdown...")
+			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring grpc API is shutdown.")
 			app.CloseGrpcAPI()
 		}()
 
@@ -50,7 +50,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 							return
 						}
 						if !ready && app.MasterNodeIsReady {
-							log.Warn().Int("tenant", i).Msg("⚠️ Tenant node does not respond.")
+							log.Warn().Int("tenant", i).Msg("⚠️️ Tenant node does not respond.")
 						}
 						readyMap[i] = ready
 					default:
@@ -106,7 +106,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			}
 
 			if !allReady && app.MasterNodeIsReady {
-				log.Warn().Msg("⚠️ One or more nodes are not ready. Marking node as not ready.")
+				log.Warn().Msg("⚠️️ One or more nodes are not ready. Marking node as not ready.")
 				app.MasterNodeIsReady = false
 				app.CloseAdminAPI()
 				app.CloseGrpcAPI()
@@ -114,7 +114,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 
 			select {
 			case <-app.NodeReadyWatcherStopper.ShouldStop():
-				log.Info().Msg("🛑 NodeReadyWatcher received stop signal.")
+				log.Info().Msg("ℹ️  NodeReadyWatcher received stop signal.")
 				return
 			case <-time.After(interval):
 			}

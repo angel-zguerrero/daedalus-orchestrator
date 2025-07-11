@@ -238,11 +238,11 @@ func (app *Application) Stop() {
 	go func() {
 		defer wg.Done()
 		if app.MasterNode != nil {
-			log.Info().Msg("🛑 Stopping Master Node...")
+			log.Info().Msg("🔌 Stopping Master Node.")
 			app.MasterNode.Stop()
 			log.Info().Msg("✅ Master Node stopped.")
 		} else {
-			log.Warn().Msg("⚠ No Master Node to stop.")
+			log.Warn().Msg("⚠️ No Master Node to stop.")
 		}
 	}()
 
@@ -256,13 +256,14 @@ func (app *Application) Stop() {
 					if r := recover(); r != nil {
 						log.Error().
 							Interface("recover", r).
-							Int("tenantIndex", i).
+							Int("ShardId", int(node.ShardID)).
+							Int("ReplicaId", int(node.ReplicaID)).
 							Msg("❌ Panic while stopping tenant node")
 					}
 				}()
-				log.Info().Int("tenantIndex", i).Msg("🛑 Stopping Tenant Node...")
+				log.Info().Int("ShardId", int(node.ShardID)).Int("ReplicaID", int(node.ReplicaID)).Msg("🔌 Stopping Tenant Node")
 				node.Stop()
-				log.Info().Int("tenantIndex", i).Msg("✅ Tenant Node stopped.")
+				log.Info().Int("ShardId", int(node.ShardID)).Int("ReplicaID", int(node.ReplicaID)).Msg("✅ Tenant Node stopped.")
 			}(i, tenantNode)
 		}
 	}
@@ -274,7 +275,7 @@ func (app *Application) Stop() {
 		if app.RestAPI != nil {
 			app.CloseAdminAPI()
 		} else {
-			log.Warn().Msg("⚠ No Admin API to stop.")
+			log.Warn().Msg("⚠️  No Admin API to stop.")
 		}
 	}()
 
@@ -284,7 +285,7 @@ func (app *Application) Stop() {
 		if app.GrpcAPI != nil {
 			app.CloseGrpcAPI()
 		} else {
-			log.Warn().Msg("⚠ No Grpc API to stop.")
+			log.Warn().Msg("⚠️  No Grpc API to stop.")
 		}
 	}()
 
@@ -293,7 +294,7 @@ func (app *Application) Stop() {
 	go func() {
 		defer wg.Done()
 		app.NodeReadyWatcherStopper.Stop()
-		log.Info().Msg("⛔ NodeReadyWatcher stopped.")
+		log.Info().Msg("✅ NodeReadyWatcher stopped.")
 	}()
 
 	// Stop Watcher
@@ -301,18 +302,18 @@ func (app *Application) Stop() {
 	go func() {
 		defer wg.Done()
 		app.NodeClearExpiredTTLStopper.Stop()
-		log.Info().Msg("⛔ NodeClearExpiredTTLStopper stopped.")
+		log.Info().Msg("✅ NodeClearExpiredTTLStopper stopped.")
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if app.MasterNode != nil {
-			log.Info().Msg("🛑 Stopping Node Host...")
+			log.Info().Msg("🔌 Stopping Node Host.")
 			app.NH.Close()
 			log.Info().Msg("✅ Node Host stopped.")
 		} else {
-			log.Warn().Msg("⚠ No Node Host to stop.")
+			log.Warn().Msg("⚠️ No Node Host to stop.")
 		}
 	}()
 
@@ -327,7 +328,7 @@ func (app *Application) Stop() {
 	case <-done:
 		log.Info().Msg("✅ All components stopped gracefully.")
 	case <-ctx.Done():
-		log.Warn().Msg("⚠ Stop operation timed out. Some components may not have stopped.")
+		log.Warn().Msg("⚠️ Stop operation timed out. Some components may not have stopped.")
 	}
 }
 

@@ -52,7 +52,7 @@ func (s *RestServer) Start() error {
 	}
 
 	listenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
-	s.Config.Logger.Info().Str("address", listenAddr).Msg("🚀 Starting Admin REST API server...")
+	s.Config.Logger.Info().Str("address", listenAddr).Msg("🚀 Starting Admin REST API server.")
 
 	s.Config.Server = &http.Server{
 		Addr:    listenAddr,
@@ -71,7 +71,7 @@ func (s *RestServer) Start() error {
 func (s *RestServer) Shutdown() error {
 	ctx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
-	s.Config.Logger.Info().Msg("🔌 Shutting down Admin REST API server...")
+	s.Config.Logger.Info().Msg("🔌 Shutting down Admin REST API server.")
 	if s.Config.Server != nil {
 		return s.Config.Server.Shutdown(ctx)
 	}

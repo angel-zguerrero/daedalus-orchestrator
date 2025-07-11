@@ -64,7 +64,7 @@ func (app *Application) StartNodeClearExpiredTTLWorker(interval time.Duration, b
 				}()
 
 			case <-app.NodeClearExpiredTTLStopper.ShouldStop():
-				log.Info().Msg("🛑 TTL cleaner worker stopped gracefully")
+				log.Info().Msg("ℹ️  TTL cleaner worker stopped gracefully")
 				return
 			}
 		}

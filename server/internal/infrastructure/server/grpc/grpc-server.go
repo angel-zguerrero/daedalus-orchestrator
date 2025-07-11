@@ -8,12 +8,12 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
-	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
+	"deadalus-orch/server/internal/pkg/config"
 )
 
 type GrpcServer struct {
@@ -58,7 +58,7 @@ func (s *GrpcServer) Start() error {
 	// and the listener is already created with this address.
 	// We log the address the listener is actually using.
 	actualAddr := s.listener.Addr().String()
-	s.Config.Logger.Info().Str("address", actualAddr).Msg("🚀 Starting gRPC server...")
+	s.Config.Logger.Info().Str("address", actualAddr).Msg("🚀 Starting gRPC server.")
 
 	if err := s.grpcServer.Serve(s.listener); err != nil {
 		s.Config.Logger.Error().Err(err).Msg("❌ Failed to start gRPC server")
@@ -69,6 +69,6 @@ func (s *GrpcServer) Start() error {
 }
 
 func (s *GrpcServer) Shutdown() {
-	s.Config.Logger.Info().Msg("🔌 Shutting down gRPC server...")
+	s.Config.Logger.Info().Msg("🔌 Shutting down gRPC server.")
 	s.grpcServer.GracefulStop()
 }
