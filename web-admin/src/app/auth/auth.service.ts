@@ -7,7 +7,7 @@ import { Observable, BehaviorSubject, tap, catchError, of } from 'rxjs';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = '/login'; // Assuming the API is served from the same origin
+  private apiUrl = '/admin-api/login'; // Corrected API endpoint
   private tokenKey = 'authToken';
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
 
@@ -20,7 +20,11 @@ export class AuthService {
   }
 
   login(credentials: { username?: string, password?: string }): Observable<any> {
-    return this.http.post<any>(this.apiUrl, credentials).pipe(
+    const payload = {
+      UsernameOrEmail: credentials.username,
+      password: credentials.password
+    };
+    return this.http.post<any>(this.apiUrl, payload).pipe(
       tap(response => {
         // Assuming the token is in response.token or response.access_token
         const token = response.token || response.access_token;
