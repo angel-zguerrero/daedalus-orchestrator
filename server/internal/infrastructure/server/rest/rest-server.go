@@ -58,7 +58,7 @@ func (s *RestServer) Start() error {
 		Addr:    listenAddr,
 		Handler: s.GinEngine,
 	}
-	s.Config.Logger.Info().Str("address", listenAddr).Msg("🚀 Admin API scheduled to start because RoleAdmin is present.")
+
 	if err := s.Config.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		s.Config.Logger.Error().Err(err).Msg("❌ Failed to start Admin REST API server")
 		return err
