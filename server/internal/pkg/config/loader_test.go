@@ -259,6 +259,169 @@ func TestValidateClusterBasePort_PortTooLow(t *testing.T) {
 	assert.PanicsWithValue(t, expected, func() { validateClusterBasePort(cfg) })
 }
 
+// Tests for gRPC Server Configuration
+func TestLoadDefault_GrpcServer_Defaults(t *testing.T) {
+	os.Clearenv() // Clear environment variables to ensure defaults are tested
+	// Reset flags to their default values if they were changed by other tests.
+	// This is tricky because flags are global. A better approach might be to run flag-dependent tests in separate processes
+	// or use a library that allows temporary flag set/reset. For now, we assume other tests clean up or don't interfere.
+	*ConfigFilePathFlag = "" // Ensure no config file is used
+
+	err := LoadDefaultConfiguration()
+	require.NoError(t, err)
+
+	assert.Equal(t, "0.0.0.0", GlobalConfiguration.GrpcServerListenAddrHost, "Default gRPC host should be 0.0.0.0")
+	assert.Equal(t, 4545, GlobalConfiguration.GrpcServerListenAddrPort, "Default gRPC port should be 4545")
+}
+
+func TestLoadDefault_GrpcServer_ConfigFile(t *testing.T) {
+	os.Clearenv()
+	content := `
+grpc_server_listen_addr_host=127.0.0.1
+grpc_server_listen_addr_port=50051
+`
+	path := writeTempFile(t, content)
+	*ConfigFilePathFlag = path // Set config file path directly for the test
+
+	err := LoadDefaultConfiguration()
+	require.NoError(t, err)
+
+	assert.Equal(t, "127.0.0.1", GlobalConfiguration.GrpcServerListenAddrHost)
+	assert.Equal(t, 50051, GlobalConfiguration.GrpcServerListenAddrPort)
+	*ConfigFilePathFlag = "" // Reset for other tests
+}
+
+func TestLoadDefault_GrpcServer_EnvVars(t *testing.T) {
+	os.Clearenv()
+	setEnv(t, constants.EnvVarGrpcServerListenAddrHost, "192.168.1.100")
+	setEnv(t, constants.EnvVarGrpcServerListenAddrPort, "50052")
+	*ConfigFilePathFlag = ""
+
+	err := LoadDefaultConfiguration()
+	require.NoError(t, err)
+
+	assert.Equal(t, "192.168.1.100", GlobalConfiguration.GrpcServerListenAddrHost)
+	assert.Equal(t, 50052, GlobalConfiguration.GrpcServerListenAddrPort)
+}
+
+func TestLoadDefault_GrpcServer_Flags(t *testing.T) {
+	os.Clearenv()
+	// Simulate setting flags. Note: Direct manipulation of flag variables is the standard way to "set" flags for testing in Go.
+	originalHostFlag := *GrpcServerListenAddrHostFlag
+	originalPortFlag := *GrpcServerListenAddrPortFlag
+	defer func() { // Reset flags after test
+		*GrpcServerListenAddrHostFlag = originalHostFlag
+		*GrpcServerListenAddrPortFlag = originalPortFlag
+	}()
+
+	*GrpcServerListenAddrHostFlag = "my.grpc.server"
+	*GrpcServerListenAddrPortFlag = 50053
+	*ConfigFilePathFlag = ""
+
+	err := LoadDefaultConfiguration() // This will call flag.Parse() if it hasn't been called
+	require.NoError(t, err)
+
+	assert.Equal(t, "my.grpc.server", GlobalConfiguration.GrpcServerListenAddrHost)
+	assert.Equal(t, 50053, GlobalConfiguration.GrpcServerListenAddrPort)
+}
+
+func TestLoadDefault_GrpcServer_Precedence_FlagOverEnvOverFile(t *testing.T) {
+	os.Clearenv()
+
+	// 1. Config File values
+	content := `
+grpc_server_listen_addr_host=config.host.com
+grpc_server_listen_addr_port=11111
+`
+	path := writeTempFile(t, content)
+	*ConfigFilePathFlag = path
+
+	// 2. Environment Variable values (should override config file)
+	setEnv(t, constants.EnvVarGrpcServerListenAddrHost, "env.host.com")
+	setEnv(t, constants.EnvVarGrpcServerListenAddrPort, "22222")
+
+	// 3. Flag values (should override env vars and config file)
+	originalHostFlag := *GrpcServerListenAddrHostFlag
+	originalPortFlag := *GrpcServerListenAddrPortFlag
+	defer func() {
+		*GrpcServerListenAddrHostFlag = originalHostFlag
+		*GrpcServerListenAddrPortFlag = originalPortFlag
+		*ConfigFilePathFlag = "" // Reset config file path
+	}()
+	*GrpcServerListenAddrHostFlag = "flag.host.com"
+	*GrpcServerListenAddrPortFlag = 33333
+
+	err := LoadDefaultConfiguration()
+	require.NoError(t, err)
+
+	assert.Equal(t, "flag.host.com", GlobalConfiguration.GrpcServerListenAddrHost, "Flag host should take precedence")
+	assert.Equal(t, 33333, GlobalConfiguration.GrpcServerListenAddrPort, "Flag port should take precedence")
+}
+
+func TestLoadDefault_GrpcServer_Precedence_EnvOverFile(t *testing.T) {
+	os.Clearenv()
+	// 1. Config File values
+	content := `
+grpc_server_listen_addr_host=config.host.com
+grpc_server_listen_addr_port=11111
+`
+	path := writeTempFile(t, content)
+	*ConfigFilePathFlag = path
+
+	// 2. Environment Variable values (should override config file)
+	setEnv(t, constants.EnvVarGrpcServerListenAddrHost, "env.host.com")
+	setEnv(t, constants.EnvVarGrpcServerListenAddrPort, "22222")
+
+	// Ensure flags are not set or are default (empty for string, 0 for int for these specific flags)
+	originalHostFlag := *GrpcServerListenAddrHostFlag
+	originalPortFlag := *GrpcServerListenAddrPortFlag
+	defer func() {
+		*GrpcServerListenAddrHostFlag = originalHostFlag
+		*GrpcServerListenAddrPortFlag = originalPortFlag
+		*ConfigFilePathFlag = ""
+	}()
+	*GrpcServerListenAddrHostFlag = "" // Default/unset state for string flag
+	*GrpcServerListenAddrPortFlag = 0  // Default/unset state for int flag
+
+	err := LoadDefaultConfiguration()
+	require.NoError(t, err)
+
+	assert.Equal(t, "env.host.com", GlobalConfiguration.GrpcServerListenAddrHost, "Env host should take precedence over file")
+	assert.Equal(t, 22222, GlobalConfiguration.GrpcServerListenAddrPort, "Env port should take precedence over file")
+}
+
+func TestLoadDefault_GrpcServer_InvalidPort_Env(t *testing.T) {
+	os.Clearenv()
+	setEnv(t, constants.EnvVarGrpcServerListenAddrPort, "not-a-port")
+	*ConfigFilePathFlag = ""
+
+	err := LoadDefaultConfiguration()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error parsing GRPC_SERVER_LISTEN_ADDR_PORT environment variable")
+}
+
+func TestLoadConfigFromPath_GrpcServerConfig(t *testing.T) {
+	os.Clearenv()
+	content := `
+grpc_server_listen_addr_host=file.grpc.local
+grpc_server_listen_addr_port=54321
+unknown_grpc_key=some_value
+`
+	path := writeTempFile(t, content)
+	cfg, err := LoadConfigFromPath(path)
+	require.NoError(t, err)
+	assert.Equal(t, "file.grpc.local", cfg.GrpcServerListenAddrHost)
+	assert.Equal(t, 54321, cfg.GrpcServerListenAddrPort)
+}
+
+func TestLoadConfigFromPath_InvalidGrpcPortValue(t *testing.T) {
+	os.Clearenv()
+	path := writeTempFile(t, "grpc_server_listen_addr_port=abc")
+	_, err := LoadConfigFromPath(path)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error parsing grpc_server_listen_addr_port")
+}
+
 func TestValidateClusterBasePort_PortTooHigh(t *testing.T) {
 	cfg := &Config{
 		ClusterBasePort: constants.MaxPort + 1,

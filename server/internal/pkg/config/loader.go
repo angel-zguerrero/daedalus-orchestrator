@@ -36,6 +36,8 @@ Available Flags:
   --admin-port                 Port for the Admin API. Overrides config file and environment variable.
   --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
   --max-tenants                Maximum number of tenants (default 10, max 10000). Overrides config file and environment variable.
+  --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
+  --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -58,6 +60,8 @@ Environment Variables:
   ADMIN_API_JWT_SECRET         JWT secret key for the Admin API. (Corresponds to ` + constants.EnvVarAdminAPIJWTSecret + `)
   API_RAFT_TIMEOUT             Timeout for API to Raft node requests (e.g., "5s", "1m"). (Corresponds to ` + constants.EnvVarAPIRaftTimeout + `)
   MAX_TENANTS                  Maximum number of tenants. (Corresponds to ` + constants.EnvVarMaxTenants + `)
+  GRPC_SERVER_LISTEN_ADDR_HOST Host address for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrHost + `)
+  GRPC_SERVER_LISTEN_ADDR_PORT Port for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrPort + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -86,6 +90,8 @@ Configuration File:
     api_raft_timeout               Timeout for API to Raft node requests in seconds (e.g., 5 for 5s).
     tenant_port_range              Tenant port range (e.g., "4000-4100").
     max_tenants                    Maximum number of tenants.
+    grpc_server_listen_addr_host   Host address for the gRPC server.
+    grpc_server_listen_addr_port   Port for the gRPC server.
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -154,6 +160,12 @@ var MaxTenantsFlag = flag.Int(
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
+
+// GrpcServerListenAddrHostFlag defines the --grpc-host command-line flag for specifying the gRPC server listen host.
+var GrpcServerListenAddrHostFlag = flag.String(constants.GrpcServerListenAddrHostFlagName, "", "Host address for the gRPC server. Overrides config file and environment variable.")
+
+// GrpcServerListenAddrPortFlag defines the --grpc-port command-line flag for specifying the gRPC server listen port.
+var GrpcServerListenAddrPortFlag = flag.Int(constants.GrpcServerListenAddrPortFlagName, 0, "Port for the gRPC server. Default 4545. Overrides config file and environment variable.")
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -334,6 +346,18 @@ func LoadDefaultConfiguration() error {
 		config.MaxTenants = maxTenants
 	}
 
+	if envVal := os.Getenv(constants.EnvVarGrpcServerListenAddrHost); envVal != "" {
+		config.GrpcServerListenAddrHost = envVal
+	}
+
+	if envVal := os.Getenv(constants.EnvVarGrpcServerListenAddrPort); envVal != "" {
+		grpcPort, err := strconv.Atoi(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarGrpcServerListenAddrPort, err)
+		}
+		config.GrpcServerListenAddrPort = grpcPort
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -393,6 +417,13 @@ func LoadDefaultConfiguration() error {
 		config.MaxTenants = *MaxTenantsFlag
 	}
 
+	if *GrpcServerListenAddrHostFlag != "" {
+		config.GrpcServerListenAddrHost = *GrpcServerListenAddrHostFlag
+	}
+	if *GrpcServerListenAddrPortFlag != 0 {
+		config.GrpcServerListenAddrPort = *GrpcServerListenAddrPortFlag
+	}
+
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
@@ -418,6 +449,13 @@ func LoadDefaultConfiguration() error {
 	if config.AdminAPIJWTSecret == "" {
 		config.AdminAPIJWTSecret = "super-secret-default-jwt-key-please-change"
 		log.Warn().Msgf("⚠️ WARNING: Admin API JWT Secret is not set, using default insecure key. Please set the %s environment variable or the admin_api_jwt_secret key in your configuration file.", constants.EnvVarAdminAPIJWTSecret)
+	}
+
+	if config.GrpcServerListenAddrHost == "" {
+		config.GrpcServerListenAddrHost = "0.0.0.0"
+	}
+	if config.GrpcServerListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
+		config.GrpcServerListenAddrPort = 4545 // Default gRPC port
 	}
 
 	// Default for ApiRaftTimeout if not set by file, env, or flag (flag itself has a default of 5s)
@@ -667,6 +705,14 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.max_tenants = mt
+		case constants.ConfigGrpcServerListenAddrHostKey:
+			cfg.grpc_server_listen_addr_host = v
+		case constants.ConfigGrpcServerListenAddrPortKey:
+			p, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.grpc_server_listen_addr_port = p
 		}
 	}
 
