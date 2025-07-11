@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "go-server",
+  "projectType": "application",
+  "sourceRoot": "server",
+  "targets": {
+    "serve-dev": {
+      "executor": "@nx/run-commands",
+      "options": {
+        "command": "go run server/cmd/main.go",
+        "cwd": "{workspaceRoot}"
+      },
+      "dependsOn": [
+        {
+          "target": "build",
+          "project": "daedalus-web-admin",
+          "params": "development"
+        }
+      ]
+    }
+  }
+}
