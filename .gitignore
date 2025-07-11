@@ -2,6 +2,7 @@ backlog.txt
 node_modules
 web-admin/node_modules
 web-admin/.angular
+.angular/cache/20.1.0/daedalus-web-admin
 .angular/cache
 .angular/cache/20.1.0/daedalus-web-admin/.tsbuildinfo
 .nx/installation
