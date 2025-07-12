@@ -19,6 +19,10 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	{
 
 		adminAPIGroup.POST("/login", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.LoginHandler)
+		adminAPIGroup.POST("/logout",
+			authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey),
+			rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4),
+			adminController.LogoutHandler)
 
 		tenantsGroup := adminAPIGroup.Group("/tenants")
 		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))

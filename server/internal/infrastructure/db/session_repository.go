@@ -138,6 +138,37 @@ func (r *SessionRepository) RegisterSession(jwtToken string, now time.Time) erro
 	return nil
 }
 
+func (r *SessionRepository) RemoveSession(jwtToken string, now time.Time) error {
+	claims, err := r.ParseToken(jwtToken)
+	if err != nil {
+		return fmt.Errorf("invalid token for session registration: %w", err)
+	}
+
+	userName := claims.Subject
+	if userName == "" {
+		return fmt.Errorf("username not found in token for session registration")
+	}
+
+	// Check if a session for this user already exists
+	existingSession, err := r.repo.FindByField("UserName", userName, now)
+	if err != nil {
+		// Distinguish between "not found" (which is not an error from FindByField, it returns nil)
+		// and actual DB errors.
+		return fmt.Errorf("error checking for existing session for user %s: %w", userName, err)
+	}
+
+	if existingSession != nil {
+
+		_, err := r.repo.Delete(existingSession.ID, now)
+		if err != nil {
+			return fmt.Errorf("failed to delete session for user %s: %w", userName, err)
+		}
+
+	}
+
+	return nil
+}
+
 // GetSessionByUsername is a helper if direct username access is needed (not part of original request but good practice)
 func (r *SessionRepository) GetSessionByUsername(username string, now time.Time) (*models.UserSession, error) {
 	session, err := r.repo.FindByField("UserName", username, now)

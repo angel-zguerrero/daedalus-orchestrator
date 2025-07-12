@@ -8,6 +8,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -104,6 +105,54 @@ func (ctrl *AdminController) LoginHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
 		"token":   tokenString,
+	})
+}
+
+func (ctrl *AdminController) LogoutHandler(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+		return
+	}
+
+	// Verificar que sea un Bearer token
+	const prefix = "Bearer "
+	if !strings.HasPrefix(authHeader, prefix) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
+		return
+	}
+
+	// Extraer el token
+	token := strings.TrimPrefix(authHeader, prefix)
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Empty bearer token"})
+		return
+	}
+	removeSessionCommand := &commands.RemoveSessionCommand{
+		JWTToken: token,
+		JWTKey:   ctrl.Config.JwtKey,
+	}
+
+	fsmCmd := commands.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: commands.REPOSITORY_COMMAND,
+		CMD:  removeSessionCommand,
+	}
+
+	writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
+	defer writeCancel()
+
+	_, err := ctrl.Config.MasterNode.Write(writeCtx, fsmCmd)
+	if err != nil {
+
+		ctrl.Config.Logger.Error().Err(err).Msg("Failed removing current session")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed removing current session: " + err.Error()})
+		return
+	}
+
+	ctrl.Config.Logger.Info().Msg("User logged out successfully")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logout successful",
 	})
 }
 

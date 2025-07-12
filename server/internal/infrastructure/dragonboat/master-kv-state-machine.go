@@ -74,6 +74,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return deleteTenantInMasterCommand.Execute(uow, now)
 	}
 
+	removeSessionCommand, ok := cmd.(commands.RemoveSessionCommand)
+	if ok {
+		return removeSessionCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
