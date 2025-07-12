@@ -16,7 +16,7 @@ import (
 )
 
 type loginRequest struct {
-	UsernameOrEmail string `json:"UsernameOrEmail" binding:"required"`
+	UsernameOrEmail string `json:"usernameOrEmail" binding:"required"`
 	Password        string `json:"password" binding:"required"`
 }
 
