@@ -49,23 +49,22 @@ export class AuthService {
 
   logout(): void {
     const logoutUrl = '/admin-api/logout'; // Define the logout endpoint
-    // Make an HTTP POST request to the logout endpoint.
-    // The request body might be empty or might require the token, depending on the API design.
-    // For this example, we'll assume an empty body is sufficient.
-    this.http.post(logoutUrl, {}).pipe(
-      tap(() => {
-        // This block will be executed on a successful logout response from the server.
-        this.clearSession();
-      }),
-      catchError(error => {
-        // This block will be executed if the API call fails.
-        console.error('Logout API call failed:', error);
-        // Even if the API call fails, we should still clear the local session to ensure the user is logged out client-side.
-        this.clearSession();
-        // Optionally, re-throw the error or return a user-friendly error message.
-        return of(null); // Continue the observable chain.
-      })
-    ).subscribe();
+    const token = this.getToken();
+
+    if (token) {
+      const headers = { 'Authorization': `Bearer ${token}` };
+      this.http.post(logoutUrl, {}, { headers }).pipe(
+        tap(() => this.clearSession()),
+        catchError(error => {
+          console.error('Logout API call failed:', error);
+          this.clearSession();
+          return of(null);
+        })
+      ).subscribe();
+    } else {
+      // If there's no token, just clear the session
+      this.clearSession();
+    }
   }
 
   private clearSession(): void {
