@@ -48,6 +48,26 @@ export class AuthService {
   }
 
   logout(): void {
+    const logoutUrl = '/admin-api/logout'; // Define the logout endpoint
+    const token = this.getToken();
+
+    if (token) {
+      const headers = { 'Authorization': `Bearer ${token}` };
+      this.http.post(logoutUrl, {}, { headers }).pipe(
+        tap(() => this.clearSession()),
+        catchError(error => {
+          console.error('Logout API call failed:', error);
+          this.clearSession();
+          return of(null);
+        })
+      ).subscribe();
+    } else {
+      // If there's no token, just clear the session
+      this.clearSession();
+    }
+  }
+
+  private clearSession(): void {
     localStorage.removeItem(this.tokenKey);
     this.isAuthenticatedSubject.next(false);
     this.router.navigate(['/login']);
