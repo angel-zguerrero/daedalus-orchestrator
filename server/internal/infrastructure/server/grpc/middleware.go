@@ -36,86 +36,91 @@ func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger
 			return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
 		}
 
-		authHeaders := md.Get("authorization")
-		if len(authHeaders) == 0 {
-			logger.Warn().Msg("UnaryAuthInterceptor: Authorization header missing")
-			return nil, status.Errorf(codes.Unauthenticated, "authorization token is required")
-		}
+		fmt.Println("info.FullMethod")
+		fmt.Println(info.FullMethod)
 
-		authHeader := authHeaders[0]
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			logger.Warn().Msg("UnaryAuthInterceptor: Invalid Authorization header format")
-			return nil, status.Errorf(codes.Unauthenticated, "authorization token format is 'Bearer <token>'")
-		}
-		tokenString := parts[1]
-
-		claims := &jwt.RegisteredClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		if !strings.HasSuffix(info.FullMethod, "AuthService/Login") {
+			authHeaders := md.Get("authorization")
+			if len(authHeaders) == 0 {
+				logger.Warn().Msg("UnaryAuthInterceptor: Authorization header missing")
+				return nil, status.Errorf(codes.Unauthenticated, "authorization token is required")
 			}
-			return jwtKey, nil
-		})
 
-		if err != nil {
-			if err == jwt.ErrTokenExpired {
-				logger.Warn().Msg("UnaryAuthInterceptor: JWT token expired")
-				return nil, status.Errorf(codes.Unauthenticated, "token expired")
+			authHeader := authHeaders[0]
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+				logger.Warn().Msg("UnaryAuthInterceptor: Invalid Authorization header format")
+				return nil, status.Errorf(codes.Unauthenticated, "authorization token format is 'Bearer <token>'")
 			}
-			logger.Warn().Err(err).Msg("UnaryAuthInterceptor: Invalid JWT token")
-			return nil, status.Errorf(codes.Unauthenticated, "invalid token")
+			tokenString := parts[1]
+
+			claims := &jwt.RegisteredClaims{}
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return jwtKey, nil
+			})
+
+			if err != nil {
+				if err == jwt.ErrTokenExpired {
+					logger.Warn().Msg("UnaryAuthInterceptor: JWT token expired")
+					return nil, status.Errorf(codes.Unauthenticated, "token expired")
+				}
+				logger.Warn().Err(err).Msg("UnaryAuthInterceptor: Invalid JWT token")
+				return nil, status.Errorf(codes.Unauthenticated, "invalid token")
+			}
+
+			if !token.Valid {
+				logger.Warn().Msg("UnaryAuthInterceptor: JWT token is invalid")
+				return nil, status.Errorf(codes.Unauthenticated, "invalid token")
+			}
+
+			// Locally validated, now check session existence via Raft
+			checkSessionCmd := &commands.CheckSessionExistsCommand{
+				JWTToken: tokenString,
+				JWTKey:   jwtKey,
+			}
+
+			queryCmd := &commands.Query_Command{
+				Command: &commands.Repository_Command{
+					CMD: checkSessionCmd,
+				},
+				Now: time.Now().UnixNano(),
+			}
+
+			raftCtx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+			defer cancel()
+
+			result, err := MasterNode.Read(raftCtx, *queryCmd)
+			if err != nil {
+				logger.Error().Err(err).Msg("UnaryAuthInterceptor: Failed to execute CheckSessionExistsCommand via Raft")
+				return nil, status.Errorf(codes.Internal, "failed to verify session")
+			}
+
+			buf := bytes.NewBuffer(result.([]byte))
+			dec := gob.NewDecoder(buf)
+			parsedResult := &commands.CommandResult{}
+			if err := dec.Decode(parsedResult); err != nil {
+				logger.Error().Err(err).Msg("UnaryAuthInterceptor: Session does not exist or has been invalidated - decode error")
+				return nil, status.Errorf(codes.Internal, "failed to decode session verification result")
+			}
+
+			sessionExists, ok := parsedResult.Result.(bool)
+			if !ok {
+				logger.Error().Msg("UnaryAuthInterceptor: Unexpected type for session existence result")
+				return nil, status.Errorf(codes.Internal, "failed to interpret session verification result")
+			}
+
+			if !sessionExists {
+				logger.Warn().Str("token_subject", claims.Subject).Msg("UnaryAuthInterceptor: Session does not exist or has been invalidated")
+				return nil, status.Errorf(codes.Unauthenticated, "session is invalid or has expired")
+			}
+
+			// Add claims to context for downstream use if needed
+			// newCtx := context.WithValue(ctx, "user_claims", claims)
+			// return handler(newCtx, req)
 		}
-
-		if !token.Valid {
-			logger.Warn().Msg("UnaryAuthInterceptor: JWT token is invalid")
-			return nil, status.Errorf(codes.Unauthenticated, "invalid token")
-		}
-
-		// Locally validated, now check session existence via Raft
-		checkSessionCmd := &commands.CheckSessionExistsCommand{
-			JWTToken: tokenString,
-			JWTKey:   jwtKey,
-		}
-
-		queryCmd := &commands.Query_Command{
-			Command: &commands.Repository_Command{
-				CMD: checkSessionCmd,
-			},
-			Now: time.Now().UnixNano(),
-		}
-
-		raftCtx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
-		defer cancel()
-
-		result, err := MasterNode.Read(raftCtx, *queryCmd)
-		if err != nil {
-			logger.Error().Err(err).Msg("UnaryAuthInterceptor: Failed to execute CheckSessionExistsCommand via Raft")
-			return nil, status.Errorf(codes.Internal, "failed to verify session")
-		}
-
-		buf := bytes.NewBuffer(result.([]byte))
-		dec := gob.NewDecoder(buf)
-		parsedResult := &commands.CommandResult{}
-		if err := dec.Decode(parsedResult); err != nil {
-			logger.Error().Err(err).Msg("UnaryAuthInterceptor: Session does not exist or has been invalidated - decode error")
-			return nil, status.Errorf(codes.Internal, "failed to decode session verification result")
-		}
-
-		sessionExists, ok := parsedResult.Result.(bool)
-		if !ok {
-			logger.Error().Msg("UnaryAuthInterceptor: Unexpected type for session existence result")
-			return nil, status.Errorf(codes.Internal, "failed to interpret session verification result")
-		}
-
-		if !sessionExists {
-			logger.Warn().Str("token_subject", claims.Subject).Msg("UnaryAuthInterceptor: Session does not exist or has been invalidated")
-			return nil, status.Errorf(codes.Unauthenticated, "session is invalid or has expired")
-		}
-
-		// Add claims to context for downstream use if needed
-		// newCtx := context.WithValue(ctx, "user_claims", claims)
-		// return handler(newCtx, req)
 
 		return handler(ctx, req)
 	}

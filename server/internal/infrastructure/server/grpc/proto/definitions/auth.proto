@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package auth;
 
-option go_package = "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth";
+option go_package = "pb/auth;auth";
 
 // Request message for login
 message LoginRequest {
@@ -29,3 +29,6 @@ service AuthService {
     rpc Login(LoginRequest) returns (LoginResponse);
     rpc Logout(LogoutRequest) returns (LogoutResponse);
 }
+
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/auth.proto
