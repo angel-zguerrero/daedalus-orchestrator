@@ -10,6 +10,8 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/auth" // Import new auth service
+	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth" // Import new auth pb
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
@@ -45,6 +47,9 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	// Registrar servicios
 	pb.RegisterMetricsServiceServer(server, healthmetrics.NewMetricsServer())
 	pbT.RegisterTenantServiceServer(server, tenant.NewTenantService(cfg))
+	// Register new AuthService
+	authSvc := auth.NewAuthService(cfg.MasterNode, cfg)
+	pbAuth.RegisterAuthServiceServer(server, authSvc)
 
 	return &GrpcServer{
 		Config:     cfg,

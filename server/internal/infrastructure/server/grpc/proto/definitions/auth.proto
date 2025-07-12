@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "pb/auth;auth";
+
+// Request message for login
+message LoginRequest {
+    string usernameOrEmail = 1;
+    string password = 2;
+}
+
+// Response message for login
+message LoginResponse {
+    string token = 1;
+    string message = 2;
+}
+
+// Request message for logout
+message LogoutRequest {}
+
+// Response message for logout
+message LogoutResponse {
+    string message = 1;
+}
+
+// AuthService defines the authentication operations
+service AuthService {
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc Logout(LogoutRequest) returns (LogoutResponse);
+}
+
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/auth.proto
