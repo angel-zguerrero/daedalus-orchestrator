@@ -85,7 +85,7 @@ func (ctrl *TenantController) DeleteTenantHandler(c *gin.Context) {
 }
 
 func (ctrl *TenantController) GetTenantsHandler(c *gin.Context) {
-	pageParam := c.Query("page")
+	pageParam := c.Query("pageSize")
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {
 		page = 50

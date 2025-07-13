@@ -26,7 +26,7 @@ export class TenantsComponent implements OnInit {
   tenants: any[] = [];
   cursor = '';
   cursors: string[] = [];
-  pageSize = 10;
+  pageSize = 20;
 
   public createModalVisible = false;
   public editModalVisible = false;
@@ -34,6 +34,7 @@ export class TenantsComponent implements OnInit {
   public detailsModalVisible = false;
 
   tenantForm: FormGroup;
+  tenantFormUpdate: FormGroup;
   selectedTenant: any;
 
   constructor(
@@ -44,17 +45,21 @@ export class TenantsComponent implements OnInit {
       name: ['', Validators.required],
       code: ['', Validators.required]
     });
+    this.tenantFormUpdate = this.fb.group({
+      name: ['', Validators.required],
+      code: [{ value: '', disabled: true }]
+    });
   }
 
   ngOnInit(): void {
+    this.cursors.push('')
     this.loadTenants();
   }
 
   loadTenants(cursor: string = '', isPrevious: boolean = false): void {
-    if (!isPrevious) {
-      this.cursors.push(this.cursor);
+    if (!isPrevious && cursor) {
+      this.cursors.push(cursor);
     }
-
     this.tenantsService.getTenants(cursor, this.pageSize).subscribe(response => {
       this.tenants = response.result.Entities;
       this.cursor = response.result.Cursor;
@@ -69,9 +74,8 @@ export class TenantsComponent implements OnInit {
 
   previousPage(): void {
     if (this.cursors.length > 1) {
-      this.cursors.pop(); // Remove current cursor
-      const previousCursor = this.cursors.pop() || ''; // Get previous cursor
-      this.loadTenants(previousCursor, true);
+      this.cursors.pop()
+      this.loadTenants(this.cursors[this.cursors.length - 1], true);
     }
   }
 
@@ -82,7 +86,8 @@ export class TenantsComponent implements OnInit {
 
   openEditModal(tenant: any): void {
     this.selectedTenant = tenant;
-    this.tenantForm.patchValue({
+     this.tenantFormUpdate.reset();
+    this.tenantFormUpdate.patchValue({
       name: tenant.Name,
       code: tenant.Code
     });
@@ -103,21 +108,21 @@ export class TenantsComponent implements OnInit {
 
   createTenant(): void {
     if (this.tenantForm.valid) {
-      this.tenantsService.createTenant(this.tenantForm.value).subscribe(() => {
+      this.tenantsService.assertTenant(this.tenantForm.value).subscribe(() => {
         this.createModalVisible = false;
         this.loadTenants();
       });
     }
   }
-
-  updateTenant(): void {
-    if (this.tenantForm.valid) {
-      this.tenantsService.updateTenant(this.selectedTenant.ID, this.tenantForm.value).subscribe(() => {
-        this.editModalVisible = false;
-        this.loadTenants();
-      });
-    }
+updateTenant(): void {
+  if (this.tenantFormUpdate.valid) {
+    const tenantData = this.tenantFormUpdate.getRawValue();
+    this.tenantsService.assertTenant(tenantData).subscribe(() => {
+      this.editModalVisible = false;
+      this.loadTenants();
+    });
   }
+}
 
   deleteTenant(): void {
     this.tenantsService.deleteTenant(this.selectedTenant.ID).subscribe(() => {

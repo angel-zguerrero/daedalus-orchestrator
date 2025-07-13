@@ -18,12 +18,8 @@ export class TenantsService {
     return this.http.get(`${this.apiUrl}/${id}`);
   }
 
-  createTenant(tenant: any): Observable<any> {
+  assertTenant(tenant: any): Observable<any> {
     return this.http.post(this.apiUrl, tenant);
-  }
-
-  updateTenant(id: string, tenant: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/${id}`, tenant);
   }
 
   deleteTenant(id: string): Observable<any> {

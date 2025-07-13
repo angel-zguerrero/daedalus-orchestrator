@@ -27,7 +27,7 @@
       </tbody>
     </table>
     <div class="d-flex justify-content-end mt-3">
-      <button cButton color="secondary" [disabled]="cursors.length === 0" (click)="previousPage()">Previous</button>
+      <button cButton color="secondary" [disabled]="cursors.length === 1" (click)="previousPage()">Previous</button>
       <button cButton color="secondary" [disabled]="!cursor" (click)="nextPage()">Next</button>
     </div>
   </c-card-body>
@@ -70,17 +70,17 @@
     <button (click)="editModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
-    <form [formGroup]="tenantForm">
+    <form [formGroup]="tenantFormUpdate">
       <c-row class="mb-3">
         <c-col>
           <label cLabel for="name">Name</label>
-          <input cFormControl id="name" formControlName="name" />
+          <input cFormControl id="name-update" formControlName="name" />
         </c-col>
       </c-row>
       <c-row class="mb-3">
         <c-col>
           <label cLabel for="code">Code</label>
-          <input cFormControl id="code" formControlName="code" />
+          <input cFormControl id="code-update" formControlName="code" [disabled]="true"/>
         </c-col>
       </c-row>
     </form>

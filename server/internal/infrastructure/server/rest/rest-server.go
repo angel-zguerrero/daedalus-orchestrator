@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -44,6 +45,13 @@ func NewRestServer(config *common.ServerConfing) *RestServer {
 	engine.Static("/admin/", staticPath)
 
 	engine.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/admin-api/") {
+			// 404 para rutas API no existentes
+			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
+			return
+		}
+
+		// Cualquier otra ruta => Angular app
 		c.File(filepath.Join(staticPath, "index.html"))
 	})
 
