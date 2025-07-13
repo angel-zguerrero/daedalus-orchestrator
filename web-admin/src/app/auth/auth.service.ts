@@ -7,7 +7,7 @@ import { Observable, BehaviorSubject, tap, catchError, of } from 'rxjs';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = '/admin-api/login'; // Corrected API endpoint
+  private apiUrl = '/rest-api/login'; // Corrected API endpoint
   private tokenKey = 'authToken';
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
 
@@ -48,7 +48,7 @@ export class AuthService {
   }
 
   logout(): void {
-    const logoutUrl = '/admin-api/logout'; // Define the logout endpoint
+    const logoutUrl = '/rest-api/logout'; // Define the logout endpoint
     const token = this.getToken();
 
     if (token) {

@@ -1,7 +1,7 @@
 package rest_server
 
 import (
-	rest_api_admin "deadalus-orch/server/internal/infrastructure/server/rest/admin"
+	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"time"
@@ -11,20 +11,20 @@ import (
 
 func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
-	adminController := rest_api_admin.NewAdminController(s.Config)
+	adminController := auth.NewAdminController(s.Config)
 	metricsController := metrics.NewMetricsController(s.Config)
 	tenantController := tenant.NewTenantController(s.Config)
 
-	adminAPIGroup := engine.Group("/admin-api")
+	restAPIGroup := engine.Group("/rest-api")
 	{
 
-		adminAPIGroup.POST("/login", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.LoginHandler)
-		adminAPIGroup.POST("/logout",
+		restAPIGroup.POST("/login", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.LoginHandler)
+		restAPIGroup.POST("/logout",
 			authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey),
 			rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4),
 			adminController.LogoutHandler)
 
-		tenantsGroup := adminAPIGroup.Group("/tenants")
+		tenantsGroup := restAPIGroup.Group("/tenants")
 		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 20))
 		{

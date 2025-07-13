@@ -5,7 +5,10 @@ export const routes: Routes = [
   {
     path: '',
     redirectTo: 'dashboard', // This will be caught by the guard if not authenticated
-    pathMatch: 'full'
+    pathMatch: 'full',
+    data: {
+      title: 'Daedalus'
+    }
   },
   {
     path: '', // This route group contains all authenticated pages

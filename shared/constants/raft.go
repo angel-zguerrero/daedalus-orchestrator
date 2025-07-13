@@ -13,4 +13,4 @@ const MaxReplicationInNonProduction = 10
 const MinSafePort = 5000
 const MaxPort = 65535
 
-const AdminPortSafeDistance = 1000
+const RestPortSafeDistance = 1000

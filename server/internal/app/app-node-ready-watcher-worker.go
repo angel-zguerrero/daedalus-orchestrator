@@ -24,8 +24,8 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 		const masterKey = -1
 
 		defer func() {
-			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Admin API is shutdown.")
-			app.CloseAdminAPI()
+			log.Info().Msg("🔌 Node readiness watcher stopped, ensuring Rest API is shutdown.")
+			app.CloseRestAPI()
 		}()
 
 		defer func() {
@@ -102,9 +102,9 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 				}
 
 				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleAdmin) {
-					app.StartAdminAPI()
+					app.StartRestAPI()
 				} else {
-					app.CloseAdminAPI()
+					app.CloseRestAPI()
 				}
 
 				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConnector) {
@@ -118,7 +118,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			if !allReady && app.MasterNodeIsReady {
 				log.Warn().Msg("⚠️️ One or more nodes are not ready. Marking node as not ready.")
 				app.MasterNodeIsReady = false
-				app.CloseAdminAPI()
+				app.CloseRestAPI()
 				app.CloseGrpcAPI()
 			}
 

@@ -6,7 +6,7 @@ import { Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class TenantsService {
-  private apiUrl = '/admin-api/tenants';
+  private apiUrl = '/rest-api/tenants';
 
   constructor(private http: HttpClient) { }
 

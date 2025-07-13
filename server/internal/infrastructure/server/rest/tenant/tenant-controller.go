@@ -15,7 +15,6 @@ type TenantController struct {
 	TenantBO *bo.TenantBO
 }
 
-// NewTenantController creates a new instance of RestAdminAPI.
 func NewTenantController(Config *common.ServerConfing) *TenantController {
 	api := &TenantController{
 		Config:   Config,
@@ -29,7 +28,7 @@ type createTenantInMasterRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
-// CreateTenantHandler handles POST /admin-api/tenants
+// CreateTenantHandler handles POST /rest-api/tenants
 func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 	var req createTenantInMasterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -50,7 +49,7 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 	})
 }
 
-// GetTenantHandler handles GET /admin-api/tenants/:id
+// GetTenantHandler handles GET /rest-api/tenants/:id
 func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
 	tenantInMaster, node, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)

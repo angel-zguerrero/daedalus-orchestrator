@@ -33,7 +33,7 @@ func (z zerologAdapter) Write(p []byte) (n int, err error) {
 // NewRestServer creates a new instance of RestServer.
 func NewRestServer(config *common.ServerConfing) *RestServer {
 	if config.MasterNode == nil {
-		config.Logger.Fatal().Msg("Admin API: Raft node cannot be nil")
+		config.Logger.Fatal().Msg("Rest API: Raft node cannot be nil")
 	}
 
 	gin.DefaultWriter = zerologAdapter{config.Logger}
@@ -45,14 +45,17 @@ func NewRestServer(config *common.ServerConfing) *RestServer {
 	engine.Static("/admin/", staticPath)
 
 	engine.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/admin-api/") {
-			// 404 para rutas API no existentes
-			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
+		if strings.HasPrefix(c.Request.URL.Path, "/rest-api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "REST API route not found"})
 			return
 		}
 
-		// Cualquier otra ruta => Angular app
-		c.File(filepath.Join(staticPath, "index.html"))
+		if strings.HasPrefix(c.Request.URL.Path, "/admin") {
+			c.File(filepath.Join(staticPath, "index.html"))
+			return
+		}
+
+		c.JSON(http.StatusNotFound, gin.H{"error": "Route not found"})
 	})
 
 	server := &RestServer{
@@ -95,21 +98,21 @@ func resolveAngularDistPath(restServerConfing *common.ServerConfing) string {
 				Err(err).
 				Str("package", "rest_server").
 				Str("func", "resolveAngularDistPath").
-				Msgf("❌ Getting admin web application path")
+				Msgf("❌ Getting Rest web application path")
 		}
 		return base_path
 	}
 
 }
 
-// Start starts the Gin HTTP server for the admin API.
+// Start starts the Gin HTTP server for the Rest API.
 func (s *RestServer) Start() error {
 	if s.GinEngine == nil {
-		return fmt.Errorf("admin API Gin engine not initialized")
+		return fmt.Errorf("Rest API Gin engine not initialized")
 	}
 
-	listenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.AdminListenAddrHost, config.GlobalConfiguration.AdminListenAddrPort)
-	s.Config.Logger.Info().Str("address", listenAddr).Msg("🚀 Starting Admin REST API server.")
+	listenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.RestListenAddrHost, config.GlobalConfiguration.RestListenAddrPort)
+	s.Config.Logger.Info().Str("address", listenAddr).Msg("🚀 Starting Rest REST API server.")
 
 	s.Config.Server = &http.Server{
 		Addr:    listenAddr,
@@ -117,10 +120,10 @@ func (s *RestServer) Start() error {
 	}
 
 	if err := s.Config.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		s.Config.Logger.Error().Err(err).Msg("❌ Failed to start Admin REST API server")
+		s.Config.Logger.Error().Err(err).Msg("❌ Failed to start Rest REST API server")
 		return err
 	}
-	s.Config.Logger.Info().Msg("✅ Admin REST API server shut down gracefully.")
+	s.Config.Logger.Info().Msg("✅ Rest REST API server shut down gracefully.")
 	return nil
 }
 
@@ -128,7 +131,7 @@ func (s *RestServer) Start() error {
 func (s *RestServer) Shutdown() error {
 	ctx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
-	s.Config.Logger.Info().Msg("🔌 Shutting down Admin REST API server.")
+	s.Config.Logger.Info().Msg("🔌 Shutting down Rest REST API server.")
 	if s.Config.Server != nil {
 		return s.Config.Server.Shutdown(ctx)
 	}

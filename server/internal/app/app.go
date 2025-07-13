@@ -269,14 +269,14 @@ func (app *Application) Stop() {
 		}
 	}
 
-	// Stop Admin API
+	// Stop Rest API
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if app.RestAPI != nil {
-			app.CloseAdminAPI()
+			app.CloseRestAPI()
 		} else {
-			log.Warn().Msg("⚠️  No Admin API to stop.")
+			log.Warn().Msg("⚠️  No Rest API to stop.")
 		}
 	}()
 

@@ -33,13 +33,21 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-
     this.#router.events.pipe(
-        takeUntilDestroyed(this.#destroyRef)
-      ).subscribe((evt) => {
-      if (!(evt instanceof NavigationEnd)) {
-        return;
-      }
+      filter(event => event instanceof NavigationEnd),
+      map(() => {
+        let route = this.#activatedRoute;
+        while (route.firstChild) {
+          route = route.firstChild;
+        }
+        return route;
+      }),
+      filter(route => route.outlet === 'primary'),
+      map(route => route.snapshot.data['title']),
+      filter(title => !!title),
+      takeUntilDestroyed(this.#destroyRef)
+    ).subscribe((title: string) => {
+      this.#titleService.setTitle(`Daedalus - ${title}`);
     });
 
     this.#activatedRoute.queryParams

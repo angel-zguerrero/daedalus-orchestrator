@@ -1,4 +1,4 @@
-package rest_api_admin
+package auth
 
 import (
 	"net/http"
@@ -28,7 +28,7 @@ func NewAdminController(Config *common.ServerConfing) *AdminController {
 	return api
 }
 
-// LoginHandler handles the /admin-api/login endpoint.
+// LoginHandler handles the /rest-api/login endpoint.
 func (ctrl *AdminController) LoginHandler(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

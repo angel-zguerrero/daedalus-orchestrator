@@ -31,9 +31,9 @@ Available Flags:
   --cluster-base-port The base port number that this node will use for communication with other members in the cluster. (e.g., 5000)
   --master-db-engine         The database engine for the master database (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "rocksdb"). Defaults to "pebble".
-  --admin-api-jwt-expiration-hours JWT expiration time in hours for the Admin API. Default is 3 hours.
-  --admin-host                 Host address for the Admin API. Overrides config file and environment variable.
-  --admin-port                 Port for the Admin API. Overrides config file and environment variable.
+  --rest-api-jwt-expiration-hours JWT expiration time in hours for the Rest API. Default is 3 hours.
+  --rest-host                 Host address for the Rest API. Overrides config file and environment variable.
+  --rest-port                 Port for the Rest API. Overrides config file and environment variable.
   --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
   --max-tenants                Maximum number of tenants (default 10, max 10000). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
@@ -54,10 +54,10 @@ Environment Variables:
   TTL_INTERNAL_ERROR           TTL for internal error caching in seconds.
   MASTER_DB_ENGINE             The database engine for the master database.
   TENANT_DB_ENGINE             The database engine for tenant databases.
-  ADMIN_API_JWT_EXPIRATION_HOURS JWT expiration time in hours for the Admin API.
-  ADMIN_LISTEN_ADDR_HOST       Host address for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrHost + `)
-  ADMIN_LISTEN_ADDR_PORT       Port for the Admin API. (Corresponds to ` + constants.EnvVarAdminListenAddrPort + `)
-  ADMIN_API_JWT_SECRET         JWT secret key for the Admin API. (Corresponds to ` + constants.EnvVarAdminAPIJWTSecret + `)
+  REST_API_JWT_EXPIRATION_HOURS JWT expiration time in hours for the Rest API.
+  REST_LISTEN_ADDR_HOST       Host address for the Rest API. (Corresponds to ` + constants.EnvVarRestListenAddrHost + `)
+  REST_LISTEN_ADDR_PORT       Port for the Rest API. (Corresponds to ` + constants.EnvVarRestListenAddrPort + `)
+  REST_API_JWT_SECRET         JWT secret key for the Rest API. (Corresponds to ` + constants.EnvVarRestAPIJWTSecret + `)
   API_RAFT_TIMEOUT             Timeout for API to Raft node requests (e.g., "5s", "1m"). (Corresponds to ` + constants.EnvVarAPIRaftTimeout + `)
   MAX_TENANTS                  Maximum number of tenants. (Corresponds to ` + constants.EnvVarMaxTenants + `)
   GRPC_SERVER_LISTEN_ADDR_HOST Host address for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrHost + `)
@@ -83,10 +83,10 @@ Configuration File:
     ttl_internal_error
     master_db_engine
     tenant_db_engine
-    admin_api_jwt_expiration_hours
-    admin_listen_addr_host
-    admin_listen_addr_port
-    admin_api_jwt_secret
+    rest_api_jwt_expiration_hours
+    rest_listen_addr_host
+    rest_listen_addr_port
+    rest_api_jwt_secret
     api_raft_timeout               Timeout for API to Raft node requests in seconds (e.g., 5 for 5s).
     tenant_port_range              Tenant port range (e.g., "4000-4100").
     max_tenants                    Maximum number of tenants.
@@ -135,14 +135,14 @@ var MasterDBEngineFlag = flag.String(constants.MasterDBEngineFlagName, "", "The 
 // TenantDBEngineFlag defines the --tenant-db-engine command-line flag for specifying the tenant database engine.
 var TenantDBEngineFlag = flag.String(constants.TenantDBEngineFlagName, "", "The database engine for tenant databases (e.g., \"pebble\", \"rocksdb\").")
 
-// AdminAPIJWTExpirationHoursFlag defines the --admin-api-jwt-expiration-hours command-line flag for specifying the Admin API JWT expiration in hours.
-var AdminAPIJWTExpirationHoursFlag = flag.Int("admin-api-jwt-expiration-hours", 0, "JWT expiration time in hours for the Admin API. Overrides config file and environment variable.")
+// RestAPIJWTExpirationHoursFlag defines the --rest-api-jwt-expiration-hours command-line flag for specifying the Rest API JWT expiration in hours.
+var RestAPIJWTExpirationHoursFlag = flag.Int("rest-api-jwt-expiration-hours", 0, "JWT expiration time in hours for the Rest API. Overrides config file and environment variable.")
 
-// AdminListenAddrHostFlag defines the --admin-host command-line flag for specifying the Admin API listen host.
-var AdminListenAddrHostFlag = flag.String("admin-host", "", "Host address for the Admin API. Overrides config file and environment variable.")
+// RestListenAddrHostFlag defines the --rest-host command-line flag for specifying the Rest API listen host.
+var RestListenAddrHostFlag = flag.String("rest-host", "", "Host address for the Rest API. Overrides config file and environment variable.")
 
-// AdminListenAddrPortFlag defines the --admin-port command-line flag for specifying the Admin API listen port.
-var AdminListenAddrPortFlag = flag.Int("admin-port", 0, "Port for the Admin API. Overrides config file and environment variable.")
+// RestListenAddrPortFlag defines the --rest-port command-line flag for specifying the Rest API listen port.
+var RestListenAddrPortFlag = flag.Int("rest-port", 0, "Port for the Rest API. Overrides config file and environment variable.")
 
 // ApiRaftTimeoutFlag defines the --api-raft-timeout command-line flag for specifying the API to Raft node request timeout.
 var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 5*time.Second, "Timeout for API to Raft node requests (e.g., 5s, 1m). Overrides config file and environment variable.")
@@ -305,28 +305,28 @@ func LoadDefaultConfiguration() error {
 		config.TenantDBEngine = envVal
 	}
 
-	if envVal := os.Getenv(constants.EnvVarAdminAPIJWTExpirationHours); envVal != "" {
+	if envVal := os.Getenv(constants.EnvVarRestAPIJWTExpirationHours); envVal != "" {
 		jwtExpirationHours, err := strconv.Atoi(envVal)
 		if err != nil {
 			return err
 		}
-		config.AdminAPIJWTExpirationHours = jwtExpirationHours
+		config.RestAPIJWTExpirationHours = jwtExpirationHours
 	}
 
-	if envVal := os.Getenv(constants.EnvVarAdminListenAddrHost); envVal != "" {
-		config.AdminListenAddrHost = envVal
+	if envVal := os.Getenv(constants.EnvVarRestListenAddrHost); envVal != "" {
+		config.RestListenAddrHost = envVal
 	}
 
-	if envVal := os.Getenv(constants.EnvVarAdminListenAddrPort); envVal != "" {
-		adminPort, err := strconv.Atoi(envVal)
+	if envVal := os.Getenv(constants.EnvVarRestListenAddrPort); envVal != "" {
+		restPort, err := strconv.Atoi(envVal)
 		if err != nil {
 			return err
 		}
-		config.AdminListenAddrPort = adminPort
+		config.RestListenAddrPort = restPort
 	}
 
-	if envVal := os.Getenv(constants.EnvVarAdminAPIJWTSecret); envVal != "" {
-		config.AdminAPIJWTSecret = envVal
+	if envVal := os.Getenv(constants.EnvVarRestAPIJWTSecret); envVal != "" {
+		config.RestAPIJWTSecret = envVal
 	}
 
 	if envVal := os.Getenv(constants.EnvVarAPIRaftTimeout); envVal != "" {
@@ -393,16 +393,16 @@ func LoadDefaultConfiguration() error {
 		config.TenantDBEngine = *TenantDBEngineFlag
 	}
 
-	if *AdminAPIJWTExpirationHoursFlag != 0 {
-		config.AdminAPIJWTExpirationHours = *AdminAPIJWTExpirationHoursFlag
+	if *RestAPIJWTExpirationHoursFlag != 0 {
+		config.RestAPIJWTExpirationHours = *RestAPIJWTExpirationHoursFlag
 	}
 
-	if *AdminListenAddrHostFlag != "" {
-		config.AdminListenAddrHost = *AdminListenAddrHostFlag
+	if *RestListenAddrHostFlag != "" {
+		config.RestListenAddrHost = *RestListenAddrHostFlag
 	}
 
-	if *AdminListenAddrPortFlag != 0 {
-		config.AdminListenAddrPort = *AdminListenAddrPortFlag
+	if *RestListenAddrPortFlag != 0 {
+		config.RestListenAddrPort = *RestListenAddrPortFlag
 	}
 
 	// Note: ApiRaftTimeoutFlag is a time.Duration. If it's different from its default, it means it was set.
@@ -437,18 +437,18 @@ func LoadDefaultConfiguration() error {
 	if config.TenantDBEngine == "" {
 		config.TenantDBEngine = "pebble"
 	}
-	if config.AdminAPIJWTExpirationHours == 0 { // Note: 0 is the default for int if not set by flag/env/file
-		config.AdminAPIJWTExpirationHours = 3 // Default to 3 hours
+	if config.RestAPIJWTExpirationHours == 0 { // Note: 0 is the default for int if not set by flag/env/file
+		config.RestAPIJWTExpirationHours = 3 // Default to 3 hours
 	}
-	if config.AdminListenAddrHost == "" {
-		config.AdminListenAddrHost = "0.0.0.0"
+	if config.RestListenAddrHost == "" {
+		config.RestListenAddrHost = "0.0.0.0"
 	}
-	if config.AdminListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
-		config.AdminListenAddrPort = 3000
+	if config.RestListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
+		config.RestListenAddrPort = 3000
 	}
-	if config.AdminAPIJWTSecret == "" {
-		config.AdminAPIJWTSecret = "super-secret-default-jwt-key-please-change"
-		log.Warn().Msgf("⚠️️ WARNING: Admin API JWT Secret is not set, using default insecure key. Please set the %s environment variable or the admin_api_jwt_secret key in your configuration file.", constants.EnvVarAdminAPIJWTSecret)
+	if config.RestAPIJWTSecret == "" {
+		config.RestAPIJWTSecret = "super-secret-default-jwt-key-please-change"
+		log.Warn().Msgf("⚠️️ WARNING: Rest API JWT Secret is not set, using default insecure key. Please set the %s environment variable or the rest_api_jwt_secret key in your configuration file.", constants.EnvVarRestAPIJWTSecret)
 	}
 
 	if config.GrpcServerListenAddrHost == "" {
@@ -533,7 +533,7 @@ func LoadDefaultConfiguration() error {
 	}
 
 	validateClusterBasePort(config)
-	validateAdminPortAgainstClusterBasePort(config.AdminListenAddrPort, config.ClusterBasePort)
+	validateRestPortAgainstClusterBasePort(config.RestListenAddrPort, config.ClusterBasePort)
 
 	GlobalConfiguration = config
 	return nil
@@ -677,22 +677,22 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 
 		case constants.ConfigTenantDBEngineKey:
 			cfg.tenant_db_engine = v
-		case constants.ConfigAdminAPIJWTExpirationHoursKey:
+		case constants.ConfigRestAPIJWTExpirationHoursKey:
 			p, err := strconv.Atoi(v)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
-			cfg.admin_api_jwt_expiration_hours = p
-		case "admin_listen_addr_host":
-			cfg.admin_listen_addr_host = v
-		case "admin_listen_addr_port":
+			cfg.rest_api_jwt_expiration_hours = p
+		case "rest_listen_addr_host":
+			cfg.rest_listen_addr_host = v
+		case "rest_listen_addr_port":
 			p, err := strconv.Atoi(v)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
-			cfg.admin_listen_addr_port = p
-		case constants.ConfigAdminAPIJWTSecretKey:
-			cfg.admin_api_jwt_secret = v
+			cfg.rest_listen_addr_port = p
+		case constants.ConfigRestAPIJWTSecretKey:
+			cfg.rest_api_jwt_secret = v
 		case constants.ConfigAPIRaftTimeoutKey:
 			p, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
@@ -747,9 +747,9 @@ func validateClusterBasePort(config *Config) {
 	}
 }
 
-func validateAdminPortAgainstClusterBasePort(adminPort int, clusterBasePort int) {
-	if adminPort >= clusterBasePort-constants.AdminPortSafeDistance {
-		log.Panic().Msgf("❌ Admin API port (%d) must be at least %d ports below ClusterBasePort (%d) to avoid conflicts. "+
-			"Please choose a lower admin port.", adminPort, constants.AdminPortSafeDistance, clusterBasePort)
+func validateRestPortAgainstClusterBasePort(restPort int, clusterBasePort int) {
+	if restPort >= clusterBasePort-constants.RestPortSafeDistance {
+		log.Panic().Msgf("❌ Rest API port (%d) must be at least %d ports below ClusterBasePort (%d) to avoid conflicts. "+
+			"Please choose a lower restport.", restPort, constants.RestPortSafeDistance, clusterBasePort)
 	}
 }

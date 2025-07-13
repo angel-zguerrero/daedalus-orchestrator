@@ -41,17 +41,17 @@ const ConfigMasterDBEngineKey = "master_db_engine"
 // ConfigTenantDBEngineKey is the key for the tenant database engine setting in the configuration file.
 const ConfigTenantDBEngineKey = "tenant_db_engine"
 
-// ConfigAdminAPIJWTExpirationHoursKey is the key for the Admin API JWT expiration hours setting in the configuration file.
-const ConfigAdminAPIJWTExpirationHoursKey = "admin_api_jwt_expiration_hours"
+// ConfigRestAPIJWTExpirationHoursKey is the key for the Rest API JWT expiration hours setting in the configuration file.
+const ConfigRestAPIJWTExpirationHoursKey = "rest_api_jwt_expiration_hours"
 
-// ConfigAdminListenAddrHostKey is the key for the Admin API listen host setting in the configuration file.
-const ConfigAdminListenAddrHostKey = "admin_listen_addr_host"
+// ConfigRestListenAddrHostKey is the key for the Rest API listen host setting in the configuration file.
+const ConfigRestListenAddrHostKey = "rest_listen_addr_host"
 
-// ConfigAdminListenAddrPortKey is the key for the Admin API listen port setting in the configuration file.
-const ConfigAdminListenAddrPortKey = "admin_listen_addr_port"
+// ConfigRestListenAddrPortKey is the key for the Rest API listen port setting in the configuration file.
+const ConfigRestListenAddrPortKey = "rest_listen_addr_port"
 
-// ConfigAdminAPIJWTSecretKey is the key for the Admin API JWT secret setting in the configuration file.
-const ConfigAdminAPIJWTSecretKey = "admin_api_jwt_secret"
+// ConfigRestAPIJWTSecretKey is the key for the Rest API JWT secret setting in the configuration file.
+const ConfigRestAPIJWTSecretKey = "rest_api_jwt_secret"
 
 // ConfigAPIRaftTimeoutKey is the key for the API Raft timeout setting in the configuration file (in seconds).
 const ConfigAPIRaftTimeoutKey = "api_raft_timeout"
@@ -113,17 +113,17 @@ const EnvVarMasterDBEngine = "MASTER_DB_ENGINE"
 // EnvVarTenantDBEngine is the environment variable name for the tenant database engine.
 const EnvVarTenantDBEngine = "TENANT_DB_ENGINE"
 
-// EnvVarAdminAPIJWTExpirationHours is the environment variable name for the Admin API JWT expiration hours.
-const EnvVarAdminAPIJWTExpirationHours = "ADMIN_API_JWT_EXPIRATION_HOURS"
+// EnvVarRestAPIJWTExpirationHours is the environment variable name for the Rest API JWT expiration hours.
+const EnvVarRestAPIJWTExpirationHours = "REST_API_JWT_EXPIRATION_HOURS"
 
-// EnvVarAdminListenAddrHost is the environment variable name for the Admin API listen host.
-const EnvVarAdminListenAddrHost = "ADMIN_LISTEN_ADDR_HOST"
+// EnvVarRestListenAddrHost is the environment variable name for the Rest API listen host.
+const EnvVarRestListenAddrHost = "REST_LISTEN_ADDR_HOST"
 
-// EnvVarAdminListenAddrPort is the environment variable name for the Admin API listen port.
-const EnvVarAdminListenAddrPort = "ADMIN_LISTEN_ADDR_PORT"
+// EnvVarRestListenAddrPort is the environment variable name for the Rest API listen port.
+const EnvVarRestListenAddrPort = "REST_LISTEN_ADDR_PORT"
 
-// EnvVarAdminAPIJWTSecret is the environment variable name for the Admin API JWT secret.
-const EnvVarAdminAPIJWTSecret = "ADMIN_API_JWT_SECRET"
+// EnvVarRestAPIJWTSecret is the environment variable name for the Rest API JWT secret.
+const EnvVarRestAPIJWTSecret = "REST_API_JWT_SECRET"
 
 // EnvVarAPIRaftTimeout is the environment variable name for the API Raft timeout (e.g., "5s", "1m").
 const EnvVarAPIRaftTimeout = "API_RAFT_TIMEOUT"

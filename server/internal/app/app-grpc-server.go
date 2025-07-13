@@ -13,8 +13,8 @@ func (app *Application) StartGrpcAPI() {
 	app.GrpcLock.Lock()
 	defer app.GrpcLock.Unlock()
 	if app.GrpcAPI == nil {
-		jwtSecret := config.GlobalConfiguration.AdminAPIJWTSecret
-		jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.AdminAPIJWTExpirationHours)
+		jwtSecret := config.GlobalConfiguration.RestAPIJWTSecret
+		jwtDuration := time.Hour * time.Duration(config.GlobalConfiguration.RestAPIJWTExpirationHours)
 
 		log.Info().Msg("grpc API JWT Expiration: " + jwtDuration.String())
 
