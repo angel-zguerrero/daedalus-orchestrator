@@ -53,29 +53,21 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 // GetTenantHandler handles GET /admin-api/tenants/:id
 func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
-	tenantInMaster, node, nodeHostInfo, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenantInMaster, node, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if nodeHostInfo == nil {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Tenant",
-			"result":  tenantInMaster,
-		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Tenant",
-			"result":  tenantInMaster,
-			"node": gin.H{
-				"SelfMember":   node.SelfMember,
-				"ShardID":      node.ShardID,
-				"Roles":        node.Roles,
-				"NodeHostInfo": nodeHostInfo,
-			},
-		})
-	}
+	c.JSON(http.StatusOK, gin.H{
+		"Message": "Tenant",
+		"Result":  tenantInMaster,
+		"Node": gin.H{
+			"SelfMember": node.SelfMember,
+			"ShardID":    node.ShardID,
+			"Roles":      node.Roles,
+		},
+	})
 }
 
 func (ctrl *TenantController) DeleteTenantHandler(c *gin.Context) {

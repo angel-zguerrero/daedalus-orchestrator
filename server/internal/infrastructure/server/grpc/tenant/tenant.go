@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -45,7 +46,12 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 }
 
 func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoRequest) (*pb.TenantInfoResponse, error) {
-	tenantInMaster, node, nodeHostInfo, err := s.TenantBO.GetTenant(ctx, r.ID)
+	tenantInMaster, node, _, err := s.TenantBO.GetTenant(ctx, r.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	roles, err := dragonboat.ParseRolesToStringList(node.Roles)
 	if err != nil {
 		return nil, err
 	}
@@ -61,18 +67,14 @@ func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoReque
 			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
 		},
-	}
-
-	if nodeHostInfo != nil {
-		response.Node = &pb.Node{
-			SelfMember: node.SelfMember,
-			ShardID:    node.ShardID,
-			Roles:      node.Roles,
-			NodeHostInfo: &pb.NodeHostInfo{
-				RaftAddress:    nodeHostInfo.RaftAddress,
-				ServiceAddress: nodeHostInfo.ServiceAddress,
+		Node: &pb.Node{
+			SelfMember: &pb.SelfMember{
+				IP:   node.SelfMember.IP,
+				Port: int32(node.SelfMember.Port),
 			},
-		}
+			ShardID: node.ShardID,
+			Roles:   roles,
+		},
 	}
 
 	return response, nil

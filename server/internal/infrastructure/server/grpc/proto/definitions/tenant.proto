@@ -15,16 +15,15 @@ message TenantInfoRequest {
    string ID = 1;
 }
 
-message NodeHostInfo {
-  string RaftAddress = 1;
-  string ServiceAddress = 2;
+message SelfMember {
+  string IP = 1;
+  int32 Port = 2;
 }
 
 message Node {
-  string SelfMember = 1;
+  SelfMember SelfMember = 1;
   uint64 ShardID = 2;
   repeated string Roles = 3;
-  NodeHostInfo NodeHostInfo = 4;
 }
 
 message TenantInfoResponse {
