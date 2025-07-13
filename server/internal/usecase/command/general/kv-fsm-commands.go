@@ -1,4 +1,4 @@
-package command
+package general_command
 
 import (
 	"encoding/gob"

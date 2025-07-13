@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"encoding/binary"
 	"encoding/gob"
 	"errors"
@@ -138,11 +139,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	batch := db.NewWriteBatch()
 	uow := db.NewUnitOfWork(kv_store, batch)
 
-	fsm_commands := make([]commands.FSM_Command, len(ents))
+	fsm_commands := make([]general_command.FSM_Command, len(ents))
 	parseErrors := make([]bool, len(ents))
 
 	for i, ent := range ents {
-		var cmd commands.FSM_Command
+		var cmd general_command.FSM_Command
 		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
 			parseErrors[i] = true
 			msg := fmt.Sprintf(
@@ -169,31 +170,31 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		}
 
 		if cmd.Now <= 0 {
-			if cmd.Type == commands.RW {
-				if rwCmd, ok := cmd.CMD.(commands.RWK_Command); ok && rwCmd.Op == commands.Write {
+			if cmd.Type == general_command.RW {
+				if rwCmd, ok := cmd.CMD.(general_command.RWK_Command); ok && rwCmd.Op == general_command.Write {
 					parseErrors[i] = true // Mark to prevent further processing in subsequent loops
 					ents[i].Result = statemachine.Result{
 						Value: uint64(len(ents[i].Cmd)), // As per convention for statemachine results
-						Data:  []byte(commands.ErrMissingOrInvalidNowField.Error()),
+						Data:  []byte(general_command.ErrMissingOrInvalidNowField.Error()),
 					}
 					log.Warn(). // Changed to Warn as it's a client data validation issue
 							Uint64("raft_index", ents[i].Index).
 							Int64("provided_now", cmd.Now).
 							Str("command_type", "RW_Write").
-							Msgf("FSM_Command validation failed: %s", commands.ErrMissingOrInvalidNowField.Error())
+							Msgf("FSM_Command validation failed: %s", general_command.ErrMissingOrInvalidNowField.Error())
 					continue // Move to the next command entry
 				}
 			}
 		}
 
 		switch cmd.Type {
-		case commands.DDL_FC:
+		case general_command.DDL_FC:
 			dllFCEntries = append(dllFCEntries, i)
-		case commands.RW:
+		case general_command.RW:
 			rwEntries = append(rwEntries, i)
-		case commands.MCL:
+		case general_command.MCL:
 			mclEntries = append(mclEntries, i)
-		case commands.REPOSITORY_COMMAND:
+		case general_command.REPOSITORY_COMMAND:
 			specializedEntries = append(specializedEntries, i)
 		default:
 			msg := fmt.Sprintf("unknown command type: %v", cmd.Type)
@@ -210,7 +211,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			continue
 		}
 		cmd := fsm_commands[idx]
-		ddlCmd, ok := cmd.CMD.(commands.DDL_Command)
+		ddlCmd, ok := cmd.CMD.(general_command.DDL_Command)
 		if !ok {
 			msg := fmt.Sprintf("expected DDL_Command for DLL type, got %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
@@ -231,7 +232,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		}
 		cmd := fsm_commands[idx]
 		now := time.Unix(0, cmd.Now)
-		rwCmd, ok := cmd.CMD.(commands.RWK_Command)
+		rwCmd, ok := cmd.CMD.(general_command.RWK_Command)
 		if !ok {
 			msg := fmt.Sprintf("expected RWK_Command for RW type, got %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
@@ -241,15 +242,15 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			continue
 		}
 		switch rwCmd.Op {
-		case commands.Read:
+		case general_command.Read:
 			msg := fmt.Sprintf("Invalid read operation: %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
 				Value: uint64(len(ents[idx].Cmd)),
 				Data:  []byte(msg),
 			}
 			continue
-		case commands.Write:
-			wCmd, ok := rwCmd.CMD.(commands.WK_Command)
+		case general_command.Write:
+			wCmd, ok := rwCmd.CMD.(general_command.WK_Command)
 			if !ok {
 				msg := fmt.Sprintf("expected WK_Command for RW type, got %T", cmd.CMD)
 				ents[idx].Result = statemachine.Result{
@@ -259,11 +260,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 				continue
 			}
 			switch wCmd.Op {
-			case commands.PutOp:
+			case general_command.PutOp:
 				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, now)
-			case commands.PutOpTTL:
+			case general_command.PutOpTTL:
 				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL, now)
-			case commands.DeleteOp, commands.DeleteOpTTL:
+			case general_command.DeleteOp, general_command.DeleteOpTTL:
 				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key, now)
 			default:
 				msg := fmt.Sprintf("unknown W Operation: %v", wCmd.Op)
@@ -318,7 +319,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			continue
 		}
 		cmd := fsm_commands[idx]
-		mlcCmd, ok := cmd.CMD.(commands.MCLK_Command)
+		mlcCmd, ok := cmd.CMD.(general_command.MCLK_Command)
 		if !ok {
 			msg := fmt.Sprintf("expected MCLK_Command for MCL type, got %T", cmd.CMD)
 			ents[idx].Result = statemachine.Result{
@@ -328,7 +329,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			continue
 		}
 		switch mlcCmd.Op {
-		case commands.ClearExpiredTTL:
+		case general_command.ClearExpiredTTL:
 			now := time.Unix(0, fsm_commands[idx].Now)
 			err := kv_store.CleanExpiredKeys(now)
 			if err != nil {
@@ -376,7 +377,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		if len(data) == 0 {
 			return nil, fmt.Errorf("empty query payload")
 		}
-		var query commands.Query_Command
+		var query general_command.Query_Command
 		if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&query); err != nil {
 			return nil, fmt.Errorf("failed to decode query command: %w", err)
 		}
@@ -385,12 +386,12 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		if query.Now <= 0 {
 			log.Warn().
 				Int64("provided_now", query.Now).
-				Msgf("Query_Command validation failed: %s", commands.ErrMissingOrInvalidNowField.Error())
-			return nil, commands.ErrMissingOrInvalidNowField
+				Msgf("Query_Command validation failed: %s", general_command.ErrMissingOrInvalidNowField.Error())
+			return nil, general_command.ErrMissingOrInvalidNowField
 		}
 
 		now := time.Unix(0, query.Now)
-		repo_command, ok := query.Command.(commands.Repository_Command)
+		repo_command, ok := query.Command.(general_command.Repository_Command)
 		uow := db.NewUnitOfWork(kv_store, nil)
 		if ok {
 
@@ -403,7 +404,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 			return buf.Bytes(), nil
 		}
 
-		command, ok := query.Command.(commands.RK_Command)
+		command, ok := query.Command.(general_command.RK_Command)
 		if !ok {
 			return nil, fmt.Errorf("expected command to be RK_Command, got %T", query.Command)
 		}
@@ -414,7 +415,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 
 		switch command.Op {
 
-		case commands.GetOp:
+		case general_command.GetOp:
 			var data []byte
 
 			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
@@ -424,7 +425,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 			if data != nil {
 				return data, err
 			}
-		case commands.Search:
+		case general_command.Search:
 
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				command.ColumnFamilyName,
@@ -443,7 +444,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 			}
 			return result, nil
 
-		case commands.GetOpTTL:
+		case general_command.GetOpTTL:
 			var data []byte
 
 			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
@@ -453,7 +454,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 			if data != nil {
 				return data, err
 			}
-		case commands.SearchTTL:
+		case general_command.SearchTTL:
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				command.ColumnFamilyName,
 				command.KeyPattern,

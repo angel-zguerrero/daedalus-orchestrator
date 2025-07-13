@@ -13,6 +13,7 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
@@ -40,8 +41,8 @@ func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (
 		Password:        password,
 	}
 
-	queryCommand := &commands.Query_Command{
-		Command: &commands.Repository_Command{
+	queryCommand := &general_command.Query_Command{
+		Command: &general_command.Repository_Command{
 			CMD: loginCmd,
 		},
 		Now: time.Now().UnixNano(),
@@ -90,9 +91,9 @@ func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (
 		JWTKey:   bo.JwtKey,
 	}
 
-	fsmCmd := commands.FSM_Command{
+	fsmCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  registerSessionCmd,
 	}
 
@@ -120,9 +121,9 @@ func (bo *AuthBO) Logout(ctx context.Context, token string) error {
 		JWTKey:   bo.JwtKey,
 	}
 
-	fsmCmd := commands.FSM_Command{
+	fsmCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  removeSessionCmd,
 	}
 

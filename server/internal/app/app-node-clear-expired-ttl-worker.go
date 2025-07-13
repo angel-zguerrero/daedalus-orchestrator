@@ -4,7 +4,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/utils"
-	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"strconv"
 	"sync"
 	"time"
@@ -78,11 +78,11 @@ func (app *Application) StartNodeClearExpiredTTLWorker(interval time.Duration, b
 
 func (app *Application) clearMasterNodeTTL() {
 	if app.MasterNodeIsReady && dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConsensus) {
-		cmd := commands.FSM_Command{
+		cmd := general_command.FSM_Command{
 			Now:  utils.GetNowInInt(),
-			Type: commands.MCL,
-			CMD: commands.MCLK_Command{
-				Op: commands.ClearExpiredTTL,
+			Type: general_command.MCL,
+			CMD: general_command.MCLK_Command{
+				Op: general_command.ClearExpiredTTL,
 			},
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
@@ -98,11 +98,11 @@ func (app *Application) clearMasterNodeTTL() {
 
 func (app *Application) clearTenantBatchTTL(batch []*dragonboat.RaftNode) {
 	for _, node := range batch {
-		cmd := commands.FSM_Command{
+		cmd := general_command.FSM_Command{
 			Now:  utils.GetNowInInt(),
-			Type: commands.MCL,
-			CMD: commands.MCLK_Command{
-				Op: commands.ClearExpiredTTL,
+			Type: general_command.MCL,
+			CMD: general_command.MCLK_Command{
+				Op: general_command.ClearExpiredTTL,
 			},
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)

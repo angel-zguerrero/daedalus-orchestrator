@@ -5,7 +5,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/utils"
-	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"encoding/gob"
 	"errors"
 	"math"
@@ -201,7 +201,7 @@ func (mn *RaftNode) Stop() {
 // Returns:
 //   - The result of the proposal from the state machine.
 //   - An error if marshaling fails or if SyncPropose encounters an error.
-func (mn *RaftNode) Write(ctx context.Context, comand commands.FSM_Command) (statemachine.Result, error) { // Changed FSM_Command to commands.FSM_Command
+func (mn *RaftNode) Write(ctx context.Context, comand general_command.FSM_Command) (statemachine.Result, error) { // Changed FSM_Command to general_command.FSM_Command
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
 	if mn.stopped {
@@ -226,7 +226,7 @@ func (mn *RaftNode) Write(ctx context.Context, comand commands.FSM_Command) (sta
 // Returns:
 //   - The result of the read operation from the state machine.
 //   - An error if marshaling fails or if SyncRead encounters an error.
-func (mn *RaftNode) Read(ctx context.Context, cmd commands.Query_Command) (interface{}, error) { // Changed Query_Command to commands.Query_Command
+func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command) (interface{}, error) { // Changed Query_Command to general_command.Query_Command
 	mn.mu.Lock()
 	defer mn.mu.Unlock()
 	if mn.stopped {
@@ -263,16 +263,16 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 		for {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-			cmd := commands.FSM_Command{
+			cmd := general_command.FSM_Command{
 				Now:  utils.GetNowInInt(),
-				Type: commands.RW,
-				CMD: commands.RWK_Command{
-					Op: commands.Write,
-					CMD: commands.WK_Command{
+				Type: general_command.RW,
+				CMD: general_command.RWK_Command{
+					Op: general_command.Write,
+					CMD: general_command.WK_Command{
 						Key:              "ready",
 						Value:            []byte(Int64ToBytes(time.Now().UnixMilli())),
 						ColumnFamilyName: db.MetaFC,
-						Op:               commands.PutOp,
+						Op:               general_command.PutOp,
 					},
 				},
 			}

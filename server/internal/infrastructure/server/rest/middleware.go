@@ -8,6 +8,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"encoding/gob"
 	"fmt"
 	"net/http"
@@ -70,8 +71,8 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 			JWTKey:   jwtKey, // Assuming the command needs the key for its own validation if any
 		}
 
-		queryCmd := &commands.Query_Command{
-			Command: &commands.Repository_Command{
+		queryCmd := &general_command.Query_Command{
+			Command: &general_command.Repository_Command{
 				CMD: checkSessionCmd,
 			},
 			Now: time.Now().UnixNano(),

@@ -8,6 +8,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -26,8 +27,8 @@ func (app *Application) StartAssignTenants() {
 			PageSize: pageSize,
 		}
 
-		queryCommand := &commands.Query_Command{
-			Command: &commands.Repository_Command{
+		queryCommand := &general_command.Query_Command{
+			Command: &general_command.Repository_Command{
 				CMD: paginateTenantsCommand,
 			},
 			Now: time.Now().UnixNano(),
@@ -67,13 +68,13 @@ func (app *Application) StartAssignTenants() {
 					tenantNode = app.TenantNodes[i]
 
 					if tenant.Status == models.PendingForAssign {
-						createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
+						createColumnFamilyCommand := &general_command.CreateColumnFamilyCommand{
 							Name: tenant.ID,
 						}
 
-						ccfCmd := commands.FSM_Command{
+						ccfCmd := general_command.FSM_Command{
 							Now:  utils.GetNowInInt(),
-							Type: commands.REPOSITORY_COMMAND,
+							Type: general_command.REPOSITORY_COMMAND,
 							CMD:  createColumnFamilyCommand,
 						}
 
@@ -88,9 +89,9 @@ func (app *Application) StartAssignTenants() {
 							TenantCode: tenant.Code,
 						}
 
-						atstCmd := commands.FSM_Command{
+						atstCmd := general_command.FSM_Command{
 							Now:  utils.GetNowInInt(),
-							Type: commands.REPOSITORY_COMMAND,
+							Type: general_command.REPOSITORY_COMMAND,
 							CMD:  assignToShardTenantInMasterCommand,
 						}
 
@@ -102,13 +103,13 @@ func (app *Application) StartAssignTenants() {
 					}
 
 					if tenant.Status == models.PendingForDeletion {
-						deleteColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
+						deleteColumnFamilyCommand := &general_command.DeleteColumnFamilyCommand{
 							Name: tenant.ID,
 						}
 
-						ccfCmd := commands.FSM_Command{
+						ccfCmd := general_command.FSM_Command{
 							Now:  utils.GetNowInInt(),
-							Type: commands.REPOSITORY_COMMAND,
+							Type: general_command.REPOSITORY_COMMAND,
 							CMD:  deleteColumnFamilyCommand,
 						}
 
@@ -121,9 +122,9 @@ func (app *Application) StartAssignTenants() {
 							TenantId: tenant.ID,
 						}
 
-						atstCmd := commands.FSM_Command{
+						atstCmd := general_command.FSM_Command{
 							Now:  utils.GetNowInInt(),
-							Type: commands.REPOSITORY_COMMAND,
+							Type: general_command.REPOSITORY_COMMAND,
 							CMD:  deleteTenantInMasterCommand,
 						}
 

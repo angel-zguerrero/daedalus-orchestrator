@@ -1,22 +1,23 @@
-package command
+package general_command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"time"
 )
 
 func init() {
-	gob.Register(CreateColumnFamilyCommand{})
+	gob.Register(DeleteColumnFamilyCommand{})
 }
 
 // CreateTenantInMasterCommand represents a command to authenticate a user.
-type CreateColumnFamilyCommand struct {
+type DeleteColumnFamilyCommand struct {
 	Name string
 }
 
-func (cmd *CreateColumnFamilyCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
-	commandResult := &CommandResult{}
+func (cmd *DeleteColumnFamilyCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+	commandResult := &command.CommandResult{}
 	kvStore := uow.KVStore
 
 	exists, _, err := kvStore.ExistsColumnFamily(cmd.Name)
@@ -26,12 +27,12 @@ func (cmd *CreateColumnFamilyCommand) Execute(uow *db.UnitOfWork, now time.Time)
 		return *commandResult
 	}
 
-	if exists {
+	if !exists {
 		commandResult.Result = true
 		return *commandResult
 	}
 
-	err = kvStore.CreateColumnFamily(cmd.Name, false)
+	err = kvStore.DeleteColumnFamily(cmd.Name)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

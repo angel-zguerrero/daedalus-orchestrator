@@ -7,7 +7,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
-	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"deadalus-orch/shared/constants"
 	"encoding/binary"
 	"encoding/gob"
@@ -56,16 +56,16 @@ func TestPebble_Update_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "foo",
 				Value:            []byte("bar"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -95,16 +95,16 @@ func TestPebble_Lookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "lookup_key",
 				Value:            []byte("lookup_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -116,9 +116,9 @@ func TestPebble_Lookup_ExistingKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "lookup_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -135,9 +135,9 @@ func TestPebble_Lookup_NonExistingKey(t *testing.T) {
 	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "missing_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -162,16 +162,16 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 	kv := setupKV(t, "pebble")
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -200,9 +200,9 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	query1 := commands.Query_Command{
+	query1 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -215,9 +215,9 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	query2 := commands.Query_Command{
+	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName: db.MetaFC,
 		},
@@ -238,16 +238,16 @@ func TestPebble_SaveSnapshot_Cancelled(t *testing.T) {
 	close(done)
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -286,11 +286,11 @@ func TestPebble_Update_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 			ColumnFamilyName: "new_cf",
-			Op:               commands.Add_CF_Op,
+			Op:               general_command.Add_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -307,12 +307,12 @@ func TestPebble_Update_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := commands.FSM_Command{
-			Type: commands.DDL_FC,
-			CMD: commands.DDL_Command{
+		cmd := general_command.FSM_Command{
+			Type: general_command.DDL_FC,
+			CMD: general_command.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               commands.Add_CF_Op,
+				Op:               general_command.Add_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -325,12 +325,12 @@ func TestPebble_Update_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 
 			ColumnFamilyName: "to_delete_cf",
-			Op:               commands.Remove_CF_Op,
+			Op:               general_command.Remove_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -348,15 +348,15 @@ func TestPebble_Read_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Read,
-			CMD: commands.RK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Read,
+			CMD: general_command.RK_Command{
 				Key:              "foo",
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.GetOp,
+				Op:               general_command.GetOp,
 			},
 		},
 	}
@@ -371,24 +371,24 @@ func TestPebble_Read_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: command.RWK_Command") // Changed dragonboat.RWK_Command to commands.RWK_Command
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: general_command.RWK_Command") // Changed dragonboat.RWK_Command to general_command.RWK_Command
 }
 func TestPebble_Update_PutWithTTL(t *testing.T) {
 	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -404,12 +404,12 @@ func TestPebble_Update_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := commands.FSM_Command{
-			Type: commands.DDL_FC,
-			CMD: commands.DDL_Command{
+		cmd := general_command.FSM_Command{
+			Type: general_command.DDL_FC,
+			CMD: general_command.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               commands.Add_TTL_CF_Op,
+				Op:               general_command.Add_TTL_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -422,11 +422,11 @@ func TestPebble_Update_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
-			Op:               commands.Remove_TTL_CF_Op,
+			Op:               general_command.Remove_TTL_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -444,17 +444,17 @@ func TestPebble_Update_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -466,16 +466,16 @@ func TestPebble_Update_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = commands.FSM_Command{
+	cmd = general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               commands.DeleteOpTTL,
+				Op:               general_command.DeleteOpTTL,
 			},
 		},
 	}
@@ -491,17 +491,17 @@ func TestPebble_PutTTLStoresWithExpiration(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_test_key",
 				Value:            []byte("ttl_test_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              10,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -512,12 +512,12 @@ func TestPebble_PutTTLStoresWithExpiration(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "ttl_test_key",
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               commands.GetOpTTL,
+			Op:               general_command.GetOpTTL,
 		},
 	}
 
@@ -537,17 +537,17 @@ func TestPebble_TTLExpirationRemovesKey(t *testing.T) {
 
 	// Put TTL entry
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				Value:            []byte("soon_gone"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              1,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -560,12 +560,12 @@ func TestPebble_TTLExpirationRemovesKey(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              key,
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               commands.GetOpTTL,
+			Op:               general_command.GetOpTTL,
 		},
 	}
 	// Use gob to encode the query command
@@ -584,17 +584,17 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Insert with TTL
 	var bufPut bytes.Buffer
-	cmdPut := commands.FSM_Command{
+	cmdPut := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				Value:            []byte("value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              60,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -607,15 +607,15 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Delete it
 	var bufDel bytes.Buffer
-	cmdDel := commands.FSM_Command{
+	cmdDel := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				ColumnFamilyName: db.MasterEventFC,
-				Op:               commands.DeleteOpTTL,
+				Op:               general_command.DeleteOpTTL,
 			},
 		},
 	}
@@ -626,12 +626,12 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              key,
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               commands.GetOpTTL,
+			Op:               general_command.GetOpTTL,
 		},
 	}
 	// Use gob to encode the query command
@@ -649,17 +649,17 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 	key := "expiredKey"
 	value := []byte("some-value")
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				Value:            value,
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              1,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -674,10 +674,10 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	clearCmd := commands.FSM_Command{
-		Type: commands.MCL,
-		CMD: commands.MCLK_Command{
-			Op: commands.ClearExpiredTTL,
+	clearCmd := general_command.FSM_Command{
+		Type: general_command.MCL,
+		CMD: general_command.MCLK_Command{
+			Op: general_command.ClearExpiredTTL,
 		},
 	}
 	data = encodeCommand(t, clearCmd)
@@ -689,10 +689,10 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 		t.Fatalf("failed to clear expired TTL entries: %v", err)
 	}
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
-			Op:               commands.GetOpTTL,
+		Command: general_command.RK_Command{
+			Op:               general_command.GetOpTTL,
 			ColumnFamilyName: db.MasterEventFC,
 			Key:              key,
 		},
@@ -703,7 +703,7 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
-func encodeCommand(t *testing.T, cmd commands.FSM_Command) []byte { // Changed dragonboat.FSM_Command to commands.FSM_Command
+func encodeCommand(t *testing.T, cmd general_command.FSM_Command) []byte { // Changed dragonboat.FSM_Command to general_command.FSM_Command
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	if err != nil {
@@ -715,7 +715,7 @@ func TestPebble_Update_UnknownCommandType(t *testing.T) {
 	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Type: 999, // This is an unknown type
 		CMD:  nil,
 	}
@@ -735,12 +735,12 @@ func TestPebble_Update_UnknownWriteOp(t *testing.T) {
 	kv := setupKV(t, "pebble")
 	defer kv.Close()
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "badop",
 				Value:            []byte("x"),
 				ColumnFamilyName: db.DefaultFC,
@@ -775,11 +775,11 @@ type failingImpl struct {
 	dragonboat.KVStateMachineImpl // Changed dragonboat.KVStateMachineImpl to KVStateMachineImpl
 }
 
-func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]commands.FSM_Command, error) { // Changed dragonboat.FSM_Command to commands.FSM_Command
+func (f *failingImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]general_command.FSM_Command, error) { // Changed dragonboat.FSM_Command to general_command.FSM_Command
 	return nil, errors.New("simulated update error")
 }
-func (f *failingImpl) Lookup(key interface{}) (commands.RK_Command, error) { // Changed dragonboat.RK_Command to commands.RK_Command
-	return commands.RK_Command{}, nil
+func (f *failingImpl) Lookup(key interface{}) (general_command.RK_Command, error) { // Changed dragonboat.RK_Command to general_command.RK_Command
+	return general_command.RK_Command{}, nil
 }
 func (f *failingImpl) OpenDB(string) (db.KVStore, error) {
 	return nil, nil
@@ -790,18 +790,18 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 	defer kv.Close()
 
 	// Insert some entries
-	entries := []commands.WK_Command{ // Changed dragonboat.WK_Command to commands.WK_Command
-		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},   // Changed dragonboat.PutOp to commands.PutOp
-		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},   // Changed dragonboat.PutOp to commands.PutOp
-		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},   // Changed dragonboat.PutOp to commands.PutOp
-		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp}, // Changed dragonboat.PutOp to commands.PutOp
+	entries := []general_command.WK_Command{ // Changed dragonboat.WK_Command to general_command.WK_Command
+		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
+		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
+		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
+		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp}, // Changed dragonboat.PutOp to general_command.PutOp
 	}
 
 	for _, entry := range entries {
-		cmd := commands.FSM_Command{
+		cmd := general_command.FSM_Command{
 			Now:  utils.GetNowInInt(),
-			Type: commands.RW,
-			CMD:  commands.RWK_Command{Op: commands.Write, CMD: entry},
+			Type: general_command.RW,
+			CMD:  general_command.RWK_Command{Op: general_command.Write, CMD: entry},
 		}
 		data := encodeCommand(t, cmd)
 
@@ -812,14 +812,14 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 	}
 
 	// Search with pattern "user:"
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			KeyPattern:       "user:*",
 			ColumnFamilyName: db.DefaultFC,
 			Cursor:           "",
 			Limit:            10,
-			Op:               commands.Search, // Changed dragonboat.Search to commands.Search
+			Op:               general_command.Search, // Changed dragonboat.Search to general_command.Search
 		},
 	}
 
@@ -847,17 +847,17 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 
 	for _, e := range entries {
-		cmd := commands.FSM_Command{
+		cmd := general_command.FSM_Command{
 			Now:  utils.GetNowInInt(),
-			Type: commands.RW,
-			CMD: commands.RWK_Command{
-				Op: commands.Write,
-				CMD: commands.WK_Command{
+			Type: general_command.RW,
+			CMD: general_command.RWK_Command{
+				Op: general_command.Write,
+				CMD: general_command.WK_Command{
 					Key:              e.key,
 					Value:            []byte(e.value),
 					ColumnFamilyName: db.MasterEventFC,
 					TTL:              e.ttl,
-					Op:               commands.PutOpTTL,
+					Op:               general_command.PutOpTTL,
 				},
 			},
 		}
@@ -871,14 +871,14 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 	time.Sleep(2 * time.Second)
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			KeyPattern:       "k*",
 			ColumnFamilyName: db.MasterEventFC,
 			Cursor:           "",
 			Limit:            10,
-			Op:               commands.SearchTTL, // Changed dragonboat.SearchTTL to commands.SearchTTL
+			Op:               general_command.SearchTTL, // Changed dragonboat.SearchTTL to general_command.SearchTTL
 		},
 	}
 
@@ -906,16 +906,16 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 	kvPebble := setupKVMasterPebble(t, "pebble")
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -942,9 +942,9 @@ func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 	err = pebbleDB.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	query1 := commands.Query_Command{
+	query1 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -956,9 +956,9 @@ func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	query2 := commands.Query_Command{
+	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName: db.MetaFC,
 		},

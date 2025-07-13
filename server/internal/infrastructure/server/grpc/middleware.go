@@ -9,6 +9,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 
 	"bytes"
 	"encoding/gob"
@@ -80,8 +81,8 @@ func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger
 				JWTKey:   jwtKey,
 			}
 
-			queryCmd := &commands.Query_Command{
-				Command: &commands.Repository_Command{
+			queryCmd := &general_command.Query_Command{
+				Command: &general_command.Repository_Command{
 					CMD: checkSessionCmd,
 				},
 				Now: time.Now().UnixNano(),

@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -29,12 +30,12 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 
 func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
 
-	createColumnFamilyCommand, ok := cmd.(commands.CreateColumnFamilyCommand)
+	createColumnFamilyCommand, ok := cmd.(general_command.CreateColumnFamilyCommand)
 	if ok {
 		return createColumnFamilyCommand.Execute(uow, now)
 	}
 
-	deleteColumnFamilyCommand, ok := cmd.(commands.DeleteColumnFamilyCommand)
+	deleteColumnFamilyCommand, ok := cmd.(general_command.DeleteColumnFamilyCommand)
 	if ok {
 		return deleteColumnFamilyCommand.Execute(uow, now)
 	}

@@ -7,7 +7,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
-	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"time"
@@ -43,8 +43,8 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 	fullKey := s.fullKey(key)
 	now := time.Now().Unix()
 
-	readCmd := commands.Query_Command{
-		Command: commands.RK_Command{
+	readCmd := general_command.Query_Command{
+		Command: general_command.RK_Command{
 			Key:              fullKey,
 			ColumnFamilyName: db.MasterEventFC,
 		},
@@ -104,17 +104,17 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 		return limiter.Context{}, err
 	}
 
-	writeCmd := commands.FSM_Command{
+	writeCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              fullKey,
 				Value:            buf.Bytes(),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              int(ttlRemaining),
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -137,8 +137,8 @@ func (s *RaftStore) Peek(ctx context.Context, key string, rate limiter.Rate) (li
 	fullKey := s.fullKey(key)
 	now := time.Now().Unix()
 
-	readCmd := commands.Query_Command{
-		Command: commands.RK_Command{
+	readCmd := general_command.Query_Command{
+		Command: general_command.RK_Command{
 			Key:              fullKey,
 			ColumnFamilyName: db.MasterEventFC,
 		},
@@ -202,17 +202,17 @@ func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) erro
 		return err
 	}
 
-	writeCmd := commands.FSM_Command{
+	writeCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              fullKey,
 				Value:            buf.Bytes(),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              int(s.ttl.Seconds()),
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -239,17 +239,17 @@ func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (l
 		return limiter.Context{}, err
 	}
 
-	writeCmd := commands.FSM_Command{
+	writeCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              fullKey,
 				Value:            buf.Bytes(),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              int(s.ttl.Seconds()),
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}

@@ -9,6 +9,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -57,9 +58,9 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 		TenantName: name,
 	}
 
-	fsmCmd := commands.FSM_Command{
+	fsmCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  createTenantInMasterCommand,
 	}
 
@@ -91,13 +92,13 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 		return models.TenantInMaster{}, errors.New("Tenant node not found")
 	}
 
-	createColumnFamilyCommand := &commands.CreateColumnFamilyCommand{
+	createColumnFamilyCommand := &general_command.CreateColumnFamilyCommand{
 		Name: tenantInMaster.ID,
 	}
 
-	ccfCmd := commands.FSM_Command{
+	ccfCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  createColumnFamilyCommand,
 	}
 
@@ -123,9 +124,9 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 		TenantCode: code,
 	}
 
-	atstCmd := commands.FSM_Command{
+	atstCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  assignToShardTenantInMasterCommand,
 	}
 
@@ -160,8 +161,8 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.Tena
 		TenantID: tenantID,
 	}
 
-	queryCommand := &commands.Query_Command{
-		Command: &commands.Repository_Command{
+	queryCommand := &general_command.Query_Command{
+		Command: &general_command.Repository_Command{
 			CMD: findTenantCommand,
 		},
 		Now: time.Now().UnixNano(),
@@ -216,9 +217,9 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 		TenantId: tenantID,
 	}
 
-	atstCmd := commands.FSM_Command{
+	atstCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  markToDeletionTenantInMasterCommand,
 	}
 
@@ -240,13 +241,13 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 		return errors.New("Failed to delete tenant error: " + parsedResult.Error)
 	}
 
-	deleteColumnFamilyCommand := &commands.DeleteColumnFamilyCommand{
+	deleteColumnFamilyCommand := &general_command.DeleteColumnFamilyCommand{
 		Name: tenantID,
 	}
 
-	ccfCmd := commands.FSM_Command{
+	ccfCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  deleteColumnFamilyCommand,
 	}
 
@@ -264,9 +265,9 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 		TenantId: tenantID,
 	}
 
-	atstCmd = commands.FSM_Command{
+	atstCmd = general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.REPOSITORY_COMMAND,
+		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  deleteTenantInMasterCommand,
 	}
 
@@ -285,8 +286,8 @@ func (bo *TenantBO) GetTenants(ctx context.Context, cursor string, pageSize int)
 		PageSize: pageSize,
 	}
 
-	queryCommand := &commands.Query_Command{
-		Command: &commands.Repository_Command{
+	queryCommand := &general_command.Query_Command{
+		Command: &general_command.Repository_Command{
 			CMD: paginateTenantsCommand,
 		},
 		Now: time.Now().UnixNano(),

@@ -7,7 +7,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config" // Added
 	"deadalus-orch/server/internal/pkg/utils"
-	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"encoding/binary"
 	"encoding/gob"
 	"io"
@@ -54,16 +54,16 @@ func TestTenantUpdate_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "foo",
 				Value:            []byte("bar"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -93,16 +93,16 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "lookup_key",
 				Value:            []byte("lookup_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -114,9 +114,9 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "lookup_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -132,9 +132,9 @@ func TestTenantLookup_NonExistingKey(t *testing.T) {
 	kv := setupTenantKV(t)
 	defer kv.Close()
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "missing_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -159,16 +159,16 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupTenantKV(t)
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -201,9 +201,9 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	err = kv2.RecoverFromSnapshot(&snap, ctx.Done())
 	require.NoError(t, err)
 
-	query1 := commands.Query_Command{
+	query1 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -215,9 +215,9 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("snap_value"), val)
 
-	query2 := commands.Query_Command{
+	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName: db.MetaFC,
 		},
@@ -238,16 +238,16 @@ func TestTenantSaveSnapshot_Cancelled(t *testing.T) {
 	close(done)
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -286,11 +286,11 @@ func TestTenantUpdate_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 			ColumnFamilyName: "new_cf",
-			Op:               commands.Add_CF_Op,
+			Op:               general_command.Add_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -307,12 +307,12 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := commands.FSM_Command{
-			Type: commands.DDL_FC,
-			CMD: commands.DDL_Command{
+		cmd := general_command.FSM_Command{
+			Type: general_command.DDL_FC,
+			CMD: general_command.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               commands.Add_CF_Op,
+				Op:               general_command.Add_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -325,12 +325,12 @@ func TestTenantUpdate_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 
 			ColumnFamilyName: "to_delete_cf",
-			Op:               commands.Remove_CF_Op,
+			Op:               general_command.Remove_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -348,15 +348,15 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Read,
-			CMD: commands.RK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Read,
+			CMD: general_command.RK_Command{
 				Key:              "foo",
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.GetOp,
+				Op:               general_command.GetOp,
 			},
 		},
 	}
@@ -371,24 +371,24 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: command.RWK_Command") // Changed dragonboat.RWK_Command to commands.RWK_Command
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: general_command.RWK_Command") // Changed dragonboat.RWK_Command to general_command.RWK_Command
 }
 func TestTenantUpdate_PutWithTTL(t *testing.T) {
 	kv := setupTenantKV(t)
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -404,12 +404,12 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := commands.FSM_Command{
-			Type: commands.DDL_FC,
-			CMD: commands.DDL_Command{
+		cmd := general_command.FSM_Command{
+			Type: general_command.DDL_FC,
+			CMD: general_command.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               commands.Add_TTL_CF_Op,
+				Op:               general_command.Add_TTL_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -422,11 +422,11 @@ func TestTenantUpdate_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
-			Op:               commands.Remove_TTL_CF_Op,
+			Op:               general_command.Remove_TTL_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -444,17 +444,17 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -466,16 +466,16 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = commands.FSM_Command{
+	cmd = general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				ColumnFamilyName: db.TenantEventFC,
 				TTL:              5,
-				Op:               commands.DeleteOpTTL,
+				Op:               general_command.DeleteOpTTL,
 			},
 		},
 	}

@@ -10,7 +10,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
-	commands "deadalus-orch/server/internal/usecase/command"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"deadalus-orch/shared/constants"
 	"encoding/binary"
 	"encoding/gob"
@@ -56,16 +56,16 @@ func TestUpdate_SingleEntry(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "foo",
 				Value:            []byte("bar"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -95,16 +95,16 @@ func TestLookup_ExistingKey(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "lookup_key",
 				Value:            []byte("lookup_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -117,9 +117,9 @@ func TestLookup_ExistingKey(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "lookup_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -135,9 +135,9 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "missing_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -162,16 +162,16 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -202,9 +202,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query1 := commands.Query_Command{
+	query1 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -217,9 +217,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	require.Equal(t, []byte("snap_value"), val)
 
 	require.NoError(t, err)
-	query2 := commands.Query_Command{
+	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              dragonboat.AppliedIndexKey,
 			ColumnFamilyName: db.MetaFC,
 		},
@@ -240,16 +240,16 @@ func TestSaveSnapshot_Cancelled(t *testing.T) {
 	close(done)
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -288,11 +288,11 @@ func TestUpdate_AddColumnFamily(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 			ColumnFamilyName: "new_cf",
-			Op:               commands.Add_CF_Op,
+			Op:               general_command.Add_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -309,12 +309,12 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := commands.FSM_Command{
-			Type: commands.DDL_FC,
-			CMD: commands.DDL_Command{
+		cmd := general_command.FSM_Command{
+			Type: general_command.DDL_FC,
+			CMD: general_command.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               commands.Add_CF_Op,
+				Op:               general_command.Add_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -329,12 +329,12 @@ func TestUpdate_DropColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 
 			ColumnFamilyName: "to_delete_cf",
-			Op:               commands.Remove_CF_Op,
+			Op:               general_command.Remove_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -352,15 +352,15 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Read,
-			CMD: commands.RK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Read,
+			CMD: general_command.RK_Command{
 				Key:              "foo",
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.GetOp,
+				Op:               general_command.GetOp,
 			},
 		},
 	}
@@ -375,24 +375,24 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: command.RWK_Command")
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: general_command.RWK_Command")
 }
 func TestUpdate_PutWithTTL(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -408,12 +408,12 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	defer kv.Close()
 	{
 		var buf bytes.Buffer
-		cmd := commands.FSM_Command{
-			Type: commands.DDL_FC,
-			CMD: commands.DDL_Command{
+		cmd := general_command.FSM_Command{
+			Type: general_command.DDL_FC,
+			CMD: general_command.DDL_Command{
 
 				ColumnFamilyName: "to_delete_cf",
-				Op:               commands.Add_TTL_CF_Op,
+				Op:               general_command.Add_TTL_CF_Op,
 			},
 		}
 		err := gob.NewEncoder(&buf).Encode(cmd)
@@ -426,11 +426,11 @@ func TestUpdate_DropTTLColumnFamily(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
-		Type: commands.DDL_FC,
-		CMD: commands.DDL_Command{
+	cmd := general_command.FSM_Command{
+		Type: general_command.DDL_FC,
+		CMD: general_command.DDL_Command{
 			ColumnFamilyName: "to_delete_cf",
-			Op:               commands.Remove_TTL_CF_Op,
+			Op:               general_command.Remove_TTL_CF_Op,
 		},
 	}
 	err := gob.NewEncoder(&buf).Encode(cmd)
@@ -448,17 +448,17 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				Value:            []byte("ttl_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -470,16 +470,16 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	var bufDel bytes.Buffer
-	cmd = commands.FSM_Command{
+	cmd = general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_key",
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              5,
-				Op:               commands.DeleteOpTTL,
+				Op:               general_command.DeleteOpTTL,
 			},
 		},
 	}
@@ -495,17 +495,17 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "ttl_test_key",
 				Value:            []byte("ttl_test_value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              10,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -517,12 +517,12 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "ttl_test_key",
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               commands.GetOpTTL,
+			Op:               general_command.GetOpTTL,
 		},
 	}
 
@@ -541,17 +541,17 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 
 	// Put TTL entry
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				Value:            []byte("soon_gone"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              1,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -565,12 +565,12 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	require.NoError(t, err)
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              key,
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               commands.GetOpTTL,
+			Op:               general_command.GetOpTTL,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -588,17 +588,17 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Insert with TTL
 	var bufPut bytes.Buffer
-	cmdPut := commands.FSM_Command{
+	cmdPut := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				Value:            []byte("value"),
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              60,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -611,15 +611,15 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 
 	// Delete it
 	var bufDel bytes.Buffer
-	cmdDel := commands.FSM_Command{
+	cmdDel := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				ColumnFamilyName: db.MasterEventFC,
-				Op:               commands.DeleteOpTTL,
+				Op:               general_command.DeleteOpTTL,
 			},
 		},
 	}
@@ -631,12 +631,12 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              key,
 			ColumnFamilyName: db.MasterEventFC,
-			Op:               commands.GetOpTTL,
+			Op:               general_command.GetOpTTL,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -653,17 +653,17 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	key := "expiredKey"
 	value := []byte("some-value")
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              key,
 				Value:            value,
 				ColumnFamilyName: db.MasterEventFC,
 				TTL:              1,
-				Op:               commands.PutOpTTL,
+				Op:               general_command.PutOpTTL,
 			},
 		},
 	}
@@ -678,10 +678,10 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	clearCmd := commands.FSM_Command{
-		Type: commands.MCL,
-		CMD: commands.MCLK_Command{
-			Op: commands.ClearExpiredTTL,
+	clearCmd := general_command.FSM_Command{
+		Type: general_command.MCL,
+		CMD: general_command.MCLK_Command{
+			Op: general_command.ClearExpiredTTL,
 		},
 	}
 	data = encodeCommandR(t, clearCmd)
@@ -694,10 +694,10 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	}
 
 	require.NoError(t, err)
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
-			Op:               commands.GetOpTTL,
+		Command: general_command.RK_Command{
+			Op:               general_command.GetOpTTL,
 			ColumnFamilyName: db.MasterEventFC,
 			Key:              key,
 		},
@@ -708,7 +708,7 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 }
-func encodeCommandR(t *testing.T, cmd commands.FSM_Command) []byte {
+func encodeCommandR(t *testing.T, cmd general_command.FSM_Command) []byte {
 	var buf bytes.Buffer
 	err := gob.NewEncoder(&buf).Encode(cmd)
 	if err != nil {
@@ -720,7 +720,7 @@ func TestUpdate_UnknownCommandType(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Type: 999,
 		CMD:  nil,
 	}
@@ -740,12 +740,12 @@ func TestUpdate_UnknownWriteOp(t *testing.T) {
 	kv := setupKVMaster(t, "rocksdb")
 	defer kv.Close()
 
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "badop",
 				Value:            []byte("x"),
 				ColumnFamilyName: db.DefaultFC,
@@ -770,16 +770,16 @@ func TestUpdate_InvalidNowField(t *testing.T) {
 	defer kv.Close()
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  0, // Invalid 'Now' field
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "foo",
 				Value:            []byte("bar"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -794,15 +794,15 @@ func TestUpdate_InvalidNowField(t *testing.T) {
 	require.NoError(t, err) // The Update method itself should not error for this validation
 	require.Len(t, result, 1)
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
-	require.Equal(t, commands.ErrMissingOrInvalidNowField.Error(), string(result[0].Result.Data))
+	require.Equal(t, general_command.ErrMissingOrInvalidNowField.Error(), string(result[0].Result.Data))
 
 	// Verify that the data was not actually written
-	queryCmd := commands.Query_Command{
+	queryCmd := general_command.Query_Command{
 		Now: utils.GetNowInInt(), // Use a valid 'Now' for lookup
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "foo",
 			ColumnFamilyName: db.DefaultFC,
-			Op:               commands.GetOp,
+			Op:               general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -819,12 +819,12 @@ func TestLookup_InvalidNowField(t *testing.T) {
 	defer kv.Close()
 
 	// Attempt to lookup a key with an invalid 'Now' field
-	queryCmd := commands.Query_Command{
+	queryCmd := general_command.Query_Command{
 		Now: 0, // Invalid 'Now' field
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "any_key",
 			ColumnFamilyName: db.DefaultFC,
-			Op:               commands.GetOp,
+			Op:               general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -833,7 +833,7 @@ func TestLookup_InvalidNowField(t *testing.T) {
 
 	_, err = kv.Lookup(queryBuf.Bytes())
 	require.Error(t, err)
-	require.Equal(t, commands.ErrMissingOrInvalidNowField, err)
+	require.Equal(t, general_command.ErrMissingOrInvalidNowField, err)
 }
 
 func TestUpdate_ValidNowField(t *testing.T) {
@@ -844,16 +844,16 @@ func TestUpdate_ValidNowField(t *testing.T) {
 	require.Greater(t, validNow, int64(0), "Generated 'Now' should be valid")
 
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  validNow, // Valid 'Now' field
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "valid_now_key",
 				Value:            []byte("valid_now_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -870,16 +870,16 @@ func TestUpdate_ValidNowField(t *testing.T) {
 	require.Equal(t, uint64(len(buf.Bytes())), result[0].Result.Value)
 	// For valid command, Data might be nil or empty, not an error message
 	if len(result[0].Result.Data) > 0 {
-		require.NotEqual(t, commands.ErrMissingOrInvalidNowField.Error(), string(result[0].Result.Data))
+		require.NotEqual(t, general_command.ErrMissingOrInvalidNowField.Error(), string(result[0].Result.Data))
 	}
 
 	// Verify that the data was actually written
-	queryCmd := commands.Query_Command{
+	queryCmd := general_command.Query_Command{
 		Now: utils.GetNowInInt(), // Use a valid 'Now' for lookup
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "valid_now_key",
 			ColumnFamilyName: db.DefaultFC,
-			Op:               commands.GetOp,
+			Op:               general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -899,16 +899,16 @@ func TestLookup_ValidNowField(t *testing.T) {
 	keyToLookup := "lookup_valid_now"
 	valueToLookup := "some_value_for_valid_now_lookup"
 	var writeBuf bytes.Buffer
-	writeCmd := commands.FSM_Command{
+	writeCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(), // Valid 'Now' for write
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              keyToLookup,
 				Value:            []byte(valueToLookup),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -921,12 +921,12 @@ func TestLookup_ValidNowField(t *testing.T) {
 	validNow := utils.GetNowInInt()
 	require.Greater(t, validNow, int64(0), "Generated 'Now' for lookup should be valid")
 
-	queryCmd := commands.Query_Command{
+	queryCmd := general_command.Query_Command{
 		Now: validNow, // Valid 'Now' field
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              keyToLookup,
 			ColumnFamilyName: db.DefaultFC,
-			Op:               commands.GetOp,
+			Op:               general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -954,11 +954,11 @@ type failingRocksdbImpl struct {
 	dragonboat.KVStateMachineImpl
 }
 
-func (f *failingRocksdbImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]commands.FSM_Command, error) {
+func (f *failingRocksdbImpl) Update(ents []statemachine.Entry, batch *db.WriteBatch) ([]general_command.FSM_Command, error) {
 	return nil, errors.New("simulated update error")
 }
-func (f *failingRocksdbImpl) Lookup(key interface{}) (commands.RK_Command, error) {
-	return commands.RK_Command{}, nil
+func (f *failingRocksdbImpl) Lookup(key interface{}) (general_command.RK_Command, error) {
+	return general_command.RK_Command{}, nil
 }
 func (f *failingRocksdbImpl) OpenDB(string) (db.KVStore, error) {
 	return nil, nil
@@ -969,18 +969,18 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 	defer kv.Close()
 
 	// Insert some entries
-	entries := []commands.WK_Command{
-		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
-		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
-		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
-		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: commands.PutOp},
+	entries := []general_command.WK_Command{
+		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
+		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
+		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
+		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
 	}
 
 	for _, entry := range entries {
-		cmd := commands.FSM_Command{
+		cmd := general_command.FSM_Command{
 			Now:  utils.GetNowInInt(),
-			Type: commands.RW,
-			CMD:  commands.RWK_Command{Op: commands.Write, CMD: entry},
+			Type: general_command.RW,
+			CMD:  general_command.RWK_Command{Op: general_command.Write, CMD: entry},
 		}
 		data := encodeCommandR(t, cmd)
 
@@ -992,14 +992,14 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 
 	// Search with pattern "user:"
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			KeyPattern:       "user:*",
 			ColumnFamilyName: db.DefaultFC,
 			Cursor:           "",
 			Limit:            10,
-			Op:               commands.Search,
+			Op:               general_command.Search,
 		},
 	}
 
@@ -1027,17 +1027,17 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 
 	for _, e := range entries {
-		cmd := commands.FSM_Command{
-			Type: commands.RW,
+		cmd := general_command.FSM_Command{
+			Type: general_command.RW,
 			Now:  utils.GetNowInInt(),
-			CMD: commands.RWK_Command{
-				Op: commands.Write,
-				CMD: commands.WK_Command{
+			CMD: general_command.RWK_Command{
+				Op: general_command.Write,
+				CMD: general_command.WK_Command{
 					Key:              e.key,
 					Value:            []byte(e.value),
 					ColumnFamilyName: db.MasterEventFC,
 					TTL:              e.ttl,
-					Op:               commands.PutOpTTL,
+					Op:               general_command.PutOpTTL,
 				},
 			},
 		}
@@ -1051,14 +1051,14 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	}
 	time.Sleep(2 * time.Second)
 
-	query := commands.Query_Command{
+	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			KeyPattern:       "k:*",
 			ColumnFamilyName: db.MasterEventFC,
 			Cursor:           "",
 			Limit:            10,
-			Op:               commands.SearchTTL,
+			Op:               general_command.SearchTTL,
 		},
 	}
 
@@ -1087,16 +1087,16 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	kvRocksDB := setupKVMaster(t, "rocksdb")
 	var buf bytes.Buffer
-	cmd := commands.FSM_Command{
+	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
-		Type: commands.RW,
-		CMD: commands.RWK_Command{
-			Op: commands.Write,
-			CMD: commands.WK_Command{
+		Type: general_command.RW,
+		CMD: general_command.RWK_Command{
+			Op: general_command.Write,
+			CMD: general_command.WK_Command{
 				Key:              "snap_key",
 				Value:            []byte("snap_value"),
 				ColumnFamilyName: db.DefaultFC,
-				Op:               commands.PutOp,
+				Op:               general_command.PutOp,
 			},
 		},
 	}
@@ -1124,9 +1124,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	query1 := commands.Query_Command{
+	query1 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              "snap_key",
 			ColumnFamilyName: db.DefaultFC,
 		},
@@ -1138,9 +1138,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	require.Equal(t, []byte("snap_value"), val)
 
 	require.NoError(t, err)
-	query2 := commands.Query_Command{
+	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
-		Command: commands.RK_Command{
+		Command: general_command.RK_Command{
 			Key:              dragonboat.AppliedIndexKey,
 			ColumnFamilyName: db.MetaFC,
 		},
