@@ -30,6 +30,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		{
 			tenantsGroup.GET("", tenantController.GetTenantsHandler)
 			tenantsGroup.POST("", tenantController.CreateTenantHandler)
+			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
 			tenantsGroup.GET("/:id", tenantController.GetTenantHandler)
 			tenantsGroup.DELETE("/:id", tenantController.DeleteTenantHandler)
 		}

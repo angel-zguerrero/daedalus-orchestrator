@@ -28,6 +28,10 @@ type createTenantInMasterRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
+type createBulkTenantInMasterRequest struct {
+	Tenants []createTenantInMasterRequest `json:"tenants" binding:"required"`
+}
+
 // CreateTenantHandler handles POST /rest-api/tenants
 func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 	var req createTenantInMasterRequest
@@ -46,6 +50,33 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Tenant was asserted",
 		"result":  tenantInMaster,
+	})
+}
+
+func (ctrl *TenantController) BulkCreateTenantHandler(c *gin.Context) {
+	var req createBulkTenantInMasterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ctrl.Config.Logger.Warn().Err(err).Msg("create tenant attempt with invalid payload")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+	tenants := []*models.TenantInMaster{}
+	for _, t := range req.Tenants {
+		tenant := &models.TenantInMaster{
+			Code: t.Code,
+			Name: t.Name,
+		}
+		tenants = append(tenants, tenant)
+	}
+	tenantsInMaster, err := ctrl.TenantBO.BulkCreateTenant(c.Request.Context(), tenants)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Tenants were asserted",
+		"result":  tenantsInMaster,
 	})
 }
 
