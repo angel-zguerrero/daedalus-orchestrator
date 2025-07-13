@@ -123,7 +123,7 @@ func (ctrl *TenantController) GetTenantsHandler(c *gin.Context) {
 		page = 1000
 	}
 
-	findResult, err := ctrl.TenantBO.GetTenants(c.Request.Context(), c.Query("cursor"), page)
+	findResult, err := ctrl.TenantBO.GetTenants(c.Request.Context(), c.Query("q"), c.Query("cursor"), page)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

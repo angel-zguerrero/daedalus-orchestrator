@@ -327,8 +327,9 @@ func (x *DeleteTenantResponse) GetMessage() string {
 
 type GetTenantsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cursor        string                 `protobuf:"bytes,1,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	PageSize      int32                  `protobuf:"varint,2,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
+	Q             string                 `protobuf:"bytes,1,opt,name=q,proto3" json:"q,omitempty"`
+	Cursor        string                 `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	PageSize      int32                  `protobuf:"varint,3,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -361,6 +362,13 @@ func (x *GetTenantsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetTenantsRequest.ProtoReflect.Descriptor instead.
 func (*GetTenantsRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetTenantsRequest) GetQ() string {
+	if x != nil {
+		return x.Q
+	}
+	return ""
 }
 
 func (x *GetTenantsRequest) GetCursor() string {
@@ -797,10 +805,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ra
 	"\x13DeleteTenantRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\"0\n" +
 	"\x14DeleteTenantResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"G\n" +
-	"\x11GetTenantsRequest\x12\x16\n" +
-	"\x06cursor\x18\x01 \x01(\tR\x06cursor\x12\x1a\n" +
-	"\bpageSize\x18\x02 \x01(\x05R\bpageSize\"\xae\x01\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"U\n" +
+	"\x11GetTenantsRequest\x12\f\n" +
+	"\x01q\x18\x01 \x01(\tR\x01q\x12\x16\n" +
+	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x1a\n" +
+	"\bpageSize\x18\x03 \x01(\x05R\bpageSize\"\xae\x01\n" +
 	"\x06Tenant\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +

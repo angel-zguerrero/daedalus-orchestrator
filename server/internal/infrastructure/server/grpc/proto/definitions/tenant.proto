@@ -42,8 +42,9 @@ message DeleteTenantResponse {
 }
 
 message GetTenantsRequest {
-  string cursor = 1;
-  int32 pageSize = 2;
+  string q = 1;
+  string cursor = 2;
+  int32 pageSize = 3;
 }
 
 message Tenant {

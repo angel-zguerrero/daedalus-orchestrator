@@ -300,10 +300,11 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 	return nil
 }
 
-func (bo *TenantBO) GetTenants(ctx context.Context, cursor string, pageSize int) (db.FindResult[models.TenantInMaster], error) {
+func (bo *TenantBO) GetTenants(ctx context.Context, q string, cursor string, pageSize int) (db.FindResult[models.TenantInMaster], error) {
 	paginateTenantsCommand := &tenant_command.PaginateTenantsCommand{
 		Cursor:   cursor,
 		PageSize: pageSize,
+		Q:        q,
 	}
 
 	queryCommand := &general_command.Query_Command{

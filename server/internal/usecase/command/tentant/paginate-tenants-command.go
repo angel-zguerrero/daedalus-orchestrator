@@ -18,6 +18,7 @@ func init() {
 type PaginateTenantsCommand struct {
 	Cursor   string
 	PageSize int
+	Q        string
 }
 
 func (cmd *PaginateTenantsCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -30,7 +31,7 @@ func (cmd *PaginateTenantsCommand) Execute(uow *db.UnitOfWork, now time.Time) co
 		return *commandResult
 	}
 
-	tenantInMasterFound, err := tenantInMasterRepo.PaginateTenant(cmd.PageSize, cmd.Cursor, now)
+	tenantInMasterFound, err := tenantInMasterRepo.PaginateTenant(cmd.Q, cmd.PageSize, cmd.Cursor, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

@@ -127,7 +127,7 @@ func (s *TenantService) DeleteTenant(ctx context.Context, r *pb.DeleteTenantRequ
 }
 
 func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest) (*pb.GetTenantsResponse, error) {
-	findResult, err := s.TenantBO.GetTenants(ctx, r.Cursor, int(r.PageSize))
+	findResult, err := s.TenantBO.GetTenants(ctx, r.Q, r.Cursor, int(r.PageSize))
 	if err != nil {
 		return nil, err
 	}
