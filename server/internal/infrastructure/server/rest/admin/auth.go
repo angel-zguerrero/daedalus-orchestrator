@@ -3,6 +3,7 @@ package rest_api_admin
 import (
 	"net/http"
 
+	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,20 @@ import (
 type loginRequest struct {
 	UsernameOrEmail string `json:"usernameOrEmail" binding:"required"`
 	Password        string `json:"password" binding:"required"`
+}
+
+type AdminController struct {
+	Config *common.ServerConfing
+}
+
+// NewAdminController creates a new instance of RestAdminAPI.
+func NewAdminController(Config *common.ServerConfing) *AdminController {
+
+	api := &AdminController{
+		Config: Config,
+	}
+
+	return api
 }
 
 // LoginHandler handles the /admin-api/login endpoint.
@@ -22,7 +37,7 @@ func (ctrl *AdminController) LoginHandler(c *gin.Context) {
 		return
 	}
 
-	authBO := bo.NewAuthBO(ctrl.Config.MasterNode, ctrl.Config.JwtKey, ctrl.Config.JwtDuration, ctrl.Config.Logger)
+	authBO := bo.NewAuthBO(ctrl.Config.MasterNode, ctrl.Config.JwtKey, ctrl.Config.JwtDuration, &ctrl.Config.Logger)
 
 	tokenString, err := authBO.Login(c.Request.Context(), req.UsernameOrEmail, req.Password)
 	if err != nil {
@@ -45,7 +60,7 @@ func (ctrl *AdminController) LogoutHandler(c *gin.Context) {
 		return
 	}
 
-	authBO := bo.NewAuthBO(ctrl.Config.MasterNode, ctrl.Config.JwtKey, ctrl.Config.JwtDuration, ctrl.Config.Logger)
+	authBO := bo.NewAuthBO(ctrl.Config.MasterNode, ctrl.Config.JwtKey, ctrl.Config.JwtDuration, &ctrl.Config.Logger)
 
 	if err := authBO.Logout(c.Request.Context(), authHeader); err != nil {
 		ctrl.Config.Logger.Error().Err(err).Msg("Failed removing current session")

@@ -20,10 +20,10 @@ type AuthBO struct {
 	MasterNode  *dragonboat.RaftNode
 	JwtKey      []byte
 	JwtDuration time.Duration
-	Logger      zerolog.Logger
+	Logger      *zerolog.Logger
 }
 
-func NewAuthBO(masterNode *dragonboat.RaftNode, jwtKey []byte, jwtDuration time.Duration, logger zerolog.Logger) *AuthBO {
+func NewAuthBO(masterNode *dragonboat.RaftNode, jwtKey []byte, jwtDuration time.Duration, logger *zerolog.Logger) *AuthBO {
 	return &AuthBO{
 		MasterNode:  masterNode,
 		JwtKey:      jwtKey,

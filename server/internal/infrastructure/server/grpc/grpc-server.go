@@ -9,10 +9,10 @@ import (
 	"google.golang.org/grpc"
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
-	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/auth" // Import new auth service
-	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth" // Import new auth pb
+	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
+	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth" // Import new auth pb
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
 	"deadalus-orch/server/internal/pkg/config"
@@ -49,7 +49,7 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	pb.RegisterMetricsServiceServer(server, healthmetrics.NewMetricsServer())
 	pbT.RegisterTenantServiceServer(server, tenant.NewTenantService(cfg))
 	// Register new AuthService
-	authBO := bo.NewAuthBO(cfg.MasterNode, cfg.JwtKey, cfg.JwtDuration, *cfg.Logger)
+	authBO := bo.NewAuthBO(cfg.MasterNode, cfg.JwtKey, cfg.JwtDuration, &cfg.Logger)
 	authSvc := auth.NewAuthService(cfg, authBO)
 	pbAuth.RegisterAuthServiceServer(server, authSvc)
 
