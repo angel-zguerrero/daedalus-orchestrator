@@ -49,7 +49,7 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	pb.RegisterMetricsServiceServer(server, healthmetrics.NewMetricsServer())
 	pbT.RegisterTenantServiceServer(server, tenant.NewTenantService(cfg))
 	// Register new AuthService
-	authBO := bo.NewAuthBO(cfg.MasterNode, cfg.JwtKey, cfg.JwtDuration, cfg.Logger)
+	authBO := bo.NewAuthBO(cfg.MasterNode, cfg.JwtKey, cfg.JwtDuration, *cfg.Logger)
 	authSvc := auth.NewAuthService(cfg, authBO)
 	pbAuth.RegisterAuthServiceServer(server, authSvc)
 

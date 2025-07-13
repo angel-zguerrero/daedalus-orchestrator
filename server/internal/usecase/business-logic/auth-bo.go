@@ -13,17 +13,17 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 type AuthBO struct {
 	MasterNode  *dragonboat.RaftNode
 	JwtKey      []byte
 	JwtDuration time.Duration
-	Logger      *logrus.Logger
+	Logger      zerolog.Logger
 }
 
-func NewAuthBO(masterNode *dragonboat.RaftNode, jwtKey []byte, jwtDuration time.Duration, logger *logrus.Logger) *AuthBO {
+func NewAuthBO(masterNode *dragonboat.RaftNode, jwtKey []byte, jwtDuration time.Duration, logger zerolog.Logger) *AuthBO {
 	return &AuthBO{
 		MasterNode:  masterNode,
 		JwtKey:      jwtKey,

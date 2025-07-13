@@ -8,7 +8,7 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -64,7 +64,7 @@ func (m *MockRaftNode) Stop() {
 
 func TestAuthBO_Login(t *testing.T) {
 	mockNode := new(MockRaftNode)
-	logger := logrus.New()
+	logger := zerolog.Nop()
 	authBO := NewAuthBO(mockNode, []byte("secret"), time.Hour, logger)
 
 	// Mock successful login
