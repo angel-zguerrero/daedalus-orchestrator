@@ -91,7 +91,7 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 		parsedResult := &commands.CommandResult{}
 		if err := dec.Decode(parsedResult); err != nil {
 			logger.Error().Err(err).Msg("Session does not exist or has been invalidated")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Session does not exist or has been invalidated"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Session does not exist or has been invalidated:" + err.Error()})
 			return
 		}
 
