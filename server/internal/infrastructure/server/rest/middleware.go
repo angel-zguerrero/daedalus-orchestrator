@@ -7,6 +7,7 @@ import (
 	ratelimit "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	"encoding/gob"
 	"fmt"
 	"net/http"
@@ -64,7 +65,7 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 		}
 
 		// Locally validated, now check session existence via Raft
-		checkSessionCmd := &commands.CheckSessionExistsCommand{
+		checkSessionCmd := &auth_command.CheckSessionExistsCommand{
 			JWTToken: tokenString,
 			JWTKey:   jwtKey, // Assuming the command needs the key for its own validation if any
 		}

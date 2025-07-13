@@ -6,6 +6,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -82,7 +83,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 
 				app.StartAssignTenants()
 				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConsensus) {
-					bootstrapRootUserCmd := &commands.BootstrapRootUserCommand{}
+					bootstrapRootUserCmd := &auth_command.BootstrapRootUserCommand{}
 					cmd := commands.FSM_Command{
 						Now:  utils.GetNowInInt(),
 						Type: commands.REPOSITORY_COMMAND,

@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"time"
 
@@ -19,12 +20,12 @@ func (r *MasterKVDBStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
 
 func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
 
-	loginCmd, ok := input.(commands.LoginCommand)
+	loginCmd, ok := input.(auth_command.LoginCommand)
 	if ok {
 		return loginCmd.Execute(uow, now)
 	}
 
-	checkSessionExistsCommand, ok := input.(commands.CheckSessionExistsCommand)
+	checkSessionExistsCommand, ok := input.(auth_command.CheckSessionExistsCommand)
 	if ok {
 		return checkSessionExistsCommand.Execute(uow, now)
 	}
@@ -45,12 +46,12 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 }
 
 func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
-	bootstrapRootUserCmd, ok := cmd.(commands.BootstrapRootUserCommand)
+	bootstrapRootUserCmd, ok := cmd.(auth_command.BootstrapRootUserCommand)
 	if ok {
 		return bootstrapRootUserCmd.Execute(uow, now)
 	}
 
-	registerSessionCommand, ok := cmd.(commands.RegisterSessionCommand)
+	registerSessionCommand, ok := cmd.(auth_command.RegisterSessionCommand)
 	if ok {
 		return registerSessionCommand.Execute(uow, now)
 	}
@@ -75,7 +76,7 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return deleteTenantInMasterCommand.Execute(uow, now)
 	}
 
-	removeSessionCommand, ok := cmd.(commands.RemoveSessionCommand)
+	removeSessionCommand, ok := cmd.(auth_command.RemoveSessionCommand)
 	if ok {
 		return removeSessionCommand.Execute(uow, now)
 	}

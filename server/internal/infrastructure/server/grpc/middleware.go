@@ -8,6 +8,7 @@ import (
 	ratelimit_store "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 
 	"bytes"
 	"encoding/gob"
@@ -74,7 +75,7 @@ func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger
 			}
 
 			// Locally validated, now check session existence via Raft
-			checkSessionCmd := &commands.CheckSessionExistsCommand{
+			checkSessionCmd := &auth_command.CheckSessionExistsCommand{
 				JWTToken: tokenString,
 				JWTKey:   jwtKey,
 			}

@@ -12,6 +12,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
@@ -34,7 +35,7 @@ func NewAuthBO(masterNode *dragonboat.RaftNode, jwtKey []byte, jwtDuration time.
 }
 
 func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (string, error) {
-	loginCmd := &commands.LoginCommand{
+	loginCmd := &auth_command.LoginCommand{
 		UsernameOrEmail: usernameOrEmail,
 		Password:        password,
 	}
@@ -84,7 +85,7 @@ func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (
 		return "", err
 	}
 
-	registerSessionCmd := &commands.RegisterSessionCommand{
+	registerSessionCmd := &auth_command.RegisterSessionCommand{
 		JWTToken: tokenString,
 		JWTKey:   bo.JwtKey,
 	}
@@ -114,7 +115,7 @@ func (bo *AuthBO) Logout(ctx context.Context, token string) error {
 		return nil
 	}
 
-	removeSessionCmd := &commands.RemoveSessionCommand{
+	removeSessionCmd := &auth_command.RemoveSessionCommand{
 		JWTToken: token,
 		JWTKey:   bo.JwtKey,
 	}

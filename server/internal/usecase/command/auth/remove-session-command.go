@@ -1,7 +1,8 @@
-package command
+package auth_command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"time"
 	// "fmt" // Will be needed if we add logging or more complex error handling
@@ -19,8 +20,8 @@ type RemoveSessionCommand struct {
 	JWTKey []byte
 }
 
-func (cmd *RemoveSessionCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
-	commandResult := &CommandResult{}
+func (cmd *RemoveSessionCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+	commandResult := &command.CommandResult{}
 	if cmd.JWTToken == "" {
 		commandResult.Error = "JWTToken cannot be empty for RemoveSessionCommand"
 		return *commandResult

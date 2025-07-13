@@ -1,8 +1,9 @@
-package command
+package auth_command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"time"
 )
@@ -15,8 +16,8 @@ func init() {
 type BootstrapRootUserCommand struct {
 }
 
-func (cmd *BootstrapRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
-	commandResult := &CommandResult{}
+func (cmd *BootstrapRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+	commandResult := &command.CommandResult{}
 	userRepo, err := db.NewUserRepository(uow, &db.DeterministicIDGeneratorFactory{}) // Passing nil for IDGeneratorFactory
 	if err != nil {
 		commandResult.Error = err.Error()

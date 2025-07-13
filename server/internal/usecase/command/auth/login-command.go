@@ -1,7 +1,8 @@
-package command
+package auth_command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"time"
 )
@@ -16,8 +17,8 @@ type LoginCommand struct {
 	Password        string
 }
 
-func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
-	commandResult := &CommandResult{}
+func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+	commandResult := &command.CommandResult{}
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 	userRepo, err := db.NewUserRepository(uow, idFactory) // Passing nil for IDGeneratorFactory
 	if err != nil {
