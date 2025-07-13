@@ -38,6 +38,7 @@ export class TenantsComponent implements OnInit {
 
   public showAlert = false;
   public errorMessage = '';
+  public loading = false;
 
   tenantForm: FormGroup;
   tenantFormUpdate: FormGroup;
@@ -180,6 +181,7 @@ export class TenantsComponent implements OnInit {
       return;
     }
 
+    this.loading = true;
     const fileReader = new FileReader();
     fileReader.onload = (e: any) => {
       const data = new Uint8Array(e.target.result);
@@ -201,10 +203,12 @@ export class TenantsComponent implements OnInit {
           this.bulkUploadModalVisible = false;
           this.loadTenants();
           this.showAlert = false;
+          this.loading = false;
         },
         error: (error) => {
           this.showAlert = true;
           this.errorMessage = error.error;
+          this.loading = false;
         }
       });
     };

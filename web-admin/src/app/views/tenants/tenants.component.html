@@ -143,7 +143,7 @@
 <c-modal id="bulkUploadModal" [visible]="bulkUploadModalVisible" (visibleChange)="bulkUploadModalVisible = $event">
   <c-modal-header>
     <h5 cModalTitle>Bulk Upload Tenants</h5>
-    <button (click)="bulkUploadModalVisible = false" cButtonClose></button>
+    <button (click)="bulkUploadModalVisible = false" cButtonClose [disabled]="loading"></button>
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
@@ -152,12 +152,15 @@
       <li><strong>Name</strong>: The name of the tenant.</li>
       <li><strong>Code</strong>: The code of the tenant.</li>
     </ul>
-    <input type="file" (change)="onFileChange($event)" accept=".xlsx, .csv" />
+    <input type="file" (change)="onFileChange($event)" accept=".xlsx, .csv" [disabled]="loading" />
   </c-modal-body>
   <c-modal-footer>
-    <button (click)="bulkUploadModalVisible = false" cButton color="secondary">
+    <button (click)="bulkUploadModalVisible = false" cButton color="secondary" [disabled]="loading">
       Close
     </button>
-    <button cButton color="primary" (click)="uploadTenants()">Upload</button>
+    <button cButton color="primary" (click)="uploadTenants()" [disabled]="loading">
+      <c-spinner *ngIf="loading" size="sm"></c-spinner>
+      <span *ngIf="!loading">Upload</span>
+    </button>
   </c-modal-footer>
 </c-modal>
