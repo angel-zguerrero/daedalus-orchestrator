@@ -5,6 +5,7 @@
   <c-card-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
     <button cButton color="primary" (click)="openCreateModal()">Create Tenant</button>
+    <button cButton color="secondary" (click)="openBulkUploadModal()" class="ms-2">Bulk Upload</button>
     <table cTable class="mt-4">
       <thead>
         <tr>
@@ -135,5 +136,28 @@
     <button (click)="detailsModalVisible = false" cButton color="secondary">
       Close
     </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Bulk Upload Modal -->
+<c-modal id="bulkUploadModal" [visible]="bulkUploadModalVisible" (visibleChange)="bulkUploadModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>Bulk Upload Tenants</h5>
+    <button (click)="bulkUploadModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <p>Upload a .xlsx or .csv file with the following columns:</p>
+    <ul>
+      <li><strong>Name</strong>: The name of the tenant.</li>
+      <li><strong>Code</strong>: The code of the tenant.</li>
+    </ul>
+    <input type="file" (change)="onFileChange($event)" accept=".xlsx, .csv" />
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="bulkUploadModalVisible = false" cButton color="secondary">
+      Close
+    </button>
+    <button cButton color="primary" (click)="uploadTenants()">Upload</button>
   </c-modal-footer>
 </c-modal>

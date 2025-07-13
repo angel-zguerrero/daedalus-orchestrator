@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { TenantsService } from './services/tenants.service';
 import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'app-tenants',
@@ -33,6 +34,7 @@ export class TenantsComponent implements OnInit {
   public editModalVisible = false;
   public deleteModalVisible = false;
   public detailsModalVisible = false;
+  public bulkUploadModalVisible = false;
 
   public showAlert = false;
   public errorMessage = '';
@@ -159,5 +161,53 @@ export class TenantsComponent implements OnInit {
       this.deleteModalVisible = false;
       this.loadTenants();
     });
+  }
+
+  openBulkUploadModal(): void {
+    this.bulkUploadModalVisible = true;
+  }
+
+  private file: File | null = null;
+
+  onFileChange(event: any): void {
+    this.file = event.target.files[0];
+  }
+
+  uploadTenants(): void {
+    if (!this.file) {
+      this.showAlert = true;
+      this.errorMessage = 'Please select a file to upload.';
+      return;
+    }
+
+    const fileReader = new FileReader();
+    fileReader.onload = (e: any) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const tenants = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Code'] });
+
+      // Remove header row
+      tenants.shift();
+
+      if (tenants.length === 0) {
+        this.showAlert = true;
+        this.errorMessage = 'The uploaded file is empty.';
+        return;
+      }
+
+      this.tenantsService.bulkAssertTenants({ tenants }).subscribe({
+        next: () => {
+          this.bulkUploadModalVisible = false;
+          this.loadTenants();
+          this.showAlert = false;
+        },
+        error: (error) => {
+          this.showAlert = true;
+          this.errorMessage = error.error;
+        }
+      });
+    };
+    fileReader.readAsArrayBuffer(this.file);
   }
 }
