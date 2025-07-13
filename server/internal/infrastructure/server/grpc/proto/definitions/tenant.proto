@@ -7,6 +7,8 @@ option go_package = "pb/tenant;tenant";
 service TenantService {
   rpc GetTenantInfo (TenantInfoRequest) returns (TenantInfoResponse);
   rpc AssertTenant (AssertTenantRequest) returns (AssertTenantResponse);
+  rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse);
+  rpc GetTenants(GetTenantsRequest) returns (GetTenantsResponse);
 }
 
 message TenantInfoRequest {
@@ -21,6 +23,34 @@ message TenantInfoResponse {
   string Status = 5;
   string CreatedAt = 6;
   string UpdatedAt = 7;
+}
+
+message DeleteTenantRequest {
+  string ID = 1;
+}
+
+message DeleteTenantResponse {
+  string message = 1;
+}
+
+message GetTenantsRequest {
+  string cursor = 1;
+  int32 pageSize = 2;
+}
+
+message Tenant {
+  string ID = 1;
+  string Name = 2;
+  string Code = 3;
+  int64 ShardId = 4;
+  string Status = 5;
+  string CreatedAt = 6;
+  string UpdatedAt = 7;
+}
+
+message GetTenantsResponse {
+  repeated Tenant tenants = 1;
+  string next_cursor = 2;
 }
 
 message AssertTenantRequest {
