@@ -289,6 +289,14 @@ func ParseRolesList(list []string) ([]NodeRole, error) {
 	return roles, nil
 }
 
+func ParseRolesToStringList(list []NodeRole) ([]string, error) {
+	roles := make([]string, len(list))
+	for i, role := range list {
+		roles[i] = string(role)
+	}
+	return roles, nil
+}
+
 // ParseRolesFlag parses a comma-separated string of roles into a slice of NodeRole.
 // If the input string is empty, it returns a default list of all roles.
 //

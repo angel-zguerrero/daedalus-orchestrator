@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -31,30 +32,52 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 	}
 
 	return &pb.AssertTenantResponse{
-		ID:        tenantInMaster.ID,
-		Name:      tenantInMaster.Name,
-		ShardId:   int64(tenantInMaster.ShardId),
-		Code:      tenantInMaster.Code,
-		Status:    string(tenantInMaster.Status),
-		CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+		Message: "Tenant was asserted",
+		Result: &pb.Tenant{
+			ID:        tenantInMaster.ID,
+			Name:      tenantInMaster.Name,
+			ShardId:   int64(tenantInMaster.ShardId),
+			Code:      tenantInMaster.Code,
+			Status:    string(tenantInMaster.Status),
+			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+		},
 	}, nil
 }
 
 func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoRequest) (*pb.TenantInfoResponse, error) {
-	tenantInMaster, _, _, err := s.TenantBO.GetTenant(ctx, r.ID)
+	tenantInMaster, node, _, err := s.TenantBO.GetTenant(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.TenantInfoResponse{
-		ID:        tenantInMaster.ID,
-		ShardId:   int64(tenantInMaster.ShardId),
-		Code:      tenantInMaster.Code,
-		Status:    string(tenantInMaster.Status),
-		CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
-	}, nil
+	roles, err := dragonboat.ParseRolesToStringList(node.Roles)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &pb.TenantInfoResponse{
+		Message: "Tenant",
+		Result: &pb.Tenant{
+			ID:        tenantInMaster.ID,
+			Name:      tenantInMaster.Name,
+			Code:      tenantInMaster.Code,
+			ShardId:   int64(tenantInMaster.ShardId),
+			Status:    string(tenantInMaster.Status),
+			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+		},
+		Node: &pb.Node{
+			SelfMember: &pb.SelfMember{
+				IP:   node.SelfMember.IP,
+				Port: int32(node.SelfMember.Port),
+			},
+			ShardID: node.ShardID,
+			Roles:   roles,
+		},
+	}
+
+	return response, nil
 }
 
 func (s *TenantService) DeleteTenant(ctx context.Context, r *pb.DeleteTenantRequest) (*pb.DeleteTenantResponse, error) {
@@ -86,7 +109,10 @@ func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest)
 	}
 
 	return &pb.GetTenantsResponse{
-		Tenants:    tenants,
-		NextCursor: findResult.Cursor,
+		Message: "Tenant list",
+		Result: &pb.FindResult{
+			Entities: tenants,
+			Cursor:   findResult.Cursor,
+		},
 	}, nil
 }

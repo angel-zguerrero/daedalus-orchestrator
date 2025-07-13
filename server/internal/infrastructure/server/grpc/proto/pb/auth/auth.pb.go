@@ -77,8 +77,8 @@ func (x *LoginRequest) GetPassword() string {
 // Response message for login
 type LoginResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -113,16 +113,16 @@ func (*LoginResponse) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_auth_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *LoginResponse) GetToken() string {
+func (x *LoginResponse) GetMessage() string {
 	if x != nil {
-		return x.Token
+		return x.Message
 	}
 	return ""
 }
 
-func (x *LoginResponse) GetMessage() string {
+func (x *LoginResponse) GetToken() string {
 	if x != nil {
-		return x.Message
+		return x.Token
 	}
 	return ""
 }
@@ -217,9 +217,9 @@ const file_internal_infrastructure_server_grpc_proto_definitions_auth_proto_rawD
 	"\fLoginRequest\x12(\n" +
 	"\x0fusernameOrEmail\x18\x01 \x01(\tR\x0fusernameOrEmail\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"?\n" +
-	"\rLoginResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x0f\n" +
+	"\rLoginResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"\x0f\n" +
 	"\rLogoutRequest\"*\n" +
 	"\x0eLogoutResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage2t\n" +
