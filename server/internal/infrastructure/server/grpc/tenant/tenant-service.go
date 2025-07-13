@@ -32,7 +32,7 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 	}
 
 	return &pb.AssertTenantResponse{
-		Message: "Tenant was created",
+		Message: "Tenant was asserted",
 		Result: &pb.Tenant{
 			ID:        tenantInMaster.ID,
 			Name:      tenantInMaster.Name,
@@ -111,8 +111,8 @@ func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest)
 	return &pb.GetTenantsResponse{
 		Message: "Tenant list",
 		Result: &pb.FindResult{
-			Tenants:    tenants,
-			NextCursor: findResult.Cursor,
+			Entities: tenants,
+			Cursor:   findResult.Cursor,
 		},
 	}, nil
 }

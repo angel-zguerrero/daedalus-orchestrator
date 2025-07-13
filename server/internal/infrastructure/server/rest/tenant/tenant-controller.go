@@ -45,7 +45,7 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Tenant was created",
+		"message": "Tenant was asserted",
 		"result":  tenantInMaster,
 	})
 }
@@ -60,9 +60,9 @@ func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"Message": "Tenant",
-		"Result":  tenantInMaster,
-		"Node": gin.H{
+		"message": "Tenant",
+		"result":  tenantInMaster,
+		"node": gin.H{
 			"SelfMember": node.SelfMember,
 			"ShardID":    node.ShardID,
 			"Roles":      node.Roles,

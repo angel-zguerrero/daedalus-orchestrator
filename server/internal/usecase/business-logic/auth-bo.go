@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"errors"
 	"strings"
 	"time"
 
@@ -63,18 +64,18 @@ func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (
 
 	if parsedResult.Error != "" {
 		bo.Logger.Error().Str("username", usernameOrEmail).Str("error", parsedResult.Error).Msg("Login command returned an error")
-		return "", err
+		return "", errors.New(parsedResult.Error)
 	}
 
 	loggedIn, ok := parsedResult.Result.(bool)
 	if !ok {
 		bo.Logger.Error().Str("username", usernameOrEmail).Msg("Login command returned unexpected result type (bool assertion)")
-		return "", err
+		return "", errors.New("Login command returned unexpected result type (bool assertion)")
 	}
 
 	if !loggedIn {
 		bo.Logger.Warn().Str("username", usernameOrEmail).Msg("Login attempt failed: invalid credentials")
-		return "", err
+		return "", errors.New("Login attempt failed: invalid credentials")
 	}
 
 	tokenString, err := bo.generateJWT(usernameOrEmail)

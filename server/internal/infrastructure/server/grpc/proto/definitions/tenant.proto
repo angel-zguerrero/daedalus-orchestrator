@@ -56,8 +56,8 @@ message Tenant {
 }
 
 message FindResult {
-  repeated Tenant tenants = 1;
-  string next_cursor = 2;
+  repeated Tenant Entities = 1;
+  string Cursor = 2;
 }
 
 message GetTenantsResponse {

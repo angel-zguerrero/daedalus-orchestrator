@@ -471,8 +471,8 @@ func (x *Tenant) GetUpdatedAt() string {
 
 type FindResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tenants       []*Tenant              `protobuf:"bytes,1,rep,name=tenants,proto3" json:"tenants,omitempty"`
-	NextCursor    string                 `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	Entities      []*Tenant              `protobuf:"bytes,1,rep,name=Entities,proto3" json:"Entities,omitempty"`
+	Cursor        string                 `protobuf:"bytes,2,opt,name=Cursor,proto3" json:"Cursor,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -507,16 +507,16 @@ func (*FindResult) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *FindResult) GetTenants() []*Tenant {
+func (x *FindResult) GetEntities() []*Tenant {
 	if x != nil {
-		return x.Tenants
+		return x.Entities
 	}
 	return nil
 }
 
-func (x *FindResult) GetNextCursor() string {
+func (x *FindResult) GetCursor() string {
 	if x != nil {
-		return x.NextCursor
+		return x.Cursor
 	}
 	return ""
 }
@@ -712,12 +712,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ra
 	"\aShardId\x18\x04 \x01(\x03R\aShardId\x12\x16\n" +
 	"\x06Status\x18\x05 \x01(\tR\x06Status\x12\x1c\n" +
 	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\"W\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\"P\n" +
 	"\n" +
-	"FindResult\x12(\n" +
-	"\atenants\x18\x01 \x03(\v2\x0e.tenant.TenantR\atenants\x12\x1f\n" +
-	"\vnext_cursor\x18\x02 \x01(\tR\n" +
-	"nextCursor\"Z\n" +
+	"FindResult\x12*\n" +
+	"\bEntities\x18\x01 \x03(\v2\x0e.tenant.TenantR\bEntities\x12\x16\n" +
+	"\x06Cursor\x18\x02 \x01(\tR\x06Cursor\"Z\n" +
 	"\x12GetTenantsResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
 	"\x06result\x18\x02 \x01(\v2\x12.tenant.FindResultR\x06result\"=\n" +
@@ -765,7 +764,7 @@ var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_depI
 	1,  // 0: tenant.Node.SelfMember:type_name -> tenant.SelfMember
 	7,  // 1: tenant.TenantInfoResponse.result:type_name -> tenant.Tenant
 	2,  // 2: tenant.TenantInfoResponse.node:type_name -> tenant.Node
-	7,  // 3: tenant.FindResult.tenants:type_name -> tenant.Tenant
+	7,  // 3: tenant.FindResult.Entities:type_name -> tenant.Tenant
 	8,  // 4: tenant.GetTenantsResponse.result:type_name -> tenant.FindResult
 	7,  // 5: tenant.AssertTenantResponse.result:type_name -> tenant.Tenant
 	0,  // 6: tenant.TenantService.GetTenantInfo:input_type -> tenant.TenantInfoRequest

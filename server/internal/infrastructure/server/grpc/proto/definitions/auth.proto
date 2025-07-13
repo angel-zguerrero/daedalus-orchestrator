@@ -12,8 +12,8 @@ message LoginRequest {
 
 // Response message for login
 message LoginResponse {
-    string token = 1;
-    string message = 2;
+    string message = 1;
+    string token = 2;
 }
 
 // Request message for logout
