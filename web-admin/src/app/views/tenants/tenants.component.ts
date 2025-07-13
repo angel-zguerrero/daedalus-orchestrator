@@ -50,7 +50,11 @@ export class TenantsComponent implements OnInit {
     this.loadTenants();
   }
 
-  loadTenants(cursor: string = ''): void {
+  loadTenants(cursor: string = '', isPrevious: boolean = false): void {
+    if (!isPrevious) {
+      this.cursors.push(this.cursor);
+    }
+
     this.tenantsService.getTenants(cursor, this.pageSize).subscribe(response => {
       this.tenants = response.result.Entities;
       this.cursor = response.result.Cursor;
@@ -59,15 +63,15 @@ export class TenantsComponent implements OnInit {
 
   nextPage(): void {
     if (this.cursor) {
-      this.cursors.push(this.cursor);
       this.loadTenants(this.cursor);
     }
   }
 
   previousPage(): void {
-    if (this.cursors.length > 0) {
-      const previousCursor = this.cursors.pop() || '';
-      this.loadTenants(previousCursor);
+    if (this.cursors.length > 1) {
+      this.cursors.pop(); // Remove current cursor
+      const previousCursor = this.cursors.pop() || ''; // Get previous cursor
+      this.loadTenants(previousCursor, true);
     }
   }
 
