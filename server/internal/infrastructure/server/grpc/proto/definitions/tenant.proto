@@ -15,14 +15,22 @@ message TenantInfoRequest {
    string ID = 1;
 }
 
+message NodeHostInfo {
+  string RaftAddress = 1;
+  string ServiceAddress = 2;
+}
+
+message Node {
+  string SelfMember = 1;
+  uint64 ShardID = 2;
+  repeated string Roles = 3;
+  NodeHostInfo NodeHostInfo = 4;
+}
+
 message TenantInfoResponse {
-  string ID = 1;
-  string Name = 2;
-  string Code = 3;
-  int64 ShardId = 4;
-  string Status = 5;
-  string CreatedAt = 6;
-  string UpdatedAt = 7;
+  string message = 1;
+  Tenant result = 2;
+  Node node = 3;
 }
 
 message DeleteTenantRequest {
@@ -48,9 +56,14 @@ message Tenant {
   string UpdatedAt = 7;
 }
 
-message GetTenantsResponse {
+message FindResult {
   repeated Tenant tenants = 1;
   string next_cursor = 2;
+}
+
+message GetTenantsResponse {
+  string message = 1;
+  FindResult result = 2;
 }
 
 message AssertTenantRequest {
@@ -59,13 +72,8 @@ message AssertTenantRequest {
 }
 
 message AssertTenantResponse {
-  string ID = 1;
-  string Name = 2;
-  string Code = 3;
-  int64 ShardId = 4;
-  string Status = 5;
-  string CreatedAt = 6;
-  string UpdatedAt = 7;
+  string message = 1;
+  Tenant result = 2;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/tenant.proto

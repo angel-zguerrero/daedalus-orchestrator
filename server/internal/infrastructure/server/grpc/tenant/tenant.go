@@ -31,30 +31,51 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 	}
 
 	return &pb.AssertTenantResponse{
-		ID:        tenantInMaster.ID,
-		Name:      tenantInMaster.Name,
-		ShardId:   int64(tenantInMaster.ShardId),
-		Code:      tenantInMaster.Code,
-		Status:    string(tenantInMaster.Status),
-		CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+		Message: "Tenant was created",
+		Result: &pb.Tenant{
+			ID:        tenantInMaster.ID,
+			Name:      tenantInMaster.Name,
+			ShardId:   int64(tenantInMaster.ShardId),
+			Code:      tenantInMaster.Code,
+			Status:    string(tenantInMaster.Status),
+			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+		},
 	}, nil
 }
 
 func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoRequest) (*pb.TenantInfoResponse, error) {
-	tenantInMaster, _, _, err := s.TenantBO.GetTenant(ctx, r.ID)
+	tenantInMaster, node, nodeHostInfo, err := s.TenantBO.GetTenant(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.TenantInfoResponse{
-		ID:        tenantInMaster.ID,
-		ShardId:   int64(tenantInMaster.ShardId),
-		Code:      tenantInMaster.Code,
-		Status:    string(tenantInMaster.Status),
-		CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
-	}, nil
+	response := &pb.TenantInfoResponse{
+		Message: "Tenant",
+		Result: &pb.Tenant{
+			ID:        tenantInMaster.ID,
+			Name:      tenantInMaster.Name,
+			Code:      tenantInMaster.Code,
+			ShardId:   int64(tenantInMaster.ShardId),
+			Status:    string(tenantInMaster.Status),
+			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+		},
+	}
+
+	if nodeHostInfo != nil {
+		response.Node = &pb.Node{
+			SelfMember: node.SelfMember,
+			ShardID:    node.ShardID,
+			Roles:      node.Roles,
+			NodeHostInfo: &pb.NodeHostInfo{
+				RaftAddress:    nodeHostInfo.RaftAddress,
+				ServiceAddress: nodeHostInfo.ServiceAddress,
+			},
+		}
+	}
+
+	return response, nil
 }
 
 func (s *TenantService) DeleteTenant(ctx context.Context, r *pb.DeleteTenantRequest) (*pb.DeleteTenantResponse, error) {
@@ -86,7 +107,10 @@ func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest)
 	}
 
 	return &pb.GetTenantsResponse{
-		Tenants:    tenants,
-		NextCursor: findResult.Cursor,
+		Message: "Tenant list",
+		Result: &pb.FindResult{
+			Tenants:    tenants,
+			NextCursor: findResult.Cursor,
+		},
 	}, nil
 }
