@@ -3,10 +3,12 @@
     Tenants
   </c-card-header>
   <c-card-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
     <button cButton color="primary" (click)="openCreateModal()">Create Tenant</button>
     <table cTable class="mt-4">
       <thead>
         <tr>
+          <th>ID</th>
           <th>Name</th>
           <th>Code</th>
           <th>Status</th>
@@ -15,6 +17,7 @@
       </thead>
       <tbody>
         <tr *ngFor="let tenant of tenants">
+          <td  class="text-truncate" style="max-width: 200px;">{{ tenant.ID }}</td>
           <td>{{ tenant.Name }}</td>
           <td>{{ tenant.Code }}</td>
           <td>{{ tenant.Status }}</td>
@@ -119,6 +122,7 @@
     <button (click)="detailsModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body *ngIf="selectedTenant">
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
     <p><strong>ID:</strong> {{ selectedTenant.ID }}</p>
     <p><strong>Name:</strong> {{ selectedTenant.Name }}</p>
     <p><strong>Code:</strong> {{ selectedTenant.Code }}</p>

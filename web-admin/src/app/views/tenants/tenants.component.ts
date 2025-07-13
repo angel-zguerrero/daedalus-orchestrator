@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TenantsService } from './services/tenants.service';
-import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule } from '@coreui/angular';
+import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 @Component({
@@ -10,6 +10,7 @@ import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } 
   styleUrls: ['./tenants.component.scss'],
   standalone: true,
   imports: [
+    AlertComponent,
     CommonModule,
     TableModule,
     UtilitiesModule,
@@ -63,9 +64,15 @@ export class TenantsComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
-    this.tenantsService.getTenants(cursor, this.pageSize).subscribe(response => {
-      this.tenants = response.result.Entities;
-      this.cursor = response.result.Cursor;
+    this.tenantsService.getTenants(cursor, this.pageSize).subscribe({
+      next: (response) => {
+        this.tenants = response.result.Entities;
+        this.cursor = response.result.Cursor;
+      },
+      error: (error) => {
+        this.showAlert = true;
+        this.errorMessage = error.error;
+      }
     });
   }
 
@@ -89,7 +96,7 @@ export class TenantsComponent implements OnInit {
 
   openEditModal(tenant: any): void {
     this.selectedTenant = tenant;
-     this.tenantFormUpdate.reset();
+    this.tenantFormUpdate.reset();
     this.tenantFormUpdate.patchValue({
       name: tenant.Name,
       code: tenant.Code
@@ -103,9 +110,15 @@ export class TenantsComponent implements OnInit {
   }
 
   openDetailsModal(tenant: any): void {
-    this.tenantsService.getTenant(tenant.ID).subscribe(response => {
-      this.selectedTenant = response.result;
-      this.detailsModalVisible = true;
+    this.tenantsService.getTenant(tenant.ID).subscribe({
+      next: (response) => {
+        this.selectedTenant = response.result;
+        this.detailsModalVisible = true;
+      },
+      error: (error) => {
+        this.showAlert = true;
+        this.errorMessage = error.error;
+      }
     });
   }
 
@@ -119,7 +132,7 @@ export class TenantsComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error.error;
+          this.errorMessage = error.error;
         }
       });
     }
@@ -135,7 +148,7 @@ export class TenantsComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error.error;
+          this.errorMessage = error.error;
         }
       });
     }
