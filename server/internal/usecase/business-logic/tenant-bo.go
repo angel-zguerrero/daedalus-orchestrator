@@ -9,6 +9,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"errors"
@@ -50,7 +51,7 @@ func (bo *TenantBO) SetTenantNode(shardID int, tenantId string) *dragonboat.Raft
 }
 
 func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models.TenantInMaster, error) {
-	createTenantInMasterCommand := &commands.CreateTenantInMasterCommand{
+	createTenantInMasterCommand := &tenant_command.CreateTenantInMasterCommand{
 		TenantId:   strings.ReplaceAll(uuid.New().String(), "-", ""),
 		TenantCode: code,
 		TenantName: name,
@@ -118,7 +119,7 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 		return models.TenantInMaster{}, errors.New("Failed to create new tenant error: " + parsedResult.Error)
 	}
 
-	assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
+	assignToShardTenantInMasterCommand := &tenant_command.AssignToShardTenantInMasterCommand{
 		TenantCode: code,
 	}
 
@@ -155,7 +156,7 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 }
 
 func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.TenantInMaster, *dragonboat.RaftNode, *db4.NodeHostInfo, error) {
-	findTenantCommand := &commands.FindTenantCommand{
+	findTenantCommand := &tenant_command.FindTenantCommand{
 		TenantID: tenantID,
 	}
 
@@ -211,7 +212,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
 	defer writeCancel()
 
-	markToDeletionTenantInMasterCommand := &commands.MarkToDeletionTenantInMasterCommand{
+	markToDeletionTenantInMasterCommand := &tenant_command.MarkToDeletionTenantInMasterCommand{
 		TenantId: tenantID,
 	}
 
@@ -259,7 +260,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 		return errors.New("Failed to delete tenant error: " + err.Error())
 	}
 
-	deleteTenantInMasterCommand := &commands.DeleteTenantInMasterCommand{
+	deleteTenantInMasterCommand := &tenant_command.DeleteTenantInMasterCommand{
 		TenantId: tenantID,
 	}
 
@@ -279,7 +280,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 }
 
 func (bo *TenantBO) GetTenants(ctx context.Context, cursor string, pageSize int) (db.FindResult[models.TenantInMaster], error) {
-	paginateTenantsCommand := &commands.PaginateTenantsCommand{
+	paginateTenantsCommand := &tenant_command.PaginateTenantsCommand{
 		Cursor:   cursor,
 		PageSize: pageSize,
 	}

@@ -8,6 +8,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"time"
@@ -20,7 +21,7 @@ func (app *Application) StartAssignTenants() {
 	pageSize := 10
 
 	for {
-		paginateTenantsCommand := &commands.PaginateTenantsCommand{
+		paginateTenantsCommand := &tenant_command.PaginateTenantsCommand{
 			Cursor:   cursor,
 			PageSize: pageSize,
 		}
@@ -83,7 +84,7 @@ func (app *Application) StartAssignTenants() {
 
 						}
 
-						assignToShardTenantInMasterCommand := &commands.AssignToShardTenantInMasterCommand{
+						assignToShardTenantInMasterCommand := &tenant_command.AssignToShardTenantInMasterCommand{
 							TenantCode: tenant.Code,
 						}
 
@@ -116,7 +117,7 @@ func (app *Application) StartAssignTenants() {
 							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete column family")
 						}
 
-						deleteTenantInMasterCommand := &commands.DeleteTenantInMasterCommand{
+						deleteTenantInMasterCommand := &tenant_command.DeleteTenantInMasterCommand{
 							TenantId: tenant.ID,
 						}
 

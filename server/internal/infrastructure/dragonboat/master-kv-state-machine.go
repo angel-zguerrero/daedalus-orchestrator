@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -27,12 +28,12 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 	if ok {
 		return checkSessionExistsCommand.Execute(uow, now)
 	}
-	paginateTenantsCommand, ok := input.(commands.PaginateTenantsCommand)
+	paginateTenantsCommand, ok := input.(tenant_command.PaginateTenantsCommand)
 	if ok {
 		return paginateTenantsCommand.Execute(uow, now)
 	}
 
-	findTenantCommand, ok := input.(commands.FindTenantCommand)
+	findTenantCommand, ok := input.(tenant_command.FindTenantCommand)
 	if ok {
 		return findTenantCommand.Execute(uow, now)
 	}
@@ -54,22 +55,22 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return registerSessionCommand.Execute(uow, now)
 	}
 
-	createTenantInMasterCommand, ok := cmd.(commands.CreateTenantInMasterCommand)
+	createTenantInMasterCommand, ok := cmd.(tenant_command.CreateTenantInMasterCommand)
 	if ok {
 		return createTenantInMasterCommand.Execute(uow, now)
 	}
 
-	assignToShardTenantInMasterCommand, ok := cmd.(commands.AssignToShardTenantInMasterCommand)
+	assignToShardTenantInMasterCommand, ok := cmd.(tenant_command.AssignToShardTenantInMasterCommand)
 	if ok {
 		return assignToShardTenantInMasterCommand.Execute(uow, now)
 	}
 
-	markToDeletionTenantInMasterCommand, ok := cmd.(commands.MarkToDeletionTenantInMasterCommand)
+	markToDeletionTenantInMasterCommand, ok := cmd.(tenant_command.MarkToDeletionTenantInMasterCommand)
 	if ok {
 		return markToDeletionTenantInMasterCommand.Execute(uow, now)
 	}
 
-	deleteTenantInMasterCommand, ok := cmd.(commands.DeleteTenantInMasterCommand)
+	deleteTenantInMasterCommand, ok := cmd.(tenant_command.DeleteTenantInMasterCommand)
 	if ok {
 		return deleteTenantInMasterCommand.Execute(uow, now)
 	}

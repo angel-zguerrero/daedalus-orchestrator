@@ -1,9 +1,10 @@
-package command
+package tenant_command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
+	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"time"
@@ -21,8 +22,8 @@ type CreateTenantInMasterCommand struct {
 	TenantName string
 }
 
-func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
-	commandResult := &CommandResult{}
+func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+	commandResult := &command.CommandResult{}
 	kvStore := uow.KVStore
 	lastShardIdBytes, err := kvStore.Get(db.AdminFC, "last-shard-id", now)
 	if err != nil {

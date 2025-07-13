@@ -1,7 +1,8 @@
-package command
+package tenant_command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"time"
 )
@@ -16,8 +17,8 @@ type FindTenantCommand struct {
 	TenantCode string
 }
 
-func (cmd *FindTenantCommand) Execute(uow *db.UnitOfWork, now time.Time) CommandResult {
-	commandResult := &CommandResult{}
+func (cmd *FindTenantCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 	tenantInMasterRepo, err := db.NewTenantInMasterRepository(uow, idFactory) // Passing nil for IDGeneratorFactory
