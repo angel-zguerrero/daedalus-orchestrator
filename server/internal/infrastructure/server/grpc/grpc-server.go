@@ -16,6 +16,7 @@ import (
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
 	"deadalus-orch/server/internal/pkg/config"
+	bo "deadalus-orch/server/internal/usecase/business-logic"
 )
 
 type GrpcServer struct {
@@ -48,7 +49,8 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	pb.RegisterMetricsServiceServer(server, healthmetrics.NewMetricsServer())
 	pbT.RegisterTenantServiceServer(server, tenant.NewTenantService(cfg))
 	// Register new AuthService
-	authSvc := auth.NewAuthService(cfg.MasterNode, cfg)
+	authBO := bo.NewAuthBO(cfg.MasterNode, cfg.JwtKey, cfg.JwtDuration, cfg.Logger)
+	authSvc := auth.NewAuthService(cfg, authBO)
 	pbAuth.RegisterAuthServiceServer(server, authSvc)
 
 	return &GrpcServer{
