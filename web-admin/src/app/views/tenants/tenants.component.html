@@ -1,0 +1,133 @@
+<c-card class="mb-4">
+  <c-card-header>
+    Tenants
+  </c-card-header>
+  <c-card-body>
+    <button cButton color="primary" (click)="openCreateModal()">Create Tenant</button>
+    <table cTable class="mt-4">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Code</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let tenant of tenants">
+          <td>{{ tenant.Name }}</td>
+          <td>{{ tenant.Code }}</td>
+          <td>{{ tenant.Status }}</td>
+          <td>
+            <button cButton color="info" size="sm" (click)="openDetailsModal(tenant)">Details</button>
+            <button cButton color="warning" size="sm" (click)="openEditModal(tenant)">Edit</button>
+            <button cButton color="danger" size="sm" (click)="openDeleteModal(tenant)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="d-flex justify-content-end mt-3">
+      <button cButton color="secondary" [disabled]="cursors.length === 1" (click)="previousPage()">Previous</button>
+      <button cButton color="secondary" [disabled]="!cursor" (click)="nextPage()">Next</button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create Tenant Modal -->
+<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>Create Tenant</h5>
+    <button (click)="createModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <form [formGroup]="tenantForm">
+      <c-row class="mb-3">
+        <c-col>
+          <label cLabel for="name">Name</label>
+          <input cFormControl id="name" formControlName="name" />
+        </c-col>
+      </c-row>
+      <c-row class="mb-3">
+        <c-col>
+          <label cLabel for="code">Code</label>
+          <input cFormControl id="code" formControlName="code" />
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="createModalVisible = false" cButton color="secondary">
+      Close
+    </button>
+    <button cButton color="primary" (click)="createTenant()">Save changes</button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Edit Tenant Modal -->
+<c-modal id="editModal" [visible]="editModalVisible" (visibleChange)="editModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>Edit Tenant</h5>
+    <button (click)="editModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <form [formGroup]="tenantFormUpdate">
+      <c-row class="mb-3">
+        <c-col>
+          <label cLabel for="name">Name</label>
+          <input cFormControl id="name-update" formControlName="name" />
+        </c-col>
+      </c-row>
+      <c-row class="mb-3">
+        <c-col>
+          <label cLabel for="code">Code</label>
+          <input cFormControl id="code-update" formControlName="code" [disabled]="true"/>
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="editModalVisible = false" cButton color="secondary">
+      Close
+    </button>
+    <button cButton color="primary" (click)="updateTenant()">Save changes</button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Delete Tenant Modal -->
+<c-modal id="deleteModal" [visible]="deleteModalVisible" (visibleChange)="deleteModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>Delete Tenant</h5>
+    <button (click)="deleteModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    Are you sure you want to delete tenant {{ selectedTenant?.Name }}?
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="deleteModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="danger" (click)="deleteTenant()">Delete</button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Tenant Details Modal -->
+<c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>Tenant Details</h5>
+    <button (click)="detailsModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedTenant">
+    <p><strong>ID:</strong> {{ selectedTenant.ID }}</p>
+    <p><strong>Name:</strong> {{ selectedTenant.Name }}</p>
+    <p><strong>Code:</strong> {{ selectedTenant.Code }}</p>
+    <p><strong>Shard ID:</strong> {{ selectedTenant.ShardId }}</p>
+    <p><strong>Status:</strong> {{ selectedTenant.Status }}</p>
+    <p><strong>Created At:</strong> {{ selectedTenant.CreatedAt | date:'medium' }}</p>
+    <p><strong>Updated At:</strong> {{ selectedTenant.UpdatedAt | date:'medium' }}</p>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="detailsModalVisible = false" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>
