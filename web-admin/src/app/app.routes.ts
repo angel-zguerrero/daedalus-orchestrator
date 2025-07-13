@@ -20,41 +20,9 @@ export const routes: Routes = [
         loadChildren: () => import('./views/dashboard/routes').then((m) => m.routes)
       },
       {
-        path: 'theme',
-        loadChildren: () => import('./views/theme/routes').then((m) => m.routes)
-      },
-      {
-        path: 'base',
-        loadChildren: () => import('./views/base/routes').then((m) => m.routes)
-      },
-      {
-        path: 'buttons',
-        loadChildren: () => import('./views/buttons/routes').then((m) => m.routes)
-      },
-      {
-        path: 'forms',
-        loadChildren: () => import('./views/forms/routes').then((m) => m.routes)
-      },
-      {
-        path: 'icons',
-        loadChildren: () => import('./views/icons/routes').then((m) => m.routes)
-      },
-      {
-        path: 'notifications',
-        loadChildren: () => import('./views/notifications/routes').then((m) => m.routes)
-      },
-      {
-        path: 'widgets',
-        loadChildren: () => import('./views/widgets/routes').then((m) => m.routes)
-      },
-      {
-        path: 'charts',
-        loadChildren: () => import('./views/charts/routes').then((m) => m.routes)
+        path: 'tenants',
+        loadChildren: () => import('./views/tenants/routes').then((m) => m.routes)
       }
-      // Note: 'pages' (like login, register, 404, 500) are usually not children of DefaultLayoutComponent
-      // and should not be protected by this guard. They are defined as separate top-level routes.
-      // The existing 'pages' route was removed from here as it typically contains public pages.
-      // If there are specific pages under 'pages' that need auth, they should be structured accordingly.
     ]
   },
   {
