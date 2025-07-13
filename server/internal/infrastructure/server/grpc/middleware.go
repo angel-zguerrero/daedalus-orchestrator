@@ -36,9 +36,6 @@ func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger
 			return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
 		}
 
-		fmt.Println("info.FullMethod")
-		fmt.Println(info.FullMethod)
-
 		if !strings.HasSuffix(info.FullMethod, "AuthService/Login") {
 			authHeaders := md.Get("authorization")
 			if len(authHeaders) == 0 {
