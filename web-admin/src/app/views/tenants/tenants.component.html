@@ -12,6 +12,7 @@
           <th>ID</th>
           <th>Name</th>
           <th>Code</th>
+          <th>Shard ID</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
@@ -21,6 +22,7 @@
           <td  class="text-truncate" style="max-width: 200px;">{{ tenant.ID }}</td>
           <td>{{ tenant.Name }}</td>
           <td>{{ tenant.Code }}</td>
+          <td>{{ tenant.ShardId }}</td>
           <td>{{ tenant.Status }}</td>
           <td>
             <button cButton color="info" size="sm" (click)="openDetailsModal(tenant)">Details</button>

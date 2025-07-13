@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TenantsService } from './services/tenants.service';
-import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent } from '@coreui/angular';
+import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent, SpinnerComponent } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import * as XLSX from 'xlsx';
 
@@ -21,7 +21,8 @@ import * as XLSX from 'xlsx';
     FormModule,
     GridModule,
     ReactiveFormsModule,
-    FormsModule
+    FormsModule,
+    SpinnerComponent
   ]
 })
 export class TenantsComponent implements OnInit {
