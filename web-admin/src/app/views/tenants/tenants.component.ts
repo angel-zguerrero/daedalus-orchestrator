@@ -33,6 +33,9 @@ export class TenantsComponent implements OnInit {
   public deleteModalVisible = false;
   public detailsModalVisible = false;
 
+  public showAlert = false;
+  public errorMessage = '';
+
   tenantForm: FormGroup;
   tenantFormUpdate: FormGroup;
   selectedTenant: any;
@@ -108,21 +111,35 @@ export class TenantsComponent implements OnInit {
 
   createTenant(): void {
     if (this.tenantForm.valid) {
-      this.tenantsService.assertTenant(this.tenantForm.value).subscribe(() => {
-        this.createModalVisible = false;
-        this.loadTenants();
+      this.tenantsService.assertTenant(this.tenantForm.value).subscribe({
+        next: () => {
+          this.createModalVisible = false;
+          this.loadTenants();
+          this.showAlert = false;
+        },
+        error: (error) => {
+          this.showAlert = true;
+          this.errorMessage = error.error.error;
+        }
       });
     }
   }
-updateTenant(): void {
-  if (this.tenantFormUpdate.valid) {
-    const tenantData = this.tenantFormUpdate.getRawValue();
-    this.tenantsService.assertTenant(tenantData).subscribe(() => {
-      this.editModalVisible = false;
-      this.loadTenants();
-    });
+  updateTenant(): void {
+    if (this.tenantFormUpdate.valid) {
+      const tenantData = this.tenantFormUpdate.getRawValue();
+      this.tenantsService.assertTenant(tenantData).subscribe({
+        next: () => {
+          this.editModalVisible = false;
+          this.loadTenants();
+          this.showAlert = false;
+        },
+        error: (error) => {
+          this.showAlert = true;
+          this.errorMessage = error.error.error;
+        }
+      });
+    }
   }
-}
 
   deleteTenant(): void {
     this.tenantsService.deleteTenant(this.selectedTenant.ID).subscribe(() => {

@@ -34,20 +34,21 @@
 </c-card>
 
 <!-- Create Tenant Modal -->
-<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event">
+<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" (keydown.enter)="createTenant()">
   <c-modal-header>
     <h5 cModalTitle>Create Tenant</h5>
     <button (click)="createModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
     <form [formGroup]="tenantForm">
-      <c-row class="mb-3">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col>
           <label cLabel for="name">Name</label>
           <input cFormControl id="name" formControlName="name" />
         </c-col>
       </c-row>
-      <c-row class="mb-3">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col>
           <label cLabel for="code">Code</label>
           <input cFormControl id="code" formControlName="code" />
@@ -64,20 +65,21 @@
 </c-modal>
 
 <!-- Edit Tenant Modal -->
-<c-modal id="editModal" [visible]="editModalVisible" (visibleChange)="editModalVisible = $event">
+<c-modal id="editModal" [visible]="editModalVisible" (visibleChange)="editModalVisible = $event" (keydown.enter)="updateTenant()">
   <c-modal-header>
     <h5 cModalTitle>Edit Tenant</h5>
     <button (click)="editModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
     <form [formGroup]="tenantFormUpdate">
-      <c-row class="mb-3">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col>
           <label cLabel for="name">Name</label>
           <input cFormControl id="name-update" formControlName="name" />
         </c-col>
       </c-row>
-      <c-row class="mb-3">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col>
           <label cLabel for="code">Code</label>
           <input cFormControl id="code-update" formControlName="code" [disabled]="true"/>
