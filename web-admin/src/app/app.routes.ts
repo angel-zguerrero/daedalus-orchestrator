@@ -49,20 +49,5 @@ export const routes: Routes = [
       title: 'Login Page'
     }
   },
-  {
-    path: 'register',
-    loadComponent: () => import('./views/pages/register/register.component').then(m => m.RegisterComponent),
-    data: {
-      title: 'Register Page'
-    }
-  },
-  // The 'pages' route that was previously a child of DefaultLayoutComponent seems to define
-  // login, register, 404, 500. These are typically standalone.
-  // If there's a separate '/pages' path that needs to exist and be protected, it should be defined within the guarded DefaultLayoutComponent.
-  // For now, I am assuming the individual page routes (login, register, 404, 500) are sufficient as top-level.
-  {
-    path: 'pages', // This path seems to be for non-auth pages based on its typical content
-    loadChildren: () => import('./views/pages/routes').then((m) => m.routes)
-  },
   { path: '**', redirectTo: 'dashboard' } // If not logged in, guard on 'dashboard' (via DefaultLayout) will redirect to login.
 ];
