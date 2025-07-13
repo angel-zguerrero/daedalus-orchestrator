@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TenantService_GetTenantInfo_FullMethodName = "/tenant.TenantService/GetTenantInfo"
-	TenantService_AssertTenant_FullMethodName  = "/tenant.TenantService/AssertTenant"
-	TenantService_DeleteTenant_FullMethodName  = "/tenant.TenantService/DeleteTenant"
-	TenantService_GetTenants_FullMethodName    = "/tenant.TenantService/GetTenants"
+	TenantService_GetTenantInfo_FullMethodName    = "/tenant.TenantService/GetTenantInfo"
+	TenantService_AssertTenant_FullMethodName     = "/tenant.TenantService/AssertTenant"
+	TenantService_AssertBulkTenant_FullMethodName = "/tenant.TenantService/AssertBulkTenant"
+	TenantService_DeleteTenant_FullMethodName     = "/tenant.TenantService/DeleteTenant"
+	TenantService_GetTenants_FullMethodName       = "/tenant.TenantService/GetTenants"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -31,6 +32,7 @@ const (
 type TenantServiceClient interface {
 	GetTenantInfo(ctx context.Context, in *TenantInfoRequest, opts ...grpc.CallOption) (*TenantInfoResponse, error)
 	AssertTenant(ctx context.Context, in *AssertTenantRequest, opts ...grpc.CallOption) (*AssertTenantResponse, error)
+	AssertBulkTenant(ctx context.Context, in *AssertBulkTenantRequest, opts ...grpc.CallOption) (*AssertBulkTenantResponse, error)
 	DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*DeleteTenantResponse, error)
 	GetTenants(ctx context.Context, in *GetTenantsRequest, opts ...grpc.CallOption) (*GetTenantsResponse, error)
 }
@@ -63,6 +65,16 @@ func (c *tenantServiceClient) AssertTenant(ctx context.Context, in *AssertTenant
 	return out, nil
 }
 
+func (c *tenantServiceClient) AssertBulkTenant(ctx context.Context, in *AssertBulkTenantRequest, opts ...grpc.CallOption) (*AssertBulkTenantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssertBulkTenantResponse)
+	err := c.cc.Invoke(ctx, TenantService_AssertBulkTenant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *tenantServiceClient) DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*DeleteTenantResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteTenantResponse)
@@ -89,6 +101,7 @@ func (c *tenantServiceClient) GetTenants(ctx context.Context, in *GetTenantsRequ
 type TenantServiceServer interface {
 	GetTenantInfo(context.Context, *TenantInfoRequest) (*TenantInfoResponse, error)
 	AssertTenant(context.Context, *AssertTenantRequest) (*AssertTenantResponse, error)
+	AssertBulkTenant(context.Context, *AssertBulkTenantRequest) (*AssertBulkTenantResponse, error)
 	DeleteTenant(context.Context, *DeleteTenantRequest) (*DeleteTenantResponse, error)
 	GetTenants(context.Context, *GetTenantsRequest) (*GetTenantsResponse, error)
 	mustEmbedUnimplementedTenantServiceServer()
@@ -106,6 +119,9 @@ func (UnimplementedTenantServiceServer) GetTenantInfo(context.Context, *TenantIn
 }
 func (UnimplementedTenantServiceServer) AssertTenant(context.Context, *AssertTenantRequest) (*AssertTenantResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AssertTenant not implemented")
+}
+func (UnimplementedTenantServiceServer) AssertBulkTenant(context.Context, *AssertBulkTenantRequest) (*AssertBulkTenantResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AssertBulkTenant not implemented")
 }
 func (UnimplementedTenantServiceServer) DeleteTenant(context.Context, *DeleteTenantRequest) (*DeleteTenantResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteTenant not implemented")
@@ -170,6 +186,24 @@ func _TenantService_AssertTenant_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_AssertBulkTenant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssertBulkTenantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).AssertBulkTenant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_AssertBulkTenant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).AssertBulkTenant(ctx, req.(*AssertBulkTenantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _TenantService_DeleteTenant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteTenantRequest)
 	if err := dec(in); err != nil {
@@ -220,6 +254,10 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AssertTenant",
 			Handler:    _TenantService_AssertTenant_Handler,
+		},
+		{
+			MethodName: "AssertBulkTenant",
+			Handler:    _TenantService_AssertBulkTenant_Handler,
 		},
 		{
 			MethodName: "DeleteTenant",

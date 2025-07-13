@@ -8,6 +8,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
+	"deadalus-orch/shared/models"
 )
 
 type TenantService struct {
@@ -42,6 +43,42 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
 			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
 		},
+	}, nil
+}
+
+func (s *TenantService) AssertBulkTenant(ctx context.Context, r *pb.AssertBulkTenantRequest) (*pb.AssertBulkTenantResponse, error) {
+
+	tenants := []*models.TenantInMaster{}
+	for _, t := range r.Tenants {
+		tenant := &models.TenantInMaster{
+			Code: t.Code,
+			Name: t.Name,
+		}
+		tenants = append(tenants, tenant)
+	}
+
+	tenantsInMaster, err := s.TenantBO.BulkCreateTenant(ctx, tenants)
+	if err != nil {
+		return nil, err
+	}
+
+	rTenants := []*pb.Tenant{}
+	for _, t := range tenantsInMaster {
+		tt := &pb.Tenant{
+			ID:        t.ID,
+			Name:      t.Name,
+			ShardId:   int64(t.ShardId),
+			Code:      t.Code,
+			Status:    string(t.Status),
+			CreatedAt: t.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: t.UpdatedAt.Format(time.RFC3339),
+		}
+		rTenants = append(rTenants, tt)
+	}
+
+	return &pb.AssertBulkTenantResponse{
+		Message: "Tenant was asserted",
+		Result:  rTenants,
 	}, nil
 }
 

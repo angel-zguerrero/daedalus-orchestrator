@@ -5,6 +5,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
+	"fmt"
 
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
@@ -154,6 +155,25 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 
 	bo.Config.Logger.Info().Str("code", code).Msg("tenant asserted successfully")
 	return tenantInMaster, nil
+}
+
+func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.TenantInMaster) ([]models.TenantInMaster, error) {
+	var createdTenants []models.TenantInMaster
+
+	for _, tenant := range tenants {
+		created, err := bo.CreateTenant(ctx, tenant.Code, tenant.Name)
+		if err != nil {
+			bo.Config.Logger.Error().
+				Err(err).
+				Str("Code", tenant.Code).
+				Msg("Failed to create tenant during bulk operation")
+
+			return nil, fmt.Errorf("failed to create tenant %s: %w", tenant.Code, err)
+		}
+		createdTenants = append(createdTenants, created)
+	}
+
+	return createdTenants, nil
 }
 
 func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.TenantInMaster, *dragonboat.RaftNode, *db4.NodeHostInfo, error) {
