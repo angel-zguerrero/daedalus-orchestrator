@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	db4 "github.com/lni/dragonboat/v4"
 )
 
 type TenantController struct {
@@ -54,7 +53,7 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 // GetTenantHandler handles GET /admin-api/tenants/:id
 func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 	tenantID := c.Param("id")
-	tenantInMaster, nodeHostInfo, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenantInMaster, node, nodeHostInfo, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -70,9 +69,9 @@ func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 			"message": "Tenant",
 			"result":  tenantInMaster,
 			"node": gin.H{
-				"SelfMember":   nodeHostInfo.NodeID,
-				"ShardID":      nodeHostInfo.ShardInfo[0].ShardID,
-				"Roles":        "unknown",
+				"SelfMember":   node.SelfMember,
+				"ShardID":      node.ShardID,
+				"Roles":        node.Roles,
 				"NodeHostInfo": nodeHostInfo,
 			},
 		})

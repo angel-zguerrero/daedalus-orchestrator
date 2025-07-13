@@ -7,7 +7,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
-	"deadalus-orch/shared/models"
 )
 
 type TenantService struct {
@@ -43,7 +42,7 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 }
 
 func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoRequest) (*pb.TenantInfoResponse, error) {
-	tenantInMaster, _, err := s.TenantBO.GetTenant(ctx, r.ID)
+	tenantInMaster, _, _, err := s.TenantBO.GetTenant(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}

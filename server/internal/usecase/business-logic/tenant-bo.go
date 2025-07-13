@@ -154,7 +154,7 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 	return tenantInMaster, nil
 }
 
-func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.TenantInMaster, *db4.NodeHostInfo, error) {
+func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.TenantInMaster, *dragonboat.RaftNode, *db4.NodeHostInfo, error) {
 	findTenantCommand := &commands.FindTenantCommand{
 		TenantID: tenantID,
 	}
@@ -171,10 +171,10 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.Tena
 	result, err := bo.Config.MasterNode.Read(readCtx, *queryCommand)
 	if err != nil {
 		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
-			return models.TenantInMaster{}, nil, errors.New("Tenant not found")
+			return models.TenantInMaster{}, nil, nil, errors.New("Tenant not found")
 		}
 		bo.Config.Logger.Error().Err(err).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, errors.New("Find tenants command failed: " + err.Error())
+		return models.TenantInMaster{}, nil, nil, errors.New("Find tenants command failed: " + err.Error())
 	}
 
 	buf := bytes.NewBuffer(result.([]byte))
@@ -182,29 +182,29 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.Tena
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
 		bo.Config.Logger.Error().Err(err).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, errors.New("Find tenants command failed")
+		return models.TenantInMaster{}, nil, nil, errors.New("Find tenants command failed")
 	}
 
 	if parsedResult.Error != "" {
 		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, errors.New("Find tenants command failed")
+		return models.TenantInMaster{}, nil, nil, errors.New("Find tenants command failed")
 	}
 
 	if parsedResult.Result == nil {
 		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, errors.New("Tenant not found")
+		return models.TenantInMaster{}, nil, nil, errors.New("Tenant not found")
 	}
 
 	tenantInMaster := parsedResult.Result.(models.TenantInMaster)
 	node := bo.Config.TenantNodesDictionary[tenantInMaster.ID]
 
 	if node == nil {
-		return tenantInMaster, nil, nil
+		return tenantInMaster, nil, nil, nil
 	}
 
 	nodeHostInfoOption := &db4.NodeHostInfoOption{SkipLogInfo: true}
 	nodeHostInfo := node.NH.GetNodeHostInfo(*nodeHostInfoOption)
-	return tenantInMaster, nodeHostInfo, nil
+	return tenantInMaster, node, nodeHostInfo, nil
 }
 
 func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
