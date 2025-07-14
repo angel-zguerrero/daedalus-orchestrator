@@ -111,15 +111,16 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 		return nil, fmt.Errorf("bulk tenant creation failed: %s", parsedResult.Error)
 	}
 
-	// Parseamos el resultado
 	created := parsedResult.Result.([]models.TenantInMaster)
+
+	// Crear ColumnFamilies y recolectar códigos
+	var tenantCodes []string
 	for i := range created {
 		tenantNode := bo.SetTenantNode(created[i].ShardId, created[i].ID)
 		if tenantNode == nil {
 			return nil, fmt.Errorf("tenant node not found for ID %s", created[i].ID)
 		}
 
-		// Crear ColumnFamily
 		ccfCmd := general_command.FSM_Command{
 			Now:  utils.GetNowInInt(),
 			Type: general_command.REPOSITORY_COMMAND,
@@ -137,30 +138,33 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 			return nil, fmt.Errorf("error during column family creation for tenant %s: %v %s", created[i].ID, err, parsedResult.Error)
 		}
 
-		// Asignar a shard
-		assignCmd := &tenant_command.AssignToShardTenantInMasterCommand{TenantCode: created[i].Code}
-		atstCmd := general_command.FSM_Command{
-			Now:  utils.GetNowInInt(),
-			Type: general_command.REPOSITORY_COMMAND,
-			CMD:  assignCmd,
-		}
+		tenantCodes = append(tenantCodes, created[i].Code)
+	}
 
-		result, err = bo.Config.MasterNode.Write(writeCtx, atstCmd)
-		if err != nil {
-			return nil, fmt.Errorf("failed to assign tenant %s to shard: %w", created[i].Code, err)
-		}
+	// Asignar todos los tenants a shard en un solo comando
+	assignCmd := &tenant_command.AssignToShardTenantInMasterCommand{TenantCodes: tenantCodes}
+	atstCmd := general_command.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: general_command.REPOSITORY_COMMAND,
+		CMD:  assignCmd,
+	}
 
-		buf = bytes.NewBuffer(result.Data)
-		dec = gob.NewDecoder(buf)
-		if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
-			return nil, fmt.Errorf("error during shard assignment for tenant %s: %v %s", created[i].Code, err, parsedResult.Error)
-		}
+	result, err = bo.Config.MasterNode.Write(writeCtx, atstCmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to assign tenants to shard: %w", err)
+	}
 
-		if parsedResult.Result.(bool) {
+	buf = bytes.NewBuffer(result.Data)
+	dec = gob.NewDecoder(buf)
+	if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
+		return nil, fmt.Errorf("error during shard assignment for tenants: %v %s", err, parsedResult.Error)
+	}
+
+	if parsedResult.Result.(bool) {
+		for i := range created {
 			created[i].Status = models.Assigned
+			bo.Config.Logger.Info().Str("code", created[i].Code).Msg("tenant asserted successfully")
 		}
-
-		bo.Config.Logger.Info().Str("code", created[i].Code).Msg("tenant asserted successfully")
 	}
 
 	return created, nil
