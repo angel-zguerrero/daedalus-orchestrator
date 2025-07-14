@@ -51,13 +51,41 @@ func (bo *TenantBO) SetTenantNode(shardID int, tenantId string) *dragonboat.Raft
 	bo.Config.TenantNodesLock.Unlock()
 	return tenant
 }
-
 func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models.TenantInMaster, error) {
-	createTenantInMasterCommand := &tenant_command.CreateTenantInMasterCommand{
-		TenantId:   strings.ReplaceAll(uuid.New().String(), "-", ""),
-		TenantCode: code,
-		TenantName: name,
+	tenant := &models.TenantInMaster{
+		ID:   strings.ReplaceAll(uuid.New().String(), "-", ""),
+		Code: code,
+		Name: name,
 	}
+
+	createdList, err := bo.BulkCreateTenant(ctx, []*models.TenantInMaster{tenant})
+	if err != nil {
+		return models.TenantInMaster{}, err
+	}
+	return createdList[0], nil
+}
+
+func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.TenantInMaster) ([]models.TenantInMaster, error) {
+	if len(tenants) == 0 {
+		return nil, errors.New("no tenants provided")
+	}
+
+	// Asegurar IDs válidos
+	for _, t := range tenants {
+		if t.ID == "" {
+			t.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
+		}
+	}
+
+	createTenantInMasterCommand := &tenant_command.CreateTenantInMasterCommand{
+		Tenants: make([]models.TenantInMaster, len(tenants)),
+	}
+	for i, t := range tenants {
+		createTenantInMasterCommand.Tenants[i] = *t
+	}
+
+	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(tenants)))
+	defer writeCancel()
 
 	fsmCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
@@ -65,115 +93,77 @@ func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models
 		CMD:  createTenantInMasterCommand,
 	}
 
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
 	result, err := bo.Config.MasterNode.Write(writeCtx, fsmCmd)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Msg("Failed to create new tenant")
-		return models.TenantInMaster{}, errors.New("Failed to create new tenant: " + err.Error())
+		bo.Config.Logger.Error().Err(err).Msg("Failed to create tenants (bulk)")
+		return nil, fmt.Errorf("failed to create tenants (bulk): %w", err)
 	}
 
 	buf := bytes.NewBuffer(result.Data)
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Msg("Tenant creation command returned unexpected result type")
-		return models.TenantInMaster{}, errors.New("Tenant creation command returned unexpected error")
+		bo.Config.Logger.Error().Err(err).Msg("Bulk tenant creation command returned unexpected result type")
+		return nil, fmt.Errorf("bulk tenant creation command returned decode error: %w", err)
 	}
 
 	if parsedResult.Error != "" {
-		return models.TenantInMaster{}, errors.New("Failed to create new tenant error: " + parsedResult.Error)
+		return nil, fmt.Errorf("bulk tenant creation failed: %s", parsedResult.Error)
 	}
 
-	tenantInMaster := parsedResult.Result.(models.TenantInMaster)
-	tenantNode := bo.SetTenantNode(tenantInMaster.ShardId, tenantInMaster.ID)
-
-	if tenantNode == nil {
-		return models.TenantInMaster{}, errors.New("Tenant node not found")
-	}
-
-	createColumnFamilyCommand := &general_command.CreateColumnFamilyCommand{
-		Name: tenantInMaster.ID,
-	}
-
-	ccfCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  createColumnFamilyCommand,
-	}
-
-	result, err = tenantNode.Write(writeCtx, ccfCmd)
-	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Msg("Failed to create new tenant")
-		return models.TenantInMaster{}, errors.New("Failed to create new tenant: " + err.Error())
-	}
-
-	buf = bytes.NewBuffer(result.Data)
-	dec = gob.NewDecoder(buf)
-
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Msg("Tenant creation command returned unexpected result type")
-		return models.TenantInMaster{}, errors.New("Tenant creation command returned unexpected error")
-	}
-
-	if parsedResult.Error != "" {
-		return models.TenantInMaster{}, errors.New("Failed to create new tenant error: " + parsedResult.Error)
-	}
-
-	assignToShardTenantInMasterCommand := &tenant_command.AssignToShardTenantInMasterCommand{
-		TenantCode: code,
-	}
-
-	atstCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  assignToShardTenantInMasterCommand,
-	}
-
-	result, err = bo.Config.MasterNode.Write(writeCtx, atstCmd)
-	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Msg("Failed to create new tenant")
-		return models.TenantInMaster{}, errors.New("Failed to create new tenant: " + err.Error())
-	}
-
-	buf = bytes.NewBuffer(result.Data)
-	dec = gob.NewDecoder(buf)
-
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Msg("Tenant creation command returned unexpected result type")
-		return models.TenantInMaster{}, errors.New("Tenant creation command returned unexpected error")
-	}
-
-	if parsedResult.Error != "" {
-		return models.TenantInMaster{}, errors.New("Failed to create new tenant error: " + parsedResult.Error)
-	}
-
-	if parsedResult.Result.(bool) {
-		tenantInMaster.Status = models.Assigned
-	}
-
-	bo.Config.Logger.Info().Str("code", code).Msg("tenant asserted successfully")
-	return tenantInMaster, nil
-}
-
-func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.TenantInMaster) ([]models.TenantInMaster, error) {
-	var createdTenants []models.TenantInMaster
-
-	for _, tenant := range tenants {
-		created, err := bo.CreateTenant(ctx, tenant.Code, tenant.Name)
-		if err != nil {
-			bo.Config.Logger.Error().
-				Err(err).
-				Str("Code", tenant.Code).
-				Msg("Failed to create tenant during bulk operation")
-
-			return nil, fmt.Errorf("failed to create tenant %s: %w", tenant.Code, err)
+	// Parseamos el resultado
+	created := parsedResult.Result.([]models.TenantInMaster)
+	for i := range created {
+		tenantNode := bo.SetTenantNode(created[i].ShardId, created[i].ID)
+		if tenantNode == nil {
+			return nil, fmt.Errorf("tenant node not found for ID %s", created[i].ID)
 		}
-		createdTenants = append(createdTenants, created)
+
+		// Crear ColumnFamily
+		ccfCmd := general_command.FSM_Command{
+			Now:  utils.GetNowInInt(),
+			Type: general_command.REPOSITORY_COMMAND,
+			CMD:  &general_command.CreateColumnFamilyCommand{Name: created[i].ID},
+		}
+
+		result, err := tenantNode.Write(writeCtx, ccfCmd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create column family for tenant %s: %w", created[i].ID, err)
+		}
+
+		buf := bytes.NewBuffer(result.Data)
+		dec := gob.NewDecoder(buf)
+		if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
+			return nil, fmt.Errorf("error during column family creation for tenant %s: %v %s", created[i].ID, err, parsedResult.Error)
+		}
+
+		// Asignar a shard
+		assignCmd := &tenant_command.AssignToShardTenantInMasterCommand{TenantCode: created[i].Code}
+		atstCmd := general_command.FSM_Command{
+			Now:  utils.GetNowInInt(),
+			Type: general_command.REPOSITORY_COMMAND,
+			CMD:  assignCmd,
+		}
+
+		result, err = bo.Config.MasterNode.Write(writeCtx, atstCmd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign tenant %s to shard: %w", created[i].Code, err)
+		}
+
+		buf = bytes.NewBuffer(result.Data)
+		dec = gob.NewDecoder(buf)
+		if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
+			return nil, fmt.Errorf("error during shard assignment for tenant %s: %v %s", created[i].Code, err, parsedResult.Error)
+		}
+
+		if parsedResult.Result.(bool) {
+			created[i].Status = models.Assigned
+		}
+
+		bo.Config.Logger.Info().Str("code", created[i].Code).Msg("tenant asserted successfully")
 	}
 
-	return createdTenants, nil
+	return created, nil
 }
 
 func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.TenantInMaster, *dragonboat.RaftNode, *db4.NodeHostInfo, error) {
