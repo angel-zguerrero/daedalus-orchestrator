@@ -40,7 +40,6 @@ func (app *Application) StartAssignTenants() {
 		result, err := app.MasterNode.Read(ctx, *queryCommand)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Paginate tenants command failed")
-
 			return
 		}
 
@@ -49,7 +48,6 @@ func (app *Application) StartAssignTenants() {
 		parsedResult := &commands.CommandResult{}
 		if err := dec.Decode(parsedResult); err != nil {
 			log.Fatal().Err(err).Msg("Paginate tenants command failed (decode)")
-
 			return
 		}
 
@@ -59,8 +57,11 @@ func (app *Application) StartAssignTenants() {
 		}
 
 		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
-		writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout) // Or a specific timeout for writes
+		writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
 		defer writeCancel()
+
+		var assignableTenantCodes []string
+
 		for _, tenant := range tenantsResult.Entities {
 			var tenantNode *dragonboat.RaftNode
 			for i := range app.TenantNodes {
@@ -68,6 +69,7 @@ func (app *Application) StartAssignTenants() {
 					tenantNode = app.TenantNodes[i]
 
 					if tenant.Status == models.PendingForAssign {
+						// Crear ColumnFamily antes de asignar
 						createColumnFamilyCommand := &general_command.CreateColumnFamilyCommand{
 							Name: tenant.ID,
 						}
@@ -80,26 +82,10 @@ func (app *Application) StartAssignTenants() {
 
 						result, err = tenantNode.Write(writeCtx, ccfCmd)
 						if err != nil {
-
-							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
-
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to create column family for tenant")
 						}
 
-						assignToShardTenantInMasterCommand := &tenant_command.AssignToShardTenantInMasterCommand{
-							TenantCode: tenant.Code,
-						}
-
-						atstCmd := general_command.FSM_Command{
-							Now:  utils.GetNowInInt(),
-							Type: general_command.REPOSITORY_COMMAND,
-							CMD:  assignToShardTenantInMasterCommand,
-						}
-
-						result, err = app.MasterNode.Write(writeCtx, atstCmd)
-						if err != nil {
-							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to assign tenant")
-
-						}
+						assignableTenantCodes = append(assignableTenantCodes, tenant.Code)
 					}
 
 					if tenant.Status == models.PendingForDeletion {
@@ -140,11 +126,37 @@ func (app *Application) StartAssignTenants() {
 			app.TenantNodesDictionary[tenant.ID] = tenantNode
 		}
 
+		if len(assignableTenantCodes) > 0 {
+			assignCmd := &tenant_command.AssignToShardTenantInMasterCommand{
+				TenantCodes: assignableTenantCodes,
+			}
+
+			atstCmd := general_command.FSM_Command{
+				Now:  utils.GetNowInInt(),
+				Type: general_command.REPOSITORY_COMMAND,
+				CMD:  assignCmd,
+			}
+
+			result, err = app.MasterNode.Write(writeCtx, atstCmd)
+			if err != nil {
+				log.Fatal().Err(err).Strs("Codes", assignableTenantCodes).Msg("Failed to assign tenants to shard")
+			}
+
+			buf = bytes.NewBuffer(result.([]byte))
+			dec = gob.NewDecoder(buf)
+			if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
+				log.Fatal().
+					Strs("Codes", assignableTenantCodes).
+					Err(err).
+					Str("commandError", parsedResult.Error).
+					Msg("Shard assignment failed for one or more tenants")
+			}
+		}
+
 		if tenantsResult.Cursor == "" {
 			break
 		}
 
 		cursor = tenantsResult.Cursor
 	}
-
 }

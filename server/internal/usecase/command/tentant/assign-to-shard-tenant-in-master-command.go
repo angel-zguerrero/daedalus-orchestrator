@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
+	"fmt"
 	"time"
 )
 
@@ -12,41 +13,40 @@ func init() {
 	gob.Register(AssignToShardTenantInMasterCommand{})
 }
 
-// AssignToShardTenantInMasterCommand represents a command to authenticate a user.
+// AssignToShardTenantInMasterCommand represents a command to assign one or more tenants to a shard.
 type AssignToShardTenantInMasterCommand struct {
-	TenantCode string
+	TenantCodes []string
 }
 
 func (cmd *AssignToShardTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
-	tenantInMasterRepo, err := db.NewTenantInMasterRepository(uow, idFactory) // Passing nil for IDGeneratorFactory
+	tenantInMasterRepo, err := db.NewTenantInMasterRepository(uow, idFactory)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
 
-	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantCode(cmd.TenantCode, now)
+	for _, tenantCode := range cmd.TenantCodes {
+		tenantInMaster, err := tenantInMasterRepo.GetTenantInMasterByTenantCode(tenantCode, now)
+		if err != nil {
+			commandResult.Error = fmt.Sprintf("error retrieving tenant '%s': %s", tenantCode, err.Error())
+			return *commandResult
+		}
 
-	if err != nil {
-		commandResult.Error = err.Error()
-		return *commandResult
-	}
+		if tenantInMaster == nil {
+			commandResult.Error = fmt.Sprintf("tenant '%s' not found", tenantCode)
+			return *commandResult
+		}
 
-	if tenantInMasterFound == nil {
-		commandResult.Error = "tenant not found"
-		return *commandResult
-	}
-
-	tenantInMasterFound.Status = models.Assigned
-	_, err = tenantInMasterRepo.UpdateTenantInMaster(tenantInMasterFound, now)
-	if err != nil {
-		commandResult.Error = err.Error()
-		return *commandResult
+		tenantInMaster.Status = models.Assigned
+		if _, err := tenantInMasterRepo.UpdateTenantInMaster(tenantInMaster, now); err != nil {
+			commandResult.Error = fmt.Sprintf("error updating tenant '%s': %s", tenantCode, err.Error())
+			return *commandResult
+		}
 	}
 
 	commandResult.Result = true
-
 	return *commandResult
 }
