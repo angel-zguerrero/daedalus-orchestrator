@@ -10,8 +10,8 @@ export class TenantsService {
 
   constructor(private http: HttpClient) { }
 
-  getTenants(cursor: string = '', pageSize: number = 10): Observable<any> {
-    return this.http.get(`${this.apiUrl}?cursor=${cursor}&pageSize=${pageSize}`);
+  getTenants(cursor: string = '', pageSize: number = 10, q: string = ''): Observable<any> {
+    return this.http.get(`${this.apiUrl}?cursor=${cursor}&pageSize=${pageSize}&q=${q}`);
   }
 
   getTenant(id: string): Observable<any> {

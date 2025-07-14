@@ -30,6 +30,7 @@ export class TenantsComponent implements OnInit {
   cursor = '';
   cursors: string[] = [];
   pageSize = 20;
+  searchQuery = '';
 
   public createModalVisible = false;
   public editModalVisible = false;
@@ -68,7 +69,7 @@ export class TenantsComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
-    this.tenantsService.getTenants(cursor, this.pageSize).subscribe({
+    this.tenantsService.getTenants(cursor, this.pageSize, this.searchQuery).subscribe({
       next: (response) => {
         this.tenants = response.result.Entities;
         this.cursor = response.result.Cursor;
@@ -78,6 +79,11 @@ export class TenantsComponent implements OnInit {
         this.errorMessage = error.error;
       }
     });
+  }
+
+  searchTenants(): void {
+    this.cursors = [''];
+    this.loadTenants();
   }
 
   nextPage(): void {
