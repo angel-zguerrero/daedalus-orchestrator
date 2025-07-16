@@ -31,6 +31,35 @@
         "parallel": false,
         "cwd": "server"
       }
+    },
+     "serve-rocksdb": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "go run -tags rocksdb  cmd/main.go -master-db-engine=rocksdb -tenant-db-engine=rocksdb"
+          }
+        ],
+        "parallel": false,
+        "cwd": "server"
+      }
+    },
+    "serve-rocksdb-admin": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "nx run daedalus-web-admin:build:development"
+          },
+          {
+            "command": "go run -tags rocksdb cmd/main.go -master-db-engine=rocksdb -tenant-db-engine=rocksdb"
+          }
+        ],
+        "parallel": false,
+        "cwd": "server"
+      }
     }
   }
 }
+
+
