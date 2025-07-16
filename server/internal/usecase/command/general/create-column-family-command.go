@@ -13,7 +13,8 @@ func init() {
 
 // CreateTenantInMasterCommand represents a command to authenticate a user.
 type CreateColumnFamilyCommand struct {
-	Name string
+	Name  string
+	IsTTL bool
 }
 
 func (cmd *CreateColumnFamilyCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -32,7 +33,7 @@ func (cmd *CreateColumnFamilyCommand) Execute(uow *db.UnitOfWork, now time.Time)
 		return *commandResult
 	}
 
-	err = kvStore.CreateColumnFamily(cmd.Name, false)
+	err = kvStore.CreateColumnFamily(cmd.Name, cmd.IsTTL)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
