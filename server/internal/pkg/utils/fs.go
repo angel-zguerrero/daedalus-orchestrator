@@ -52,6 +52,26 @@ func DirExists(path string) (bool, error) {
 	return info.IsDir(), nil // Path exists, return whether it's a directory.
 }
 
+// FileExists checks if a given path exists and is a regular file.
+//
+// Parameters:
+//   - path: The path to check.
+//
+// Returns:
+//   - A boolean indicating whether the path exists and is a regular file (true) or not (false).
+//   - An error if os.Stat fails for any reason other than the path not existing.
+//     If the path does not exist, it returns (false, nil).
+func FileExists(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // Path does not exist, so it's not a file.
+		}
+		return false, err // Another error occurred (e.g., permission denied).
+	}
+	return info.Mode().IsRegular(), nil // Path exists, return whether it's a regular file.
+}
+
 // CreateFileWithDirs creates a new file at the specified path.
 // If the directory structure leading to the file does not exist, it creates all necessary directories
 // with 0755 permissions.

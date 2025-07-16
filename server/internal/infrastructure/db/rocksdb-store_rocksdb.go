@@ -7,6 +7,7 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -75,93 +76,92 @@ func CreateRocksdbStore(dbPath string,
 //     or if there's an issue listing or creating column families.
 func OpenRocksDB(
 	dbPath string,
-	columnFamilyNames []string,
-	ttlColumnFamilyNames []string,
+	extraNormalCF []string,
+	extraTTLCF []string,
 ) (*grocksdb.DB, map[string]*grocksdb.ColumnFamilyHandle, map[string]*grocksdb.ColumnFamilyHandle, error) {
 
 	log.Info().
 		Str("dbPath", dbPath).
-		Msg("🗄️  Opening index db")
-
-	// Validar duplicados dentro de cada lista
-	if utils.HasDuplicates(columnFamilyNames) {
-		return nil, nil, nil, fmt.Errorf("duplicated names in columnFamilyNames")
-	}
-	if utils.HasDuplicates(ttlColumnFamilyNames) {
-		return nil, nil, nil, fmt.Errorf("duplicated names in ttlColumnFamilyNames")
-	}
-
-	nameSet := make(map[string]struct{})
-	for _, name := range columnFamilyNames {
-		nameSet[name] = struct{}{}
-	}
-	for _, name := range ttlColumnFamilyNames {
-		if _, exists := nameSet[name]; exists {
-			return nil, nil, nil, fmt.Errorf("column family name '%s' exists in both normal and TTL sets", name)
-		}
-	}
+		Msg("🗄️  Opening RocksDB")
 
 	opts := grocksdb.NewDefaultOptions()
 	opts.SetCreateIfMissing(true)
-	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)
 	opts.SetCreateIfMissingColumnFamilies(true)
+	opts.SetInfoLogLevel(grocksdb.WarnInfoLogLevel)
 
-	var err error
-	var currentColumnFamilies []string
-	uniqueCF := make(map[string]struct{})
+	existingCFs := make(map[string]struct{})
+	allCFs := make(map[string]struct{})
+	explicitNormalSet := make(map[string]struct{})
+	explicitTTLSet := make(map[string]struct{})
 
-	if exists, _ := utils.DirExists(filepath.Join(dbPath, "CURRENT")); exists {
-		currentColumnFamilies, err = grocksdb.ListColumnFamilies(opts, dbPath)
+	// Paso 1: Detectar si la base ya existe
+	dbExists, _ := utils.FileExists(filepath.Join(dbPath, "CURRENT"))
+	if dbExists {
+		names, err := grocksdb.ListColumnFamilies(opts, dbPath)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, fmt.Errorf("error listing column families: %w", err)
 		}
-		for _, cf := range currentColumnFamilies {
-			uniqueCF[cf] = struct{}{}
+		for _, name := range names {
+			existingCFs[name] = struct{}{}
+			allCFs[name] = struct{}{}
 		}
 	}
 
-	for _, cf := range columnFamilyNames {
-		uniqueCF[cf] = struct{}{}
+	// Paso 2: Agregar CFs explícitas por parámetro
+	for _, name := range extraNormalCF {
+		allCFs[name] = struct{}{}
+		explicitNormalSet[name] = struct{}{}
 	}
-	for _, cf := range ttlColumnFamilyNames {
-		uniqueCF[cf] = struct{}{}
-	}
-
-	var allCFs []string
-	for cf := range uniqueCF {
-		allCFs = append(allCFs, cf)
+	for _, name := range extraTTLCF {
+		allCFs[name] = struct{}{}
+		explicitTTLSet[name] = struct{}{}
 	}
 
-	cfSet := make(map[string]struct{}, len(allCFs))
-	for _, name := range allCFs {
-		cfSet[name] = struct{}{}
+	// Paso 3: Asegurar que default y meta estén siempre
+	if _, ok := allCFs[DefaultFC]; !ok {
+		allCFs[DefaultFC] = struct{}{}
+	}
+	if _, ok := allCFs[MetaFC]; !ok {
+		allCFs[MetaFC] = struct{}{}
 	}
 
-	if _, ok := cfSet[DefaultFC]; !ok {
-		allCFs = append(allCFs, DefaultFC)
+	// Paso 4: Ordenar los CFs para consistencia
+	var cfNames []string
+	for name := range allCFs {
+		cfNames = append(cfNames, name)
 	}
-	if _, ok := cfSet[MetaFC]; !ok {
-		allCFs = append(allCFs, MetaFC)
-	}
+	slices.Sort(cfNames) // Usa sort.Strings(cfNames) si prefieres compatibilidad total
 
-	cfOpts := make([]*grocksdb.Options, len(allCFs))
-	for i := range allCFs {
+	// Paso 5: Crear opciones por CF
+	cfOpts := make([]*grocksdb.Options, len(cfNames))
+	for i := range cfNames {
 		cfOpts[i] = grocksdb.NewDefaultOptions()
 		defer cfOpts[i].Destroy()
 	}
-	db, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, allCFs, cfOpts)
+
+	// Paso 6: Abrir DB
+	db, cfHandles, err := grocksdb.OpenDbColumnFamilies(opts, dbPath, cfNames, cfOpts)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error opening database: %v", err)
+		return nil, nil, nil, fmt.Errorf("error opening RocksDB: %w", err)
 	}
 
+	// Paso 7: Clasificar handles
 	normalCFHandles := make(map[string]*grocksdb.ColumnFamilyHandle)
 	ttlCFHandles := make(map[string]*grocksdb.ColumnFamilyHandle)
 
-	for i, name := range allCFs {
-		handle := cfHs[i]
-		if utils.Contains(ttlColumnFamilyNames, name) {
+	for i, name := range cfNames {
+		handle := cfHandles[i]
+
+		if _, ok := explicitTTLSet[name]; ok {
 			ttlCFHandles[name] = handle
+		} else if _, ok := explicitNormalSet[name]; ok {
+			normalCFHandles[name] = handle
+		} else if strings.HasPrefix(name, "cf-ttl-") {
+			ttlCFHandles[name] = handle
+		} else if strings.HasPrefix(name, "cf-n-") || name == DefaultFC || name == MetaFC {
+			normalCFHandles[name] = handle
 		} else {
+			log.Warn().Str("name", name).Msg("🔶 Column family with unknown prefix or classification — assigning as normal")
 			normalCFHandles[name] = handle
 		}
 	}
@@ -804,6 +804,7 @@ func (r *RocksdbStore) Close() error {
 // Parameters:
 //   - columnFamilyName: The name of the column family to create.
 //   - isTtl: A boolean indicating whether the new column family should be a TTL column family.
+//
 // Returns:
 //   - An error if the column family already exists or if any RocksDB error occurs.
 func (r *RocksdbStore) CreateColumnFamily(columnFamilyName string, isTtl bool) error {
@@ -831,6 +832,7 @@ func (r *RocksdbStore) CreateColumnFamily(columnFamilyName string, isTtl bool) e
 // DeleteColumnFamily deletes a column family from the RocksDB store.
 // Parameters:
 //   - columnFamilyName: The name of the column family to delete.
+//
 // Returns:
 //   - An error if the column family does not exist or if any RocksDB error occurs.
 func (r *RocksdbStore) DeleteColumnFamily(columnFamilyName string) error {
@@ -858,6 +860,7 @@ func (r *RocksdbStore) DeleteColumnFamily(columnFamilyName string) error {
 // ExistsColumnFamily checks if a column family exists in the RocksDB store.
 // Parameters:
 //   - columnFamilyName: The name of the column family to check.
+//
 // Returns:
 //   - A boolean indicating whether the column family exists.
 //   - A boolean indicating whether it is a TTL column family.

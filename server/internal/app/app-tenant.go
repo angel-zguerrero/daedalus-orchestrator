@@ -69,9 +69,10 @@ func (app *Application) StartAssignTenants() {
 					tenantNode = app.TenantNodes[i]
 
 					if tenant.Status == models.PendingForAssign {
-						// Crear ColumnFamily antes de asignar
+
 						createColumnFamilyCommand := &general_command.CreateColumnFamilyCommand{
-							Name: tenant.ID,
+							Name:  "cf-n-" + tenant.ID,
+							IsTTL: false,
 						}
 
 						ccfCmd := general_command.FSM_Command{
@@ -83,6 +84,22 @@ func (app *Application) StartAssignTenants() {
 						result, err = tenantNode.Write(writeCtx, ccfCmd)
 						if err != nil {
 							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to create column family for tenant")
+						}
+
+						createColumnFamilyCommandTtl := &general_command.CreateColumnFamilyCommand{
+							Name:  "cf-ttl-" + tenant.ID,
+							IsTTL: false,
+						}
+
+						ccfCmdTtl := general_command.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: general_command.REPOSITORY_COMMAND,
+							CMD:  createColumnFamilyCommandTtl,
+						}
+
+						result, err = tenantNode.Write(writeCtx, ccfCmdTtl)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to create column family ttl for tenant")
 						}
 
 						assignableTenantCodes = append(assignableTenantCodes, tenant.Code)
