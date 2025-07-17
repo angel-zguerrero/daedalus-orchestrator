@@ -56,8 +56,8 @@ const ConfigRestAPIJWTSecretKey = "rest_api_jwt_secret"
 // ConfigAPIRaftTimeoutKey is the key for the API Raft timeout setting in the configuration file (in seconds).
 const ConfigAPIRaftTimeoutKey = "api_raft_timeout"
 
-// ConfigMaxTenantsKey is the key for the maximum number of tenants setting in the configuration file.
-const ConfigMaxTenantsKey = "max_tenants"
+// ConfigMaxShardsKey is the key for the maximum number of shards setting in the configuration file.
+const ConfigMaxShardsKey = "max_shards"
 
 // ConfigGrpcServerListenAddrHostKey is the key for the gRPC server listen host setting in the configuration file.
 const ConfigGrpcServerListenAddrHostKey = "grpc_server_listen_addr_host"
@@ -128,8 +128,8 @@ const EnvVarRestAPIJWTSecret = "REST_API_JWT_SECRET"
 // EnvVarAPIRaftTimeout is the environment variable name for the API Raft timeout (e.g., "5s", "1m").
 const EnvVarAPIRaftTimeout = "API_RAFT_TIMEOUT"
 
-// EnvVarMaxTenants is the environment variable name for the maximum number of tenants.
-const EnvVarMaxTenants = "MAX_TENANTS"
+// EnvVarMaxShards is the environment variable name for the maximum number of shards.
+const EnvVarMaxShards = "MAX_SHARDS"
 
 // EnvVarGrpcServerListenAddrHost is the environment variable name for the gRPC server listen host.
 const EnvVarGrpcServerListenAddrHost = "GRPC_SERVER_LISTEN_ADDR_HOST"
@@ -178,8 +178,8 @@ const MasterDBEngineFlagName = "master-db-engine"
 // TenantDBEngineFlagName is the command-line flag name for the tenant database engine.
 const TenantDBEngineFlagName = "tenant-db-engine"
 
-// MaxTenantsFlagName is the command-line flag name for the maximum number of tenants.
-const MaxTenantsFlagName = "max-tenants"
+// MaxShardsFlagName is the command-line flag name for the maximum number of shards.
+const MaxShardsFlagName = "max-shards"
 
 // SelfMemberHostFlagName is the command-line flag name for the self member host.
 const SelfMemberHostFlagName = "self-member-host"

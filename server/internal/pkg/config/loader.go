@@ -35,7 +35,7 @@ Available Flags:
   --rest-host                 Host address for the Rest API. Overrides config file and environment variable.
   --rest-port                 Port for the Rest API. Overrides config file and environment variable.
   --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
-  --max-tenants                Maximum number of tenants (default 10, max 10000). Overrides config file and environment variable.
+  --max-shards                Maximum number of shards (default 10, max 10000). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
   --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
 
@@ -59,7 +59,7 @@ Environment Variables:
   REST_LISTEN_ADDR_PORT       Port for the Rest API. (Corresponds to ` + constants.EnvVarRestListenAddrPort + `)
   REST_API_JWT_SECRET         JWT secret key for the Rest API. (Corresponds to ` + constants.EnvVarRestAPIJWTSecret + `)
   API_RAFT_TIMEOUT             Timeout for API to Raft node requests (e.g., "5s", "1m"). (Corresponds to ` + constants.EnvVarAPIRaftTimeout + `)
-  MAX_TENANTS                  Maximum number of tenants. (Corresponds to ` + constants.EnvVarMaxTenants + `)
+  MAX_SHARDS                  Maximum number of shards. (Corresponds to ` + constants.EnvVarMaxShards + `)
   GRPC_SERVER_LISTEN_ADDR_HOST Host address for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrHost + `)
   GRPC_SERVER_LISTEN_ADDR_PORT Port for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrPort + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
@@ -89,7 +89,7 @@ Configuration File:
     rest_api_jwt_secret
     api_raft_timeout               Timeout for API to Raft node requests in seconds (e.g., 5 for 5s).
     tenant_port_range              Tenant port range (e.g., "4000-4100").
-    max_tenants                    Maximum number of tenants.
+    max_shards                    Maximum number of shards.
     grpc_server_listen_addr_host   Host address for the gRPC server.
     grpc_server_listen_addr_port   Port for the gRPC server.
 
@@ -147,14 +147,14 @@ var RestListenAddrPortFlag = flag.Int("rest-port", 0, "Port for the Rest API. Ov
 // ApiRaftTimeoutFlag defines the --api-raft-timeout command-line flag for specifying the API to Raft node request timeout.
 var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 5*time.Second, "Timeout for API to Raft node requests (e.g., 5s, 1m). Overrides config file and environment variable.")
 
-// MaxTenantsFlag defines the --max-tenants command-line flag.
-var MaxTenantsFlag = flag.Int(
-	constants.MaxTenantsFlagName,
+// MaxShardsFlag defines the --max-shards command-line flag.
+var MaxShardsFlag = flag.Int(
+	constants.MaxShardsFlagName,
 	0,
 	fmt.Sprintf(
-		"Maximum number of tenants (default: 10, max: %d in production, %d in non-production environments).",
-		constants.MaxTenantsInProduction,
-		constants.MaxTenantsInNonProduction,
+		"Maximum number of shards (default: 10, max: %d in production, %d in non-production environments).",
+		constants.MaxShardsInProduction,
+		constants.MaxShardsInNonProduction,
 	),
 )
 
@@ -337,13 +337,13 @@ func LoadDefaultConfiguration() error {
 		config.ApiRaftTimeout = apiRaftTimeout
 	}
 
-	// MaxTenants from environment variable
-	if envVal := os.Getenv(constants.EnvVarMaxTenants); envVal != "" {
-		maxTenants, err := strconv.Atoi(envVal)
+	// MaxShards from environment variable
+	if envVal := os.Getenv(constants.EnvVarMaxShards); envVal != "" {
+		maxShards, err := strconv.Atoi(envVal)
 		if err != nil {
-			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarMaxTenants, err)
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarMaxShards, err)
 		}
-		config.MaxTenants = maxTenants
+		config.MaxShards = maxShards
 	}
 
 	if envVal := os.Getenv(constants.EnvVarGrpcServerListenAddrHost); envVal != "" {
@@ -413,8 +413,8 @@ func LoadDefaultConfiguration() error {
 	// Assign flag value (user-set, or flag's own default e.g. 5s). This overrides env/file.
 	config.ApiRaftTimeout = *ApiRaftTimeoutFlag
 
-	if *MaxTenantsFlag != 0 {
-		config.MaxTenants = *MaxTenantsFlag
+	if *MaxShardsFlag != 0 {
+		config.MaxShards = *MaxShardsFlag
 	}
 
 	if *GrpcServerListenAddrHostFlag != "" {
@@ -500,25 +500,25 @@ func LoadDefaultConfiguration() error {
 		config.InitialMembers = fmt.Sprintf("%s:r%d", config.SelfMemberHost, config.ReplicaID)
 	}
 
-	// Apply default for MaxTenants if not set by any source
-	if config.MaxTenants == 0 {
-		config.MaxTenants = constants.MaxTenantsInNonProduction
-		log.Info().Msgf("Max tenants not specified, defaulting to %d", config.MaxTenants)
+	// Apply default for MaxShards if not set by any source
+	if config.MaxShards == 0 {
+		config.MaxShards = constants.MaxShardsInNonProduction
+		log.Info().Msgf("Max shards not specified, defaulting to %d", config.MaxShards)
 	}
 
-	var MaxTenants int
+	var MaxShards int
 	if env == string(constants.PRODUCTION) {
-		MaxTenants = constants.MaxTenantsInProduction
+		MaxShards = constants.MaxShardsInProduction
 	} else {
-		MaxTenants = constants.MaxTenantsInNonProduction
+		MaxShards = constants.MaxShardsInNonProduction
 	}
 
-	if config.MaxTenants > MaxTenants {
-		log.Error().Msgf("❌ Max tenants (%d) exceeds the maximum allowed (%d). Capping at %d.", config.MaxTenants, MaxTenants, MaxTenants)
-		config.MaxTenants = MaxTenants
+	if config.MaxShards > MaxShards {
+		log.Error().Msgf("❌ Max shards (%d) exceeds the maximum allowed (%d). Capping at %d.", config.MaxShards, MaxShards, MaxShards)
+		config.MaxShards = MaxShards
 	}
-	if config.MaxTenants <= 0 {
-		config.MaxTenants = 10
+	if config.MaxShards <= 0 {
+		config.MaxShards = 10
 	}
 
 	var MaxReplicaId int
@@ -699,12 +699,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.api_raft_timeout = p
-		case constants.ConfigMaxTenantsKey:
+		case constants.ConfigMaxShardsKey:
 			mt, err := strconv.Atoi(v)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
-			cfg.max_tenants = mt
+			cfg.max_shards = mt
 		case constants.ConfigGrpcServerListenAddrHostKey:
 			cfg.grpc_server_listen_addr_host = v
 		case constants.ConfigGrpcServerListenAddrPortKey:
@@ -722,7 +722,7 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 func validateClusterBasePort(config *Config) {
 	clusterBasePort := config.ClusterBasePort
 	env := config.Env
-	maxTenants := config.MaxTenants
+	maxShards := config.MaxShards
 
 	if clusterBasePort < constants.MinSafePort || clusterBasePort > constants.MaxPort {
 		log.Panic().Msgf("❌ ClusterBasePort (%d) must be between %d and %d",
@@ -733,17 +733,17 @@ func validateClusterBasePort(config *Config) {
 
 	if env != string(constants.PRODUCTION) {
 		maxReplicaID := constants.MaxReplicationInNonProduction
-		portSpan := maxReplicaID*maxReplicaID*constants.MaxReplicationInNonProduction + maxTenants - 1
+		portSpan := maxReplicaID*maxReplicaID*constants.MaxReplicationInNonProduction + maxShards - 1
 		maxUsedPort = clusterBasePort + portSpan
 	} else {
-		portSpan := maxTenants - 1
+		portSpan := maxShards - 1
 		maxUsedPort = clusterBasePort + portSpan
 	}
 
 	if maxUsedPort > constants.MaxPort {
-		log.Panic().Msgf("❌ ClusterBasePort (%d) with max tenants (%d) exceeds maximum allowed port %d. "+
-			"Please adjust the ClusterBasePort or reduce the number of tenants.",
-			clusterBasePort, maxTenants, constants.MaxPort)
+		log.Panic().Msgf("❌ ClusterBasePort (%d) with max shards (%d) exceeds maximum allowed port %d. "+
+			"Please adjust the ClusterBasePort or reduce the number of shards.",
+			clusterBasePort, maxShards, constants.MaxPort)
 	}
 }
 
