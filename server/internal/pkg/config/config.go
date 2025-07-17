@@ -46,8 +46,8 @@ type Config struct {
 	RestAPIJWTSecret string
 	// ApiRaftTimeout defines the timeout duration for requests from the API to the Raft node.
 	ApiRaftTimeout time.Duration
-	// MaxTenants is the maximum number of tenants supported by the cluster.
-	MaxTenants int
+	// MaxShards is the maximum number of shards supported by the cluster.
+	MaxShards int
 	// GrpcServerListenAddrHost is the host address for the gRPC server.
 	GrpcServerListenAddrHost string
 	// GrpcServerListenAddrPort is the port for the gRPC server.
@@ -78,7 +78,7 @@ type ConfigFromMap struct {
 	rest_listen_addr_port         int
 	rest_api_jwt_secret           string
 	api_raft_timeout              int64 // Timeout in seconds
-	max_tenants                   int
+	max_shards                   int
 	grpc_server_listen_addr_host  string
 	grpc_server_listen_addr_port  int
 }
@@ -111,7 +111,7 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		RestListenAddrPort:        configFromMapInstance.rest_listen_addr_port,
 		RestAPIJWTSecret:          configFromMapInstance.rest_api_jwt_secret,
 		ApiRaftTimeout:            time.Duration(configFromMapInstance.api_raft_timeout) * time.Second,
-		MaxTenants:                configFromMapInstance.max_tenants,
+		MaxShards:                configFromMapInstance.max_shards,
 		GrpcServerListenAddrHost:  configFromMapInstance.grpc_server_listen_addr_host,
 		GrpcServerListenAddrPort:  configFromMapInstance.grpc_server_listen_addr_port,
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration

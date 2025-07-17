@@ -32,7 +32,7 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 	if lastShardIdBytes == nil {
-		lastShardIdBytes, err = utils.IntToBytes(config.GlobalConfiguration.MaxTenants + 1)
+		lastShardIdBytes, err = utils.IntToBytes(config.GlobalConfiguration.MaxShards + 1)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
@@ -55,7 +55,7 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 
 	for _, tenant := range cmd.Tenants {
 		lastShardId++
-		if lastShardId > config.GlobalConfiguration.MaxTenants+1 {
+		if lastShardId > config.GlobalConfiguration.MaxShards+1 {
 			lastShardId = 2
 		}
 		tenant.ShardId = lastShardId

@@ -250,7 +250,7 @@ func TestValidateClusterBasePort_PortTooLow(t *testing.T) {
 	cfg := &Config{
 		ClusterBasePort: constants.MinSafePort - 1,
 		Env:             string(constants.DEVELOPMENT),
-		MaxTenants:      10,
+		MaxShards:      10,
 	}
 
 	expected := fmt.Sprintf("❌ ClusterBasePort (%d) must be between %d and %d",
@@ -426,7 +426,7 @@ func TestValidateClusterBasePort_PortTooHigh(t *testing.T) {
 	cfg := &Config{
 		ClusterBasePort: constants.MaxPort + 1,
 		Env:             string(constants.PRODUCTION),
-		MaxTenants:      10,
+		MaxShards:      10,
 	}
 
 	expected := fmt.Sprintf("❌ ClusterBasePort (%d) must be between %d and %d",
@@ -439,7 +439,7 @@ func TestValidateClusterBasePort_ValidInProduction(t *testing.T) {
 	cfg := &Config{
 		ClusterBasePort: 5000,
 		Env:             string(constants.PRODUCTION),
-		MaxTenants:      100,
+		MaxShards:      100,
 	}
 
 	assert.NotPanics(t, func() { validateClusterBasePort(cfg) })
@@ -449,12 +449,12 @@ func TestValidateClusterBasePort_ExceedsMaxInProduction(t *testing.T) {
 	cfg := &Config{
 		ClusterBasePort: constants.MaxPort - 10,
 		Env:             string(constants.PRODUCTION),
-		MaxTenants:      20,
+		MaxShards:      20,
 	}
 
-	expected := fmt.Sprintf("❌ ClusterBasePort (%d) with max tenants (%d) exceeds maximum allowed port %d. "+
-		"Please adjust the ClusterBasePort or reduce the number of tenants.",
-		cfg.ClusterBasePort, cfg.MaxTenants, constants.MaxPort)
+	expected := fmt.Sprintf("❌ ClusterBasePort (%d) with max shards (%d) exceeds maximum allowed port %d. "+
+		"Please adjust the ClusterBasePort or reduce the number of shards.",
+		cfg.ClusterBasePort, cfg.MaxShards, constants.MaxPort)
 
 	assert.PanicsWithValue(t, expected, func() { validateClusterBasePort(cfg) })
 }
@@ -463,7 +463,7 @@ func TestValidateClusterBasePort_ValidInNonProduction(t *testing.T) {
 	cfg := &Config{
 		ClusterBasePort: 5000,
 		Env:             string(constants.DEVELOPMENT),
-		MaxTenants:      10,
+		MaxShards:      10,
 	}
 
 	assert.NotPanics(t, func() { validateClusterBasePort(cfg) })
@@ -473,12 +473,12 @@ func TestValidateClusterBasePort_ExceedsMaxInNonProduction(t *testing.T) {
 	cfg := &Config{
 		ClusterBasePort: constants.MaxPort - 10,
 		Env:             string(constants.DEVELOPMENT),
-		MaxTenants:      50,
+		MaxShards:      50,
 	}
 
-	expected := fmt.Sprintf("❌ ClusterBasePort (%d) with max tenants (%d) exceeds maximum allowed port %d. "+
-		"Please adjust the ClusterBasePort or reduce the number of tenants.",
-		cfg.ClusterBasePort, cfg.MaxTenants, constants.MaxPort)
+	expected := fmt.Sprintf("❌ ClusterBasePort (%d) with max shards (%d) exceeds maximum allowed port %d. "+
+		"Please adjust the ClusterBasePort or reduce the number of shards.",
+		cfg.ClusterBasePort, cfg.MaxShards, constants.MaxPort)
 
 	assert.PanicsWithValue(t, expected, func() { validateClusterBasePort(cfg) })
 }

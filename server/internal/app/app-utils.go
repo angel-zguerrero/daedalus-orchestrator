@@ -3,7 +3,7 @@ package app
 import "deadalus-orch/server/internal/pkg/config"
 
 func RecommendRTTMillisecond() uint64 {
-	shardCount := config.GlobalConfiguration.MaxTenants
+	shardCount := config.GlobalConfiguration.MaxShards
 	switch {
 	case shardCount <= 50:
 		return 200

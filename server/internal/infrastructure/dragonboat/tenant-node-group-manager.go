@@ -17,7 +17,7 @@ func StartTentantNodes(
 	initialMembers []Member,
 	NH *dragonboat.NodeHost,
 ) ([]*RaftNode, error) {
-	MaxTenants := config.GlobalConfiguration.MaxTenants
+	MaxShards := config.GlobalConfiguration.MaxShards
 
 	var (
 		tenantNodes []*RaftNode
@@ -28,7 +28,7 @@ func StartTentantNodes(
 		semaphore   = make(chan struct{}, 20)
 	)
 
-	for shardID := 0; shardID < MaxTenants; shardID++ {
+	for shardID := 0; shardID < MaxShards; shardID++ {
 		wg.Add(1)
 
 		go func(shardID int) {

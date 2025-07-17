@@ -44,7 +44,7 @@ type RaftTuningParams struct {
 }
 
 func RecommendRaftParamsForShards() RaftTuningParams {
-	numShards := appConfig.GlobalConfiguration.MaxTenants
+	numShards := appConfig.GlobalConfiguration.MaxShards
 	// Base values
 	var heartbeatRTT int
 	switch {
