@@ -24,10 +24,10 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 	value := []byte("value")
 	now := time.Now()
 
-	err = store.Put(TestFC, key, value, 0, now)
+	err = store.Put(TestFC, testColumnFamilySelector, key, value, 0, now)
 	require.NoError(t, err)
 
-	result, err := store.Get(TestFC, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
 	require.NoError(t, err)
 	assert.Equal(t, value, result)
 }
@@ -39,7 +39,7 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	result, err := store.Get(TestFC, "nonexistent", now)
+	result, err := store.Get(TestFC, testColumnFamilySelector, "nonexistent", now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -52,17 +52,17 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	now := time.Now()
 
 	batch := db.NewWriteBatch()
-	batch.Put(TestFC, "a", []byte("valueA"), now)
-	batch.Put(TestFC, "b", []byte("valueB"), now)
+	batch.Put(TestFC, testColumnFamilySelector, "a", []byte("valueA"), now)
+	batch.Put(TestFC, testColumnFamilySelector, "b", []byte("valueB"), now)
 
 	err = store.Write(batch)
 	require.NoError(t, err)
 
-	resultA, err := store.Get(TestFC, "a", now)
+	resultA, err := store.Get(TestFC, testColumnFamilySelector, "a", now)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueA"), resultA)
 
-	resultB, err := store.Get(TestFC, "b", now)
+	resultB, err := store.Get(TestFC, testColumnFamilySelector, "b", now)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueB"), resultB)
 }
@@ -74,9 +74,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, "user:123:name", []byte("Alice"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:123:name", []byte("Alice"), 0, now))
 
-	results, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:123:*", "", 10, now)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:123:*", "", 10, now)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "user:123:name", results[0].Key)
@@ -91,14 +91,14 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, "user:1", []byte("a"), 0, now))
-	require.NoError(t, store.Put(TestFC, "user:2", []byte("b"), 0, now))
-	require.NoError(t, store.Put(TestFC, "user:3", []byte("c"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:1", []byte("a"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:2", []byte("b"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:3", []byte("c"), 0, now))
 
 	var all []db.KeyValuePair
 	cursor := ""
 	for {
-		page, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:*", cursor, 2, now)
+		page, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:*", cursor, 2, now)
 		require.NoError(t, err)
 		all = append(all, page...)
 		if next == "" {
@@ -116,9 +116,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, "product:1", []byte("item"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "product:1", []byte("item"), 0, now))
 
-	results, next, err := store.SearchByPatternPaginatedKV(TestFC, "user:*", "", 10, now)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:*", "", 10, now)
 	require.NoError(t, err)
 	require.Empty(t, results)
 	require.Equal(t, "", next)
@@ -131,7 +131,7 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.
 	defer store.Close()
 	now := time.Now()
 
-	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", "pattern:*", "", 10, now)
+	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", testColumnFamilySelector, "pattern:*", "", 10, now)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }
@@ -146,10 +146,10 @@ func TestRocksdbStore_Delete_ExistingKey(t *testing.T) {
 	key := "delete-key"
 	value := []byte("to-delete")
 
-	require.NoError(t, store.Put(TestFC, key, value, 0, now))
-	require.NoError(t, store.Delete(TestFC, key, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, key, value, 0, now))
+	require.NoError(t, store.Delete(TestFC, testColumnFamilySelector, key, now))
 
-	result, err := store.Get(TestFC, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -161,7 +161,7 @@ func TestRocksdbStore_Delete_NonExistentKey(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	err = store.Delete(TestFC, "nonexistent", now)
+	err = store.Delete(TestFC, testColumnFamilySelector, "nonexistent", now)
 	assert.NoError(t, err)
 }
 
@@ -172,7 +172,7 @@ func TestRocksdbStore_Delete_InvalidColumnFamily(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	err = store.Delete("nonexistent_cf", "key", now)
+	err = store.Delete("nonexistent_cf", testColumnFamilySelector, "key", now)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }
@@ -187,10 +187,10 @@ func TestRocksdbStore_Delete_TTLColumnFamily(t *testing.T) {
 	key := "ttl-key"
 	value := []byte("ttl-value")
 
-	require.NoError(t, store.Put(TestFC, key, value, 0, now))
-	require.NoError(t, store.Delete(TestFC, key, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, key, value, 0, now))
+	require.NoError(t, store.Delete(TestFC, testColumnFamilySelector, key, now))
 
-	result, err := store.Get(TestFC, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -225,32 +225,32 @@ func TestRepository_TTL_BasicExpiration(t *testing.T) {
 	// Verify directly from kvStore (TemporalFC) before ttl
 
 	mainDataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-	dataBytes, err := store.Get(TemporalFC, mainDataKey, now)
+	dataBytes, err := store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, now)
 	require.NoError(t, err)
 	assert.NotNil(t, dataBytes)
 
 	uniqueIndexKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
-	idxBytes, err := store.Get(TemporalFC, uniqueIndexKey, now)
+	idxBytes, err := store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyName, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyLastName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyLastName, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyLastName, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyAge := fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyAge, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyAge, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyID := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyID, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
@@ -267,32 +267,32 @@ func TestRepository_TTL_BasicExpiration(t *testing.T) {
 	expiredTimeCheck := creationTime.Add(time.Duration(entity.TTL+1) * time.Second)
 
 	mainDataKey = fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-	dataBytes, err = store.Get(TemporalFC, mainDataKey, expiredTimeCheck)
+	dataBytes, err = store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, dataBytes)
 
 	uniqueIndexKey = fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
-	idxBytes, err = store.Get(TemporalFC, uniqueIndexKey, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyName, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyLastName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyLastName, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyLastName, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyAge = fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyAge, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyAge, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyID = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-	idxBytes, err = store.Get(TemporalFC, generalIndexKeyID, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 }
@@ -457,22 +457,22 @@ func TestRepository_TTL_BulkCreateExpiration(t *testing.T) {
 
 		// Verify directly from kvStore (TemporalFC)
 		mainDataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-		dataBytes, err := store.Get(TemporalFC, mainDataKey, expiredTimeCheck)
+		dataBytes, err := store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, dataBytes, "Main data key should be nil for ID %s", createdID)
 
 		uniqueIndexKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", originalEntity.Name)
-		idxBytes, err := store.Get(TemporalFC, uniqueIndexKey, expiredTimeCheck)
+		idxBytes, err := store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "Unique index key should be nil for Name %s", originalEntity.Name)
 
 		generalIndexKeyName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", originalEntity.Name, createdID)
-		idxBytes, err = store.Get(TemporalFC, generalIndexKeyName, expiredTimeCheck)
+		idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "General name index key should be nil for Name %s, ID %s", originalEntity.Name, createdID)
 
 		generalIndexKeyID := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-		idxBytes, err = store.Get(TemporalFC, generalIndexKeyID, expiredTimeCheck)
+		idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "General ID index key should be nil for ID %s", createdID)
 	}
@@ -521,18 +521,18 @@ func TestRocksdbStore_ColumnFamilyOperations(t *testing.T) {
 
 	// 7. Put/Get in new non-TTL CF
 	key1, val1 := "key1_rocks", []byte("val1_rocks")
-	err = store.Put(cfName, key1, val1, 0, time.Now())
+	err = store.Put(cfName, testColumnFamilySelector, key1, val1, 0, time.Now())
 	require.NoError(t, err)
-	retVal1, err := store.Get(cfName, key1, time.Now())
+	retVal1, err := store.Get(cfName, testColumnFamilySelector, key1, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, val1, retVal1)
 
 	// 8. Put/Get in new TTL CF
 	key2, val2 := "key2_rocks", []byte("val2_rocks")
 	// Using a short TTL for testing if needed, but basic Put/Get doesn't rely on TTL expiry for this test
-	err = store.Put(cfNameTTL, key2, val2, 3600, time.Now())
+	err = store.Put(cfNameTTL, testColumnFamilySelector, key2, val2, 3600, time.Now())
 	require.NoError(t, err)
-	retVal2, err := store.Get(cfNameTTL, key2, time.Now())
+	retVal2, err := store.Get(cfNameTTL, testColumnFamilySelector, key2, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, val2, retVal2)
 
@@ -547,7 +547,7 @@ func TestRocksdbStore_ColumnFamilyOperations(t *testing.T) {
 	assert.False(t, isTTL)
 
 	// 11. Get from deleted non-TTL CF should fail
-	_, err = store.Get(cfName, key1, time.Now())
+	_, err = store.Get(cfName, testColumnFamilySelector, key1, time.Now())
 	require.Error(t, err) // Expect an error as CF is gone
 
 	// 12. DeleteColumnFamily - TTL

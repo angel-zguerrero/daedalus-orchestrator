@@ -261,11 +261,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			}
 			switch wCmd.Op {
 			case general_command.PutOp:
-				batch.Put(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, now)
+			batch.Put(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, wCmd.Value, now)
 			case general_command.PutOpTTL:
-				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.Key, wCmd.Value, wCmd.TTL, now)
+			batch.PutTTl(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, wCmd.Value, wCmd.TTL, now)
 			case general_command.DeleteOp, general_command.DeleteOpTTL:
-				batch.Delete(wCmd.ColumnFamilyName, wCmd.Key, now)
+			batch.Delete(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, now)
 			default:
 				msg := fmt.Sprintf("unknown W Operation: %v", wCmd.Op)
 				ents[idx].Result = statemachine.Result{
@@ -352,7 +352,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
-	batch.Put(db.MetaFC, AppliedIndexKey, appliedIndex, time.Now())
+	batch.Put(db.MetaFC, db.MetaFCSelector, AppliedIndexKey, appliedIndex, time.Now())
 
 	if err := uow.Commit(); err != nil {
 		return nil, err
@@ -418,7 +418,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		case general_command.GetOp:
 			var data []byte
 
-			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
+			data, err := kv_store.Get(command.ColumnFamilyName, command.ColumnFamilySector, command.Key, now)
 			if err != nil {
 				return nil, err
 			}
@@ -429,6 +429,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				command.ColumnFamilyName,
+				command.ColumnFamilySector,
 				command.KeyPattern,
 				command.Cursor,
 				int(command.Limit),
@@ -447,7 +448,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		case general_command.GetOpTTL:
 			var data []byte
 
-			data, err := kv_store.Get(command.ColumnFamilyName, command.Key, now)
+			data, err := kv_store.Get(command.ColumnFamilyName, command.ColumnFamilySector, command.Key, now)
 			if err != nil {
 				return nil, err
 			}
@@ -457,6 +458,7 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		case general_command.SearchTTL:
 			pairs, nextCursor, err := kv_store.SearchByPatternPaginatedKV(
 				command.ColumnFamilyName,
+				command.ColumnFamilySector,
 				command.KeyPattern,
 				command.Cursor,
 				int(command.Limit),
@@ -503,7 +505,7 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 
 	enc := gob.NewEncoder(w)
 
-	err := kv_store.Iterate(func(cfName string, key, value []byte) error {
+	err := kv_store.Iterate(func(cfName string, cfSelector string, key, value []byte) error {
 		select {
 		case <-done:
 			return fmt.Errorf("snapshot cancelled")
@@ -511,13 +513,15 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 		}
 
 		entry := struct {
-			CFName string
-			Key    []byte
-			Value  []byte
+			CFName    string
+			CFNSector string
+			Key       []byte
+			Value     []byte
 		}{
-			CFName: cfName,
-			Key:    append([]byte(nil), key...),
-			Value:  append([]byte(nil), value...),
+			CFName:    cfName,
+			CFNSector: cfSelector,
+			Key:       append([]byte(nil), key...),
+			Value:     append([]byte(nil), value...),
 		}
 
 		return enc.Encode(&entry)
@@ -578,9 +582,10 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 		}
 
 		var entry struct {
-			CFName string
-			Key    []byte
-			Value  []byte
+			CFName    string
+			CFNSector string
+			Key       []byte
+			Value     []byte
 		}
 
 		if err := dec.Decode(&entry); err != nil {
@@ -592,7 +597,7 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 			return fmt.Errorf("decode failed: %w", err)
 		}
 
-		if err := kv_store.PutRaw(entry.CFName, string(entry.Key), entry.Value); err != nil {
+		if err := kv_store.PutRaw(entry.CFName, entry.CFNSector, string(entry.Key), entry.Value); err != nil {
 			kv_store.Close()
 			os.RemoveAll(dbdir)
 			return fmt.Errorf("put failed during snapshot recovery for CF %s, Key %s: %w", entry.CFName, string(entry.Key), err)

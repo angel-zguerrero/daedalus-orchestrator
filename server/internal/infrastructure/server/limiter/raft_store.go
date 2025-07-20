@@ -16,16 +16,18 @@ import (
 )
 
 type RaftStore struct {
-	node     *dragonboat.RaftNode
-	keyspace string
-	ttl      time.Duration
+	node               *dragonboat.RaftNode
+	keyspace           string
+	columnFamilySector string
+	ttl                time.Duration
 }
 
-func NewRaftStore(node *dragonboat.RaftNode, keyspace string, ttl time.Duration) *RaftStore {
+func NewRaftStore(node *dragonboat.RaftNode, keyspace, columnFamilySector string, ttl time.Duration) *RaftStore {
 	return &RaftStore{
-		node:     node,
-		keyspace: keyspace,
-		ttl:      ttl,
+		node:               node,
+		keyspace:           keyspace,
+		columnFamilySector: columnFamilySector,
+		ttl:                ttl,
 	}
 }
 
@@ -45,8 +47,9 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 
 	readCmd := general_command.Query_Command{
 		Command: general_command.RK_Command{
-			Key:              fullKey,
-			ColumnFamilyName: db.MasterEventFC,
+			Key:                fullKey,
+			ColumnFamilyName:   db.MasterEventFC,
+			ColumnFamilySector: s.columnFamilySector,
 		},
 		Now: utils.GetNowInInt(),
 	}
@@ -110,11 +113,12 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              fullKey,
-				Value:            buf.Bytes(),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              int(ttlRemaining),
-				Op:               general_command.PutOpTTL,
+				Key:                fullKey,
+				Value:              buf.Bytes(),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: s.columnFamilySector,
+				TTL:                int(ttlRemaining),
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -139,8 +143,9 @@ func (s *RaftStore) Peek(ctx context.Context, key string, rate limiter.Rate) (li
 
 	readCmd := general_command.Query_Command{
 		Command: general_command.RK_Command{
-			Key:              fullKey,
-			ColumnFamilyName: db.MasterEventFC,
+			Key:                fullKey,
+			ColumnFamilyName:   db.MasterEventFC,
+			ColumnFamilySector: s.columnFamilySector,
 		},
 		Now: utils.GetNowInInt(),
 	}
@@ -208,11 +213,12 @@ func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) erro
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              fullKey,
-				Value:            buf.Bytes(),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              int(s.ttl.Seconds()),
-				Op:               general_command.PutOpTTL,
+				Key:                fullKey,
+				Value:              buf.Bytes(),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: s.columnFamilySector,
+				TTL:                int(s.ttl.Seconds()),
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -245,11 +251,12 @@ func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (l
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              fullKey,
-				Value:            buf.Bytes(),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              int(s.ttl.Seconds()),
-				Op:               general_command.PutOpTTL,
+				Key:                fullKey,
+				Value:              buf.Bytes(),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: s.columnFamilySector,
+				TTL:                int(s.ttl.Seconds()),
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}

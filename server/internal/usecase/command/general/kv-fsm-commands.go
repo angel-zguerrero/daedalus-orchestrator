@@ -72,11 +72,12 @@ const (
 
 // WK_Command (Write Key Command) defines the structure for commands that modify a single key-value pair.
 type WK_Command struct {
-	Key              string // The key to write.
-	Value            []byte // The value to write.
-	ColumnFamilyName string // The name of the column family to operate on.
-	TTL              int    // Time-To-Live for the key in seconds (used with PutOpTTL).
-	Op               W_Type // The specific write operation type (PutOp, PutOpTTL, DeleteOp, DeleteOpTTL).
+	Key                string // The key to write.
+	Value              []byte // The value to write.
+	ColumnFamilyName   string // The name of the column family to operate on.
+	ColumnFamilySector string // The name of the column family sector to operate on.
+	TTL                int    // Time-To-Live for the key in seconds (used with PutOpTTL).
+	Op                 W_Type // The specific write operation type (PutOp, PutOpTTL, DeleteOp, DeleteOpTTL).
 }
 
 // RK_Command (Read Key Command) defines the structure for commands that read a single key or search keys.
@@ -87,13 +88,14 @@ type Query_Command struct {
 }
 
 type RK_Command struct {
-	Key              string // The specific key to read (used with GetOp, GetOpTTL).
-	KeyPattern       string // The pattern to search for (used with Search, SearchTTL).
-	Cursor           string // The cursor for paginated search results.
-	Limit            int64  // The maximum number of results for paginated search.
-	ColumnFamilyName string // The name of the column family to operate on.
-	TTL              int64  // Expected TTL, or for filtering by TTL (usage may vary).
-	Op               R_Type // The specific read operation type (GetOp, GetOpTTL, Search, SearchTTL).
+	Key                string // The specific key to read (used with GetOp, GetOpTTL).
+	KeyPattern         string // The pattern to search for (used with Search, SearchTTL).
+	Cursor             string // The cursor for paginated search results.
+	Limit              int64  // The maximum number of results for paginated search.
+	ColumnFamilyName   string // The name of the column family to operate on.
+	ColumnFamilySector string // The name of the column family sector to operate on.
+	TTL                int64  // Expected TTL, or for filtering by TTL (usage may vary).
+	Op                 R_Type // The specific read operation type (GetOp, GetOpTTL, Search, SearchTTL).
 }
 
 type Repository_Command struct {

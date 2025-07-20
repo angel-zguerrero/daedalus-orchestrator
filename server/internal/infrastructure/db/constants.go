@@ -12,3 +12,10 @@ const (
 	DefaultFC = "default"
 	MetaFC    = "meta"
 )
+
+const (
+	// MetaFCSelector is the selector for the metadata column family.
+	MetaFCSelector = MetaFC + "-selector"
+	// DefaultFCSelector is the selector for the default column family.
+	DefaultFCSelector = DefaultFC + "-selector"
+)

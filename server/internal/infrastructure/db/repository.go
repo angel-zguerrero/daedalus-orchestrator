@@ -54,6 +54,8 @@ type FieldDefinition struct {
 type TableDefinition struct {
 	// ColumnFamily is the name of the column family where the table data is stored.
 	ColumnFamily string
+	// ColumnFamilySector is the name of the column family sector where the table data is stored.
+	ColumnFamilySector string
 	// Schema is the namespace or schema name for the table.
 	Schema string
 	// Name is the name of the table.
@@ -223,7 +225,7 @@ func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) 
 	case "=":
 		pattern := prefix + value + ":*"
 		for {
-			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, pattern, cursorInner, limit, now)
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, r.definition.ColumnFamilySector, pattern, cursorInner, limit, now)
 			if err != nil {
 				return nil, err
 			}
@@ -242,7 +244,7 @@ func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) 
 			return nil, fmt.Errorf("invalid LIKE pattern: %s", value)
 		}
 		for {
-			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit, now)
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, r.definition.ColumnFamilySector, prefix+"*", cursorInner, limit, now)
 			if err != nil {
 				return nil, err
 			}
@@ -263,7 +265,7 @@ func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) 
 		}
 	case "<", "<=", ">", ">=", "!=", "BETWEEN":
 		for {
-			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, prefix+"*", cursorInner, limit, now)
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, r.definition.ColumnFamilySector, prefix+"*", cursorInner, limit, now)
 			if err != nil {
 				return nil, err
 			}
@@ -394,7 +396,7 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string, now time.T
 	results := []T{}
 	for _, id := range selectedIDs {
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-		dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey, now)
+		dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, now)
 		if err != nil {
 			return nil, err
 		}
@@ -436,7 +438,7 @@ func (r *Repository[T]) FindByField(field string, value string, now time.Time) (
 	var dataKey string
 	if def.Unique {
 		searchKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, field, value)
-		idBytes, err := r.kvStore.Get(r.definition.ColumnFamily, searchKey, now)
+		idBytes, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, searchKey, now)
 		if err != nil || idBytes == nil || len(idBytes) == 0 {
 			return nil, err
 		}
@@ -446,14 +448,14 @@ func (r *Repository[T]) FindByField(field string, value string, now time.Time) (
 		dataKey = fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, value)
 	} else {
 		searchKey := fmt.Sprintf("%s:%s:idx:%s:%s:*", r.definition.Schema, r.definition.Name, field, value)
-		idBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, searchKey, "", 1, now)
+		idBytes, _, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, r.definition.ColumnFamilySector, searchKey, "", 1, now)
 		if err != nil || idBytes == nil || len(idBytes) == 0 {
 			return nil, err
 		}
 
 		dataKey = fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, string(idBytes[0].Value))
 	}
-	dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, dataKey, now)
+	dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, now)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +537,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		// This check must be done before the unique field checks for other fields
 		// as it's a more fundamental constraint.
 		pkDataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, currentEntityIDValue)
-		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, pkDataKey, now)
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, r.definition.ColumnFamilySector, pkDataKey, now)
 		if err != nil {
 			return nil, fmt.Errorf("error checking existence for primary key %s: %w", currentEntityIDValue, err)
 		}
@@ -588,7 +590,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 	// Validar duplicados en la base
 	// This check inherently respects shouldSkipUniqueness because items are not added to uniqueChecks
 	for _, check := range uniqueChecks {
-		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, check.Key, now)
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, r.definition.ColumnFamilySector, check.Key, now)
 		if err != nil {
 			return nil, err
 		}
@@ -624,9 +626,9 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 			fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
 			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue, id)
 			if hasTTL {
-				batch.PutTTl(r.definition.ColumnFamily, idxKey, []byte(id), ttl, now)
+				batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, idxKey, []byte(id), ttl, now)
 			} else {
-				batch.Put(r.definition.ColumnFamily, idxKey, []byte(id), now)
+				batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, idxKey, []byte(id), now)
 			}
 
 			if def.Unique {
@@ -653,9 +655,9 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 				} else {
 					uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
 					if hasTTL {
-						batch.PutTTl(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), ttl, now)
+						batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, uniqueIdxKey, []byte(id), ttl, now)
 					} else {
-						batch.Put(r.definition.ColumnFamily, uniqueIdxKey, []byte(id), now)
+						batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, uniqueIdxKey, []byte(id), now)
 					}
 				}
 			}
@@ -667,9 +669,9 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 			return nil, err
 		}
 		if hasTTL {
-			batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl, now)
+			batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, dataBytes, ttl, now)
 		} else {
-			batch.Put(r.definition.ColumnFamily, dataKey, dataBytes, now)
+			batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, dataBytes, now)
 		}
 	}
 
@@ -894,7 +896,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 				if def.Unique {
 					// Always delete old unique index if value changed
 					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue)
-					batch.Delete(r.definition.ColumnFamily, oldUIdxKey, now)
+					batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, oldUIdxKey, now)
 
 					shouldSkipUniquenessForNewValue := false
 					if def.HasConditionalUniqueness {
@@ -911,7 +913,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 					if !shouldSkipUniquenessForNewValue {
 						// Check for new value collision in DB
 						idxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
-						existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, idxKey, now)
+						existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, idxKey, now)
 						if errDb != nil {
 							return nil, fmt.Errorf("error checking unique constraint for field '%s', value '%s': %w", def.Name, newValue, errDb)
 						}
@@ -922,23 +924,23 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 						// Add new unique index
 						newUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue)
 						if hasTTL { // Assuming hasTTL and ttl are determined for the entity
-							batch.PutTTl(r.definition.ColumnFamily, newUIdxKey, []byte(id), ttl, now)
+							batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, newUIdxKey, []byte(id), ttl, now)
 						} else {
-							batch.Put(r.definition.ColumnFamily, newUIdxKey, []byte(id), now)
+							batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, newUIdxKey, []byte(id), now)
 						}
 					}
 				}
 
 				// Delete old regular index
 				oldIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue, id)
-				batch.Delete(r.definition.ColumnFamily, oldIdxKey, now)
+				batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, oldIdxKey, now)
 
 				// Add new regular index
 				newIdxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, newValue, id)
 				if hasTTL {
-					batch.PutTTl(r.definition.ColumnFamily, newIdxKey, []byte(id), ttl, now)
+					batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, newIdxKey, []byte(id), ttl, now)
 				} else {
-					batch.Put(r.definition.ColumnFamily, newIdxKey, []byte(id), now)
+					batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, newIdxKey, []byte(id), now)
 				}
 
 				// Update the field in the currentEntityDataVal model, which will be marshaled
@@ -963,9 +965,9 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 				return nil, err
 			}
 			if hasTTL {
-				batch.PutTTl(r.definition.ColumnFamily, dataKey, dataBytes, ttl, now)
+				batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, dataBytes, ttl, now)
 			} else {
-				batch.Put(r.definition.ColumnFamily, dataKey, dataBytes, now)
+				batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, dataBytes, now)
 			}
 		}
 
@@ -1052,16 +1054,16 @@ func (r *Repository[T]) BulkDelete(ids []string, now time.Time) ([]bool, error) 
 			fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
 
 			idxKey := fmt.Sprintf("%s:%s:idx:%s:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue, id)
-			batch.Delete(r.definition.ColumnFamily, idxKey, now)
+			batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, idxKey, now)
 
 			if def.Unique {
 				idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
-				batch.Delete(r.definition.ColumnFamily, idxUKey, now)
+				batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, idxUKey, now)
 			}
 		}
 
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-		batch.Delete(r.definition.ColumnFamily, dataKey, now)
+		batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, now)
 	}
 
 	if batch.Count() > 0 {
@@ -1166,7 +1168,7 @@ func getNestedFieldValue(entityValue reflect.Value, fieldName string) (reflect.V
 // Returns:
 //   - A pointer to the initialized Repository.
 //   - An error if the repository initialization fails (e.g., due to invalid struct tags or schema).
-func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema string, idGeneratorFactory IDGeneratorFactory) (*Repository[T], error) {
+func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySector string, schema string, idGeneratorFactory IDGeneratorFactory) (*Repository[T], error) {
 	t := reflect.TypeOf(new(T)).Elem()
 
 	var tableName string
@@ -1178,10 +1180,11 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily string, schema str
 	}
 
 	table := &TableDefinition{
-		ColumnFamily: ColumnFamily,
-		Schema:       schema,
-		Name:         tableName,
-		Fields:       map[string]FieldDefinition{},
+		ColumnFamily:       ColumnFamily,
+		ColumnFamilySector: columnFamilySector,
+		Schema:             schema,
+		Name:               tableName,
+		Fields:             map[string]FieldDefinition{},
 	}
 
 	fields, err := extractFieldsRecursively(t, "")
@@ -1346,8 +1349,8 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 	return def, nil
 }
 
-func NewRepositoryWithBatch[T ORMEntity](kvStore KVStore, ColumnFamily, schema string, idGeneratorFactory IDGeneratorFactory, batch *WriteBatch) (*Repository[T], error) {
-	repo, err := NewRepository[T](kvStore, ColumnFamily, schema, idGeneratorFactory)
+func NewRepositoryWithBatch[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySector, schema string, idGeneratorFactory IDGeneratorFactory, batch *WriteBatch) (*Repository[T], error) {
+	repo, err := NewRepository[T](kvStore, ColumnFamily, columnFamilySector, schema, idGeneratorFactory)
 	if err != nil {
 		return nil, err
 	}
