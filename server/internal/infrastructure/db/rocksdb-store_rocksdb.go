@@ -455,7 +455,10 @@ func (r *RocksdbStore) Put(columnFamily, key string, value []byte, ttl int, now 
 		dataKey := key
 		ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
 
-		oldTTLBytes, err := r.GetRaw(columnFamily, ttlExpireIndexKey)
+		ro := grocksdb.NewDefaultReadOptions()
+		defer ro.Destroy()
+
+		oldTTLBytes, err := r.getValue(cf, ro, ttlExpireIndexKey)
 		if err != nil {
 			return err
 		}
@@ -518,7 +521,10 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 				dataKey := op.Key
 				ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)
 
-				oldTTLBytes, err := r.GetRaw(op.CF, ttlExpireIndexKey)
+				ro := grocksdb.NewDefaultReadOptions()
+				defer ro.Destroy()
+
+				oldTTLBytes, err := r.getValue(cf, ro, ttlExpireIndexKey)
 				if err != nil {
 					return err
 				}
