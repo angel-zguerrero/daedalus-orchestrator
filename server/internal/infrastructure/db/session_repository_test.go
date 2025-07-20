@@ -51,7 +51,7 @@ func setupSessionTestDB(t *testing.T) (*db.UnitOfWork, *db.SessionRepository, fu
 	require.NoError(t, err, "Failed to create SessionRepository")
 
 	cleanup := func() {
-		assert.NoError(t, err, "Failed to close KVStore")
+		assert.NoError(t, kvStore.Close(), "Failed to close KVStore")
 		err = os.RemoveAll(baseTestPath) // Clean up the entire base test path
 		assert.NoError(t, err, "Failed to remove test DB directory")
 	}

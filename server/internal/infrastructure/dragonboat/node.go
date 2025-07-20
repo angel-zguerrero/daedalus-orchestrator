@@ -269,10 +269,11 @@ func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
 				CMD: general_command.RWK_Command{
 					Op: general_command.Write,
 					CMD: general_command.WK_Command{
-						Key:              "ready",
-						Value:            []byte(Int64ToBytes(time.Now().UnixMilli())),
-						ColumnFamilyName: db.MetaFC,
-						Op:               general_command.PutOp,
+					Key:                "ready",
+					Value:              []byte(Int64ToBytes(time.Now().UnixMilli())),
+					ColumnFamilyName:   db.MetaFC,
+					ColumnFamilySector: db.MetaFCSelector,
+					Op:                 general_command.PutOp,
 					},
 				},
 			}
