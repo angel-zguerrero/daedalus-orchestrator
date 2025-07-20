@@ -2,7 +2,7 @@ package db
 
 import "time"
 
-type X struct {
+type DataStruct struct {
 	CF    string
 	Key   string
 	Value []byte
@@ -14,17 +14,17 @@ type X struct {
 // WriteBatch represents a batch of write operations to be applied atomically.
 // The concrete implementation of this interface will depend on the underlying database system.
 type WriteBatch struct {
-	Data []X
+	Data []DataStruct
 }
 
 // NewWriteBatch creates and returns a new WriteBatch.
 func NewWriteBatch() *WriteBatch {
-	return &WriteBatch{Data: make([]X, 0)}
+	return &WriteBatch{Data: make([]DataStruct, 0)}
 }
 
 // Put adds a put operation to the batch.
 func (wb *WriteBatch) Put(columnFamily string, key string, value []byte, now time.Time) {
-	wb.Data = append(wb.Data, X{
+	wb.Data = append(wb.Data, DataStruct{
 		CF:    columnFamily,
 		Key:   key,
 		Value: value,
@@ -34,7 +34,7 @@ func (wb *WriteBatch) Put(columnFamily string, key string, value []byte, now tim
 }
 
 func (wb *WriteBatch) PutTTl(columnFamily string, key string, value []byte, ttl int, now time.Time) {
-	wb.Data = append(wb.Data, X{
+	wb.Data = append(wb.Data, DataStruct{
 		CF:    columnFamily,
 		Key:   key,
 		Value: value,
@@ -46,7 +46,7 @@ func (wb *WriteBatch) PutTTl(columnFamily string, key string, value []byte, ttl 
 
 // Delete adds a delete operation to the batch.
 func (wb *WriteBatch) Delete(columnFamily string, key string, now time.Time) {
-	wb.Data = append(wb.Data, X{
+	wb.Data = append(wb.Data, DataStruct{
 		CF:   columnFamily,
 		Key:  key,
 		Type: "delete",
