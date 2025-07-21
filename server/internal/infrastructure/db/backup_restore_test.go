@@ -7,6 +7,7 @@ package db_test
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,9 +107,15 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 	// Restore (Target Store)
 	t.Log("Restoring data to target store...")
 	restoreBatch := db.NewWriteBatch()
-	for cfName, cfData := range dumpedMap {
+	for fullCFKey, cfData := range dumpedMap {
+		parts := strings.SplitN(fullCFKey, ":", 2)
+		require.Equal(t, 2, len(parts), "Invalid CF key format: %s", fullCFKey)
+
+		cfName := parts[0]
+		cfSelector := parts[1]
+
 		for key, value := range cfData {
-			restoreBatch.Put(cfName, testColumnFamilySelector, key, value, time.Now())
+			restoreBatch.Put(cfName, cfSelector, key, value, time.Now())
 		}
 	}
 	err = targetStore.WriteRaw(restoreBatch)

@@ -168,7 +168,8 @@ func (ps *PebbleStore) Put(columnFamily, columnFamilySector, key string, value [
 	}
 
 	// TTL: borrar índice antiguo si existe y escribir batch completo
-	ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+	ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(columnFamilySector+":")...)
+	ttlExpireKey = append(ttlExpireKey, []byte(PrefixTTLExpire)...)
 	ttlExpireKey = append(ttlExpireKey, []byte(key)...)
 
 	oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
@@ -185,9 +186,9 @@ func (ps *PebbleStore) Put(columnFamily, columnFamilySector, key string, value [
 
 	ttlIndexKeyOld := []byte{}
 	if oldTTLMillis > 0 {
-		ttlIndexKeyOld = []byte(fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, oldTTLMillis, key))
+		ttlIndexKeyOld = []byte(fmt.Sprintf("%s%s:%s%020d:%s", string(cfPrefix), columnFamilySector, PrefixTTLIndex, oldTTLMillis, key))
 	}
-	ttlIndexKeyNew := []byte(fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, newTTLMillis, key))
+	ttlIndexKeyNew := []byte(fmt.Sprintf("%s%s:%s%020d:%s", string(cfPrefix), columnFamilySector, PrefixTTLIndex, newTTLMillis, key))
 
 	batch := ps.db.NewBatch()
 	defer batch.Close()
@@ -395,6 +396,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, c
 		return nil, "", fmt.Errorf("column family %s not found", resolvedCfName)
 	}
 
+	cfPrefix = append(cfPrefix, []byte(cfSelector+":")...)
 	iterOpts := &pebble.IterOptions{
 		LowerBound: cfPrefix,
 		UpperBound: prefixRangeEnd(cfPrefix),
@@ -410,8 +412,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, c
 	// Manejo de cursor
 	if cursor != "" {
 		cursorBytes := []byte(cursor)
-		finalKey := fmt.Sprintf("%s:%s", cfSelector, string(cursorBytes))
-		startKey := append(cfPrefix, []byte(finalKey)...)
+		startKey := append(cfPrefix, cursorBytes...)
 
 		if iter.SeekGE(startKey) {
 			if bytes.Equal(iter.Key(), startKey) {
@@ -489,7 +490,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, c
 	return results, nextCursor, nil
 }
 
-// DumpAll retrieves all data from the database, organized by column family.
+// DumpAll retrieves all data from the database, organized by column family:column selector.
 func (ps *PebbleStore) DumpAll() (interface{}, error) {
 	result := make(map[string]map[string][]byte)
 	allPrefixes := make(map[string][]byte)
@@ -498,7 +499,6 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 		allPrefixes[cfName] = cfPrefix
 	}
 	for cfName, cfPrefix := range ps.ttlCfPrefixes {
-		// Check for name collision, though CreatePebbleStore should prevent this.
 		if _, exists := allPrefixes[cfName]; exists {
 			return nil, fmt.Errorf("DumpAll: duplicate column family name %s found between normal and TTL CFs", cfName)
 		}
@@ -506,7 +506,6 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 	}
 
 	for cfName, cfPrefix := range allPrefixes {
-		cfResult := make(map[string][]byte)
 		iterOpts := &pebble.IterOptions{
 			LowerBound: cfPrefix,
 			UpperBound: prefixRangeEnd(cfPrefix),
@@ -515,24 +514,41 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 
 		for iter.First(); iter.Valid(); iter.Next() {
 			rawKey := iter.Key()
-			// The prefix stored in cfPrefixes includes the separator (e.g., "cfName:")
-			// So, we need to ensure TrimPrefix works correctly.
-			// If cfPrefix is "cfName:", and rawKey is "cfName:actualKey", TrimPrefix yields "actualKey".
-			keyWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix)
+			keyWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix) // => cfSelector:key
 			keyStr := string(keyWithoutPrefix)
 
-			// Copy value as Pebble's buffer might be reused
+			// Split cfSelector:key en cfSelector y key
+			parts := strings.SplitN(keyStr, ":", 2)
+			if len(parts) != 2 {
+				// Saltar claves mal formadas
+				fmt.Printf("DumpAll: skipping malformed key in %s: %s\n", cfName, keyStr)
+				continue
+			}
+			cfSelector := parts[0]
+			innerKey := parts[1]
+
+			// Compose map key for result
+			mapKey := cfName + ":" + cfSelector
+
+			// Get or create sub-map
+			subMap, ok := result[mapKey]
+			if !ok {
+				subMap = make(map[string][]byte)
+				result[mapKey] = subMap
+			}
+
+			// Copy value
 			val := make([]byte, len(iter.Value()))
 			copy(val, iter.Value())
-			cfResult[keyStr] = val
+
+			subMap[innerKey] = val
 		}
 
 		err := iter.Error()
-		iter.Close() // Close must be called after checking error
+		iter.Close()
 		if err != nil {
 			return nil, fmt.Errorf("DumpAll: iterator error for cf %s: %w", cfName, err)
 		}
-		result[cfName] = cfResult
 	}
 
 	return result, nil
@@ -550,8 +566,9 @@ func (ps *PebbleStore) Get(columnFamily, columnFamilySector, key string, now tim
 	}
 
 	if isTTL {
-		// Construye la clave de expiración: cfPrefix + PrefixTTLExpire + key
-		expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+
+		expireKey := append(append([]byte(nil), cfPrefix...), []byte(columnFamilySector+":")...)
+		expireKey = append(expireKey, []byte(PrefixTTLExpire)...)
 		expireKey = append(expireKey, []byte(key)...)
 		expired, err := ps.isTTLKeyExpired(expireKey, now)
 
@@ -625,7 +642,8 @@ func (ps *PebbleStore) Delete(columnFamily, columnFamilySector, key string, now 
 
 	// To find the indexKey, we need the expiry time from expireRefKey
 	// actualCfPrefix is like "myTTLCF:"
-	expireRefKeyBytes := append(actualCfPrefix, []byte(PrefixTTLExpire)...)
+	expireRefKeyBytes := append(actualCfPrefix, []byte(columnFamilySector+":")...)
+	expireRefKeyBytes = append(expireRefKeyBytes, []byte(PrefixTTLExpire)...)
 	expireRefKeyBytes = append(expireRefKeyBytes, []byte(key)...)
 
 	expiryBytes, closer, errGetExpiry := ps.db.Get(expireRefKeyBytes)
@@ -641,6 +659,7 @@ func (ps *PebbleStore) Delete(columnFamily, columnFamilySector, key string, now 
 
 	// Data key: actualCfPrefix + key
 	dataKey := actualCfPrefix
+	dataKey = append(dataKey, []byte(columnFamilySector+":")...)
 	dataKey = append(dataKey, []byte(key)...)
 	if err := b.Delete(dataKey, nil); err != nil {
 		return fmt.Errorf("Delete: failed to add data key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
@@ -655,7 +674,7 @@ func (ps *PebbleStore) Delete(columnFamily, columnFamilySector, key string, now 
 	if errGetExpiry == nil && expiryBytes != nil {
 		expiryMillisStr := string(expiryBytes)
 		// Index key: actualCfPrefix + PrefixTTLIndex + expiryMillisStr + ":" + key
-		indexKeyStr := fmt.Sprintf("%s%s%s:%s", string(actualCfPrefix), PrefixTTLIndex, expiryMillisStr, key)
+		indexKeyStr := fmt.Sprintf("%s%s:%s%s:%s", string(actualCfPrefix), columnFamilySector, PrefixTTLIndex, expiryMillisStr, key)
 		if err := b.Delete([]byte(indexKeyStr), nil); err != nil {
 			return fmt.Errorf("Delete: failed to add index key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
 		}
@@ -719,7 +738,8 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 				nowMillis := op.Now.UnixMilli()
 				newTTLMillis := nowMillis + int64(op.TTL)*1000
 
-				ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+				ttlExpireKey := append(cfPrefix, []byte(op.CFS+":")...)
+				ttlExpireKey = append(ttlExpireKey, []byte(PrefixTTLExpire)...)
 				ttlExpireKey = append(ttlExpireKey, []byte(op.Key)...)
 
 				oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
@@ -733,13 +753,13 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 				}
 
 				if oldTTLMillis > 0 {
-					oldIndexKey := fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, oldTTLMillis, op.Key)
+					oldIndexKey := fmt.Sprintf("%s%s:%s%020d:%s", string(cfPrefix), op.CFS, PrefixTTLIndex, oldTTLMillis, op.Key)
 					if err := b.Delete([]byte(oldIndexKey), nil); err != nil {
 						return fmt.Errorf("Write: failed to delete old TTL index key: %w", err)
 					}
 				}
 
-				newIndexKey := fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, newTTLMillis, op.Key)
+				newIndexKey := fmt.Sprintf("%s%s:%s%020d:%s", string(cfPrefix), op.CFS, PrefixTTLIndex, newTTLMillis, op.Key)
 
 				if err := b.Set(dataKey, op.Value, nil); err != nil {
 					return fmt.Errorf("Write: failed to set data key: %w", err)

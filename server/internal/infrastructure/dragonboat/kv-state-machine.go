@@ -111,7 +111,7 @@ func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 }
 
 func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, error) {
-	result, err := kv_store.Get(db.MetaFC, AppliedIndexKey, time.Now()) // WORK, here now can be any value, due to the key used to store the "applyed index" is not ttl key
+	result, err := kv_store.Get(db.MetaFC, db.MetaFCSelector, AppliedIndexKey, time.Now()) // WORK, here now can be any value, due to the key used to store the "applyed index" is not ttl key
 	if err != nil {
 		return 0, err
 	}
@@ -261,11 +261,11 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 			}
 			switch wCmd.Op {
 			case general_command.PutOp:
-			batch.Put(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, wCmd.Value, now)
+				batch.Put(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, wCmd.Value, now)
 			case general_command.PutOpTTL:
-			batch.PutTTl(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, wCmd.Value, wCmd.TTL, now)
+				batch.PutTTl(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, wCmd.Value, wCmd.TTL, now)
 			case general_command.DeleteOp, general_command.DeleteOpTTL:
-			batch.Delete(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, now)
+				batch.Delete(wCmd.ColumnFamilyName, wCmd.ColumnFamilySector, wCmd.Key, now)
 			default:
 				msg := fmt.Sprintf("unknown W Operation: %v", wCmd.Op)
 				ents[idx].Result = statemachine.Result{
