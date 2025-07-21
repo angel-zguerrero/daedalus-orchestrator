@@ -26,9 +26,6 @@ type PebbleStore struct {
 	ttlCfPrefixes map[string][]byte // Maps TTL column family name to its key prefix
 }
 
-// CreatePebbleStore creates and returns a new PebbleStore instance.
-// (Retaining previous implementation of CreatePebbleStore as it's not part of this subtask's changes,
-// but it should be compatible with the new getPrefixedKey logic if DefaultFC is handled correctly in it)
 func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamilyNames []string) (*PebbleStore, error) {
 	opts := pebble.Options{}
 	dbPath = filepath.Join(dbPath, "pebble")
@@ -45,13 +42,31 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 	ttlCfPrefixes := make(map[string][]byte)
 	allCfNames := make(map[string]struct{})
 
+	iter := db.NewIter(nil)
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		keyStr := string(key)
+
+		if strings.HasPrefix(keyStr, "cf-ttl-") {
+			parts := strings.SplitN(keyStr, ":", 2)
+			if len(parts) > 0 {
+				allCfNames[parts[0]] = struct{}{}
+			}
+		} else if strings.HasPrefix(keyStr, "cf-n-") {
+			parts := strings.SplitN(keyStr, ":", 2)
+			if len(parts) > 0 {
+				allCfNames[parts[0]] = struct{}{}
+			}
+		}
+	}
+	iter.Close()
+
 	addCf := func(name string, isTTL bool) error {
 		if _, exists := allCfNames[name]; exists {
-			return fmt.Errorf("duplicate column family name: %s", name)
+			return nil // Already discovered or added
 		}
 		allCfNames[name] = struct{}{}
-		// Using simple name as prefix, e.g., "default:", "meta:"
-		// This matches the new getPrefixedKey which expects prefix + key string
 		prefix := []byte(name + ":")
 		if isTTL {
 			ttlCfPrefixes[name] = prefix
@@ -59,6 +74,16 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 			cfPrefixes[name] = prefix
 		}
 		return nil
+	}
+
+	// Add discovered column families to the maps
+	for name := range allCfNames {
+		prefix := []byte(name + ":")
+		if strings.HasPrefix(name, "cf-ttl-") {
+			ttlCfPrefixes[name] = prefix
+		} else {
+			cfPrefixes[name] = prefix
+		}
 	}
 
 	if err := addCf(DefaultFC, false); err != nil {
@@ -949,7 +974,7 @@ func (ps *PebbleStore) CreateColumnFamily(columnFamilyName string, isTtl bool) e
 	} else {
 		ps.cfPrefixes[columnFamilyName] = newPrefix
 	}
-	return nil
+	return ps.PutRaw(columnFamilyName, "cfs-mark", "pebble-check", []byte("checked"))
 }
 
 // DeleteColumnFamily removes a column family.
