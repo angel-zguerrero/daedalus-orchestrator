@@ -28,12 +28,12 @@ func (u *UnitOfWork) Commit() error {
 	return u.KVStore.Write(u.batch)
 }
 
-func GetRepository[T ORMEntity](uow *UnitOfWork, cf string, schema string, factory IDGeneratorFactory) (*Repository[T], error) {
-	key := schema + "/" + cf + "/" + reflect.TypeOf((*T)(nil)).Elem().Name()
+func GetRepository[T ORMEntity](uow *UnitOfWork, cf, cfs, schema string, factory IDGeneratorFactory) (*Repository[T], error) {
+	key := schema + "/" + cf + "/" + cfs + "/" + reflect.TypeOf((*T)(nil)).Elem().Name()
 	if repo, ok := uow.repos[key]; ok {
 		return repo.(*Repository[T]), nil
 	}
-	repo, err := NewRepositoryWithBatch[T](uow.KVStore, cf, schema, factory, uow.batch)
+	repo, err := NewRepositoryWithBatch[T](uow.KVStore, cf, cfs, schema, factory, uow.batch)
 	if err != nil {
 		return nil, err
 	}

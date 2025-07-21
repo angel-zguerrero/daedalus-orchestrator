@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	TenantEventFC = "tenant-events"
+	TenantEventFC         = "tenant-events"
+	TenantEventFCSelector = "tenant-events-selector"
 )
 
 func OpenTenantDB(dbPath string) (KVStore, error) {

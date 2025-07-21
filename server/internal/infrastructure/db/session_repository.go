@@ -26,7 +26,7 @@ func NewSessionRepository(uow *UnitOfWork, factory IDGeneratorFactory, jwtKey []
 		return nil, fmt.Errorf("jwtKey is required for SessionRepository")
 	}
 
-	repo, err := GetRepository[models.UserSession](uow, MasterEventFC, "session_schema", factory)
+	repo, err := GetRepository[models.UserSession](uow, MasterEventFC, MasterEventFCSelector, "session_schema", factory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize generic repository for UserSession: %w", err)
 	}

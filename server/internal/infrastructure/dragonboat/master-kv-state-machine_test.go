@@ -62,10 +62,11 @@ func TestUpdate_SingleEntry(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "foo",
-				Value:            []byte("bar"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                "foo",
+				Value:              []byte("bar"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -101,10 +102,11 @@ func TestLookup_ExistingKey(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "lookup_key",
-				Value:            []byte("lookup_value"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                "lookup_key",
+				Value:              []byte("lookup_value"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -120,8 +122,9 @@ func TestLookup_ExistingKey(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              "lookup_key",
-			ColumnFamilyName: db.DefaultFC,
+			Key:                "lookup_key",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -138,8 +141,9 @@ func TestLookup_NonExistingKey(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              "missing_key",
-			ColumnFamilyName: db.DefaultFC,
+			Key:                "missing_key",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
 		},
 	}
 	var buf bytes.Buffer
@@ -168,10 +172,11 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "snap_key",
-				Value:            []byte("snap_value"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                "snap_key",
+				Value:              []byte("snap_value"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -205,8 +210,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	query1 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              "snap_key",
-			ColumnFamilyName: db.DefaultFC,
+			Key:                "snap_key",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
 		},
 	}
 
@@ -220,8 +226,9 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              dragonboat.AppliedIndexKey,
-			ColumnFamilyName: db.MetaFC,
+			Key:                dragonboat.AppliedIndexKey,
+			ColumnFamilyName:   db.MetaFC,
+			ColumnFamilySector: db.MetaFCSelector,
 		},
 	}
 
@@ -246,10 +253,11 @@ func TestSaveSnapshot_Cancelled(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "snap_key",
-				Value:            []byte("snap_value"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                "snap_key",
+				Value:              []byte("snap_value"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -358,9 +366,10 @@ func TestRead_SingleEntryIntoUpdate(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Read,
 			CMD: general_command.RK_Command{
-				Key:              "foo",
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.GetOp,
+				Key:                "foo",
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.GetOp,
 			},
 		},
 	}
@@ -388,11 +397,12 @@ func TestUpdate_PutWithTTL(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "ttl_key",
-				Value:            []byte("ttl_value"),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              5,
-				Op:               general_command.PutOpTTL,
+				Key:                "ttl_key",
+				Value:              []byte("ttl_value"),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                5,
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -454,11 +464,12 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "ttl_key",
-				Value:            []byte("ttl_value"),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              5,
-				Op:               general_command.PutOpTTL,
+				Key:                "ttl_key",
+				Value:              []byte("ttl_value"),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                5,
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -476,10 +487,11 @@ func TestUpdate_DeleteWithTTL(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "ttl_key",
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              5,
-				Op:               general_command.DeleteOpTTL,
+				Key:                "ttl_key",
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                5,
+				Op:                 general_command.DeleteOpTTL,
 			},
 		},
 	}
@@ -501,11 +513,12 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "ttl_test_key",
-				Value:            []byte("ttl_test_value"),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              10,
-				Op:               general_command.PutOpTTL,
+				Key:                "ttl_test_key",
+				Value:              []byte("ttl_test_value"),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                10,
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -520,9 +533,10 @@ func TestPutTTLStoresWithExpiration(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              "ttl_test_key",
-			ColumnFamilyName: db.MasterEventFC,
-			Op:               general_command.GetOpTTL,
+			Key:                "ttl_test_key",
+			ColumnFamilyName:   db.MasterEventFC,
+			ColumnFamilySector: db.MasterEventFCSelector,
+			Op:                 general_command.GetOpTTL,
 		},
 	}
 
@@ -547,11 +561,12 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              key,
-				Value:            []byte("soon_gone"),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              1,
-				Op:               general_command.PutOpTTL,
+				Key:                key,
+				Value:              []byte("soon_gone"),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                1,
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -568,9 +583,10 @@ func TestTTLExpirationRemovesKey(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              key,
-			ColumnFamilyName: db.MasterEventFC,
-			Op:               general_command.GetOpTTL,
+			Key:                key,
+			ColumnFamilyName:   db.MasterEventFC,
+			ColumnFamilySector: db.MasterEventFCSelector,
+			Op:                 general_command.GetOpTTL,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -594,11 +610,12 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              key,
-				Value:            []byte("value"),
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              60,
-				Op:               general_command.PutOpTTL,
+				Key:                key,
+				Value:              []byte("value"),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                60,
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -617,9 +634,10 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              key,
-				ColumnFamilyName: db.MasterEventFC,
-				Op:               general_command.DeleteOpTTL,
+				Key:                key,
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				Op:                 general_command.DeleteOpTTL,
 			},
 		},
 	}
@@ -634,9 +652,10 @@ func TestDeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              key,
-			ColumnFamilyName: db.MasterEventFC,
-			Op:               general_command.GetOpTTL,
+			Key:                key,
+			ColumnFamilyName:   db.MasterEventFC,
+			ColumnFamilySector: db.MasterEventFCSelector,
+			Op:                 general_command.GetOpTTL,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -659,11 +678,12 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              key,
-				Value:            value,
-				ColumnFamilyName: db.MasterEventFC,
-				TTL:              1,
-				Op:               general_command.PutOpTTL,
+				Key:                key,
+				Value:              value,
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                1,
+				Op:                 general_command.PutOpTTL,
 			},
 		},
 	}
@@ -697,9 +717,10 @@ func TestKVStateMachine_ClearExpiredTTL(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Op:               general_command.GetOpTTL,
-			ColumnFamilyName: db.MasterEventFC,
-			Key:              key,
+			Op:                 general_command.GetOpTTL,
+			ColumnFamilyName:   db.MasterEventFC,
+			ColumnFamilySector: db.MasterEventFCSelector,
+			Key:                key,
 		},
 	}
 	var buf bytes.Buffer
@@ -746,10 +767,11 @@ func TestUpdate_UnknownWriteOp(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "badop",
-				Value:            []byte("x"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               999,
+				Key:                "badop",
+				Value:              []byte("x"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 999,
 			},
 		},
 	}
@@ -776,10 +798,11 @@ func TestUpdate_InvalidNowField(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "foo",
-				Value:            []byte("bar"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                "foo",
+				Value:              []byte("bar"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -800,9 +823,10 @@ func TestUpdate_InvalidNowField(t *testing.T) {
 	queryCmd := general_command.Query_Command{
 		Now: utils.GetNowInInt(), // Use a valid 'Now' for lookup
 		Command: general_command.RK_Command{
-			Key:              "foo",
-			ColumnFamilyName: db.DefaultFC,
-			Op:               general_command.GetOp,
+			Key:                "foo",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
+			Op:                 general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -822,9 +846,10 @@ func TestLookup_InvalidNowField(t *testing.T) {
 	queryCmd := general_command.Query_Command{
 		Now: 0, // Invalid 'Now' field
 		Command: general_command.RK_Command{
-			Key:              "any_key",
-			ColumnFamilyName: db.DefaultFC,
-			Op:               general_command.GetOp,
+			Key:                "any_key",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
+			Op:                 general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -850,10 +875,11 @@ func TestUpdate_ValidNowField(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "valid_now_key",
-				Value:            []byte("valid_now_value"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                "valid_now_key",
+				Value:              []byte("valid_now_value"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -877,9 +903,10 @@ func TestUpdate_ValidNowField(t *testing.T) {
 	queryCmd := general_command.Query_Command{
 		Now: utils.GetNowInInt(), // Use a valid 'Now' for lookup
 		Command: general_command.RK_Command{
-			Key:              "valid_now_key",
-			ColumnFamilyName: db.DefaultFC,
-			Op:               general_command.GetOp,
+			Key:                "valid_now_key",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
+			Op:                 general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -905,10 +932,11 @@ func TestLookup_ValidNowField(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              keyToLookup,
-				Value:            []byte(valueToLookup),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                keyToLookup,
+				Value:              []byte(valueToLookup),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -924,9 +952,10 @@ func TestLookup_ValidNowField(t *testing.T) {
 	queryCmd := general_command.Query_Command{
 		Now: validNow, // Valid 'Now' field
 		Command: general_command.RK_Command{
-			Key:              keyToLookup,
-			ColumnFamilyName: db.DefaultFC,
-			Op:               general_command.GetOp,
+			Key:                keyToLookup,
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
+			Op:                 general_command.GetOp,
 		},
 	}
 	var queryBuf bytes.Buffer
@@ -970,10 +999,10 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 
 	// Insert some entries
 	entries := []general_command.WK_Command{
-		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
-		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
-		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
-		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, Op: general_command.PutOp},
+		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp},
+		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp},
+		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp},
+		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp},
 	}
 
 	for _, entry := range entries {
@@ -995,11 +1024,12 @@ func TestLookup_Search_MultipleResults(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			KeyPattern:       "user:*",
-			ColumnFamilyName: db.DefaultFC,
-			Cursor:           "",
-			Limit:            10,
-			Op:               general_command.Search,
+			KeyPattern:         "user:*",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
+			Cursor:             "",
+			Limit:              10,
+			Op:                 general_command.Search,
 		},
 	}
 
@@ -1033,11 +1063,12 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 			CMD: general_command.RWK_Command{
 				Op: general_command.Write,
 				CMD: general_command.WK_Command{
-					Key:              e.key,
-					Value:            []byte(e.value),
-					ColumnFamilyName: db.MasterEventFC,
-					TTL:              e.ttl,
-					Op:               general_command.PutOpTTL,
+				Key:                e.key,
+				Value:              []byte(e.value),
+				ColumnFamilyName:   db.MasterEventFC,
+				ColumnFamilySector: db.MasterEventFCSelector,
+				TTL:                e.ttl,
+				Op:                 general_command.PutOpTTL,
 				},
 			},
 		}
@@ -1054,11 +1085,12 @@ func TestLookup_SearchTTL_OnlyValidResults(t *testing.T) {
 	query := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			KeyPattern:       "k:*",
-			ColumnFamilyName: db.MasterEventFC,
-			Cursor:           "",
-			Limit:            10,
-			Op:               general_command.SearchTTL,
+			KeyPattern:         "k:*",
+			ColumnFamilyName:   db.MasterEventFC,
+			ColumnFamilySector: db.MasterEventFCSelector,
+			Cursor:             "",
+			Limit:              10,
+			Op:                 general_command.SearchTTL,
 		},
 	}
 
@@ -1093,10 +1125,11 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 		CMD: general_command.RWK_Command{
 			Op: general_command.Write,
 			CMD: general_command.WK_Command{
-				Key:              "snap_key",
-				Value:            []byte("snap_value"),
-				ColumnFamilyName: db.DefaultFC,
-				Op:               general_command.PutOp,
+				Key:                "snap_key",
+				Value:              []byte("snap_value"),
+				ColumnFamilyName:   db.DefaultFC,
+				ColumnFamilySector: db.DefaultFCSelector,
+				Op:                 general_command.PutOp,
 			},
 		},
 	}
@@ -1127,8 +1160,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	query1 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              "snap_key",
-			ColumnFamilyName: db.DefaultFC,
+			Key:                "snap_key",
+			ColumnFamilyName:   db.DefaultFC,
+			ColumnFamilySector: db.DefaultFCSelector,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -1141,8 +1175,9 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:              dragonboat.AppliedIndexKey,
-			ColumnFamilyName: db.MetaFC,
+			Key:                dragonboat.AppliedIndexKey,
+			ColumnFamilyName:   db.MetaFC,
+			ColumnFamilySector: db.MetaFCSelector,
 		},
 	}
 	var bufQ2 bytes.Buffer

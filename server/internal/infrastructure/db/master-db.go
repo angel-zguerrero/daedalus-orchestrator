@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	AdminFC       = "admin"
-	MasterEventFC = "master-events"
+	AdminFC               = "admin"
+	MasterEventFC         = "master-events"
+	MasterEventFCSelector = "master-events-selector"
+	AdminFCSelector       = "admin-selector"
 )
 
 func OpenMasterDB(dbPath string) (KVStore, error) {

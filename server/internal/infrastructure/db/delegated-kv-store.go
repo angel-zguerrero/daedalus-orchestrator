@@ -15,31 +15,31 @@ func NewDelegatedKVStore(base KVStore, batch *WriteBatch) *DelegatedKVStore {
 }
 
 // Get simplemente delega
-func (d *DelegatedKVStore) Get(cf string, key string, now time.Time) ([]byte, error) {
-	return d.base.Get(cf, key, now)
+func (d *DelegatedKVStore) Get(cf, cfs, key string, now time.Time) ([]byte, error) {
+	return d.base.Get(cf, cfs, key, now)
 }
 
 // Delete interceptado y va al batch
 // The `now` parameter is not used here as the actual deletion happens when the batch is written.
-func (d *DelegatedKVStore) Delete(cf string, key string, now time.Time) error {
-	d.batch.Delete(cf, key, now)
+func (d *DelegatedKVStore) Delete(cf, cfs, key string, now time.Time) error {
+	d.batch.Delete(cf, cfs, key, now)
 	return nil
 }
 
 // Put interceptado, soporta TTL
 // The `now` parameter is not used here as the actual put happens when the batch is written.
-func (d *DelegatedKVStore) Put(cf string, key string, value []byte, ttl int, now time.Time) error {
+func (d *DelegatedKVStore) Put(cf, cfs, key string, value []byte, ttl int, now time.Time) error {
 	if ttl > 0 {
-		d.batch.PutTTl(cf, key, value, ttl, now)
+		d.batch.PutTTl(cf, cfs, key, value, ttl, now)
 	} else {
-		d.batch.Put(cf, key, value, now)
+		d.batch.Put(cf, cfs, key, value, now)
 	}
 	return nil
 }
 
 // PutRaw = sin TTL
-func (d *DelegatedKVStore) PutRaw(cf string, key string, value []byte) error {
-	d.batch.Put(cf, key, value, time.Now())
+func (d *DelegatedKVStore) PutRaw(cf, cfs, key string, value []byte) error {
+	d.batch.Put(cf, cfs, key, value, time.Now())
 	return nil
 }
 
@@ -67,19 +67,19 @@ func (d *DelegatedKVStore) WriteRaw(batch *WriteBatch) error {
 }
 
 // Resto delegados
-func (d *DelegatedKVStore) SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
-	return d.base.SearchByPatternPaginatedKV(cfName, pattern, cursor, limit, now)
+func (d *DelegatedKVStore) SearchByPatternPaginatedKV(cfName, cfs, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
+	return d.base.SearchByPatternPaginatedKV(cfName, cfs, pattern, cursor, limit, now)
 }
 
-func (d *DelegatedKVStore) Exists(cfName, key string, now time.Time) (bool, error) {
-	return d.base.Exists(cfName, key, now)
+func (d *DelegatedKVStore) Exists(cfName, cfs, key string, now time.Time) (bool, error) {
+	return d.base.Exists(cfName, cfs, key, now)
 }
 
 func (d *DelegatedKVStore) DumpAll() (interface{}, error) {
 	return d.base.DumpAll()
 }
 
-func (d *DelegatedKVStore) Iterate(fn func(cfName string, key, value []byte) error) error {
+func (d *DelegatedKVStore) Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error {
 	return d.base.Iterate(fn)
 }
 

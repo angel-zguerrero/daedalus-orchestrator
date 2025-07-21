@@ -26,7 +26,7 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 	kvStore := uow.KVStore
 
 	// Obtener último shard ID
-	lastShardIdBytes, err := kvStore.Get(db.AdminFC, "last-shard-id", now)
+	lastShardIdBytes, err := kvStore.Get(db.AdminFC, db.AdminFCSelector, "last-shard-id", now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -88,7 +88,7 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
-	err = kvStore.Put(db.AdminFC, "last-shard-id", nextShardIdInBytes, 0, now)
+	err = kvStore.Put(db.AdminFC, db.AdminFCSelector, "last-shard-id", nextShardIdInBytes, 0, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

@@ -3,6 +3,7 @@ package db
 import "time"
 
 type DataStruct struct {
+	CFS   string
 	CF    string
 	Key   string
 	Value []byte
@@ -23,8 +24,9 @@ func NewWriteBatch() *WriteBatch {
 }
 
 // Put adds a put operation to the batch.
-func (wb *WriteBatch) Put(columnFamily string, key string, value []byte, now time.Time) {
+func (wb *WriteBatch) Put(columnFamily, columnFamilySector string, key string, value []byte, now time.Time) {
 	wb.Data = append(wb.Data, DataStruct{
+		CFS:   columnFamilySector,
 		CF:    columnFamily,
 		Key:   key,
 		Value: value,
@@ -33,8 +35,9 @@ func (wb *WriteBatch) Put(columnFamily string, key string, value []byte, now tim
 	})
 }
 
-func (wb *WriteBatch) PutTTl(columnFamily string, key string, value []byte, ttl int, now time.Time) {
+func (wb *WriteBatch) PutTTl(columnFamily, columnFamilySector string, key string, value []byte, ttl int, now time.Time) {
 	wb.Data = append(wb.Data, DataStruct{
+		CFS:   columnFamilySector,
 		CF:    columnFamily,
 		Key:   key,
 		Value: value,
@@ -45,8 +48,9 @@ func (wb *WriteBatch) PutTTl(columnFamily string, key string, value []byte, ttl 
 }
 
 // Delete adds a delete operation to the batch.
-func (wb *WriteBatch) Delete(columnFamily string, key string, now time.Time) {
+func (wb *WriteBatch) Delete(columnFamily, columnFamilySector string, key string, now time.Time) {
 	wb.Data = append(wb.Data, DataStruct{
+		CFS:  columnFamilySector,
 		CF:   columnFamily,
 		Key:  key,
 		Type: "delete",
@@ -71,9 +75,9 @@ type KVStore interface {
 	// Returns:
 	//   - The value as a byte slice, or nil if the key is not found.
 	//   - An error if any occurred during the operation.
-	Get(columnFamily string, key string, now time.Time) ([]byte, error)
+	Get(columnFamily, columnFamilySector string, key string, now time.Time) ([]byte, error)
 
-	Delete(columnFamily string, key string, now time.Time) error
+	Delete(columnFamily, columnFamilySector string, key string, now time.Time) error
 
 	// Put stores a key-value pair into a specific column family.
 	// If the key already exists, its value will be overwritten.
@@ -85,9 +89,9 @@ type KVStore interface {
 	//   - now: The current time, for TTL calculations.
 	// Returns:
 	//   - An error if any occurred during the operation.
-	Put(columnFamily string, key string, value []byte, ttl int, now time.Time) error
+	Put(columnFamily, columnFamilySector string, key string, value []byte, ttl int, now time.Time) error
 
-	PutRaw(columnFamily string, key string, value []byte) error
+	PutRaw(columnFamily, columnFamilySector string, key string, value []byte) error
 
 	// Write applies a batch of operations (e.g., Puts, Deletes) atomically.
 	// The exact type of `batch` depends on the KVStore implementation.
@@ -100,9 +104,9 @@ type KVStore interface {
 
 	WriteRaw(batch *WriteBatch) error
 
-	SearchByPatternPaginatedKV(cfName, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error)
+	SearchByPatternPaginatedKV(cfName, cfSelector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error)
 
-	Exists(cfName, key string, now time.Time) (bool, error)
+	Exists(cfName, cfSelector, key string, now time.Time) (bool, error)
 
 	// DumpAll retrieves all key-value pairs from the store.
 	// The format of the returned data (interface{}) is implementation-specific.
@@ -121,7 +125,7 @@ type KVStore interface {
 	//         If this function returns an error, the iteration stops and the error is returned.
 	// Returns:
 	//   - An error if any occurred during iteration or if `fn` returned an error.
-	Iterate(fn func(cfName string, key, value []byte) error) error
+	Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error
 
 	// ClearAll removes all data from the key-value store. This is a destructive operation.
 	// Returns:

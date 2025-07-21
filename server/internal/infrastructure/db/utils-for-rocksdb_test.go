@@ -39,7 +39,6 @@ func newRocksdbStore(t *testing.T) *db.RocksdbStore {
 
 	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{DefaultFC, TestFC, TemporalFC, db.MasterEventFC}, []*grocksdb.Options{goOp, goOp, goOp, goOp})
 	require.NoError(t, err)
-	t.Cleanup(func() { rocks.Close() })
 
 	columnFamilyNames, err := grocksdb.ListColumnFamilies(opts, tmpDir)
 	require.NoError(t, err)

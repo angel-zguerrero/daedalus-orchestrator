@@ -15,37 +15,37 @@ import (
 func newTestRepositoryPebble(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
 }
 
 func newTestDeterministicRepositoryPebble(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := &db.DeterministicIDGeneratorFactory{}
-	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
 }
 
 func newTestRepositorySpesificIdsPebble(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := NewTestIDGeneratorFactory(ids)
-	return db.NewRepository[testEntity](store, TestFC, "test_schema", iGF)
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
 }
 
 func newTestRepositoryDefaultIdGeneratorPebble(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 
-	return db.NewRepository[testEntity](store, TestFC, "test_schema", &db.DefaultIDGeneratorFactory{})
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
 }
 
 func newTestNRepositoryPebble(t *testing.T) (*db.Repository[UserComplex], error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	return db.NewRepository[UserComplex](store, TestFC, "test_schema", iGF)
+	return db.NewRepository[UserComplex](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
 }
 
 func newNestedEntityTestPebbleRepositoryPebble(t *testing.T) (*db.Repository[NestedEntityTest], error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})       // Assumes newPebbleStore is defined in this file
 	iGF := NewTestIDGeneratorFactory([]string{"pnid1", "pnid2", "pnid3", "pnid4", "pnid5"}) // Example IDs for Pebble
-	return db.NewRepository[NestedEntityTest](store, TestFC, "nested_entity_schema_pebble", iGF)
+	return db.NewRepository[NestedEntityTest](store, TestFC, testColumnFamilySelector, "nested_entity_schema_pebble", iGF)
 }
 
 // --- Conditional Uniqueness Tests ---
@@ -53,7 +53,7 @@ func newNestedEntityTestPebbleRepositoryPebble(t *testing.T) (*db.Repository[Nes
 func newTestConditionalUniqueRepoPebble(t *testing.T, initialIDs []string) (*db.Repository[ConditionalUniqueEntity], db.KVStore) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	idGenerator := NewTestIDGeneratorFactory(initialIDs)
-	repo, err := db.NewRepository[ConditionalUniqueEntity](store, TestFC, "test_schema_cond", idGenerator)
+	repo, err := db.NewRepository[ConditionalUniqueEntity](store, TestFC, testColumnFamilySelector, "test_schema_cond", idGenerator)
 	require.NoError(t, err, "Failed to create repository for ConditionalUniqueEntity")
 	return repo, store
 }
