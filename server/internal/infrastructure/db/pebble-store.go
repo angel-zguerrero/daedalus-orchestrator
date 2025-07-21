@@ -974,7 +974,7 @@ func (ps *PebbleStore) CreateColumnFamily(columnFamilyName string, isTtl bool) e
 	} else {
 		ps.cfPrefixes[columnFamilyName] = newPrefix
 	}
-	return ps.PutRaw(columnFamilyName, "cfs-mark", "pebble-check", []byte("checked"))
+	return ps.PutRaw(columnFamilyName, "cfs-mark", "cfs-mark-check", []byte("checked"))
 }
 
 // DeleteColumnFamily removes a column family.

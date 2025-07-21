@@ -901,7 +901,7 @@ func (r *RocksdbStore) CreateColumnFamily(columnFamilyName string, isTtl bool) e
 		r.ColumnFamilyHandles[columnFamilyName] = cfHandle
 	}
 	r.currentCFs[columnFamilyName] = true
-	return nil
+	return r.PutRaw(columnFamilyName, "cfs-mark", "cfs-mark-check", []byte("checked"))
 }
 
 // DeleteColumnFamily deletes a column family from the RocksDB store.
