@@ -42,15 +42,12 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 	ttlCfPrefixes := make(map[string][]byte)
 	allCfNames := make(map[string]struct{})
 
-	// Scan existing keys to discover column families
-	iter, err := db.NewIter(&pebble.IterOptions{})
-	if err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to create iterator for discovering column families: %w", err)
-	}
+	iter := db.NewIter(nil)
+
 	for iter.First(); iter.Valid(); iter.Next() {
 		key := iter.Key()
 		keyStr := string(key)
+
 		if strings.HasPrefix(keyStr, "cf-ttl-") {
 			parts := strings.SplitN(keyStr, ":", 2)
 			if len(parts) > 0 {
@@ -977,7 +974,7 @@ func (ps *PebbleStore) CreateColumnFamily(columnFamilyName string, isTtl bool) e
 	} else {
 		ps.cfPrefixes[columnFamilyName] = newPrefix
 	}
-	return nil
+	return ps.PutRaw(columnFamilyName, "cfs-mark", "pebble-check", []byte("checked"))
 }
 
 // DeleteColumnFamily removes a column family.
