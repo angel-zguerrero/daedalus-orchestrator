@@ -43,7 +43,7 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 	allCfNames := make(map[string]struct{})
 
 	// Scan existing keys to discover column families
-	iter, err := db.NewIter(nil)
+	iter, err := db.NewIter(&pebble.IterOptions{})
 	if err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to create iterator for discovering column families: %w", err)
