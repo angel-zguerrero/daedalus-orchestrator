@@ -13,14 +13,14 @@ import (
 
 func newTestTTLRepositoryDefaultIdGeneratorPebble(t *testing.T) (*db.Repository[testEntity], db.KVStore, error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
-	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 	return repository, store, err
 }
 
 func newTestTTLRepositoryPebble(t *testing.T) (*db.Repository[testEntity], db.KVStore, error) {
 	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySelector, "test_schema", iGF)
+	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySector, "test_schema", iGF)
 	return repository, store, err
 }
 
@@ -34,10 +34,10 @@ func TestPebbleStore_PutAndGet(t *testing.T) {
 	value := []byte("value")
 	now := time.Now()
 
-	err = store.Put(TestFC, testColumnFamilySelector, key, value, 0, now)
+	err = store.Put(TestFC, testColumnFamilySector, key, value, 0, now)
 	require.NoError(t, err)
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySector, key, now)
 	require.NoError(t, err)
 	assert.Equal(t, value, result)
 }
@@ -49,7 +49,7 @@ func TestPebbleStore_Get_NotFound(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, "nonexistent", now)
+	result, err := store.Get(TestFC, testColumnFamilySector, "nonexistent", now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -62,17 +62,17 @@ func TestPebbleStore_WriteBatch(t *testing.T) {
 	now := time.Now()
 
 	batch := db.NewWriteBatch()
-	batch.Put(TestFC, testColumnFamilySelector, "a", []byte("valueA"), now)
-	batch.Put(TestFC, testColumnFamilySelector, "b", []byte("valueB"), now)
+	batch.Put(TestFC, testColumnFamilySector, "a", []byte("valueA"), now)
+	batch.Put(TestFC, testColumnFamilySector, "b", []byte("valueB"), now)
 
 	err = store.Write(batch)
 	require.NoError(t, err)
 
-	resultA, err := store.Get(TestFC, testColumnFamilySelector, "a", now)
+	resultA, err := store.Get(TestFC, testColumnFamilySector, "a", now)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueA"), resultA)
 
-	resultB, err := store.Get(TestFC, testColumnFamilySelector, "b", now)
+	resultB, err := store.Get(TestFC, testColumnFamilySector, "b", now)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueB"), resultB)
 }
@@ -84,9 +84,9 @@ func TestPebbleStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:123:name", []byte("Alice"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:123:name", []byte("Alice"), 0, now))
 
-	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:123:*", "", 10, now)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySector, "user:123:*", "", 10, now)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "user:123:name", results[0].Key)
@@ -101,14 +101,14 @@ func TestPebbleStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T)
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:1", []byte("a"), 0, now))
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:2", []byte("b"), 0, now))
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:3", []byte("c"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:1", []byte("a"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:2", []byte("b"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:3", []byte("c"), 0, now))
 
 	var all []db.KeyValuePair
 	cursor := ""
 	for {
-		page, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:*", cursor, 2, now)
+		page, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySector, "user:*", cursor, 2, now)
 		require.NoError(t, err)
 		all = append(all, page...)
 		if next == "" {
@@ -126,9 +126,9 @@ func TestPebbleStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "product:1", []byte("item"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "product:1", []byte("item"), 0, now))
 
-	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:*", "", 10, now)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySector, "user:*", "", 10, now)
 	require.NoError(t, err)
 	require.Empty(t, results)
 	require.Equal(t, "", next)
@@ -141,7 +141,7 @@ func TestPebbleStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.T
 	defer store.Close()
 	now := time.Now()
 
-	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", testColumnFamilySelector, "pattern:*", "", 10, now)
+	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", testColumnFamilySector, "pattern:*", "", 10, now)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }
@@ -156,10 +156,10 @@ func TestPebbleStore_Delete_ExistingKey(t *testing.T) {
 	key := "delete-key"
 	value := []byte("to-delete")
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, key, value, 0, now))
-	require.NoError(t, store.Delete(TestFC, testColumnFamilySelector, key, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, key, value, 0, now))
+	require.NoError(t, store.Delete(TestFC, testColumnFamilySector, key, now))
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySector, key, now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -171,7 +171,7 @@ func TestPebbleStore_Delete_NonExistentKey(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	err = store.Delete(TestFC, testColumnFamilySelector, "nonexistent", now)
+	err = store.Delete(TestFC, testColumnFamilySector, "nonexistent", now)
 	assert.NoError(t, err)
 }
 
@@ -182,7 +182,7 @@ func TestPebbleStore_Delete_InvalidColumnFamily(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	err = store.Delete("nonexistent_cf", testColumnFamilySelector, "key", now)
+	err = store.Delete("nonexistent_cf", testColumnFamilySector, "key", now)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }
@@ -197,10 +197,10 @@ func TestPebbleStore_Delete_TTLColumnFamily(t *testing.T) {
 	key := "ttl-key"
 	value := []byte("ttl-value")
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, key, value, 0, now))
-	require.NoError(t, store.Delete(TestFC, testColumnFamilySelector, key, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, key, value, 0, now))
+	require.NoError(t, store.Delete(TestFC, testColumnFamilySector, key, now))
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySector, key, now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -235,32 +235,32 @@ func TestPebbleRepository_TTL_BasicExpiration(t *testing.T) {
 	// Verify directly from kvStore (TemporalFC) before ttl
 
 	mainDataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-	dataBytes, err := store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, now)
+	dataBytes, err := store.Get(TemporalFC, testColumnFamilySector, mainDataKey, now)
 	require.NoError(t, err)
 	assert.NotNil(t, dataBytes)
 
 	uniqueIndexKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
-	idxBytes, err := store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, now)
+	idxBytes, err := store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyLastName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyLastName, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyLastName, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyAge := fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyAge, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyAge, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyID := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
@@ -278,32 +278,32 @@ func TestPebbleRepository_TTL_BasicExpiration(t *testing.T) {
 	expiredTimeCheck := creationTime.Add(time.Duration(entity.TTL+1) * time.Second)
 
 	mainDataKey = fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-	dataBytes, err = store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, expiredTimeCheck)
+	dataBytes, err = store.Get(TemporalFC, testColumnFamilySector, mainDataKey, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, dataBytes)
 
 	uniqueIndexKey = fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyLastName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyLastName, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyLastName, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyAge = fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyAge, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyAge, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyID = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 }
@@ -468,22 +468,22 @@ func TestPebbleRepository_TTL_BulkCreateExpiration(t *testing.T) {
 
 		// Verify directly from kvStore (TemporalFC)
 		mainDataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-		dataBytes, err := store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, expiredTimeCheck)
+		dataBytes, err := store.Get(TemporalFC, testColumnFamilySector, mainDataKey, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, dataBytes, "Main data key should be nil for ID %s", createdID)
 
 		uniqueIndexKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", originalEntity.Name)
-		idxBytes, err := store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, expiredTimeCheck)
+		idxBytes, err := store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "Unique index key should be nil for Name %s", originalEntity.Name)
 
 		generalIndexKeyName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", originalEntity.Name, createdID)
-		idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, expiredTimeCheck)
+		idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "General name index key should be nil for Name %s, ID %s", originalEntity.Name, createdID)
 
 		generalIndexKeyID := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-		idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, expiredTimeCheck)
+		idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "General ID index key should be nil for ID %s", createdID)
 	}
@@ -530,17 +530,17 @@ func TestPebbleStore_ColumnFamilyOperations(t *testing.T) {
 
 	// 7. Put/Get in new non-TTL CF
 	key1, val1 := "key1", []byte("val1")
-	err = store.Put(cfName, testColumnFamilySelector, key1, val1, 0, time.Now())
+	err = store.Put(cfName, testColumnFamilySector, key1, val1, 0, time.Now())
 	require.NoError(t, err)
-	retVal1, err := store.Get(cfName, testColumnFamilySelector, key1, time.Now())
+	retVal1, err := store.Get(cfName, testColumnFamilySector, key1, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, val1, retVal1)
 
 	// 8. Put/Get in new TTL CF
 	key2, val2 := "key2", []byte("val2")
-	err = store.Put(cfNameTTL, testColumnFamilySelector, key2, val2, 3600, time.Now())
+	err = store.Put(cfNameTTL, testColumnFamilySector, key2, val2, 3600, time.Now())
 	require.NoError(t, err)
-	retVal2, err := store.Get(cfNameTTL, testColumnFamilySelector, key2, time.Now())
+	retVal2, err := store.Get(cfNameTTL, testColumnFamilySector, key2, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, val2, retVal2)
 
@@ -555,7 +555,7 @@ func TestPebbleStore_ColumnFamilyOperations(t *testing.T) {
 	assert.False(t, isTTL)
 
 	// 11. Get from deleted non-TTL CF should fail or return not found (implementation specific, check for error)
-	_, err = store.Get(cfName, testColumnFamilySelector, key1, time.Now())
+	_, err = store.Get(cfName, testColumnFamilySector, key1, time.Now())
 	require.Error(t, err) // Expect an error as CF is gone
 
 	// 12. DeleteColumnFamily - TTL

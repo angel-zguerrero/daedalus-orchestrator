@@ -104,9 +104,9 @@ type KVStore interface {
 
 	WriteRaw(batch *WriteBatch) error
 
-	SearchByPatternPaginatedKV(cfName, cfSelector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error)
+	SearchByPatternPaginatedKV(cfName, cfSector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error)
 
-	Exists(cfName, cfSelector, key string, now time.Time) (bool, error)
+	Exists(cfName, cfSector, key string, now time.Time) (bool, error)
 
 	// DumpAll retrieves all key-value pairs from the store.
 	// The format of the returned data (interface{}) is implementation-specific.
@@ -125,7 +125,7 @@ type KVStore interface {
 	//         If this function returns an error, the iteration stops and the error is returned.
 	// Returns:
 	//   - An error if any occurred during iteration or if `fn` returned an error.
-	Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error
+	Iterate(fn func(cfName string, cfSector string, key, value []byte) error) error
 
 	// ClearAll removes all data from the key-value store. This is a destructive operation.
 	// Returns:

@@ -17,18 +17,18 @@ func TestNewRepositoryConditionalUniquenessValidations(t *testing.T) {
 	iGF := NewTestIDGeneratorFactory([]string{})
 
 	t.Run("Valid ConditionalUniqueEntity", func(t *testing.T) {
-		_, err := db.NewRepository[ConditionalUniqueEntity](mockStore, "cf_valid", testColumnFamilySelector, "test_valid", iGF)
+		_, err := db.NewRepository[ConditionalUniqueEntity](mockStore, "cf_valid", testColumnFamilySector, "test_valid", iGF)
 		require.NoError(t, err)
 	})
 
 	t.Run("InvalidConditionalEntityBadRef - NonExistentFlag", func(t *testing.T) {
-		_, err := db.NewRepository[InvalidConditionalEntityBadRef](mockStore, "cf_bad_ref", testColumnFamilySelector, "test_bad_ref", iGF)
+		_, err := db.NewRepository[InvalidConditionalEntityBadRef](mockStore, "cf_bad_ref", testColumnFamilySector, "test_bad_ref", iGF)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "field 'UniqueValue' tagged with 'ignore-is-true:NonExistentFlag', but referenced field 'NonExistentFlag' does not exist in struct InvalidConditionalEntityBadRef")
 	})
 
 	t.Run("InvalidConditionalEntityBadType - NonBoolFlag", func(t *testing.T) {
-		_, err := db.NewRepository[InvalidConditionalEntityBadType](mockStore, "cf_bad_type", testColumnFamilySelector, "test_bad_type", iGF)
+		_, err := db.NewRepository[InvalidConditionalEntityBadType](mockStore, "cf_bad_type", testColumnFamilySector, "test_bad_type", iGF)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "field 'UniqueValue' tagged with 'ignore-is-true:NonBoolFlag', but referenced field 'NonBoolFlag' must be of type 'bool', found 'int'")
 	})
@@ -36,7 +36,7 @@ func TestNewRepositoryConditionalUniquenessValidations(t *testing.T) {
 	// Test for createFieldDefinition error: ignore-is-true with empty field name
 
 	t.Run("InvalidConditionalEmptyField - ignore-is-true with empty field", func(t *testing.T) {
-		_, err := db.NewRepository[InvalidConditionalEmptyField](mockStore, "cf_empty", testColumnFamilySelector, "test_empty", iGF)
+		_, err := db.NewRepository[InvalidConditionalEmptyField](mockStore, "cf_empty", testColumnFamilySector, "test_empty", iGF)
 		require.Error(t, err)
 		// This error comes from createFieldDefinition
 		assert.Contains(t, err.Error(), "error extracting fields from struct InvalidConditionalEmptyField: invalid ignore-is-true format for field 'UniqueValue': ignore-is-true:")
@@ -53,7 +53,7 @@ func TestRepository_Create_Success(t *testing.T) {
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	data, _ := json.Marshal(user)
@@ -62,14 +62,14 @@ func TestRepository_Create_Success(t *testing.T) {
 	uNameFieldKey := "admin:users:idx-u:Name:Alice"
 	indexKey := "admin:users:idx:ID:123:123"
 
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, uNameFieldKey, mock.Anything).Return(false, nil)
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, "admin:users:data:123", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, uNameFieldKey, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:123", mock.Anything).Return(false, nil)
 	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Put("cf1", testColumnFamilySelector, indexKey, []byte("123"), now)
-	batch.Put("cf1", testColumnFamilySelector, nameFieldKey, []byte("123"), now)
-	batch.Put("cf1", testColumnFamilySelector, uNameFieldKey, []byte("123"), now)
-	batch.Put("cf1", testColumnFamilySelector, dataKey, data, now)
+	batch.Put("cf1", testColumnFamilySector, indexKey, []byte("123"), now)
+	batch.Put("cf1", testColumnFamilySector, nameFieldKey, []byte("123"), now)
+	batch.Put("cf1", testColumnFamilySector, uNameFieldKey, []byte("123"), now)
+	batch.Put("cf1", testColumnFamilySector, dataKey, data, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -86,7 +86,7 @@ func TestRepository_Create_DuplicatePrimaryKey_InDB(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing ID in entity
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	existingUserID := "existing-id-123"
@@ -97,7 +97,7 @@ func TestRepository_Create_DuplicatePrimaryKey_InDB(t *testing.T) {
 
 	// Mock that the primary key (data key) already exists
 	dataKey := "admin:users:data:" + existingUserID
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(true, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(true, nil)
 	// No unique checks for "Name" should be hit if PK check fails first
 	// No "Write" should be called
 
@@ -112,7 +112,7 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing IDs in entities
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	existingUserID := "existing-bulk-id-456"
@@ -126,11 +126,11 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InDB(t *testing.T) {
 	pkDataKeyExisting := "admin:users:data:" + existingUserID
 	// For the first user (new-bulk-id-1), PK check should pass
 	pkDataKeyNew1 := "admin:users:data:new-bulk-id-1"
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, pkDataKeyNew1, mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf1", testColumnFamilySector, pkDataKeyNew1, mock.Anything).Return(false, nil).Once()
 	// For the second user (existingUserID), PK check should fail
-	//mockStore.On("Exists", "cf1", testColumnFamilySelector, pkDataKeyExisting).Return(true, nil).Once()
+	//mockStore.On("Exists", "cf1", testColumnFamilySector, pkDataKeyExisting).Return(true, nil).Once()
 
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, pkDataKeyExisting, mock.Anything).Return(true, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, pkDataKeyExisting, mock.Anything).Return(true, nil)
 	// No further Exists or Write calls should happen for subsequent users or the batch itself.
 
 	_, err = repo.BulkCreate(users, time.Now())
@@ -144,7 +144,7 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := &db.DeterministicIDGeneratorFactory{} // Allows providing IDs in entities
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	duplicateIDInBatch := "dup-batch-id-789"
@@ -160,8 +160,8 @@ func TestRepository_BulkCreate_DuplicatePrimaryKey_InBatch(t *testing.T) {
 	pkDataKeyDup := "admin:users:data:" + duplicateIDInBatch
 
 	// The third user will cause the "duplicate primary key in input batch" error before DB check.
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, pkDataKeyUnique1, mock.Anything).Return(false, nil)
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, pkDataKeyDup, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, pkDataKeyUnique1, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, pkDataKeyDup, mock.Anything).Return(false, nil)
 
 	_, err = repo.BulkCreate(users, time.Now())
 	require.Error(t, err)
@@ -174,7 +174,7 @@ func TestRepository_Create_EmptyProvidedID(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := &db.DeterministicIDGeneratorFactory{} // Using this factory means ID must be provided
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	userWithEmptyID := User{
@@ -200,14 +200,14 @@ func TestRepository_Create_DuplicateUnique(t *testing.T) {
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	uIndexKey := "admin:users:idx-u:Name:Alice"
 	dataey := "admin:users:data:123"
-	mockStore.On("Get", "cf1", testColumnFamilySelector, uIndexKey, mock.Anything).Return([]byte("123"), nil)
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, uIndexKey, mock.Anything).Return(true, nil)
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, dataey, mock.Anything).Return(false, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, uIndexKey, mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, uIndexKey, mock.Anything).Return(true, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, dataey, mock.Anything).Return(false, nil)
 
 	_, err = repo.Create(&user, time.Now())
 	assert.Error(t, err)
@@ -218,7 +218,7 @@ func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
 	mockStore := new(MockKVStore)
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	_, err := db.NewRepository[NoPrimary](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.EqualError(t, err, "struct NoPrimary must have a string field named 'ID' with `orm:\"primary-key\"`")
 
 }
@@ -226,7 +226,7 @@ func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
 func TestRepository_FindByField_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	uIndexKey := "admin:users:idx-u:Name:Alice"
@@ -234,8 +234,8 @@ func TestRepository_FindByField_Success(t *testing.T) {
 	user := User{ID: "123", Name: "Alice"}
 	data, _ := json.Marshal(user)
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, uIndexKey, mock.Anything).Return([]byte("123"), nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(data, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, uIndexKey, mock.Anything).Return([]byte("123"), nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(data, nil)
 
 	result, err := repo.FindByField("Name", "Alice", time.Now())
 	assert.NoError(t, err)
@@ -247,7 +247,7 @@ func TestRepository_FindByField_Success(t *testing.T) {
 func TestRepository_FindByField_Unknown_Field_Name(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	_, err = repo.FindByField("x", "Alice", time.Now())
@@ -258,10 +258,10 @@ func TestRepository_FindByField_Unknown_Field_Name(t *testing.T) {
 func TestRepository_Find_AND_Unknown_Field_Name(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:users:idx:ID:123:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:users:idx:ID:123:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 
 	_, err = repo.Find("ID=123&X=Alice", 1000, "", time.Now())
@@ -273,7 +273,7 @@ func TestRepository_Find_AND_Unknown_Field_Name(t *testing.T) {
 func TestRepository_FindByField_Invalid_Use_For_TTL_Query(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	_, err = repo.FindByField("TTL", "111", time.Now())
@@ -284,10 +284,10 @@ func TestRepository_FindByField_Invalid_Use_For_TTL_Query(t *testing.T) {
 func TestRepository_Find_AND_Invalid_Use_For_TTL_Query(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[TempEntity](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:temporal_entities:idx:ID:123:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:temporal_entities:idx:ID:123:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 
 	_, err = repo.Find("ID=123&TTL=22", 1000, "", time.Now())
@@ -299,7 +299,7 @@ func TestRepository_Find_AND_Invalid_Use_For_TTL_Query(t *testing.T) {
 func TestRepository_FindByField_Invalid_TTL_Field_name(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	_, err := db.NewRepository[InvalidTempEntity](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	_, err := db.NewRepository[InvalidTempEntity](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error extracting fields from struct InvalidTempEntity: ttl can only be defined on top-level 'TTL' field, found on 'ttl'")
 }
@@ -308,7 +308,7 @@ func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
 
-	_, err := db.NewRepository[Invalid](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	_, err := db.NewRepository[Invalid](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "struct Invalid must have a string field named 'ID' with `orm:\"primary-key\"`")
 }
@@ -316,17 +316,17 @@ func TestNewRepository_MissingPrimaryKey(t *testing.T) {
 func TestRepository_Find_AND(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	user := User{ID: "123", Name: "Alice"}
 	data, _ := json.Marshal(user)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:users:idx:ID:123:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:users:idx:ID:123:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:users:idx:Name:Alice:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:users:idx:Name:Alice:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:123", mock.Anything).
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:123", mock.Anything).
 		Return(data, nil)
 
 	result, err := repo.Find("ID=123&Name=Alice", 1000, "", time.Now())
@@ -338,7 +338,7 @@ func TestRepository_Find_AND(t *testing.T) {
 func TestRepository_Find_OR(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	user1 := User{ID: "123", Name: "Alice"}
@@ -346,13 +346,13 @@ func TestRepository_Find_OR(t *testing.T) {
 	data1, _ := json.Marshal(user1)
 	data2, _ := json.Marshal(user2)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:users:idx:Name:Alice:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:users:idx:Name:Alice:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:users:idx:Name:Bob:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:users:idx:Name:Bob:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("456")}}, "", nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:123", mock.Anything).
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:123", mock.Anything).
 		Return(data1, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:456", mock.Anything).
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:456", mock.Anything).
 		Return(data2, nil)
 
 	result, err := repo.Find("Name=Alice|Name=Bob", 1000, "", time.Now())
@@ -363,15 +363,15 @@ func TestRepository_Find_OR(t *testing.T) {
 func TestRepository_Find_SpecialCharacters(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	user := User{ID: "999", Name: "foo:bar"}
 	data, _ := json.Marshal(user)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:users:idx:Name:foo:bar:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:users:idx:Name:foo:bar:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Value: []byte("999")}}, "", nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:999", mock.Anything).
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:999", mock.Anything).
 		Return(data, nil)
 
 	result, err := repo.Find("Name=foo:bar", 1000, "", time.Now())
@@ -383,10 +383,10 @@ func TestRepository_Find_SpecialCharacters(t *testing.T) {
 func TestRepository_Find_NoMatch(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySelector, "admin:users:idx:Name:Ghost:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:users:idx:Name:Ghost:*", "", 1000, mock.Anything).
 		Return(nil, "", nil)
 
 	result, err := repo.Find("Name=Ghost", 1000, "", time.Now())
@@ -398,7 +398,7 @@ func TestRepository_Update_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	originalUser := User{ID: "123", Name: "Alice"}
@@ -417,16 +417,16 @@ func TestRepository_Update_Success(t *testing.T) {
 
 	// FindByField (which calls Get) will be called with now.
 	// The Get for unique check will also be called with now.
-	mockStore.On("Get", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(originalData, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, newUIndexKey, mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(originalData, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, newUIndexKey, mock.Anything).Return(nil, nil)
 	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Delete("cf1", testColumnFamilySelector, oldUIndexKey, now)
-	batch.Put("cf1", testColumnFamilySelector, newUIndexKey, []byte("123"), now)
-	batch.Delete("cf1", testColumnFamilySelector, oldIndexKey, now)
+	batch.Delete("cf1", testColumnFamilySector, oldUIndexKey, now)
+	batch.Put("cf1", testColumnFamilySector, newUIndexKey, []byte("123"), now)
+	batch.Delete("cf1", testColumnFamilySector, oldIndexKey, now)
 
-	batch.Put("cf1", testColumnFamilySelector, newIndexKey, []byte("123"), now)
-	batch.Put("cf1", testColumnFamilySelector, dataKey, updatedData, now)
+	batch.Put("cf1", testColumnFamilySector, newIndexKey, []byte("123"), now)
+	batch.Put("cf1", testColumnFamilySector, dataKey, updatedData, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -443,13 +443,13 @@ func TestRepository_Update_Nonexistent(t *testing.T) {
 	mockStore := new(MockKVStore)
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	user := User{ID: "999", Name: "Ghost"}
 	dataKey := "admin:users:data:999"
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(nil, nil) // For FindByField
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(nil, nil) // For FindByField
 
 	changed, err := repo.Update(&user, time.Now())
 	assert.NoError(t, err)
@@ -459,7 +459,7 @@ func TestRepository_Delete_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	user := User{ID: "123", Name: "Alice"}
@@ -469,14 +469,14 @@ func TestRepository_Delete_Success(t *testing.T) {
 	pkIndexKey := "admin:users:idx:ID:123:123"
 	data, _ := json.Marshal(user)
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(data, nil) // For FindByField
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(data, nil) // For FindByField
 
 	batch := db.NewWriteBatch()
 	now := time.Now()
-	batch.Delete("cf1", testColumnFamilySelector, indexKey, now)
-	batch.Delete("cf1", testColumnFamilySelector, pkIndexKey, now)
-	batch.Delete("cf1", testColumnFamilySelector, uIndexKey, now)
-	batch.Delete("cf1", testColumnFamilySelector, dataKey, now)
+	batch.Delete("cf1", testColumnFamilySector, indexKey, now)
+	batch.Delete("cf1", testColumnFamilySector, pkIndexKey, now)
+	batch.Delete("cf1", testColumnFamilySector, uIndexKey, now)
+	batch.Delete("cf1", testColumnFamilySector, dataKey, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -493,11 +493,11 @@ func TestRepository_Delete_NotFound(t *testing.T) {
 	mockStore := new(MockKVStore)
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	dataKey := "admin:users:data:123"
-	mockStore.On("Get", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(nil, nil) // For FindByField
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(nil, nil) // For FindByField
 
 	deleted, err := repo.Delete("123", time.Now())
 	assert.Equal(t, deleted, false)
@@ -508,12 +508,12 @@ func TestRepository_Delete_CorruptedData(t *testing.T) {
 	mockStore := new(MockKVStore)
 
 	iGF := NewTestIDGeneratorFactory([]string{"123"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	dataKey := "admin:users:data:123"
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return([]byte("not a valid json"), nil) // For FindByField
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return([]byte("not a valid json"), nil) // For FindByField
 
 	deleted, err := repo.Delete("123", time.Now())
 	assert.Equal(t, deleted, false)
@@ -525,7 +525,7 @@ func TestRepository_Delete_CorruptedData(t *testing.T) {
 func TestRepository_BulkCreate_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2", "id3"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	users := []*User{
@@ -545,13 +545,13 @@ func TestRepository_BulkCreate_Success(t *testing.T) {
 		uIdx := "admin:users:idx-u:Name:" + u.Name
 		pkIdx := "admin:users:idx:ID:" + id + ":" + id
 
-		mockStore.On("Exists", "cf1", testColumnFamilySelector, uIdx, mock.Anything).Return(false, nil)
-		mockStore.On("Exists", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(false, nil)
+		mockStore.On("Exists", "cf1", testColumnFamilySector, uIdx, mock.Anything).Return(false, nil)
+		mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(false, nil)
 		now := time.Now()
-		batch.Put("cf1", testColumnFamilySelector, dataKey, d, now)
-		batch.Put("cf1", testColumnFamilySelector, nameIdx, []byte(id), now)
-		batch.Put("cf1", testColumnFamilySelector, uIdx, []byte(id), now)
-		batch.Put("cf1", testColumnFamilySelector, pkIdx, []byte(id), now)
+		batch.Put("cf1", testColumnFamilySector, dataKey, d, now)
+		batch.Put("cf1", testColumnFamilySector, nameIdx, []byte(id), now)
+		batch.Put("cf1", testColumnFamilySector, uIdx, []byte(id), now)
+		batch.Put("cf1", testColumnFamilySector, pkIdx, []byte(id), now)
 	}
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
@@ -568,7 +568,7 @@ func TestRepository_BulkCreate_Success(t *testing.T) {
 func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	users := []*User{
@@ -576,7 +576,7 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 		{Name: "Alice"}, // duplicado intencional
 	}
 
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil).Once() // For first Alice
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil).Once() // For first Alice
 	// For second Alice, Exists check will happen against the batch first (which passes), then DB.
 	// This mock is for the DB check for the *second* Alice, assuming the first one was "not in DB" for its Exists check
 	// and then added to the batch. The test logic in BulkCreate checks batch then DB.
@@ -586,10 +586,10 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 	// If not in batch, it checks DB.
 	// Let's adjust the mock to simulate the scenario where the second "Alice" check finds the first "Alice" already in the DB
 	// (or rather, that the key it would use is taken).
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(true, nil).Once()
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(true, nil).Once()
 
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(false, nil).Once()
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, "admin:users:data:id2", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:id2", mock.Anything).Return(false, nil).Once()
 	_, err = repo.BulkCreate(users, time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate unique field")
@@ -598,15 +598,15 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 func TestRepository_BulkCreate_WriteError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	users := []*User{
 		{Name: "Alice"},
 	}
 
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil)
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(false, nil)
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
 
 	_, err = repo.BulkCreate(users, time.Now())
@@ -616,7 +616,7 @@ func TestRepository_BulkCreate_WriteError(t *testing.T) {
 func TestRepository_BulkDelete_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	users := []*User{
@@ -627,18 +627,18 @@ func TestRepository_BulkDelete_Success(t *testing.T) {
 	for _, u := range users {
 		data, _ := json.Marshal(u)
 		// This Get is part of the FindByField call within BulkDelete
-		mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:"+u.ID, mock.Anything).Return(data, nil)
+		mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:"+u.ID, mock.Anything).Return(data, nil)
 	}
 	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx:Name:Alice:id1", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx:Name:Bob:id2", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx:ID:id1:id1", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx:ID:id2:id2", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx-u:Name:Alice", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx-u:Name:Bob", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:data:id1", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:data:id2", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx:Name:Alice:id1", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx:Name:Bob:id2", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx:ID:id1:id1", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx:ID:id2:id2", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx-u:Name:Bob", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:data:id1", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:data:id2", now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -655,20 +655,20 @@ func TestRepository_BulkDelete_Success(t *testing.T) {
 func TestRepository_BulkDelete_Partial(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	user := &User{ID: "id1", Name: "Alice"}
 	data, _ := json.Marshal(user)
 	// These Gets are part of FindByField calls
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(data, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id2", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(data, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id2", mock.Anything).Return(nil, nil)
 	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx:Name:Alice:id1", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx:ID:id1:id1", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:idx-u:Name:Alice", now)
-	batch.Delete("cf1", testColumnFamilySelector, "admin:users:data:id1", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx:Name:Alice:id1", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx:ID:id1:id1", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", now)
+	batch.Delete("cf1", testColumnFamilySector, "admin:users:data:id1", now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true
@@ -685,10 +685,10 @@ func TestRepository_BulkDelete_Partial(t *testing.T) {
 func TestRepository_BulkDelete_InvalidData(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return([]byte("invalid json"), nil) // For FindByField
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return([]byte("invalid json"), nil) // For FindByField
 
 	deleted, err := repo.BulkDelete([]string{"id1"}, time.Now())
 	assert.Error(t, err)
@@ -701,7 +701,7 @@ func TestRepository_BulkDelete_InvalidData(t *testing.T) {
 func TestRepository_BulkUpdate_Success(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	original1 := User{ID: "id1", Name: "Alice"}
@@ -715,12 +715,12 @@ func TestRepository_BulkUpdate_Success(t *testing.T) {
 	originalData2, _ := json.Marshal(original2)
 
 	// Se mockea GET para los datos originales (called by FindByField)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id2", mock.Anything).Return(originalData2, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id2", mock.Anything).Return(originalData2, nil)
 
 	// Para las claves únicas nuevas, simular que no existen (para no dar error de duplicados)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:BobUpdated", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:BobUpdated", mock.Anything).Return(nil, nil)
 
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil)
 
@@ -736,7 +736,7 @@ func TestRepository_BulkUpdate_Success(t *testing.T) {
 func TestRepository_BulkUpdate_SomeNonexistent(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	existing := User{ID: "id1", Name: "Alice"}
@@ -745,10 +745,10 @@ func TestRepository_BulkUpdate_SomeNonexistent(t *testing.T) {
 
 	originalData, _ := json.Marshal(existing)
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(originalData, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id999", mock.Anything).Return(nil, nil) // no existe
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(originalData, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id999", mock.Anything).Return(nil, nil) // no existe
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
 
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil)
 
@@ -764,7 +764,7 @@ func TestRepository_BulkUpdate_SomeNonexistent(t *testing.T) {
 func TestRepository_BulkUpdate_DuplicateUniqueWithinBatch(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	original1 := User{ID: "id1", Name: "Alice"}
@@ -776,8 +776,8 @@ func TestRepository_BulkUpdate_DuplicateUniqueWithinBatch(t *testing.T) {
 	originalData1, _ := json.Marshal(original1)
 	originalData2, _ := json.Marshal(original2)
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id2", mock.Anything).Return(originalData2, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id2", mock.Anything).Return(originalData2, nil)
 
 	// El repositorio debería detectar el duplicado dentro del batch sin llamar al store para el índice uName
 
@@ -790,7 +790,7 @@ func TestRepository_BulkUpdate_DuplicateUniqueWithinBatch(t *testing.T) {
 func TestRepository_BulkUpdate_DuplicateUniqueExisting(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1", "id2"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	original1 := User{ID: "id1", Name: "Alice"}
@@ -798,9 +798,9 @@ func TestRepository_BulkUpdate_DuplicateUniqueExisting(t *testing.T) {
 
 	originalData1, _ := json.Marshal(original1)
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(originalData1, nil)
 	// Simulamos que el índice único ya apunta a otro ID distinto al que actualizamos
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:Bob", mock.Anything).Return([]byte("otherID"), nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Bob", mock.Anything).Return([]byte("otherID"), nil)
 
 	results, err := repo.BulkUpdate([]*User{&updated1}, time.Now())
 	assert.Error(t, err)
@@ -811,7 +811,7 @@ func TestRepository_BulkUpdate_DuplicateUniqueExisting(t *testing.T) {
 func TestRepository_BulkUpdate_WriteError(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	original := User{ID: "id1", Name: "Alice"}
@@ -819,8 +819,8 @@ func TestRepository_BulkUpdate_WriteError(t *testing.T) {
 
 	originalData, _ := json.Marshal(original)
 
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return(originalData, nil)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(originalData, nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:AliceUpdated", mock.Anything).Return(nil, nil)
 
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
 
@@ -832,11 +832,11 @@ func TestRepository_BulkUpdate_WriteError(t *testing.T) {
 func TestRepository_BulkUpdate_InvalidData(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{"id1"})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	// Simula que data original almacenada está corrupta (no json válido)
-	mockStore.On("Get", "cf1", testColumnFamilySelector, "admin:users:data:id1", mock.Anything).Return([]byte("not json"), nil)
+	mockStore.On("Get", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return([]byte("not json"), nil)
 
 	updated := User{ID: "id1", Name: "AliceUpdated"}
 
@@ -848,7 +848,7 @@ func TestRepository_BulkUpdate_InvalidData(t *testing.T) {
 func TestRepository_BulkUpdate_EmptyInput(t *testing.T) {
 	mockStore := new(MockKVStore)
 	iGF := NewTestIDGeneratorFactory([]string{})
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	require.NoError(t, err)
 
 	results, err := repo.BulkUpdate([]*User{}, time.Now())
@@ -862,7 +862,7 @@ func TestRepository_Create_NestedSuccess_UserComplexEmbedded(t *testing.T) {
 	entityID := "uce123"
 	iGF := NewTestIDGeneratorFactory([]string{entityID})
 
-	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed", testColumnFamilySelector, "test_sch_embed", iGF)
+	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed", testColumnFamilySector, "test_sch_embed", iGF)
 	require.NoError(t, err)
 
 	user := UserComplexEmbedded{
@@ -877,10 +877,10 @@ func TestRepository_Create_NestedSuccess_UserComplexEmbedded(t *testing.T) {
 
 	// Mock for unique checks (Email and embedded Tag)
 	// These Gets are effectively Exists checks
-	mockStore.On("Exists", "cf_embed", testColumnFamilySelector, "test_sch_embed:users_complex_embedded:idx-u:Email:embedded@example.com", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf_embed", testColumnFamilySector, "test_sch_embed:users_complex_embedded:idx-u:Email:embedded@example.com", mock.Anything).Return(false, nil).Once()
 	// Assuming embedded field 'Tag' becomes a top-level field name 'Tag'
-	mockStore.On("Exists", "cf_embed", testColumnFamilySelector, "test_sch_embed:users_complex_embedded:idx-u:Tag:embeddedTag1", mock.Anything).Return(false, nil).Once()
-	mockStore.On("Exists", "cf_embed", testColumnFamilySelector, "test_sch_embed:users_complex_embedded:data:uce123", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf_embed", testColumnFamilySector, "test_sch_embed:users_complex_embedded:idx-u:Tag:embeddedTag1", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf_embed", testColumnFamilySector, "test_sch_embed:users_complex_embedded:data:uce123", mock.Anything).Return(false, nil).Once()
 
 	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
 		return batch.Count() > 0
@@ -904,7 +904,7 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 	entityID := "uc456"
 	iGF := NewTestIDGeneratorFactory([]string{entityID})
 
-	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySelector, "test_sch", iGF)
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySector, "test_sch", iGF)
 	require.NoError(t, err)
 
 	user := UserComplex{
@@ -918,10 +918,10 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 	}
 
 	// Mock for unique checks
-	mockStore.On("Exists", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(false, nil)
-	mockStore.On("Exists", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:data:uc456", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:data:uc456", mock.Anything).Return(false, nil)
 	// Simulate Meta.Tag being a duplicate
-	mockStore.On("Exists", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:idx-u:Meta.Tag:existingTag", mock.Anything).Return(true, nil)
+	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Meta.Tag:existingTag", mock.Anything).Return(true, nil)
 	// No On("Write") should be called
 
 	_, err = repo.Create(&user, time.Now())
@@ -936,7 +936,7 @@ func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
 	entityID := "uc789"
 	iGF := NewTestIDGeneratorFactory([]string{}) // Not used for FindByField directly for ID generation
 
-	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySelector, "test_sch", iGF)
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySector, "test_sch", iGF)
 	require.NoError(t, err)
 
 	expectedUser := UserComplex{
@@ -955,8 +955,8 @@ func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
 	uniqueIdxKey := "test_sch:users_complex:idx-u:Meta.Tag:findThisTag"
 	dataKey := "test_sch:users_complex:data:" + entityID
 
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, uniqueIdxKey, mock.Anything).Return([]byte(entityID), nil).Once()
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, dataKey, mock.Anything).Return(jsonData, nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, uniqueIdxKey, mock.Anything).Return([]byte(entityID), nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, dataKey, mock.Anything).Return(jsonData, nil).Once()
 
 	foundUser, err := repo.FindByField("Meta.Tag", "findThisTag", time.Now())
 	require.NoError(t, err)
@@ -971,7 +971,7 @@ func TestRepository_Find_NestedCondition_UserComplex(t *testing.T) {
 	entityID := "uc101"
 	iGF := NewTestIDGeneratorFactory([]string{})
 
-	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySelector, "test_sch", iGF)
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySector, "test_sch", iGF)
 	require.NoError(t, err)
 
 	user := UserComplex{
@@ -988,14 +988,14 @@ func TestRepository_Find_NestedCondition_UserComplex(t *testing.T) {
 
 	// Mock KVStore SearchByPatternPaginatedKV calls
 	// For "Meta.Tag = 'filterTag'"
-	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:idx:Meta.Tag:filterTag:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx:Meta.Tag:filterTag:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Key: "...", Value: []byte(entityID)}}, "", nil).Once()
 	// For "Email = 'filter@example.com'"
-	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:idx:Email:filter@example.com:*", "", 1000, mock.Anything).
+	mockStore.On("SearchByPatternPaginatedKV", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx:Email:filter@example.com:*", "", 1000, mock.Anything).
 		Return([]db.KeyValuePair{{Key: "...", Value: []byte(entityID)}}, "", nil).Once()
 
 	// Mock Get for the data key
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(jsonData, nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(jsonData, nil).Once()
 
 	result, err := repo.Find("Meta.Tag = 'filterTag' & Email = 'filter@example.com'", 1000, "", time.Now())
 	require.NoError(t, err)
@@ -1009,7 +1009,7 @@ func TestRepository_Update_NestedField_UserComplex(t *testing.T) {
 	mockStore := new(MockKVStore)
 	entityID := "ucUpdate1"
 	iGF := NewTestIDGeneratorFactory([]string{})
-	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySelector, "test_sch", iGF)
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySector, "test_sch", iGF)
 	require.NoError(t, err)
 
 	originalUser := UserComplex{
@@ -1037,10 +1037,10 @@ func TestRepository_Update_NestedField_UserComplex(t *testing.T) {
 	// updatedData, _ := json.Marshal(updatedUser) // repo.Update internally marshals the modified 'current'
 
 	// 1. FindByField (ID) to get current entity
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(originalData, nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(originalData, nil).Once()
 
 	// 2. Unique check for new Meta.Tag value
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:idx-u:Meta.Tag:newTag", mock.Anything).Return(nil, nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Meta.Tag:newTag", mock.Anything).Return(nil, nil).Once()
 	// (No other unique fields changed in this test case for Meta)
 
 	// 3. Write batch operations (simplified, actual batch content is complex)
@@ -1061,7 +1061,7 @@ func TestRepository_Update_NestedField_DuplicateUnique_UserComplex(t *testing.T)
 	mockStore := new(MockKVStore)
 	entityID := "ucUpdateDup1"
 	iGF := NewTestIDGeneratorFactory([]string{})
-	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySelector, "test_sch", iGF)
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySector, "test_sch", iGF)
 	require.NoError(t, err)
 
 	originalUser := UserComplex{
@@ -1078,10 +1078,10 @@ func TestRepository_Update_NestedField_DuplicateUnique_UserComplex(t *testing.T)
 	originalData, _ := json.Marshal(originalUser)
 
 	// 1. FindByField (ID)
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(originalData, nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(originalData, nil).Once()
 
 	// 2. Unique check for new Meta.Tag shows it exists for another ID
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:idx-u:Meta.Tag:conflictingTag", mock.Anything).Return([]byte("anotherEntityID"), nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Meta.Tag:conflictingTag", mock.Anything).Return([]byte("anotherEntityID"), nil).Once()
 
 	changed, err := repo.Update(&updatedUser, time.Now())
 	require.Error(t, err)
@@ -1095,7 +1095,7 @@ func TestRepository_Delete_WithNestedFields_UserComplex(t *testing.T) {
 	mockStore := new(MockKVStore)
 	entityID := "ucDelete1"
 	iGF := NewTestIDGeneratorFactory([]string{})
-	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySelector, "test_sch", iGF)
+	repo, err := db.NewRepository[UserComplex](mockStore, "cf_complex", testColumnFamilySector, "test_sch", iGF)
 	require.NoError(t, err)
 
 	userToDelete := UserComplex{
@@ -1112,7 +1112,7 @@ func TestRepository_Delete_WithNestedFields_UserComplex(t *testing.T) {
 	jsonData, _ := json.Marshal(userToDelete)
 
 	// 1. FindByField (ID) to get entity before deleting its indexes
-	mockStore.On("Get", "cf_complex", testColumnFamilySelector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(jsonData, nil).Once()
+	mockStore.On("Get", "cf_complex", testColumnFamilySector, "test_sch:users_complex:data:"+entityID, mock.Anything).Return(jsonData, nil).Once()
 
 	// 2. Write batch for deletions
 	mockStore.On("Write", mock.MatchedBy(func(batch *db.WriteBatch) bool {
@@ -1134,7 +1134,7 @@ func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
 	entityID := "uceFieldTest"
 	iGF := NewTestIDGeneratorFactory([]string{entityID})
 
-	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed_fn", testColumnFamilySelector, "test_sch_fn", iGF)
+	repo, err := db.NewRepository[UserComplexEmbedded](mockStore, "cf_embed_fn", testColumnFamilySector, "test_sch_fn", iGF)
 	require.NoError(t, err)
 
 	user := UserComplexEmbedded{
@@ -1149,9 +1149,9 @@ func TestRepository_Create_UserComplexEmbedded_FieldNames(t *testing.T) {
 
 	// Mock unique checks. If extractFieldsRecursively makes embedded fields top-level,
 	// then "Tag" should be the unique field name, not "MetaForEmbed.Tag".
-	mockStore.On("Exists", "cf_embed_fn", testColumnFamilySelector, "test_sch_fn:users_complex_embedded:idx-u:Email:embedfn@example.com", mock.Anything).Return(false, nil).Once()
-	mockStore.On("Exists", "cf_embed_fn", testColumnFamilySelector, "test_sch_fn:users_complex_embedded:idx-u:Tag:embedFnTag", mock.Anything).Return(false, nil).Once() // Key check
-	mockStore.On("Exists", "cf_embed_fn", testColumnFamilySelector, "test_sch_fn:users_complex_embedded:data:uceFieldTest", mock.Anything).Return(false, nil).Once()    // Key check
+	mockStore.On("Exists", "cf_embed_fn", testColumnFamilySector, "test_sch_fn:users_complex_embedded:idx-u:Email:embedfn@example.com", mock.Anything).Return(false, nil).Once()
+	mockStore.On("Exists", "cf_embed_fn", testColumnFamilySector, "test_sch_fn:users_complex_embedded:idx-u:Tag:embedFnTag", mock.Anything).Return(false, nil).Once() // Key check
+	mockStore.On("Exists", "cf_embed_fn", testColumnFamilySector, "test_sch_fn:users_complex_embedded:data:uceFieldTest", mock.Anything).Return(false, nil).Once()    // Key check
 
 	// Mock the Write call
 	// In a real test, capture the batch and verify specific index keys, e.g.:
@@ -1182,7 +1182,7 @@ func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
 
 	iGF := &db.DeterministicIDGeneratorFactory{}
 
-	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySelector, "admin", iGF)
+	repo, err := db.NewRepository[User](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
 	assert.NoError(t, err)
 
 	data, _ := json.Marshal(user)
@@ -1191,14 +1191,14 @@ func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
 	uNameFieldKey := "admin:users:idx-u:Name:Alice"
 	indexKey := "admin:users:idx:ID:det-123:det-123"
 
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, uNameFieldKey, mock.Anything).Return(false, nil)
-	mockStore.On("Exists", "cf1", testColumnFamilySelector, dataKey, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, uNameFieldKey, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(false, nil)
 	now := time.Now()
 	batch := db.NewWriteBatch()
-	batch.Put("cf1", testColumnFamilySelector, indexKey, []byte("det-123"), now)
-	batch.Put("cf1", testColumnFamilySelector, nameFieldKey, []byte("det-123"), now)
-	batch.Put("cf1", testColumnFamilySelector, uNameFieldKey, []byte("det-123"), now)
-	batch.Put("cf1", testColumnFamilySelector, dataKey, data, now)
+	batch.Put("cf1", testColumnFamilySector, indexKey, []byte("det-123"), now)
+	batch.Put("cf1", testColumnFamilySector, nameFieldKey, []byte("det-123"), now)
+	batch.Put("cf1", testColumnFamilySector, uNameFieldKey, []byte("det-123"), now)
+	batch.Put("cf1", testColumnFamilySector, dataKey, data, now)
 
 	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
 		return true

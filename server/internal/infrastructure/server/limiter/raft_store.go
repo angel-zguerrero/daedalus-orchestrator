@@ -47,7 +47,7 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 		Command: general_command.RK_Command{
 			Key:                fullKey,
 			ColumnFamilyName:   db.MasterEventFC,
-			ColumnFamilySector: db.MasterEventFCSelector,
+			ColumnFamilySector: db.MasterEventFCSector,
 		},
 		Now: utils.GetNowInInt(),
 	}
@@ -114,7 +114,7 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 				Key:                fullKey,
 				Value:              buf.Bytes(),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                int(ttlRemaining),
 				Op:                 general_command.PutOpTTL,
 			},
@@ -143,7 +143,7 @@ func (s *RaftStore) Peek(ctx context.Context, key string, rate limiter.Rate) (li
 		Command: general_command.RK_Command{
 			Key:                fullKey,
 			ColumnFamilyName:   db.MasterEventFC,
-			ColumnFamilySector: db.MasterEventFCSelector,
+			ColumnFamilySector: db.MasterEventFCSector,
 		},
 		Now: utils.GetNowInInt(),
 	}
@@ -214,7 +214,7 @@ func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) erro
 				Key:                fullKey,
 				Value:              buf.Bytes(),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                int(s.ttl.Seconds()),
 				Op:                 general_command.PutOpTTL,
 			},
@@ -252,7 +252,7 @@ func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (l
 				Key:                fullKey,
 				Value:              buf.Bytes(),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                int(s.ttl.Seconds()),
 				Op:                 general_command.PutOpTTL,
 			},

@@ -240,8 +240,8 @@ func (r *RocksdbStore) resolveColumnFamily(columnFamily string) (*grocksdb.Colum
 }
 
 // getValue safely retrieves and copies data for a given key
-func (r *RocksdbStore) getValue(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, cfSelector, key string) ([]byte, error) {
-	finalKey := fmt.Sprintf("%s:%s", cfSelector, key)
+func (r *RocksdbStore) getValue(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, cfSector, key string) ([]byte, error) {
+	finalKey := fmt.Sprintf("%s:%s", cfSector, key)
 	slice, err := r.DB.GetCF(ro, cf, []byte(finalKey))
 	if err != nil {
 		return nil, err
@@ -255,9 +255,9 @@ func (r *RocksdbStore) getValue(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.Re
 }
 
 // isTTLKeyExpired checks if the TTL key is expired
-func (r *RocksdbStore) isTTLKeyExpired(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, cfSelector, key string, now time.Time) (bool, error) {
+func (r *RocksdbStore) isTTLKeyExpired(cf *grocksdb.ColumnFamilyHandle, ro *grocksdb.ReadOptions, cfSector, key string, now time.Time) (bool, error) {
 
-	expireKey := fmt.Sprintf("%s:%s%s", cfSelector, PrefixTTLExpire, key)
+	expireKey := fmt.Sprintf("%s:%s%s", cfSector, PrefixTTLExpire, key)
 	slice, err := r.DB.GetCF(ro, cf, []byte(expireKey))
 	if err != nil {
 		return false, err
@@ -350,8 +350,8 @@ func (r *RocksdbStore) Exists(columnFamily, columnFamilySector, key string, now 
 //   - A slice of KeyValuePair structs matching the pattern.
 //   - A string representing the next cursor (the key of the last item returned), or an empty string if no more results.
 //   - An error if the column family is not found or if an iterator error occurs.
-func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
-	if cfSelector == "" {
+func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
+	if cfSector == "" {
 		return nil, "", fmt.Errorf("column family sector cannot be empty")
 	}
 
@@ -369,7 +369,7 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, c
 	iter := r.DB.NewIteratorCF(readOpts, cf)
 	defer iter.Close()
 
-	cfPrefix := []byte(cfSelector + ":")
+	cfPrefix := []byte(cfSector + ":")
 	count := 0
 
 	// Cursor handling
@@ -395,7 +395,7 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, c
 
 		// TTL check
 		if isTTL {
-			expired, err := r.isTTLKeyExpired(cf, readOpts, cfSelector, keyStr, now)
+			expired, err := r.isTTLKeyExpired(cf, readOpts, cfSector, keyStr, now)
 			if err != nil {
 				return nil, "", fmt.Errorf("SearchByPatternPaginatedKV TTL check error: %w", err)
 			}
@@ -686,16 +686,16 @@ func (r *RocksdbStore) DumpAll() (interface{}, error) {
 			key.Free()
 			value.Free()
 
-			// Esperamos que la clave sea cfSelector:key
+			// Esperamos que la clave sea cfSector:key
 			parts := strings.SplitN(keyStr, ":", 2)
 			if len(parts) != 2 {
 				fmt.Printf("DumpAll: skipping malformed key in %s: %s\n", cfName, keyStr)
 				continue
 			}
-			cfSelector := parts[0]
+			cfSector := parts[0]
 			innerKey := parts[1]
 
-			mapKey := cfName + ":" + cfSelector
+			mapKey := cfName + ":" + cfSector
 			subMap, ok := result[mapKey]
 
 			if !ok {
@@ -724,7 +724,7 @@ func (r *RocksdbStore) DumpAll() (interface{}, error) {
 //
 // Returns:
 //   - An error if `fn` returns an error or if any RocksDB iterator error occurs.
-func (r *RocksdbStore) Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error {
+func (r *RocksdbStore) Iterate(fn func(cfName string, cfSector string, key, value []byte) error) error {
 	ro := grocksdb.NewDefaultReadOptions()
 	defer ro.Destroy()
 

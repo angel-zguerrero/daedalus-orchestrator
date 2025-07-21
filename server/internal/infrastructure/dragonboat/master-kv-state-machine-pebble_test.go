@@ -65,7 +65,7 @@ func TestPebble_Update_SingleEntry(t *testing.T) {
 				Key:                "foo",
 				Value:              []byte("bar"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -105,7 +105,7 @@ func TestPebble_Lookup_ExistingKey(t *testing.T) {
 				Key:                "lookup_key",
 				Value:              []byte("lookup_value"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -123,7 +123,7 @@ func TestPebble_Lookup_ExistingKey(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "lookup_key",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 		},
 	}
 
@@ -143,7 +143,7 @@ func TestPebble_Lookup_NonExistingKey(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "missing_key",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 		},
 	}
 	var buf bytes.Buffer
@@ -175,7 +175,7 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 				Key:                "snap_key",
 				Value:              []byte("snap_value"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -210,7 +210,7 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "snap_key",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 		},
 	}
 
@@ -226,7 +226,7 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName:   db.MetaFC,
-			ColumnFamilySector: db.MetaFCSelector,
+			ColumnFamilySector: db.MetaFCSector,
 		},
 	}
 
@@ -254,7 +254,7 @@ func TestPebble_SaveSnapshot_Cancelled(t *testing.T) {
 				Key:                "snap_key",
 				Value:              []byte("snap_value"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -364,7 +364,7 @@ func TestPebble_Read_SingleEntryIntoUpdate(t *testing.T) {
 			CMD: general_command.RK_Command{
 				Key:                "foo",
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.GetOp,
 			},
 		},
@@ -396,7 +396,7 @@ func TestPebble_Update_PutWithTTL(t *testing.T) {
 				Key:                "ttl_key",
 				Value:              []byte("ttl_value"),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                5,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -463,7 +463,7 @@ func TestPebble_Update_DeleteWithTTL(t *testing.T) {
 				Key:                "ttl_key",
 				Value:              []byte("ttl_value"),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                5,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -485,7 +485,7 @@ func TestPebble_Update_DeleteWithTTL(t *testing.T) {
 			CMD: general_command.WK_Command{
 				Key:                "ttl_key",
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                5,
 				Op:                 general_command.DeleteOpTTL,
 			},
@@ -512,7 +512,7 @@ func TestPebble_PutTTLStoresWithExpiration(t *testing.T) {
 				Key:                "ttl_test_key",
 				Value:              []byte("ttl_test_value"),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                10,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -530,7 +530,7 @@ func TestPebble_PutTTLStoresWithExpiration(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "ttl_test_key",
 			ColumnFamilyName:   db.MasterEventFC,
-			ColumnFamilySector: db.MasterEventFCSelector,
+			ColumnFamilySector: db.MasterEventFCSector,
 			Op:                 general_command.GetOpTTL,
 		},
 	}
@@ -560,7 +560,7 @@ func TestPebble_TTLExpirationRemovesKey(t *testing.T) {
 				Key:                key,
 				Value:              []byte("soon_gone"),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                1,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -580,7 +580,7 @@ func TestPebble_TTLExpirationRemovesKey(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                key,
 			ColumnFamilyName:   db.MasterEventFC,
-			ColumnFamilySector: db.MasterEventFCSelector,
+			ColumnFamilySector: db.MasterEventFCSector,
 			Op:                 general_command.GetOpTTL,
 		},
 	}
@@ -609,7 +609,7 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 				Key:                key,
 				Value:              []byte("value"),
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                60,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -632,7 +632,7 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 			CMD: general_command.WK_Command{
 				Key:                key,
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				Op:                 general_command.DeleteOpTTL,
 			},
 		},
@@ -649,7 +649,7 @@ func TestPebble_DeleteTTLRemovesFromCFAndExpirations(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                key,
 			ColumnFamilyName:   db.MasterEventFC,
-			ColumnFamilySector: db.MasterEventFCSelector,
+			ColumnFamilySector: db.MasterEventFCSector,
 			Op:                 general_command.GetOpTTL,
 		},
 	}
@@ -677,7 +677,7 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 				Key:                key,
 				Value:              value,
 				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
+				ColumnFamilySector: db.MasterEventFCSector,
 				TTL:                1,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -714,7 +714,7 @@ func TestPebble_KVStateMachine_ClearExpiredTTL(t *testing.T) {
 		Command: general_command.RK_Command{
 			Op:                 general_command.GetOpTTL,
 			ColumnFamilyName:   db.MasterEventFC,
-			ColumnFamilySector: db.MasterEventFCSelector,
+			ColumnFamilySector: db.MasterEventFCSector,
 			Key:                key,
 		},
 	}
@@ -765,7 +765,7 @@ func TestPebble_Update_UnknownWriteOp(t *testing.T) {
 				Key:                "badop",
 				Value:              []byte("x"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 999, // This is an unknown op
 			},
 		},
@@ -813,10 +813,10 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 
 	// Insert some entries
 	entries := []general_command.WK_Command{ // Changed dragonboat.WK_Command to general_command.WK_Command
-		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
-		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
-		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
-		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSelector, Op: general_command.PutOp}, // Changed dragonboat.PutOp to general_command.PutOp
+		{Key: "user:1", Value: []byte("a"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSector, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
+		{Key: "user:2", Value: []byte("b"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSector, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
+		{Key: "user:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSector, Op: general_command.PutOp},   // Changed dragonboat.PutOp to general_command.PutOp
+		{Key: "user_x:3", Value: []byte("c"), ColumnFamilyName: db.DefaultFC, ColumnFamilySector: db.DefaultFCSector, Op: general_command.PutOp}, // Changed dragonboat.PutOp to general_command.PutOp
 	}
 
 	for _, entry := range entries {
@@ -839,7 +839,7 @@ func TestPebble_Lookup_Search_MultipleResults(t *testing.T) {
 		Command: general_command.RK_Command{
 			KeyPattern:         "user:*",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 			Cursor:             "",
 			Limit:              10,
 			Op:                 general_command.Search, // Changed dragonboat.Search to general_command.Search
@@ -876,12 +876,12 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 			CMD: general_command.RWK_Command{
 				Op: general_command.Write,
 				CMD: general_command.WK_Command{
-				Key:                e.key,
-				Value:              []byte(e.value),
-				ColumnFamilyName:   db.MasterEventFC,
-				ColumnFamilySector: db.MasterEventFCSelector,
-				TTL:                e.ttl,
-				Op:                 general_command.PutOpTTL,
+					Key:                e.key,
+					Value:              []byte(e.value),
+					ColumnFamilyName:   db.MasterEventFC,
+					ColumnFamilySector: db.MasterEventFCSector,
+					TTL:                e.ttl,
+					Op:                 general_command.PutOpTTL,
 				},
 			},
 		}
@@ -900,7 +900,7 @@ func TestPebble_Lookup_SearchTTL_OnlyValidResults(t *testing.T) {
 		Command: general_command.RK_Command{
 			KeyPattern:         "k*",
 			ColumnFamilyName:   db.MasterEventFC,
-			ColumnFamilySector: db.MasterEventFCSelector,
+			ColumnFamilySector: db.MasterEventFCSector,
 			Cursor:             "",
 			Limit:              10,
 			Op:                 general_command.SearchTTL, // Changed dragonboat.SearchTTL to general_command.SearchTTL
@@ -940,7 +940,7 @@ func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 				Key:                "snap_key",
 				Value:              []byte("snap_value"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -973,7 +973,7 @@ func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "snap_key",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 		},
 	}
 
@@ -988,7 +988,7 @@ func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName:   db.MetaFC,
-			ColumnFamilySector: db.MetaFCSelector,
+			ColumnFamilySector: db.MetaFCSector,
 		},
 	}
 

@@ -79,7 +79,7 @@ func (d *DelegatedKVStore) DumpAll() (interface{}, error) {
 	return d.base.DumpAll()
 }
 
-func (d *DelegatedKVStore) Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error {
+func (d *DelegatedKVStore) Iterate(fn func(cfName string, cfSector string, key, value []byte) error) error {
 	return d.base.Iterate(fn)
 }
 

@@ -15,7 +15,7 @@ func NewTenantInMasterRepository(uow *UnitOfWork, factory IDGeneratorFactory) (*
 	if uow == nil {
 		return nil, fmt.Errorf("UnitOfWork is required")
 	}
-	repo, err := GetRepository[models.TenantInMaster](uow, AdminFC, AdminFCSelector, "admin_schema", factory)
+	repo, err := GetRepository[models.TenantInMaster](uow, AdminFC, AdminFCSector, "admin_schema", factory)
 	if err != nil {
 		return nil, err
 	}

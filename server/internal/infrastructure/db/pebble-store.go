@@ -101,8 +101,8 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 // getPrefixedKey constructs the actual key to be stored/retrieved in Pebble.
 // It prepends the appropriate column family prefix to the given key string.
 // For TTL column families, it targets the actual data entry (e.g., by appending PrefixData).
-func (ps *PebbleStore) getPrefixedKey(cfName, cfSelector, key string) (rawKey []byte, isTTLResolved bool, cfPrefixBytes []byte, err error) {
-	if cfSelector == "" {
+func (ps *PebbleStore) getPrefixedKey(cfName, cfSector, key string) (rawKey []byte, isTTLResolved bool, cfPrefixBytes []byte, err error) {
+	if cfSector == "" {
 		return nil, false, nil, errors.New("column family sector cannot be empty")
 	}
 
@@ -138,7 +138,7 @@ func (ps *PebbleStore) getPrefixedKey(cfName, cfSelector, key string) (rawKey []
 	// For normal CFs, it's just prefix + key.
 	// The returned cfPrefixBytes is the raw prefix for the CF (e.g., "mycf:")
 	// The returned rawKey is the fully constructed key for data access.
-	finalKey := fmt.Sprintf("%s:%s", cfSelector, key)
+	finalKey := fmt.Sprintf("%s:%s", cfSector, key)
 	cfPrefixBytes = prefix
 	if isTTL {
 		// e.g., "myTTLCF:" + "_ttldata:" + "actualKey"
@@ -377,7 +377,7 @@ func (ps *PebbleStore) ClearAll() error {
 // - "prefix*": prefix match
 // - "*suffix": suffix match
 // - "*contains*": contains match
-func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
+func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
 	var cfPrefix []byte
 	var isTTL bool
 
@@ -396,7 +396,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, c
 		return nil, "", fmt.Errorf("column family %s not found", resolvedCfName)
 	}
 
-	cfPrefix = append(cfPrefix, []byte(cfSelector+":")...)
+	cfPrefix = append(cfPrefix, []byte(cfSector+":")...)
 	iterOpts := &pebble.IterOptions{
 		LowerBound: cfPrefix,
 		UpperBound: prefixRangeEnd(cfPrefix),
@@ -490,7 +490,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, c
 	return results, nextCursor, nil
 }
 
-// DumpAll retrieves all data from the database, organized by column family:column selector.
+// DumpAll retrieves all data from the database, organized by column family:column sector.
 func (ps *PebbleStore) DumpAll() (interface{}, error) {
 	result := make(map[string]map[string][]byte)
 	allPrefixes := make(map[string][]byte)
@@ -514,21 +514,21 @@ func (ps *PebbleStore) DumpAll() (interface{}, error) {
 
 		for iter.First(); iter.Valid(); iter.Next() {
 			rawKey := iter.Key()
-			keyWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix) // => cfSelector:key
+			keyWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix) // => cfSector:key
 			keyStr := string(keyWithoutPrefix)
 
-			// Split cfSelector:key en cfSelector y key
+			// Split cfSector:key en cfSector y key
 			parts := strings.SplitN(keyStr, ":", 2)
 			if len(parts) != 2 {
 				// Saltar claves mal formadas
 				fmt.Printf("DumpAll: skipping malformed key in %s: %s\n", cfName, keyStr)
 				continue
 			}
-			cfSelector := parts[0]
+			cfSector := parts[0]
 			innerKey := parts[1]
 
 			// Compose map key for result
-			mapKey := cfName + ":" + cfSelector
+			mapKey := cfName + ":" + cfSector
 
 			// Get or create sub-map
 			subMap, ok := result[mapKey]
@@ -854,7 +854,7 @@ func (ps *PebbleStore) WriteRaw(batch *WriteBatch) error { // batch.Data is []X
 
 // Iterate calls the given function for each key-value pair in the database.
 // Iteration is done per column family.
-func (ps *PebbleStore) Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error {
+func (ps *PebbleStore) Iterate(fn func(cfName string, cfSector string, key, value []byte) error) error {
 	allPrefixes := make(map[string][]byte)
 	for cfName, cfPrefix := range ps.cfPrefixes {
 		allPrefixes[cfName] = cfPrefix

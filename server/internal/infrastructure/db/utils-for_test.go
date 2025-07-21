@@ -14,8 +14,8 @@ const (
 	normalCF      = "test_normal_cf"
 	ttlCF         = "test_ttl_cf"
 	// Small TTL for testing expiry quickly
-	testTTLSeconds           = 3
-	testColumnFamilySelector = "test-selector"
+	testTTLSeconds         = 3
+	testColumnFamilySector = "test-sector"
 )
 
 type testKeyData struct {
@@ -31,8 +31,8 @@ type MockKVStore struct {
 	mock.Mock
 }
 
-func (m *MockKVStore) Get(AdminFC, cfSelector, key string, now time.Time) ([]byte, error) {
-	args := m.Called(AdminFC, cfSelector, key, now)
+func (m *MockKVStore) Get(AdminFC, cfSector, key string, now time.Time) ([]byte, error) {
+	args := m.Called(AdminFC, cfSector, key, now)
 	var s []byte
 	if tmp := args.Get(0); tmp != nil {
 		s = tmp.([]byte)
@@ -40,23 +40,23 @@ func (m *MockKVStore) Get(AdminFC, cfSelector, key string, now time.Time) ([]byt
 	return s, args.Error(1)
 }
 
-func (m *MockKVStore) Delete(AdminFC, cfSelector, key string, now time.Time) error {
-	args := m.Called(AdminFC, cfSelector, key, now)
+func (m *MockKVStore) Delete(AdminFC, cfSector, key string, now time.Time) error {
+	args := m.Called(AdminFC, cfSector, key, now)
 	return args.Error(0)
 }
 
-func (r *MockKVStore) Exists(columnFamily, cfSelector, key string, now time.Time) (bool, error) {
-	args := r.Called(columnFamily, cfSelector, key, now)
+func (r *MockKVStore) Exists(columnFamily, cfSector, key string, now time.Time) (bool, error) {
+	args := r.Called(columnFamily, cfSector, key, now)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockKVStore) Put(AdminFC, cfSelector, key string, value []byte, ttl int, now time.Time) error {
-	args := m.Called(AdminFC, cfSelector, key, value, ttl, now)
+func (m *MockKVStore) Put(AdminFC, cfSector, key string, value []byte, ttl int, now time.Time) error {
+	args := m.Called(AdminFC, cfSector, key, value, ttl, now)
 	return args.Error(0)
 }
 
-func (m *MockKVStore) PutRaw(AdminFC, cfSelector, key string, value []byte) error {
-	args := m.Called(AdminFC, cfSelector, key, value)
+func (m *MockKVStore) PutRaw(AdminFC, cfSector, key string, value []byte) error {
+	args := m.Called(AdminFC, cfSector, key, value)
 	return args.Error(0)
 }
 
@@ -79,7 +79,7 @@ func (m *MockKVStore) DumpAll() (interface{}, error) {
 	return s, args.Error(1)
 }
 
-func (r *MockKVStore) Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error {
+func (r *MockKVStore) Iterate(fn func(cfName string, cfSector string, key, value []byte) error) error {
 	return nil
 }
 
@@ -100,8 +100,8 @@ func (r *MockKVStore) CleanExpiredKeys(now time.Time) error {
 	return args.Error(0)
 }
 
-func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, cursor string, limit int, now time.Time) ([]db.KeyValuePair, string, error) {
-	args := m.Called(cfName, cfSelector, pattern, cursor, limit, now)
+func (m *MockKVStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cursor string, limit int, now time.Time) ([]db.KeyValuePair, string, error) {
+	args := m.Called(cfName, cfSector, pattern, cursor, limit, now)
 	var s []db.KeyValuePair
 	if tmp := args.Get(0); tmp != nil {
 		s = tmp.([]db.KeyValuePair)

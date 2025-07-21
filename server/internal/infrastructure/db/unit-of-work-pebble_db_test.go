@@ -52,15 +52,15 @@ func newTestUOWDefaultIdGeneratorPebble(t *testing.T) (*db.UnitOfWork, db.KVStor
 	store := newRocksdbStoreForUOWPebble(t)
 	uow := db.NewUnitOfWork(store, nil)
 
-	carRepo, err := db.GetRepository[TestCar](uow, UOWTestFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	carRepo, err := db.GetRepository[TestCar](uow, UOWTestFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
 		t.Fatalf("failed to create car repo: %v", err)
 	}
-	testCarFixOrderRepo, err := db.GetRepository[TestCarFixOrder](uow, UOWTestFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	testCarFixOrderRepo, err := db.GetRepository[TestCarFixOrder](uow, UOWTestFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
 		t.Fatalf("failed to create fix order repo: %v", err)
 	}
-	testNotificationRepo, err := db.GetRepository[TestNotification](uow, UOWTemporalFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	testNotificationRepo, err := db.GetRepository[TestNotification](uow, UOWTemporalFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 	if err != nil {
 		t.Fatalf("failed to create notification repo: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestPebbleUnitOfWork_CreateAndCommit(t *testing.T) {
 	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store, nil)
-	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 	expired, err := nRepo.FindByField("ID", notif.ID, checkTime)
 	if err != nil {
 		t.Fatalf("error checking expired ttl entity: %v", err)
@@ -169,7 +169,7 @@ func TestPebbleUnitOfWork_TTLBulkCreateAndExpire(t *testing.T) {
 	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store, nil)
-	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
 		found, err := nRepo.FindByField("ID", notif.ID, checkTime)
@@ -220,7 +220,7 @@ func TestPebbleUnitOfWork_MassiveMixedEntities(t *testing.T) {
 	checkTime := time.Now()
 
 	uow2 := db.NewUnitOfWork(store, nil)
-	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	nRepo, _ := db.GetRepository[TestNotification](uow2, UOWTemporalFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 
 	for _, notif := range notifs {
 		found, err := nRepo.FindByField("ID", notif.ID, checkTime)

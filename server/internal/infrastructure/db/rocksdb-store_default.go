@@ -47,12 +47,12 @@ func (s *RocksdbStore) WriteRaw(batch *WriteBatch) error {
 }
 
 // SearchByPatternPaginatedKV is a placeholder method for RocksdbStore.
-func (s *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSelector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
+func (s *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cursor string, limit int, now time.Time) ([]KeyValuePair, string, error) {
 	return nil, "", fmt.Errorf("RocksDB not supported in this build")
 }
 
 // Exists is a placeholder method for RocksdbStore.
-func (s *RocksdbStore) Exists(cfName, cfSelector, key string, now time.Time) (bool, error) {
+func (s *RocksdbStore) Exists(cfName, cfSector, key string, now time.Time) (bool, error) {
 	return false, fmt.Errorf("RocksDB not supported in this build")
 }
 
@@ -62,7 +62,7 @@ func (s *RocksdbStore) DumpAll() (interface{}, error) {
 }
 
 // Iterate is a placeholder method for RocksdbStore.
-func (s *RocksdbStore) Iterate(fn func(cfName string, cfSelector string, key, value []byte) error) error {
+func (s *RocksdbStore) Iterate(fn func(cfName string, cfSector string, key, value []byte) error) error {
 	return fmt.Errorf("RocksDB not supported in this build")
 }
 

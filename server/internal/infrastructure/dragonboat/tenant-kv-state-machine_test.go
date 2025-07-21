@@ -63,7 +63,7 @@ func TestTenantUpdate_SingleEntry(t *testing.T) {
 				Key:                "foo",
 				Value:              []byte("bar"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -103,7 +103,7 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 				Key:                "lookup_key",
 				Value:              []byte("lookup_value"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -121,7 +121,7 @@ func TestTenantLookup_ExistingKey(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "lookup_key",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -140,7 +140,7 @@ func TestTenantLookup_NonExistingKey(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "missing_key",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -172,7 +172,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 				Key:                "snap_key",
 				Value:              []byte("snap_value"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -211,7 +211,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                "snap_key",
 			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSelector,
+			ColumnFamilySector: db.DefaultFCSector,
 		},
 	}
 	var bufQ bytes.Buffer
@@ -226,7 +226,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 		Command: general_command.RK_Command{
 			Key:                dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName:   db.MetaFC,
-			ColumnFamilySector: db.MetaFCSelector,
+			ColumnFamilySector: db.MetaFCSector,
 		},
 	}
 	var bufQ2 bytes.Buffer
@@ -254,7 +254,7 @@ func TestTenantSaveSnapshot_Cancelled(t *testing.T) {
 				Key:                "snap_key",
 				Value:              []byte("snap_value"),
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.PutOp,
 			},
 		},
@@ -364,7 +364,7 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 			CMD: general_command.RK_Command{
 				Key:                "foo",
 				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSelector,
+				ColumnFamilySector: db.DefaultFCSector,
 				Op:                 general_command.GetOp,
 			},
 		},
@@ -396,7 +396,7 @@ func TestTenantUpdate_PutWithTTL(t *testing.T) {
 				Key:                "ttl_key",
 				Value:              []byte("ttl_value"),
 				ColumnFamilyName:   db.TenantEventFC,
-				ColumnFamilySector: db.TenantEventFCSelector,
+				ColumnFamilySector: db.TenantEventFCSector,
 				TTL:                5,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -463,7 +463,7 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 				Key:                "ttl_key",
 				Value:              []byte("ttl_value"),
 				ColumnFamilyName:   db.TenantEventFC,
-				ColumnFamilySector: db.TenantEventFCSelector,
+				ColumnFamilySector: db.TenantEventFCSector,
 				TTL:                5,
 				Op:                 general_command.PutOpTTL,
 			},
@@ -485,7 +485,7 @@ func TestTenantUpdate_DeleteWithTTL(t *testing.T) {
 			CMD: general_command.WK_Command{
 				Key:                "ttl_key",
 				ColumnFamilyName:   db.TenantEventFC,
-				ColumnFamilySector: db.TenantEventFCSelector,
+				ColumnFamilySector: db.TenantEventFCSector,
 				TTL:                5,
 				Op:                 general_command.DeleteOpTTL,
 			},

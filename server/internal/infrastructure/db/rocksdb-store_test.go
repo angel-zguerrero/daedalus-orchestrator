@@ -23,10 +23,10 @@ func TestRocksdbStore_PutAndGet(t *testing.T) {
 	value := []byte("value")
 	now := time.Now()
 
-	err = store.Put(TestFC, testColumnFamilySelector, key, value, 0, now)
+	err = store.Put(TestFC, testColumnFamilySector, key, value, 0, now)
 	require.NoError(t, err)
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySector, key, now)
 	require.NoError(t, err)
 	assert.Equal(t, value, result)
 }
@@ -38,7 +38,7 @@ func TestRocksdbStore_Get_NotFound(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, "nonexistent", now)
+	result, err := store.Get(TestFC, testColumnFamilySector, "nonexistent", now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -51,17 +51,17 @@ func TestRocksdbStore_WriteBatch(t *testing.T) {
 	now := time.Now()
 
 	batch := db.NewWriteBatch()
-	batch.Put(TestFC, testColumnFamilySelector, "a", []byte("valueA"), now)
-	batch.Put(TestFC, testColumnFamilySelector, "b", []byte("valueB"), now)
+	batch.Put(TestFC, testColumnFamilySector, "a", []byte("valueA"), now)
+	batch.Put(TestFC, testColumnFamilySector, "b", []byte("valueB"), now)
 
 	err = store.Write(batch)
 	require.NoError(t, err)
 
-	resultA, err := store.Get(TestFC, testColumnFamilySelector, "a", now)
+	resultA, err := store.Get(TestFC, testColumnFamilySector, "a", now)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueA"), resultA)
 
-	resultB, err := store.Get(TestFC, testColumnFamilySelector, "b", now)
+	resultB, err := store.Get(TestFC, testColumnFamilySector, "b", now)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("valueB"), resultB)
 }
@@ -73,9 +73,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchSingle(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:123:name", []byte("Alice"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:123:name", []byte("Alice"), 0, now))
 
-	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:123:*", "", 10, now)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySector, "user:123:*", "", 10, now)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "user:123:name", results[0].Key)
@@ -90,14 +90,14 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_MatchMultiplePages(t *testing.T
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:1", []byte("a"), 0, now))
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:2", []byte("b"), 0, now))
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "user:3", []byte("c"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:1", []byte("a"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:2", []byte("b"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "user:3", []byte("c"), 0, now))
 
 	var all []db.KeyValuePair
 	cursor := ""
 	for {
-		page, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:*", cursor, 2, now)
+		page, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySector, "user:*", cursor, 2, now)
 		require.NoError(t, err)
 		all = append(all, page...)
 		if next == "" {
@@ -115,9 +115,9 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_NoMatch(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, "product:1", []byte("item"), 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, "product:1", []byte("item"), 0, now))
 
-	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySelector, "user:*", "", 10, now)
+	results, next, err := store.SearchByPatternPaginatedKV(TestFC, testColumnFamilySector, "user:*", "", 10, now)
 	require.NoError(t, err)
 	require.Empty(t, results)
 	require.Equal(t, "", next)
@@ -130,7 +130,7 @@ func TestRocksdbStore_SearchByPatternPaginatedKV_InvalidColumnFamily(t *testing.
 	defer store.Close()
 	now := time.Now()
 
-	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", testColumnFamilySelector, "pattern:*", "", 10, now)
+	_, _, err = store.SearchByPatternPaginatedKV("nonexistent", testColumnFamilySector, "pattern:*", "", 10, now)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }
@@ -145,10 +145,10 @@ func TestRocksdbStore_Delete_ExistingKey(t *testing.T) {
 	key := "delete-key"
 	value := []byte("to-delete")
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, key, value, 0, now))
-	require.NoError(t, store.Delete(TestFC, testColumnFamilySelector, key, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, key, value, 0, now))
+	require.NoError(t, store.Delete(TestFC, testColumnFamilySector, key, now))
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySector, key, now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -160,7 +160,7 @@ func TestRocksdbStore_Delete_NonExistentKey(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	err = store.Delete(TestFC, testColumnFamilySelector, "nonexistent", now)
+	err = store.Delete(TestFC, testColumnFamilySector, "nonexistent", now)
 	assert.NoError(t, err)
 }
 
@@ -171,7 +171,7 @@ func TestRocksdbStore_Delete_InvalidColumnFamily(t *testing.T) {
 	defer store.Close()
 	now := time.Now()
 
-	err = store.Delete("nonexistent_cf", testColumnFamilySelector, "key", now)
+	err = store.Delete("nonexistent_cf", testColumnFamilySector, "key", now)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "column family")
 }
@@ -186,10 +186,10 @@ func TestRocksdbStore_Delete_TTLColumnFamily(t *testing.T) {
 	key := "ttl-key"
 	value := []byte("ttl-value")
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySelector, key, value, 0, now))
-	require.NoError(t, store.Delete(TestFC, testColumnFamilySelector, key, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, key, value, 0, now))
+	require.NoError(t, store.Delete(TestFC, testColumnFamilySector, key, now))
 
-	result, err := store.Get(TestFC, testColumnFamilySelector, key, now)
+	result, err := store.Get(TestFC, testColumnFamilySector, key, now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -237,18 +237,18 @@ func TestRocksdbStore_ColumnFamilyOperations(t *testing.T) {
 
 	// 7. Put/Get in new non-TTL CF
 	key1, val1 := "key1_rocks", []byte("val1_rocks")
-	err = store.Put(cfName, testColumnFamilySelector, key1, val1, 0, time.Now())
+	err = store.Put(cfName, testColumnFamilySector, key1, val1, 0, time.Now())
 	require.NoError(t, err)
-	retVal1, err := store.Get(cfName, testColumnFamilySelector, key1, time.Now())
+	retVal1, err := store.Get(cfName, testColumnFamilySector, key1, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, val1, retVal1)
 
 	// 8. Put/Get in new TTL CF
 	key2, val2 := "key2_rocks", []byte("val2_rocks")
 	// Using a short TTL for testing if needed, but basic Put/Get doesn't rely on TTL expiry for this test
-	err = store.Put(cfNameTTL, testColumnFamilySelector, key2, val2, 3600, time.Now())
+	err = store.Put(cfNameTTL, testColumnFamilySector, key2, val2, 3600, time.Now())
 	require.NoError(t, err)
-	retVal2, err := store.Get(cfNameTTL, testColumnFamilySelector, key2, time.Now())
+	retVal2, err := store.Get(cfNameTTL, testColumnFamilySector, key2, time.Now())
 	require.NoError(t, err)
 	assert.Equal(t, val2, retVal2)
 
@@ -263,7 +263,7 @@ func TestRocksdbStore_ColumnFamilyOperations(t *testing.T) {
 	assert.False(t, isTTL)
 
 	// 11. Get from deleted non-TTL CF should fail
-	_, err = store.Get(cfName, testColumnFamilySelector, key1, time.Now())
+	_, err = store.Get(cfName, testColumnFamilySector, key1, time.Now())
 	require.Error(t, err) // Expect an error as CF is gone
 
 	// 12. DeleteColumnFamily - TTL

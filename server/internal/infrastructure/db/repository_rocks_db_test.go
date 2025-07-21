@@ -18,50 +18,50 @@ import (
 func newTestRepository(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySector, "test_schema", iGF)
 }
 
 func newTestDeterministicRepository(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 	iGF := &db.DeterministicIDGeneratorFactory{}
-	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySector, "test_schema", iGF)
 }
 
 func newTestTTLRepository(t *testing.T) (*db.Repository[testEntity], *db.RocksdbStore, error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySelector, "test_schema", iGF)
+	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySector, "test_schema", iGF)
 	return repository, store, err
 }
 
 func newTestRepositorySpesificIds(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory(ids)
-	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySector, "test_schema", iGF)
 }
 
 func newTestTTLRepositorySpesificIds(t *testing.T, ids []string) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory(ids)
-	return db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySelector, "test_schema", iGF)
+	return db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySector, "test_schema", iGF)
 }
 
 func newTestRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntity], error) {
 	store := newRocksdbStore(t)
 
-	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	return db.NewRepository[testEntity](store, TestFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 }
 
 func newTestTTLRepositoryDefaultIdGenerator(t *testing.T) (*db.Repository[testEntity], db.KVStore, error) {
 	store := newRocksdbStore(t)
-	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySelector, "test_schema", &db.DefaultIDGeneratorFactory{})
+	repository, err := db.NewRepository[testEntity](store, TemporalFC, testColumnFamilySector, "test_schema", &db.DefaultIDGeneratorFactory{})
 	return repository, store, err
 }
 
 func newTestConditionalUniqueRepoRocksDB(t *testing.T, initialIDs []string) (*db.Repository[ConditionalUniqueEntity], db.KVStore) {
 	store := newRocksdbStore(t) // Uses a new temp dir for each call
 	idGenerator := NewTestIDGeneratorFactory(initialIDs)
-	repo, err := db.NewRepository[ConditionalUniqueEntity](store, TestFC, testColumnFamilySelector, "test_schema_cond", idGenerator)
+	repo, err := db.NewRepository[ConditionalUniqueEntity](store, TestFC, testColumnFamilySector, "test_schema_cond", idGenerator)
 	require.NoError(t, err, "Failed to create repository for ConditionalUniqueEntity")
 	return repo, store
 }
@@ -69,13 +69,13 @@ func newTestConditionalUniqueRepoRocksDB(t *testing.T, initialIDs []string) (*db
 func newTestNRepository(t *testing.T) (*db.Repository[UserComplex], error) {
 	store := newRocksdbStore(t)
 	iGF := NewTestIDGeneratorFactory([]string{"123", "456"})
-	return db.NewRepository[UserComplex](store, TestFC, testColumnFamilySelector, "test_schema", iGF)
+	return db.NewRepository[UserComplex](store, TestFC, testColumnFamilySector, "test_schema", iGF)
 }
 
 func newNestedEntityTestRepositoryRocksDB(t *testing.T) (*db.Repository[NestedEntityTest], error) {
 	store := newRocksdbStore(t)                                                        // Assumes newRocksdbStore is defined in this file
 	iGF := NewTestIDGeneratorFactory([]string{"nid1", "nid2", "nid3", "nid4", "nid5"}) // Example IDs
-	return db.NewRepository[NestedEntityTest](store, TestFC, testColumnFamilySelector, "nested_entity_schema", iGF)
+	return db.NewRepository[NestedEntityTest](store, TestFC, testColumnFamilySector, "nested_entity_schema", iGF)
 }
 
 func TestRepository_PutAndGet(t *testing.T) {
@@ -1591,32 +1591,32 @@ func TestRepository_TTL_BasicExpiration(t *testing.T) {
 	// Verify directly from kvStore (TemporalFC) before ttl
 
 	mainDataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-	dataBytes, err := store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, now)
+	dataBytes, err := store.Get(TemporalFC, testColumnFamilySector, mainDataKey, now)
 	require.NoError(t, err)
 	assert.NotNil(t, dataBytes)
 
 	uniqueIndexKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
-	idxBytes, err := store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, now)
+	idxBytes, err := store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyLastName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyLastName, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyLastName, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyAge := fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyAge, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyAge, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
 	generalIndexKeyID := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, now)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, now)
 	require.NoError(t, err)
 	assert.NotNil(t, idxBytes)
 
@@ -1633,32 +1633,32 @@ func TestRepository_TTL_BasicExpiration(t *testing.T) {
 	expiredTimeCheck := creationTime.Add(time.Duration(entity.TTL+1) * time.Second)
 
 	mainDataKey = fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-	dataBytes, err = store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, expiredTimeCheck)
+	dataBytes, err = store.Get(TemporalFC, testColumnFamilySector, mainDataKey, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, dataBytes)
 
 	uniqueIndexKey = fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyLastName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyLastName, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyLastName, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyAge = fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyAge, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyAge, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 
 	generalIndexKeyID = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-	idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, expiredTimeCheck)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
 }
@@ -1823,22 +1823,22 @@ func TestRepository_TTL_BulkCreateExpiration(t *testing.T) {
 
 		// Verify directly from kvStore (TemporalFC)
 		mainDataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
-		dataBytes, err := store.Get(TemporalFC, testColumnFamilySelector, mainDataKey, expiredTimeCheck)
+		dataBytes, err := store.Get(TemporalFC, testColumnFamilySector, mainDataKey, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, dataBytes, "Main data key should be nil for ID %s", createdID)
 
 		uniqueIndexKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", originalEntity.Name)
-		idxBytes, err := store.Get(TemporalFC, testColumnFamilySelector, uniqueIndexKey, expiredTimeCheck)
+		idxBytes, err := store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "Unique index key should be nil for Name %s", originalEntity.Name)
 
 		generalIndexKeyName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", originalEntity.Name, createdID)
-		idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyName, expiredTimeCheck)
+		idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "General name index key should be nil for Name %s, ID %s", originalEntity.Name, createdID)
 
 		generalIndexKeyID := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
-		idxBytes, err = store.Get(TemporalFC, testColumnFamilySelector, generalIndexKeyID, expiredTimeCheck)
+		idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, expiredTimeCheck)
 		require.NoError(t, err)
 		assert.Nil(t, idxBytes, "General ID index key should be nil for ID %s", createdID)
 	}

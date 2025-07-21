@@ -17,7 +17,7 @@ func NewUserRepository(uow *UnitOfWork, factory IDGeneratorFactory) (*UserReposi
 	if uow == nil {
 		return nil, fmt.Errorf("UnitOfWork is required")
 	}
-	repo, err := GetRepository[models.User](uow, AdminFC, AdminFCSelector, "admin_schema", factory)
+	repo, err := GetRepository[models.User](uow, AdminFC, AdminFCSector, "admin_schema", factory)
 	if err != nil {
 		return nil, err
 	}

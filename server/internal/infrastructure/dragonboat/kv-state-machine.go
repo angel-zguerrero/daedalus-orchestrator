@@ -111,7 +111,7 @@ func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 }
 
 func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, error) {
-	result, err := kv_store.Get(db.MetaFC, db.MetaFCSelector, AppliedIndexKey, time.Now()) // WORK, here now can be any value, due to the key used to store the "applyed index" is not ttl key
+	result, err := kv_store.Get(db.MetaFC, db.MetaFCSector, AppliedIndexKey, time.Now()) // WORK, here now can be any value, due to the key used to store the "applyed index" is not ttl key
 	if err != nil {
 		return 0, err
 	}
@@ -352,7 +352,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
-	batch.Put(db.MetaFC, db.MetaFCSelector, AppliedIndexKey, appliedIndex, time.Now())
+	batch.Put(db.MetaFC, db.MetaFCSector, AppliedIndexKey, appliedIndex, time.Now())
 
 	if err := uow.Commit(); err != nil {
 		return nil, err
@@ -505,7 +505,7 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 
 	enc := gob.NewEncoder(w)
 
-	err := kv_store.Iterate(func(cfName string, cfSelector string, key, value []byte) error {
+	err := kv_store.Iterate(func(cfName string, cfSector string, key, value []byte) error {
 		select {
 		case <-done:
 			return fmt.Errorf("snapshot cancelled")
@@ -519,7 +519,7 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 			Value     []byte
 		}{
 			CFName:    cfName,
-			CFNSector: cfSelector,
+			CFNSector: cfSector,
 			Key:       append([]byte(nil), key...),
 			Value:     append([]byte(nil), value...),
 		}

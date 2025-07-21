@@ -61,7 +61,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		value := fmt.Sprintf("normalValue_%d", i)
 		item := testKeyData{ColumnFamily: normalCF, Key: key, Value: value, IsTTL: false}
 		generatedKeys[item.ColumnFamily+":"+item.Key] = item
-		batch.Put(item.ColumnFamily, testColumnFamilySelector, item.Key, []byte(item.Value), time.Now())
+		batch.Put(item.ColumnFamily, testColumnFamilySector, item.Key, []byte(item.Value), time.Now())
 	}
 
 	// Reset batch for TTL keys
@@ -77,7 +77,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		// Our test will use `testTTLSeconds` for *expected* expiry checks.
 		insertTime := time.Now()
 		// This Put should use the system's default TTL for the ttlCF
-		batch.PutTTl(ttlCF, testColumnFamilySelector, key, []byte(value), testTTLSeconds, time.Now())
+		batch.PutTTl(ttlCF, testColumnFamilySector, key, []byte(value), testTTLSeconds, time.Now())
 
 		item := testKeyData{
 			ColumnFamily: ttlCF,
@@ -112,10 +112,10 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		require.Equal(t, 2, len(parts), "Invalid CF key format: %s", fullCFKey)
 
 		cfName := parts[0]
-		cfSelector := parts[1]
+		cfSector := parts[1]
 
 		for key, value := range cfData {
-			restoreBatch.Put(cfName, cfSelector, key, value, time.Now())
+			restoreBatch.Put(cfName, cfSector, key, value, time.Now())
 		}
 	}
 	err = targetStore.WriteRaw(restoreBatch)
@@ -123,7 +123,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 
 	queryTime := time.Now()
 	for _, originalKeyData := range generatedKeys {
-		retrievedValue, err := targetStore.Get(originalKeyData.ColumnFamily, testColumnFamilySelector, originalKeyData.Key, queryTime)
+		retrievedValue, err := targetStore.Get(originalKeyData.ColumnFamily, testColumnFamilySector, originalKeyData.Key, queryTime)
 		require.NoError(t, err, "Failed to get key %s from target store", originalKeyData.Key)
 		require.Equal(t, originalKeyData.Value, string(retrievedValue), "Value mismatch for key %s", originalKeyData.Key)
 
@@ -131,7 +131,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 			expireRefKeyName := originalKeyData.Key
 			// For TTL data that was just restored, we expect it to exist when queried with current time.
 			// The expiry check will happen later.
-			retrievedExpireRefVal, err := targetStore.Get(originalKeyData.ColumnFamily, testColumnFamilySelector, expireRefKeyName, queryTime)
+			retrievedExpireRefVal, err := targetStore.Get(originalKeyData.ColumnFamily, testColumnFamilySector, expireRefKeyName, queryTime)
 			require.NoError(t, err, "Failed to get expire reference key %s for %s in CF %s", expireRefKeyName, originalKeyData.Key, originalKeyData.ColumnFamily)
 			require.NotNil(t, retrievedExpireRefVal, "Expire reference value for key %s (key %s, CF %s) should exist", originalKeyData.Key, expireRefKeyName, originalKeyData.ColumnFamily)
 		}
@@ -185,7 +185,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 		require.NoError(t, err, "Failed to run CleanExpiredKeys on target store")
 
 		for _, kd := range keysToTestExpiry {
-			retrievedValue, errGet := targetStore.Get(kd.ColumnFamily, testColumnFamilySelector, kd.Key, expiryCheckTime)
+			retrievedValue, errGet := targetStore.Get(kd.ColumnFamily, testColumnFamilySector, kd.Key, expiryCheckTime)
 			// It's okay if errGet is pebble.ErrNotFound or similar. The main thing is retrievedValue is nil.
 			if errGet != nil {
 				// Log the error but don't fail if it's a 'not found' type error.
@@ -196,7 +196,7 @@ func runBackupRestoreTest(t *testing.T, srcStoreType, targetStoreType string) {
 
 			// kd is the testKeyData for an expired key
 			expireRefKeyName := db.PrefixTTLExpire + kd.Key
-			retrievedExpireRefVal, err := targetStore.Get(kd.ColumnFamily, testColumnFamilySelector, expireRefKeyName, expiryCheckTime)
+			retrievedExpireRefVal, err := targetStore.Get(kd.ColumnFamily, testColumnFamilySector, expireRefKeyName, expiryCheckTime)
 			require.NoError(t, err, "Error getting expire reference key %s for supposedly expired key %s (post-clean) in CF %s", expireRefKeyName, kd.Key, kd.ColumnFamily)
 			require.Nil(t, retrievedExpireRefVal, "Expire reference key %s for %s (CF %s) should be nil (expired and cleaned)", expireRefKeyName, kd.Key, kd.ColumnFamily)
 
