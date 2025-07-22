@@ -601,3 +601,47 @@ func TestPebbleStore_CleanExpiredKeys(t *testing.T) {
 	// The dump should be empty or not contain the test column family
 	assert.Empty(t, dump)
 }
+func TestPebbleStore_CleanExpiredKeysWithBatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreatePebbleStore(tmpDir, []string{"non_ttl_cf"}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+
+	now := time.Now()
+	expiredKey := "expired-key"
+	validTTLKey := "valid-ttl-key"
+	nonTTLKey := "non-ttl-key"
+
+	batch := db.NewWriteBatch()
+	batch.PutTTl(TestFC, testColumnFamilySector, expiredKey, []byte("will expire"), 1, now)     // 1-second TTL
+	batch.PutTTl(TestFC, testColumnFamilySector, validTTLKey, []byte("should remain"), 30, now) // 30-second TTL
+	batch.Put("non_ttl_cf", testColumnFamilySector, nonTTLKey, []byte("no ttl"), now)           // No TTL
+	err = store.Write(batch)
+	require.NoError(t, err)
+
+	// Wait for the short TTL to expire
+	time.Sleep(2 * time.Second)
+
+	// Clean expired keys
+	err = store.CleanExpiredKeys(time.Now())
+	require.NoError(t, err)
+
+	// Dump all data and verify
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+	dump := dumpX.(map[string]map[string][]byte)
+	// Check that the expired key is gone
+	fullColumnFamily := TestFC + ":test-sector"
+	_, cfExists := dump[fullColumnFamily]
+
+	if cfExists {
+		_, keyExists := dump[fullColumnFamily][expiredKey]
+		assert.False(t, keyExists, "Expired key should have been removed")
+	}
+
+	// Check that the valid TTL key is still present
+	assert.NotNil(t, dump[fullColumnFamily][validTTLKey], "Valid TTL key should be present")
+
+	// Check that the non-TTL key is still present
+	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+}
