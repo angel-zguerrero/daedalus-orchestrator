@@ -991,15 +991,27 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle,
 	defer it.Close()
 
 	nowMillis := now.UnixMilli()
-	prefix := []byte(PrefixTTLIndex)
 
-	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+	for it.SeekToFirst(); it.Valid(); it.Next() {
 		key := it.Key()
 		keyBytes := append([]byte(nil), key.Data()...)
 		key.Free()
 
 		keyStr := string(keyBytes)
-		trimmed := strings.TrimPrefix(keyStr, PrefixTTLIndex)
+
+		sepSectorIdx := strings.IndexByte(keyStr, ':')
+		if sepSectorIdx <= 0 || sepSectorIdx >= len(keyStr)-1 {
+			continue
+		}
+
+		trimmedWithPrefix := keyStr[sepSectorIdx+1:]
+
+		if !strings.HasPrefix(trimmedWithPrefix, PrefixTTLIndex) {
+			continue
+		}
+
+		trimmed := strings.TrimPrefix(trimmedWithPrefix, PrefixTTLIndex)
+
 		sepIdx := strings.IndexByte(trimmed, ':')
 		if sepIdx <= 0 || sepIdx >= len(trimmed)-1 {
 			continue
@@ -1017,8 +1029,9 @@ func cleanExpiredKeys(db_instance *grocksdb.DB, cf *grocksdb.ColumnFamilyHandle,
 			break
 		}
 
-		dataKey := []byte(originalKey)
-		expireRefKey := []byte(PrefixTTLExpire + originalKey)
+		sectorPrefix := keyStr[:sepSectorIdx+1]
+		dataKey := []byte(sectorPrefix + originalKey)
+		expireRefKey := []byte(sectorPrefix + PrefixTTLExpire + originalKey)
 
 		ro := grocksdb.NewDefaultReadOptions()
 		defer ro.Destroy()
