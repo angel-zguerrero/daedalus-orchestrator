@@ -572,3 +572,34 @@ func TestPebbleStore_ColumnFamilyOperations(t *testing.T) {
 	err = store.DeleteColumnFamily(cfName)
 	require.Error(t, err) // Should error
 }
+
+func TestPebbleStore_CleanExpiredKeys(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreatePebbleStore(tmpDir, []string{}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+
+	key := "my-ttl-key"
+	value := []byte("some data")
+	now := time.Now()
+
+	// Put a key with a 1-second TTL
+	err = store.Put(TestFC, testColumnFamilySector, key, value, 1, now)
+	require.NoError(t, err)
+
+	// Wait for the key to expire
+	time.Sleep(2 * time.Second)
+
+	// Clean expired keys
+	err = store.CleanExpiredKeys(time.Now())
+	require.NoError(t, err)
+
+	// Dump all data and verify that the keys are gone
+	dump, err := store.DumpAll()
+	require.NoError(t, err)
+
+	// The dump should be empty or not contain the test column family
+	if cfDump, ok := dump.(map[string]map[string][]byte)[TestFC+":"+testColumnFamilySector]; ok {
+		assert.Empty(t, cfDump)
+	}
+}
