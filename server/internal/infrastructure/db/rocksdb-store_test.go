@@ -294,7 +294,6 @@ func TestRocksdbStore_CleanExpiredKeys(t *testing.T) {
 	// Put a key with a 1-second TTL
 	err = store.Put(TestFC, testColumnFamilySector, key, value, 1, now)
 	require.NoError(t, err)
-
 	// Wait for the key to expire
 	time.Sleep(2 * time.Second)
 
@@ -306,8 +305,6 @@ func TestRocksdbStore_CleanExpiredKeys(t *testing.T) {
 	dump, err := store.DumpAll()
 	require.NoError(t, err)
 
-	// The dump should be empty or not contain the test column family
-	if cfDump, ok := dump.(map[string]map[string][]byte)[TestFC+":"+testColumnFamilySector]; ok {
-		assert.Empty(t, cfDump)
-	}
+	// The dump should be empty
+	assert.Empty(t, dump)
 }

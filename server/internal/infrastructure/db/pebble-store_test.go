@@ -599,7 +599,5 @@ func TestPebbleStore_CleanExpiredKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	// The dump should be empty or not contain the test column family
-	if cfDump, ok := dump.(map[string]map[string][]byte)[TestFC+":"+testColumnFamilySector]; ok {
-		assert.Empty(t, cfDump)
-	}
+	assert.Empty(t, dump)
 }

@@ -275,7 +275,7 @@ func (ps *PebbleStore) CleanExpiredKeys(now time.Time) error {
 	for cfName, actualCfPrefix := range ps.ttlCfPrefixes {
 		// Construct the specific prefix for scanning TTL index entries within this CF
 		// actualCfPrefix is like "myTTLCF:", so ttlIndexScanPrefix becomes "myTTLCF:_ttlidx:"
-		ttlIndexScanPrefixBytes := append(actualCfPrefix, []byte(PrefixTTLIndex)...)
+		ttlIndexScanPrefixBytes := actualCfPrefix
 
 		iterOpts := &pebble.IterOptions{
 			LowerBound: ttlIndexScanPrefixBytes,
@@ -293,14 +293,14 @@ func (ps *PebbleStore) CleanExpiredKeys(now time.Time) error {
 			// Strip actualCfPrefix + PrefixTTLIndex to get "timestamp:actualUserKey"
 			keyPart := bytes.TrimPrefix(fullIndexKey, ttlIndexScanPrefixBytes)
 
-			parts := bytes.SplitN(keyPart, []byte{':'}, 2)
-			if len(parts) < 2 {
+			parts := bytes.SplitN(keyPart, []byte{':'}, 6)
+			if len(parts) < 6 {
 				// Malformed key, log it or handle as an error. For now, skip.
 				// Consider logging: fmt.Printf("CleanExpiredKeys: malformed TTL index key in cf %s: %s\n", cfName, string(fullIndexKey))
 				continue
 			}
 
-			expireAtTimestamp, err := strconv.ParseInt(string(parts[0]), 10, 64)
+			expireAtTimestamp, err := strconv.ParseInt(string(parts[4]), 10, 64)
 			if err != nil {
 				// Malformed timestamp, log or handle. For now, skip.
 				// Consider logging: fmt.Printf("CleanExpiredKeys: malformed timestamp in TTL index key in cf %s: %s\n", cfName, string(fullIndexKey))
@@ -308,19 +308,12 @@ func (ps *PebbleStore) CleanExpiredKeys(now time.Time) error {
 			}
 
 			if expireAtTimestamp <= nowMillis {
-				originalKeyStr := string(parts[1])
+				originalKeyStr := string(parts[5])
 
-				// Construct the full prefixed keys for data, expire-ref, and the index itself
-				// Data key: actualCfPrefix + PrefixData + originalKeyStr
-				prefixedDataKey := actualCfPrefix
-				prefixedDataKey = append(prefixedDataKey, []byte(originalKeyStr)...)
-
-				// Expire ref key: actualCfPrefix + PrefixTTLExpire + originalKeyStr
-				// (This key's purpose is usually to allow quick lookup of expiry time if you only have the original key)
-				// Depending on the full TTL strategy, this might or might not exist.
-				// For cleaning, we assume it exists if the index key exists and is expired.
-				prefixedExpireRefKey := append(actualCfPrefix, []byte(PrefixTTLExpire)...)
+				prefixedExpireRefKey := []byte(fmt.Sprintf("%s%s:%s", actualCfPrefix, string(parts[0]), PrefixTTLExpire))
 				prefixedExpireRefKey = append(prefixedExpireRefKey, []byte(originalKeyStr)...)
+
+				prefixedDataKey := []byte(fmt.Sprintf("%s%s:%s", actualCfPrefix, string(parts[0]), originalKeyStr))
 
 				if err := b.Delete(prefixedDataKey, nil); err != nil { // pebble.NoSync implied
 					iter.Close()
