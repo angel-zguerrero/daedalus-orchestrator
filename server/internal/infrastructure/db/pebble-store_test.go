@@ -356,6 +356,44 @@ func TestPebbleStore_CleanExpiredKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestPebbleStore_CleanExpiredKeysChangeTLL(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreatePebbleStore(tmpDir, []string{}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+
+	key := "my-ttl-key"
+	value := []byte("some data")
+	now := time.Now()
+
+	// Put a key with a 1-second TTL
+	err = store.Put(TestFC, testColumnFamilySector, key, value, 1, now)
+	require.NoError(t, err)
+
+	err = store.Put(TestFC, testColumnFamilySector, key, value, 3, now)
+	require.NoError(t, err)
+
+	// Wait for the key to expire
+	time.Sleep(4 * time.Second)
+
+	// Clean expired keys
+	err = store.CleanExpiredKeys(time.Now())
+	require.NoError(t, err)
+
+	// Dump all data and verify that the keys are gone
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+
+	// The dump should be empty or not contain the test column family
+	assert.Empty(t, dumpX)
+	dump := dumpX.(map[string]map[string][]byte)
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, key, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
+}
 func TestPebbleStore_CleanExpiredKeysWithBatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	store, err := db.CreatePebbleStore(tmpDir, []string{"non_ttl_cf"}, []string{TestFC})
@@ -376,6 +414,61 @@ func TestPebbleStore_CleanExpiredKeysWithBatch(t *testing.T) {
 
 	// Wait for the short TTL to expire
 	time.Sleep(2 * time.Second)
+
+	// Clean expired keys
+	err = store.CleanExpiredKeys(time.Now())
+	require.NoError(t, err)
+
+	// Dump all data and verify
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+	dump := dumpX.(map[string]map[string][]byte)
+	// Check that the expired key is gone
+	fullColumnFamily := TestFC + ":test-sector"
+	_, cfExists := dump[fullColumnFamily]
+
+	if cfExists {
+		_, keyExists := dump[fullColumnFamily][expiredKey]
+		assert.False(t, keyExists, "Expired key should have been removed")
+	}
+
+	// Check that the valid TTL key is still present
+	assert.NotNil(t, dump[fullColumnFamily][validTTLKey], "Valid TTL key should be present")
+
+	// Check that the non-TTL key is still present
+	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, expiredKey, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
+}
+
+func TestPebbleStore_CleanExpiredKeysWithBatchChangeTTL(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreatePebbleStore(tmpDir, []string{"non_ttl_cf"}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+
+	now := time.Now()
+	expiredKey := "expired-key"
+	validTTLKey := "valid-ttl-key"
+	nonTTLKey := "non-ttl-key"
+
+	batch := db.NewWriteBatch()
+	batch.PutTTl(TestFC, testColumnFamilySector, expiredKey, []byte("will expire"), 1, now)     // 1-second TTL
+	batch.PutTTl(TestFC, testColumnFamilySector, validTTLKey, []byte("should remain"), 30, now) // 30-second TTL
+	batch.Put("non_ttl_cf", testColumnFamilySector, nonTTLKey, []byte("no ttl"), now)           // No TTL
+	err = store.Write(batch)
+	require.NoError(t, err)
+
+	batchU := db.NewWriteBatch()
+	batchU.PutTTl(TestFC, testColumnFamilySector, expiredKey, []byte("will expire"), 2, now)
+	err = store.Write(batchU)
+	require.NoError(t, err)
+
+	// Wait for the short TTL to expire
+	time.Sleep(4 * time.Second)
 
 	// Clean expired keys
 	err = store.CleanExpiredKeys(time.Now())
