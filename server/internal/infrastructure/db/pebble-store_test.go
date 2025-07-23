@@ -809,3 +809,116 @@ func TestPebbleStore_BatchDeletion(t *testing.T) {
 		}
 	}
 }
+
+func TestPebbleStore_DeleteWithBatchWaitForTTL(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreatePebbleStore(tmpDir, []string{"non_ttl_cf"}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+
+	now := time.Now()
+	ttlKeyToDelete := "ttl-key-to-delete"
+	ttlKeyToKeep := "ttl-key-to-keep"
+	nonTTLKey := "non-ttl-key"
+
+	// Batch write TTL and non-TTL entries
+	batch := db.NewWriteBatch()
+	batch.PutTTl(TestFC, testColumnFamilySector, ttlKeyToDelete, []byte("delete-me"), 3, now)
+	batch.PutTTl(TestFC, testColumnFamilySector, ttlKeyToKeep, []byte("keep-me"), 30, now)
+	batch.Put("non_ttl_cf", testColumnFamilySector, nonTTLKey, []byte("no-ttl"), now)
+	err = store.Write(batch)
+	require.NoError(t, err)
+
+	time.Sleep(4 * time.Second) // Wait for the TTL of the key to delete to expire
+	afterSleepNow := time.Now()
+
+	// Delete one of the TTL keys
+	err = store.Delete(TestFC, testColumnFamilySector, ttlKeyToDelete, afterSleepNow)
+	require.NoError(t, err)
+
+	// Dump all data and verify the state
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+	dump := dumpX.(map[string]map[string][]byte)
+
+	fullColumnFamily := TestFC + ":test-sector"
+
+	_, cfExists := dump[fullColumnFamily]
+	assert.True(t, cfExists, "Column family should exist")
+	if cfExists {
+		_, keyExists := dump[fullColumnFamily][ttlKeyToDelete]
+		assert.False(t, keyExists, "Deleted TTL key should not be present")
+	}
+
+	// Check that the other TTL key is still present
+	assert.NotNil(t, dump[fullColumnFamily][ttlKeyToKeep], "Kept TTL key should be present")
+
+	// Check that the non-TTL key is still present
+	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+
+	// Ensure no key in the dump contains "ttl-key-to-delete"
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, ttlKeyToDelete, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
+}
+
+func TestPebbleStore_BatchDeletionWaitForTTL(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreatePebbleStore(tmpDir, []string{"non_ttl_cf"}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+
+	now := time.Now()
+	ttlKeyToDelete := "ttl-key-to-delete"
+	ttlKeyToKeep := "ttl-key-to-keep"
+	nonTTLKey := "non-ttl-key"
+
+	// Batch write TTL and non-TTL entries
+	batch := db.NewWriteBatch()
+	batch.PutTTl(TestFC, testColumnFamilySector, ttlKeyToDelete, []byte("delete-me"), 3, now)
+	batch.PutTTl(TestFC, testColumnFamilySector, ttlKeyToKeep, []byte("keep-me"), 30, now)
+	batch.Put("non_ttl_cf", testColumnFamilySector, nonTTLKey, []byte("no-ttl"), now)
+	err = store.Write(batch)
+	require.NoError(t, err)
+
+	time.Sleep(4 * time.Second) // Wait for the TTL of the key to delete to expire
+	afterSleepNow := time.Now()
+
+	// Delete one of the TTL keys
+
+	batchDeletion := db.NewWriteBatch()
+	batchDeletion.Delete(TestFC, testColumnFamilySector, ttlKeyToDelete, afterSleepNow)
+	err = store.Write(batchDeletion)
+	require.NoError(t, err)
+
+	// Dump all data and verify the state
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+	dump := dumpX.(map[string]map[string][]byte)
+
+	fmt.Println(dump)
+
+	fullColumnFamily := TestFC + ":test-sector"
+
+	_, cfExists := dump[fullColumnFamily]
+	assert.True(t, cfExists, "Column family should exist")
+	if cfExists {
+		_, keyExists := dump[fullColumnFamily][ttlKeyToDelete]
+		assert.False(t, keyExists, "Deleted TTL key should not be present")
+	}
+
+	// Check that the other TTL key is still present
+	assert.NotNil(t, dump[fullColumnFamily][ttlKeyToKeep], "Kept TTL key should be present")
+
+	// Check that the non-TTL key is still present
+	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+
+	// Ensure no key in the dump contains "ttl-key-to-delete"
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, ttlKeyToDelete, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
+}
