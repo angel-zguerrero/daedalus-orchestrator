@@ -595,11 +595,17 @@ func TestPebbleStore_CleanExpiredKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	// Dump all data and verify that the keys are gone
-	dump, err := store.DumpAll()
+	dumpX, err := store.DumpAll()
 	require.NoError(t, err)
 
 	// The dump should be empty or not contain the test column family
-	assert.Empty(t, dump)
+	assert.Empty(t, dumpX)
+	dump := dumpX.(map[string]map[string][]byte)
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, key, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
 }
 func TestPebbleStore_CleanExpiredKeysWithBatch(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -644,6 +650,11 @@ func TestPebbleStore_CleanExpiredKeysWithBatch(t *testing.T) {
 
 	// Check that the non-TTL key is still present
 	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, expiredKey, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
 }
 
 func TestPebbleStore_DeleteWithBatch(t *testing.T) {
@@ -676,8 +687,8 @@ func TestPebbleStore_DeleteWithBatch(t *testing.T) {
 
 	fullColumnFamily := TestFC + ":test-sector"
 
-	// Check that the deleted TTL key is gone
 	_, cfExists := dump[fullColumnFamily]
+	assert.True(t, cfExists, "Column family should exist")
 	if cfExists {
 		_, keyExists := dump[fullColumnFamily][ttlKeyToDelete]
 		assert.False(t, keyExists, "Deleted TTL key should not be present")
@@ -688,4 +699,11 @@ func TestPebbleStore_DeleteWithBatch(t *testing.T) {
 
 	// Check that the non-TTL key is still present
 	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+
+	// Ensure no key in the dump contains "ttl-key-to-delete"
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, ttlKeyToDelete, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
 }
