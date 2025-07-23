@@ -187,12 +187,58 @@ func TestRocksdbStore_Delete_TTLColumnFamily(t *testing.T) {
 	key := "ttl-key"
 	value := []byte("ttl-value")
 
-	require.NoError(t, store.Put(TestFC, testColumnFamilySector, key, value, 0, now))
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, key, value, 3, now))
 	require.NoError(t, store.Delete(TestFC, testColumnFamilySector, key, now))
 
 	result, err := store.Get(TestFC, testColumnFamilySector, key, now)
 	require.NoError(t, err)
 	assert.Nil(t, result)
+
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+
+	// The dump should be empty or not contain the test column family
+	assert.Empty(t, dumpX)
+	dump := dumpX.(map[string]map[string][]byte)
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, key, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
+}
+
+func TestRocksdbStore_Delete_TTLColumnFamilyWaitForTTL(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreateRocksdbStore(tmpDir, []string{}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+	now := time.Now()
+
+	key := "ttl-key"
+	value := []byte("ttl-value")
+
+	require.NoError(t, store.Put(TestFC, testColumnFamilySector, key, value, 3, now))
+
+	time.Sleep(3 * time.Second)
+	afterSleepNow := time.Now()
+
+	require.NoError(t, store.Delete(TestFC, testColumnFamilySector, key, afterSleepNow))
+
+	result, err := store.Get(TestFC, testColumnFamilySector, key, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+
+	// The dump should be empty or not contain the test column family
+	assert.Empty(t, dumpX)
+	dump := dumpX.(map[string]map[string][]byte)
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, key, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
 }
 
 func TestRocksdbStore_ColumnFamilyOperations(t *testing.T) {
