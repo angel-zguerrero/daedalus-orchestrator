@@ -679,6 +679,7 @@ func (ps *PebbleStore) Delete(columnFamily, columnFamilySector, key string, now 
 	dataKey := actualCfPrefix
 	dataKey = append(dataKey, []byte(columnFamilySector+":")...)
 	dataKey = append(dataKey, []byte(key)...)
+
 	if err := b.Delete(dataKey, nil); err != nil {
 		return fmt.Errorf("Delete: failed to add data key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
 	}
@@ -690,9 +691,14 @@ func (ps *PebbleStore) Delete(columnFamily, columnFamilySector, key string, now 
 
 	// If expiryBytes were successfully read, construct and delete the indexKey
 	if errGetExpiry == nil && expiryBytes != nil {
-		expiryMillisStr := string(expiryBytes)
+
+		expiryMillisStr, err := strconv.ParseInt(string(expiryBytes), 10, 64)
+		if err != nil {
+			return fmt.Errorf("Delete: failed to parse expiry millis for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
+		}
 		// Index key: actualCfPrefix + PrefixTTLIndex + expiryMillisStr + ":" + key
-		indexKeyStr := fmt.Sprintf("%s%s:%s%s:%s", string(actualCfPrefix), columnFamilySector, PrefixTTLIndex, expiryMillisStr, key)
+		indexKeyStr := fmt.Sprintf("%s%s:%s%020d:%s", string(actualCfPrefix), columnFamilySector, PrefixTTLIndex, expiryMillisStr, key)
+
 		if err := b.Delete([]byte(indexKeyStr), nil); err != nil {
 			return fmt.Errorf("Delete: failed to add index key to batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
 		}

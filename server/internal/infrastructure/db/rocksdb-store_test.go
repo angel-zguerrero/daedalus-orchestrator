@@ -4,6 +4,7 @@
 package db_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -302,11 +303,18 @@ func TestRocksdbStore_CleanExpiredKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	// Dump all data and verify that the keys are gone
-	dump, err := store.DumpAll()
+	dumpX, err := store.DumpAll()
 	require.NoError(t, err)
 
 	// The dump should be empty
-	assert.Empty(t, dump)
+	assert.Empty(t, dumpX)
+
+	dump := dumpX.(map[string]map[string][]byte)
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, key, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
 }
 
 func TestRocksdbStore_CleanExpiredKeysWithBatch(t *testing.T) {
@@ -353,4 +361,60 @@ func TestRocksdbStore_CleanExpiredKeysWithBatch(t *testing.T) {
 
 	// Check that the non-TTL key is still present
 	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, expiredKey, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
+}
+
+func TestRocksdbStore_DeleteWithBatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := db.CreateRocksdbStore(tmpDir, []string{"non_ttl_cf"}, []string{TestFC})
+	require.NoError(t, err)
+	defer store.Close()
+
+	now := time.Now()
+	ttlKeyToDelete := "ttl-key-to-delete"
+	ttlKeyToKeep := "ttl-key-to-keep"
+	nonTTLKey := "non-ttl-key"
+
+	// Batch write TTL and non-TTL entries
+	batch := db.NewWriteBatch()
+	batch.PutTTl(TestFC, testColumnFamilySector, ttlKeyToDelete, []byte("delete-me"), 30, now)
+	batch.PutTTl(TestFC, testColumnFamilySector, ttlKeyToKeep, []byte("keep-me"), 30, now)
+	batch.Put("non_ttl_cf", testColumnFamilySector, nonTTLKey, []byte("no-ttl"), now)
+	err = store.Write(batch)
+	require.NoError(t, err)
+
+	// Delete one of the TTL keys
+	err = store.Delete(TestFC, testColumnFamilySector, ttlKeyToDelete, now)
+	require.NoError(t, err)
+
+	// Dump all data and verify the state
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+	dump := dumpX.(map[string]map[string][]byte)
+	fullColumnFamily := TestFC + ":test-sector"
+
+	// Check that the deleted TTL key is gone
+	_, cfExists := dump[fullColumnFamily]
+	assert.True(t, cfExists, "Column family should exist")
+	if cfExists {
+		_, keyExists := dump[fullColumnFamily][ttlKeyToDelete]
+		assert.False(t, keyExists, "Deleted TTL key should not be present")
+	}
+
+	// Check that the other TTL key is still present
+	assert.NotNil(t, dump[fullColumnFamily][ttlKeyToKeep], "Kept TTL key should be present")
+
+	// Check that the non-TTL key is still present
+	assert.NotNil(t, dump["non_ttl_cf:test-sector"][nonTTLKey], "Non-TTL key should be present")
+
+	for cf, kvs := range dump {
+		for key := range kvs {
+			assert.NotContains(t, key, ttlKeyToDelete, fmt.Sprintf("Key %s in CF %s should not contain deleted TTL key", key, cf))
+		}
+	}
 }
