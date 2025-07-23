@@ -586,8 +586,8 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 			} else {
 				ro := grocksdb.NewDefaultReadOptions()
 				defer ro.Destroy()
-				ttlExpireIndexKey := fmt.Sprintf("%s%s", PrefixTTLExpire, finalKey)
-				oldTTLBytes, err := r.getValue(cf, ro, op.CFS, ttlExpireIndexKey)
+				ttlExpireIndexKeyRelative := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)
+				oldTTLBytes, err := r.getValue(cf, ro, op.CFS, ttlExpireIndexKeyRelative)
 				if err != nil {
 					return err
 				}
@@ -595,12 +595,13 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 				if oldTTLBytes != nil {
 					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
 					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s%020d:%s", PrefixTTLIndex, oldTTLMillis, finalKey)
+						oldTTLIndexKey := fmt.Sprintf("%s:%s%020d:%s", op.CFS, PrefixTTLIndex, oldTTLMillis, op.Key)
 						rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
 					}
 				}
 
 				dataKey := finalKey
+				ttlExpireIndexKey := fmt.Sprintf("%s:%s", op.CFS, ttlExpireIndexKeyRelative)
 				rocksBatch.DeleteCF(cf, []byte(dataKey))
 				rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
 			}

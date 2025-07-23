@@ -802,7 +802,8 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 					return fmt.Errorf("Write: failed to delete key '%s': %w", op.Key, err)
 				}
 			} else {
-				ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+				ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(op.CFS+":")...)
+				ttlExpireKey = append(ttlExpireKey, []byte(PrefixTTLExpire)...)
 				ttlExpireKey = append(ttlExpireKey, []byte(op.Key)...)
 
 				oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
@@ -813,7 +814,7 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 					defer closer.Close()
 					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
 					if err == nil {
-						oldIndexKey := fmt.Sprintf("%s%s%020d:%s", string(cfPrefix), PrefixTTLIndex, oldTTLMillis, op.Key)
+						oldIndexKey := fmt.Sprintf("%s%s:%s%020d:%s", string(cfPrefix), op.CFS, PrefixTTLIndex, oldTTLMillis, op.Key)
 						if err := b.Delete([]byte(oldIndexKey), nil); err != nil {
 							return fmt.Errorf("Write: failed to delete TTL index key: %w", err)
 						}
