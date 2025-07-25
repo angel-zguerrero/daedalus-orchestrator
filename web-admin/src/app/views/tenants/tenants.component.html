@@ -23,6 +23,7 @@
           <th>Name</th>
           <th>Code</th>
           <th>Shard ID</th>
+          <th>Column Family Index</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
@@ -33,6 +34,7 @@
           <td>{{ tenant.Name }}</td>
           <td>{{ tenant.Code }}</td>
           <td>{{ tenant.ShardId }}</td>
+          <td>{{ tenant.ColumnFamilyIndex }}</td>
           <td>{{ tenant.Status }}</td>
           <td>
             <button cButton color="info" size="sm" (click)="openDetailsModal(tenant)">Details</button>
@@ -140,6 +142,7 @@
     <p><strong>Name:</strong> {{ selectedTenant.Name }}</p>
     <p><strong>Code:</strong> {{ selectedTenant.Code }}</p>
     <p><strong>Shard ID:</strong> {{ selectedTenant.ShardId }}</p>
+    <p><strong>Column Family Index:</strong> {{ selectedTenant.ColumnFamilyIndex }}</p>
     <p><strong>Status:</strong> {{ selectedTenant.Status }}</p>
     <p><strong>Created At:</strong> {{ selectedTenant.CreatedAt | date:'medium' }}</p>
     <p><strong>Updated At:</strong> {{ selectedTenant.UpdatedAt | date:'medium' }}</p>

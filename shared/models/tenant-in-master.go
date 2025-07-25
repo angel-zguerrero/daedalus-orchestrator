@@ -15,7 +15,8 @@ type TenantInMaster struct {
 	Name string
 	Code string `orm:"unique"`
 
-	ShardId int
+	ShardId           int
+	ColumnFamilyIndex int
 
 	Status    TenantInMasterStatus
 	CreatedAt time.Time

@@ -7,6 +7,7 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -53,6 +54,10 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 						}
 						if !ready && app.MasterNodeIsReady {
 							log.Warn().Int("tenant", i).Msg("⚠️️ Tenant node does not respond.")
+						}
+
+						if ready {
+							defineColumnFamilies(app)
 						}
 						readyMap[i] = ready
 					default:
@@ -132,4 +137,46 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 		}
 	})
 
+}
+
+func defineColumnFamilies(app *Application) {
+	for _, tenantNode := range app.TenantNodes {
+		for i := 0; i < config.GlobalConfiguration.MaxColumnFamilies; i++ {
+
+			createColumnFamilyCommand := &general_command.CreateColumnFamilyCommand{
+				Name:  "cf-n-" + strconv.Itoa(i),
+				IsTTL: false,
+			}
+
+			ccfCmd := general_command.FSM_Command{
+				Now:  utils.GetNowInInt(),
+				Type: general_command.REPOSITORY_COMMAND,
+				CMD:  createColumnFamilyCommand,
+			}
+
+			writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+			defer writeCancel()
+
+			_, err := tenantNode.Write(writeCtx, ccfCmd)
+			if err != nil {
+				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to create column family for Shard")
+			}
+
+			createColumnFamilyCommandTtl := &general_command.CreateColumnFamilyCommand{
+				Name:  "cf-ttl-" + strconv.Itoa(i),
+				IsTTL: false,
+			}
+
+			ccfCmdTtl := general_command.FSM_Command{
+				Now:  utils.GetNowInInt(),
+				Type: general_command.REPOSITORY_COMMAND,
+				CMD:  createColumnFamilyCommandTtl,
+			}
+
+			_, err = tenantNode.Write(writeCtx, ccfCmdTtl)
+			if err != nil {
+				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to create column family for Shard")
+			}
+		}
+	}
 }

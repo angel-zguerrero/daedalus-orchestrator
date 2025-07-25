@@ -121,40 +121,6 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 			return nil, fmt.Errorf("tenant node not found for ID %s", created[i].ID)
 		}
 
-		ccfCmd := general_command.FSM_Command{
-			Now:  utils.GetNowInInt(),
-			Type: general_command.REPOSITORY_COMMAND,
-			CMD:  &general_command.CreateColumnFamilyCommand{Name: "cf-n-" + created[i].ID, IsTTL: false},
-		}
-
-		result, err := tenantNode.Write(writeCtx, ccfCmd)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create column family for tenant %s: %w", created[i].ID, err)
-		}
-
-		buf := bytes.NewBuffer(result.Data)
-		dec := gob.NewDecoder(buf)
-		if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
-			return nil, fmt.Errorf("error during column family creation for tenant %s: %v %s", created[i].ID, err, parsedResult.Error)
-		}
-
-		ccfCmdTtl := general_command.FSM_Command{
-			Now:  utils.GetNowInInt(),
-			Type: general_command.REPOSITORY_COMMAND,
-			CMD:  &general_command.CreateColumnFamilyCommand{Name: "cf-ttl-" + created[i].ID, IsTTL: false},
-		}
-
-		result, err = tenantNode.Write(writeCtx, ccfCmdTtl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create column family ttl for tenant %s: %w", created[i].ID, err)
-		}
-
-		buf = bytes.NewBuffer(result.Data)
-		dec = gob.NewDecoder(buf)
-		if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
-			return nil, fmt.Errorf("error during column family ttl creation for tenant %s: %v %s", created[i].ID, err, parsedResult.Error)
-		}
-
 		tenantCodes = append(tenantCodes, created[i].Code)
 	}
 
