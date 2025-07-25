@@ -59,6 +59,9 @@ const ConfigAPIRaftTimeoutKey = "api_raft_timeout"
 // ConfigMaxShardsKey is the key for the maximum number of shards setting in the configuration file.
 const ConfigMaxShardsKey = "max_shards"
 
+// ConfigMaxColumnFamiliesKey is the key for the maximum number of column families setting in the configuration file.
+const ConfigMaxColumnFamiliesKey = "max_column_families"
+
 // ConfigGrpcServerListenAddrHostKey is the key for the gRPC server listen host setting in the configuration file.
 const ConfigGrpcServerListenAddrHostKey = "grpc_server_listen_addr_host"
 
@@ -131,6 +134,9 @@ const EnvVarAPIRaftTimeout = "API_RAFT_TIMEOUT"
 // EnvVarMaxShards is the environment variable name for the maximum number of shards.
 const EnvVarMaxShards = "MAX_SHARDS"
 
+// EnvVarMaxColumnFamilies is the environment variable name for the maximum number of column families.
+const EnvVarMaxColumnFamilies = "MAX_COLUMN_FAMILIES"
+
 // EnvVarGrpcServerListenAddrHost is the environment variable name for the gRPC server listen host.
 const EnvVarGrpcServerListenAddrHost = "GRPC_SERVER_LISTEN_ADDR_HOST"
 
@@ -162,6 +168,13 @@ const (
 	STAGING Env = "staging"
 )
 
+const (
+	// MaxColumnFamiliesInProduction is the maximum number of column families allowed in a production environment.
+	MaxColumnFamiliesInProduction = 100
+	// MaxColumnFamiliesInNonProduction is the maximum number of column families allowed in a non-production environment.
+	MaxColumnFamiliesInNonProduction = 10
+)
+
 // Possible string values for OpenTelemetry activation status.
 const (
 	// OTEL_ACTIVE_TRUE represents the "true" string value for enabling OpenTelemetry.
@@ -180,6 +193,9 @@ const TenantDBEngineFlagName = "tenant-db-engine"
 
 // MaxShardsFlagName is the command-line flag name for the maximum number of shards.
 const MaxShardsFlagName = "max-shards"
+
+// MaxColumnFamiliesFlagName is the command-line flag name for the maximum number of column families.
+const MaxColumnFamiliesFlagName = "max-column-families"
 
 // SelfMemberHostFlagName is the command-line flag name for the self member host.
 const SelfMemberHostFlagName = "self-member-host"

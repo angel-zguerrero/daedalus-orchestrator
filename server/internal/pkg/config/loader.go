@@ -36,6 +36,7 @@ Available Flags:
   --rest-port                 Port for the Rest API. Overrides config file and environment variable.
   --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
   --max-shards                Maximum number of shards (default 10, max 1000). Overrides config file and environment variable.
+  --max-column-families       Maximum number of column families (default 10, max 100 in production, 10 in non-production). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
   --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
 
@@ -60,6 +61,7 @@ Environment Variables:
   REST_API_JWT_SECRET         JWT secret key for the Rest API. (Corresponds to ` + constants.EnvVarRestAPIJWTSecret + `)
   API_RAFT_TIMEOUT             Timeout for API to Raft node requests (e.g., "5s", "1m"). (Corresponds to ` + constants.EnvVarAPIRaftTimeout + `)
   MAX_SHARDS                  Maximum number of shards. (Corresponds to ` + constants.EnvVarMaxShards + `)
+  MAX_COLUMN_FAMILIES         Maximum number of column families. (Corresponds to ` + constants.EnvVarMaxColumnFamilies + `)
   GRPC_SERVER_LISTEN_ADDR_HOST Host address for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrHost + `)
   GRPC_SERVER_LISTEN_ADDR_PORT Port for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrPort + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
@@ -90,6 +92,7 @@ Configuration File:
     api_raft_timeout               Timeout for API to Raft node requests in seconds (e.g., 5 for 5s).
     tenant_port_range              Tenant port range (e.g., "4000-4100").
     max_shards                    Maximum number of shards.
+    max_column_families           Maximum number of column families.
     grpc_server_listen_addr_host   Host address for the gRPC server.
     grpc_server_listen_addr_port   Port for the gRPC server.
 
@@ -160,6 +163,17 @@ var MaxShardsFlag = flag.Int(
 
 // HelpFlag defines the --help command-line flag to display the help message.
 var HelpFlag = flag.Bool("help", false, "Show help message and exit.")
+
+// MaxColumnFamiliesFlag defines the --max-column-families command-line flag.
+var MaxColumnFamiliesFlag = flag.Int(
+	constants.MaxColumnFamiliesFlagName,
+	0,
+	fmt.Sprintf(
+		"Maximum number of column families (default: 10, max: %d in production, %d in non-production environments).",
+		constants.MaxColumnFamiliesInProduction,
+		constants.MaxColumnFamiliesInNonProduction,
+	),
+)
 
 // GrpcServerListenAddrHostFlag defines the --grpc-host command-line flag for specifying the gRPC server listen host.
 var GrpcServerListenAddrHostFlag = flag.String(constants.GrpcServerListenAddrHostFlagName, "", "Host address for the gRPC server. Overrides config file and environment variable.")
@@ -346,6 +360,14 @@ func LoadDefaultConfiguration() error {
 		config.MaxShards = maxShards
 	}
 
+	if envVal := os.Getenv(constants.EnvVarMaxColumnFamilies); envVal != "" {
+		maxColumnFamilies, err := strconv.Atoi(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarMaxColumnFamilies, err)
+		}
+		config.MaxColumnFamilies = maxColumnFamilies
+	}
+
 	if envVal := os.Getenv(constants.EnvVarGrpcServerListenAddrHost); envVal != "" {
 		config.GrpcServerListenAddrHost = envVal
 	}
@@ -415,6 +437,10 @@ func LoadDefaultConfiguration() error {
 
 	if *MaxShardsFlag != 0 {
 		config.MaxShards = *MaxShardsFlag
+	}
+
+	if *MaxColumnFamiliesFlag != 0 {
+		config.MaxColumnFamilies = *MaxColumnFamiliesFlag
 	}
 
 	if *GrpcServerListenAddrHostFlag != "" {
@@ -519,6 +545,27 @@ func LoadDefaultConfiguration() error {
 	}
 	if config.MaxShards <= 0 {
 		config.MaxShards = 10
+	}
+
+	// Apply default for MaxColumnFamilies if not set by any source
+	if config.MaxColumnFamilies == 0 {
+		config.MaxColumnFamilies = constants.MaxColumnFamiliesInNonProduction
+		log.Info().Msgf("Max column families not specified, defaulting to %d", config.MaxColumnFamilies)
+	}
+
+	var maxColumnFamilies int
+	if env == string(constants.PRODUCTION) {
+		maxColumnFamilies = constants.MaxColumnFamiliesInProduction
+	} else {
+		maxColumnFamilies = constants.MaxColumnFamiliesInNonProduction
+	}
+
+	if config.MaxColumnFamilies > maxColumnFamilies {
+		log.Error().Msgf("❌ Max column families (%d) exceeds the maximum allowed (%d). Capping at %d.", config.MaxColumnFamilies, maxColumnFamilies, maxColumnFamilies)
+		config.MaxColumnFamilies = maxColumnFamilies
+	}
+	if config.MaxColumnFamilies <= 0 {
+		config.MaxColumnFamilies = 10
 	}
 
 	var MaxReplicaId int
@@ -705,6 +752,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.max_shards = mt
+		case constants.ConfigMaxColumnFamiliesKey:
+			mt, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.max_column_families = mt
 		case constants.ConfigGrpcServerListenAddrHostKey:
 			cfg.grpc_server_listen_addr_host = v
 		case constants.ConfigGrpcServerListenAddrPortKey:
