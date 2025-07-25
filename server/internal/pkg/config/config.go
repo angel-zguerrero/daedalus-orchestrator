@@ -48,6 +48,8 @@ type Config struct {
 	ApiRaftTimeout time.Duration
 	// MaxShards is the maximum number of shards supported by the cluster.
 	MaxShards int
+	// MaxColumnFamilies is the maximum number of column families supported by the cluster.
+	MaxColumnFamilies int
 	// GrpcServerListenAddrHost is the host address for the gRPC server.
 	GrpcServerListenAddrHost string
 	// GrpcServerListenAddrPort is the port for the gRPC server.
@@ -79,6 +81,7 @@ type ConfigFromMap struct {
 	rest_api_jwt_secret           string
 	api_raft_timeout              int64 // Timeout in seconds
 	max_shards                   int
+	max_column_families           int
 	grpc_server_listen_addr_host  string
 	grpc_server_listen_addr_port  int
 }
@@ -112,6 +115,7 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		RestAPIJWTSecret:          configFromMapInstance.rest_api_jwt_secret,
 		ApiRaftTimeout:            time.Duration(configFromMapInstance.api_raft_timeout) * time.Second,
 		MaxShards:                configFromMapInstance.max_shards,
+		MaxColumnFamilies:        configFromMapInstance.max_column_families,
 		GrpcServerListenAddrHost:  configFromMapInstance.grpc_server_listen_addr_host,
 		GrpcServerListenAddrPort:  configFromMapInstance.grpc_server_listen_addr_port,
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
