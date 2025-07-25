@@ -157,9 +157,9 @@ func OpenRocksDB(
 			ttlCFHandles[name] = handle
 		} else if _, ok := explicitNormalSet[name]; ok {
 			normalCFHandles[name] = handle
-		} else if strings.HasPrefix(name, "cf-ttl-") {
+		} else if strings.HasPrefix(name, ColumnFamilyTTLPrefix) {
 			ttlCFHandles[name] = handle
-		} else if strings.HasPrefix(name, "cf-n-") || name == DefaultFC || name == MetaFC {
+		} else if strings.HasPrefix(name, ColumnFamilyPrefix) || name == DefaultFC || name == MetaFC {
 			normalCFHandles[name] = handle
 		} else {
 			log.Warn().Str("name", name).Msg("🔶 Column family with unknown prefix or classification — assigning as normal")

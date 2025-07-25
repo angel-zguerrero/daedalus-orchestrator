@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
@@ -144,7 +145,7 @@ func defineColumnFamilies(app *Application) {
 		for i := 0; i < config.GlobalConfiguration.MaxColumnFamilies; i++ {
 
 			createColumnFamilyCommand := &general_command.CreateColumnFamilyCommand{
-				Name:  "cf-n-" + strconv.Itoa(i),
+				Name:  db.ColumnFamilyPrefix + strconv.Itoa(i),
 				IsTTL: false,
 			}
 
@@ -163,7 +164,7 @@ func defineColumnFamilies(app *Application) {
 			}
 
 			createColumnFamilyCommandTtl := &general_command.CreateColumnFamilyCommand{
-				Name:  "cf-ttl-" + strconv.Itoa(i),
+				Name:  db.ColumnFamilyTTLPrefix + strconv.Itoa(i),
 				IsTTL: false,
 			}
 

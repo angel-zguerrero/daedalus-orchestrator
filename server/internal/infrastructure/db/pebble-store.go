@@ -48,12 +48,12 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 		key := iter.Key()
 		keyStr := string(key)
 
-		if strings.HasPrefix(keyStr, "cf-ttl-") {
+		if strings.HasPrefix(keyStr, ColumnFamilyTTLPrefix) {
 			parts := strings.SplitN(keyStr, ":", 2)
 			if len(parts) > 0 {
 				allCfNames[parts[0]] = struct{}{}
 			}
-		} else if strings.HasPrefix(keyStr, "cf-n-") {
+		} else if strings.HasPrefix(keyStr, ColumnFamilyPrefix) {
 			parts := strings.SplitN(keyStr, ":", 2)
 			if len(parts) > 0 {
 				allCfNames[parts[0]] = struct{}{}
@@ -79,7 +79,7 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 	// Add discovered column families to the maps
 	for name := range allCfNames {
 		prefix := []byte(name + ":")
-		if strings.HasPrefix(name, "cf-ttl-") {
+		if strings.HasPrefix(name, ColumnFamilyTTLPrefix) {
 			ttlCfPrefixes[name] = prefix
 		} else {
 			cfPrefixes[name] = prefix
