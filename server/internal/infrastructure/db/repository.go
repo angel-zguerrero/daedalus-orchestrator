@@ -785,6 +785,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		if err != nil {
 			return nil, fmt.Errorf("error getting ID for entity for batch unique check: %w", err)
 		}
+
 		id := fmt.Sprintf("%v", idFieldVal.Interface())
 
 		for _, def := range r.definition.Fields {
@@ -863,6 +864,11 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 			return nil, err
 		}
 
+		forceUdpate := false
+		if hasTTL && ttl != 0 {
+			forceUdpate = true
+		}
+
 		currentEntityDataVal := currentEntityReflectVal.Elem() // For setting fields if changed
 
 		for _, def := range r.definition.Fields {
@@ -892,7 +898,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 			oldValue := fmt.Sprintf("%v", currentFieldVal.Interface())
 			newValue := fmt.Sprintf("%v", newFieldVal.Interface())
 
-			if oldValue != newValue {
+			if oldValue != newValue || forceUdpate {
 				if def.Unique {
 					// Always delete old unique index if value changed
 					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue)

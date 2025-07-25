@@ -196,7 +196,150 @@ func TestPebbleRepository_TTL_BasicExpiration(t *testing.T) {
 	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, expiredTimeCheck)
 	require.NoError(t, err)
 	assert.Nil(t, idxBytes)
+
+	err = store.CleanExpiredKeys(time.Now())
+	require.NoError(t, err)
+
+	// Dump all data and verify that the keys are gone
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+
+	// The dump should be empty or not contain the test column family
+	assert.Empty(t, dumpX)
 }
+
+func TestPebbleRepository_TTL_BasicExpiration_UpdateTTL(t *testing.T) {
+	repo, store, err := newTestTTLRepositoryPebble(t)
+	require.NoError(t, err)
+
+	entity := testEntity{
+		Name:     "ttlTestEntity",
+		Age:      20,
+		LastName: "Gomez",
+		TTL:      2, // 2 seconds
+	}
+	creationTime := time.Now()
+
+	createdID, err := repo.Create(&entity, creationTime)
+	require.NoError(t, err)
+	require.NotEmpty(t, createdID)
+
+	// Verify immediately after creation
+	found, err := repo.FindByField("ID", createdID, time.Now())
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, entity.Name, found.Name)
+	// TTL field is not usually part of the retrieved data unless explicitly handled by the ORM layer
+	// So we don't assert found.TTL == entity.TTL
+
+	schema := "test_schema"
+	table := entity.TableName()
+	now := time.Now()
+
+	// Verify directly from kvStore (TemporalFC) before ttl
+
+	mainDataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
+	dataBytes, err := store.Get(TemporalFC, testColumnFamilySector, mainDataKey, now)
+	require.NoError(t, err)
+	assert.NotNil(t, dataBytes)
+
+	uniqueIndexKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
+	idxBytes, err := store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, now)
+	require.NoError(t, err)
+	assert.NotNil(t, idxBytes)
+
+	generalIndexKeyName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, now)
+	require.NoError(t, err)
+	assert.NotNil(t, idxBytes)
+
+	generalIndexKeyLastName := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyLastName, now)
+	require.NoError(t, err)
+	assert.NotNil(t, idxBytes)
+
+	generalIndexKeyAge := fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyAge, now)
+	require.NoError(t, err)
+	assert.NotNil(t, idxBytes)
+
+	generalIndexKeyID := fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, now)
+	require.NoError(t, err)
+	assert.NotNil(t, idxBytes)
+
+	entity = testEntity{
+		ID:       createdID, // Use the same ID to update
+		Name:     "ttlTestEntity",
+		Age:      20,
+		LastName: "Gomez",
+		TTL:      5, // 5 seconds, update ttl
+	}
+	updateTime := time.Now()
+
+	result, err := repo.Update(&entity, updateTime)
+	assert.True(t, result)
+	require.NoError(t, err)
+
+	time.Sleep(3 * time.Second)
+	found, err = repo.FindByField("ID", createdID, time.Now())
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, entity.Name, found.Name)
+
+	// Wait for TTL to expire
+	time.Sleep(6 * time.Second)
+	afterSleepNow := time.Now()
+
+	// Verify entity is gone from repository
+	notFound, err := repo.FindByField("ID", createdID, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, notFound)
+
+	// Verify directly from kvStore (TemporalFC) after ttl
+	// We use a 'now' that is definitely after expiry for these checks
+
+	mainDataKey = fmt.Sprintf("%s:%s:data:%s", schema, table, createdID)
+	dataBytes, err = store.Get(TemporalFC, testColumnFamilySector, mainDataKey, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, dataBytes)
+
+	uniqueIndexKey = fmt.Sprintf("%s:%s:idx-u:%s:%s", schema, table, "Name", entity.Name)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, uniqueIndexKey, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, idxBytes)
+
+	generalIndexKeyName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "Name", entity.Name, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyName, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, idxBytes)
+
+	generalIndexKeyLastName = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "LastName", entity.LastName, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyLastName, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, idxBytes)
+
+	generalIndexKeyAge = fmt.Sprintf("%s:%s:idx:%s:%d:%s", schema, table, "Age", entity.Age, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyAge, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, idxBytes)
+
+	generalIndexKeyID = fmt.Sprintf("%s:%s:idx:%s:%s:%s", schema, table, "ID", createdID, createdID)
+	idxBytes, err = store.Get(TemporalFC, testColumnFamilySector, generalIndexKeyID, afterSleepNow)
+	require.NoError(t, err)
+	assert.Nil(t, idxBytes)
+
+	err = store.CleanExpiredKeys(time.Now())
+	require.NoError(t, err)
+
+	// Dump all data and verify that the keys are gone
+	dumpX, err := store.DumpAll()
+	require.NoError(t, err)
+
+	// The dump should be empty or not contain the test column family
+	assert.Empty(t, dumpX)
+}
+
 func TestPebbleRepository_TTL_BulkUpdateExpiration(t *testing.T) {
 	repo, _, err := newTestTTLRepositoryDefaultIdGeneratorPebble(t)
 	require.NoError(t, err)
