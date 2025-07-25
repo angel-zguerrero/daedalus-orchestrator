@@ -4,7 +4,7 @@ package constants
 // Raft group that manages cluster-wide concerns or metadata, as opposed to
 // tenant-specific data.
 const MasterTenant = "master-tenant"
-const MaxShardsInProduction = 10000
+const MaxShardsInProduction = 1000
 const MaxShardsInNonProduction = 10
 
 const MaxReplicationInProduction = 100

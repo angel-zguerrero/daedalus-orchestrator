@@ -35,7 +35,7 @@ Available Flags:
   --rest-host                 Host address for the Rest API. Overrides config file and environment variable.
   --rest-port                 Port for the Rest API. Overrides config file and environment variable.
   --api-raft-timeout           Timeout for API to Raft node requests (e.g., 5s, 1m). Default 5s. Overrides config file and environment variable.
-  --max-shards                Maximum number of shards (default 10, max 10000). Overrides config file and environment variable.
+  --max-shards                Maximum number of shards (default 10, max 1000). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
   --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
 
