@@ -16,7 +16,6 @@ func init() {
 	gob.Register([]models.TenantInMaster{})
 }
 
-// CreateTenantInMasterCommand represents a command to authenticate a user.
 type CreateTenantInMasterCommand struct {
 	Tenants []models.TenantInMaster
 }
@@ -25,7 +24,6 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 	commandResult := &command.CommandResult{}
 	kvStore := uow.KVStore
 
-	// Obtener último shard ID
 	lastShardIdBytes, err := kvStore.Get(db.AdminFC, db.AdminFCSector, "last-shard-id", now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -44,7 +42,6 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 
-	// Obtener último column family index
 	lastCFIndexBytes, err := kvStore.Get(db.AdminFC, db.AdminFCSector, "last-cf-index", now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -63,7 +60,6 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 
-	// Obtener contador interno de shard loop
 	shardLoopCounterBytes, err := kvStore.Get(db.AdminFC, db.AdminFCSector, "cf-shard-loop-counter", now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -90,17 +86,14 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 	var resultTenants []models.TenantInMaster
 
 	for _, tenant := range cmd.Tenants {
-		// Asignar shard ID (cíclico)
 		lastShardId++
 		if lastShardId > config.GlobalConfiguration.MaxShards+1 {
 			lastShardId = 2
 		}
 		tenant.ShardId = lastShardId
 
-		// Asignar column family index basado en shard loop
 		tenant.ColumnFamilyIndex = lastCFIndex
 
-		// Incrementar el contador de shard assignments
 		shardLoopCounter++
 		if shardLoopCounter >= config.GlobalConfiguration.MaxShards {
 			shardLoopCounter = 0
@@ -134,7 +127,6 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		resultTenants = append(resultTenants, tenant)
 	}
 
-	// Guardar último shard ID actualizado
 	nextShardIdInBytes, err := utils.IntToBytes(lastShardId)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -146,7 +138,6 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 
-	// Guardar último column family index
 	nextCFIndexBytes, err := utils.IntToBytes(lastCFIndex)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -158,7 +149,6 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 
-	// Guardar el contador de shard loop
 	nextLoopCounterBytes, err := utils.IntToBytes(shardLoopCounter)
 	if err != nil {
 		commandResult.Error = err.Error()
