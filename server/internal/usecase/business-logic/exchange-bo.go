@@ -30,22 +30,22 @@ func NewExchangeBO(Config *common.ServerConfing) *ExchangeBO {
 	}
 }
 
-func (bo *ExchangeBO) AssertExchange(ctx context.Context, tenantID, name string, exchangeType models.ExchangeType) (models.Exchange, error) {
+func (bo *ExchangeBO) AssertExchange(ctx context.Context, vnamespace, name string, exchangeType models.ExchangeType, cf, cfs string) (models.Exchange, error) {
 	exchange := &models.Exchange{
-		ID:       strings.ReplaceAll(uuid.New().String(), "-", ""),
-		Name:     name,
-		Type:     exchangeType,
-		TenantID: tenantID,
+		ID:         strings.ReplaceAll(uuid.New().String(), "-", ""),
+		Name:       name,
+		Type:       exchangeType,
+		VNamespace: vnamespace,
 	}
 
-	createdList, err := bo.AssertExchanges(ctx, []*models.Exchange{exchange})
+	createdList, err := bo.AssertExchanges(ctx, []*models.Exchange{exchange}, cf, cfs)
 	if err != nil {
 		return models.Exchange{}, err
 	}
 	return createdList[0], nil
 }
 
-func (bo *ExchangeBO) AssertExchanges(ctx context.Context, exchanges []*models.Exchange) ([]models.Exchange, error) {
+func (bo *ExchangeBO) AssertExchanges(ctx context.Context, exchanges []*models.Exchange, cf, cfs string) ([]models.Exchange, error) {
 	if len(exchanges) == 0 {
 		return nil, errors.New("no exchanges provided")
 	}
@@ -59,6 +59,8 @@ func (bo *ExchangeBO) AssertExchanges(ctx context.Context, exchanges []*models.E
 
 	asseertExchangeCommand := &exchange_command.AssertExchangeCommand{
 		Exchanges: make([]models.Exchange, len(exchanges)),
+		CF:        cf,
+		CFS:       cfs,
 	}
 	for i, t := range exchanges {
 		asseertExchangeCommand.Exchanges[i] = *t
@@ -73,7 +75,7 @@ func (bo *ExchangeBO) AssertExchanges(ctx context.Context, exchanges []*models.E
 		CMD:  asseertExchangeCommand,
 	}
 
-	result, err := bo.Config.MasterNode.Write(writeCtx, fsmCmd)
+	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Msg("Failed to assert exchanges (bulk)")
 		return nil, fmt.Errorf("failed to assert exchanges (bulk): %w", err)

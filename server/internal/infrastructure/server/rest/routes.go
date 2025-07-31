@@ -2,6 +2,7 @@ package rest_server
 
 import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
+	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"time"
@@ -14,6 +15,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	adminController := auth.NewAdminController(s.Config)
 	metricsController := metrics.NewMetricsController(s.Config)
 	tenantController := tenant.NewTenantController(s.Config)
+	exchangeController := exchange.NewExchangeController(s.Config)
 
 	restAPIGroup := engine.Group("/rest-api")
 	{
@@ -33,6 +35,10 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
 			tenantsGroup.GET("/:id", tenantController.GetTenantHandler)
 			tenantsGroup.DELETE("/:id", tenantController.DeleteTenantHandler)
+			{
+				tenantsGroup.POST("/:id/assert/exchange", exchangeController.AssertExchangeHandler)
+				tenantsGroup.POST("/:id/assert/exchanges", exchangeController.AssertExchangesHandler)
+			}
 		}
 	}
 	metricsAPIGroup := engine.Group("/metrics")

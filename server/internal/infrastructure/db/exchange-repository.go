@@ -11,11 +11,11 @@ type ExchangeRepository struct {
 	*Repository[models.Exchange]
 }
 
-func NewExchangeRepository(uow *UnitOfWork, factory IDGeneratorFactory) (*ExchangeRepository, error) {
+func NewExchangeRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs string) (*ExchangeRepository, error) {
 	if uow == nil {
 		return nil, fmt.Errorf("UnitOfWork is required")
 	}
-	repo, err := GetRepository[models.Exchange](uow, AdminFC, AdminFCSector, "admin_schema", factory)
+	repo, err := GetRepository[models.Exchange](uow, cf, cfs, "admin_schema", factory)
 	if err != nil {
 		return nil, err
 	}

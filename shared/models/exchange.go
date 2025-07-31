@@ -13,9 +13,8 @@ const (
 )
 
 type Exchange struct {
-	ID       string `orm:"primary-key"`
-	Name     string `orm:"unique"`
-	TenantID string
+	ID   string `orm:"primary-key"`
+	Name string `orm:"unique"`
 
 	Type ExchangeType
 

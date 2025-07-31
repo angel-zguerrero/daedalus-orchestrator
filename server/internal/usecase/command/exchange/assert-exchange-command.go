@@ -16,13 +16,15 @@ func init() {
 
 type AssertExchangeCommand struct {
 	Exchanges []models.Exchange
+	CF        string
+	CFS       string
 }
 
 func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
-	exchangeRepo, err := db.NewExchangeRepository(uow, idFactory)
+	exchangeRepo, err := db.NewExchangeRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -41,7 +43,6 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		if existing != nil {
 			exchange.ID = existing.ID
 			exchange.CreatedAt = existing.CreatedAt
-			exchange.TenantID = existing.TenantID
 			exchange.VNamespace = existing.VNamespace
 			exchange.Type = existing.Type
 			_, err = exchangeRepo.UpdateExchange(&exchange, now)

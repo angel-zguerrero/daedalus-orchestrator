@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"time"
 
@@ -38,6 +39,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	deleteColumnFamilyCommand, ok := cmd.(general_command.DeleteColumnFamilyCommand)
 	if ok {
 		return deleteColumnFamilyCommand.Execute(uow, now)
+	}
+
+	AssertExchangeCommand, ok := cmd.(exchange_command.AssertExchangeCommand)
+	if ok {
+		return AssertExchangeCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
