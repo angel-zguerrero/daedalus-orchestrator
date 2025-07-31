@@ -33,11 +33,11 @@ type createExchangeRequest struct {
 }
 
 type createBulkExchangeRequest struct {
-	Exchanges []createExchangeRequest `json:"tenants" binding:"required"`
+	Exchanges []createExchangeRequest `json:"exchanges" binding:"required"`
 }
 
-// AssertExchangeHandler handles POST /rest-api/tenants
-func (ctrl *ExchangeController) AssertExchangeHandler(c *gin.Context) {
+// CreateExchangeHandler handles POST /rest-api/tenants
+func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
 	var req createExchangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ctrl.Config.Logger.Warn().Err(err).Msg("create tenant attempt with invalid payload")
@@ -52,7 +52,7 @@ func (ctrl *ExchangeController) AssertExchangeHandler(c *gin.Context) {
 		return
 	}
 
-	exchange, err := ctrl.ExchangeBO.AssertExchange(c.Request.Context(), req.VNamespace, req.Name, models.ExchangeType(req.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), req.VNamespace, req.Name, models.ExchangeType(req.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -64,7 +64,7 @@ func (ctrl *ExchangeController) AssertExchangeHandler(c *gin.Context) {
 	})
 }
 
-func (ctrl *ExchangeController) AssertExchangesHandler(c *gin.Context) {
+func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 	var req createBulkExchangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ctrl.Config.Logger.Warn().Err(err).Msg("create tenant attempt with invalid payload")
@@ -90,7 +90,7 @@ func (ctrl *ExchangeController) AssertExchangesHandler(c *gin.Context) {
 		}
 		exchanges = append(exchanges, exchange)
 	}
-	exchangesResult, err := ctrl.ExchangeBO.AssertExchanges(c.Request.Context(), exchanges, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchangesResult, err := ctrl.ExchangeBO.BulkCreateExchange(c.Request.Context(), exchanges, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -102,11 +102,17 @@ func (ctrl *ExchangeController) AssertExchangesHandler(c *gin.Context) {
 	})
 }
 
-/*
-// GetExchangeHandler handles GET /rest-api/tenants/:id
+// GetExchangeHandler handles GET /rest-api/exchanges/:id
 func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
+	exchangeID := c.Param("exchangeId")
 	tenantID := c.Param("id")
-	tenant, node, _, err := ctrl.ExchangeBO.GetExchange(c.Request.Context(), tenantID)
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	exchange, err := ctrl.ExchangeBO.GetExchange(c.Request.Context(), exchangeID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -114,31 +120,41 @@ func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Exchange",
-		"result":  tenant,
-		"node": gin.H{
-			"SelfMember": node.SelfMember,
-			"ShardID":    node.ShardID,
-			"Roles":      node.Roles,
-		},
+		"result":  exchange,
 	})
 }
 
+// DeleteExchangeHandler handles DELETE /rest-api/exchanges/:id
 func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
+	exchangeID := c.Param("exchangeId")
 	tenantID := c.Param("id")
 
-	err := ctrl.ExchangeBO.DeleteExchange(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = ctrl.ExchangeBO.DeleteExchange(c.Request.Context(), exchangeID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Exchange " + tenantID + " was deleted",
+		"message": "Exchange " + exchangeID + " was deleted",
 	})
 }
 
 func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
+	tenantID := c.Param("id")
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {
 		page = 50
@@ -146,7 +162,7 @@ func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
 		page = 1000
 	}
 
-	findResult, err := ctrl.ExchangeBO.GetExchanges(c.Request.Context(), c.Query("q"), c.Query("cursor"), page)
+	findResult, err := ctrl.ExchangeBO.GetExchanges(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -161,4 +177,3 @@ func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
 		"result":  findResult,
 	})
 }
-*/

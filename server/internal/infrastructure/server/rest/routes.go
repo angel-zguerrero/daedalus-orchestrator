@@ -36,10 +36,14 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.GET("/:id", tenantController.GetTenantHandler)
 			tenantsGroup.DELETE("/:id", tenantController.DeleteTenantHandler)
 			{
-				tenantsGroup.POST("/:id/assert/exchange", exchangeController.AssertExchangeHandler)
-				tenantsGroup.POST("/:id/assert/exchanges", exchangeController.AssertExchangesHandler)
+				tenantsGroup.POST("/:id/exchange", exchangeController.CreateExchangeHandler)
+				tenantsGroup.POST("/:id/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
+				tenantsGroup.GET("/:id/exchange", exchangeController.GetExchangesHandler)
+				tenantsGroup.GET("/:id/exchange/:exchangeId", exchangeController.GetExchangeHandler)
+				tenantsGroup.DELETE("/:id/exchange/:exchangeId", exchangeController.DeleteExchangeHandler)
 			}
 		}
+
 	}
 	metricsAPIGroup := engine.Group("/metrics")
 	metricsAPIGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))

@@ -24,6 +24,17 @@ func (r *TenantKVBaseStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
 }
 
 func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
+
+	findExchangeCommand, ok := cmd.(exchange_command.FindExchangeCommand)
+	if ok {
+		return findExchangeCommand.Execute(uow, now)
+	}
+
+	paginateExchangesCommand, ok := cmd.(exchange_command.PaginateExchangesCommand)
+	if ok {
+		return paginateExchangesCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
@@ -44,6 +55,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	AssertExchangeCommand, ok := cmd.(exchange_command.AssertExchangeCommand)
 	if ok {
 		return AssertExchangeCommand.Execute(uow, now)
+	}
+
+	deleteExchangeCommand, ok := cmd.(exchange_command.DeleteExchangeCommand)
+	if ok {
+		return deleteExchangeCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
