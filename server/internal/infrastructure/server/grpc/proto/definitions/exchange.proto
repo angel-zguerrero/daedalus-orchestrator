@@ -55,6 +55,7 @@ message GetExchangesRequest {
   string q = 2;
   string cursor = 3;
   int32 pageSize = 4;
+  string vnamespace = 5;
 }
 
 message Exchange {

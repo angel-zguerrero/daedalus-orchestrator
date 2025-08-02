@@ -415,6 +415,7 @@ type GetExchangesRequest struct {
 	Q             string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
 	Cursor        string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
 	PageSize      int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -475,6 +476,13 @@ func (x *GetExchangesRequest) GetPageSize() int32 {
 		return x.PageSize
 	}
 	return 0
+}
+
+func (x *GetExchangesRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
+	}
+	return ""
 }
 
 type Exchange struct {
@@ -795,12 +803,15 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"exchangeId\"[\n" +
 	"\x13GetExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
-	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"s\n" +
+	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"\x93\x01\n" +
 	"\x13GetExchangesRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\f\n" +
 	"\x01q\x18\x02 \x01(\tR\x01q\x12\x16\n" +
 	"\x06cursor\x18\x03 \x01(\tR\x06cursor\x12\x1a\n" +
-	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\"\x9e\x01\n" +
+	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x05 \x01(\tR\n" +
+	"vnamespace\"\x9e\x01\n" +
 	"\bExchange\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +

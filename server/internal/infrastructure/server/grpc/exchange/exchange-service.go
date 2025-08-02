@@ -130,7 +130,7 @@ func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRe
 		page = 1000
 	}
 
-	findResult, err := s.ExchangeBO.GetExchanges(ctx, r.Q, r.Cursor, page, "", db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	findResult, err := s.ExchangeBO.GetExchanges(ctx, r.Q, r.Cursor, page, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
