@@ -39,6 +39,11 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 	for _, exchange := range cmd.Exchanges {
 
+		// Validate that VNamespace is not empty
+		if exchange.VNamespace == "" {
+			exchange.VNamespace = "default"
+		}
+
 		// Upsert VNamespace if it exists
 		if exchange.VNamespace != "" {
 			existingVNamespace, err := vNamespaceRepo.GetVNamespaceByName(exchange.VNamespace, now)
