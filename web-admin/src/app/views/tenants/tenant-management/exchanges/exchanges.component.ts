@@ -82,9 +82,7 @@ export class ExchangesComponent implements OnInit {
       vnamespace: ['']
     });
     this.exchangeFormUpdate = this.fb.group({
-      name: ['', Validators.required],
-      type: ['direct', Validators.required],
-      vnamespace: ['']
+      name: ['', Validators.required]
     });
   }
 
@@ -140,9 +138,7 @@ export class ExchangesComponent implements OnInit {
     this.selectedExchange = exchange;
     this.exchangeFormUpdate.reset();
     this.exchangeFormUpdate.patchValue({
-      name: exchange.Name,
-      type: exchange.Type,
-      vnamespace: exchange.VNamespace
+      name: exchange.Name
     });
     this.editModalVisible = true;
     this.showAlert = false;
@@ -180,7 +176,9 @@ export class ExchangesComponent implements OnInit {
   updateExchange(): void {
     if (this.exchangeFormUpdate.valid) {
       const exchangeData = {
-        ...this.exchangeFormUpdate.value,
+        name: this.exchangeFormUpdate.value.name,
+        type: this.selectedExchange.Type, // Preserve original type
+        vnamespace: this.selectedExchange.VNamespace, // Preserve original vnamespace
         id: this.selectedExchange.ID
       };
       this.exchangesService.createExchange(this.tenantId, exchangeData).subscribe({

@@ -190,24 +190,29 @@
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
     <form [formGroup]="exchangeFormUpdate">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="6">
+        <c-col [md]="12">
           <label cLabel for="name-update">Name *</label>
           <input cFormControl id="name-update" formControlName="name" placeholder="Enter exchange name" />
         </c-col>
-        <c-col [md]="6">
-          <label cLabel for="type-update">Type *</label>
-          <select cSelect id="type-update" formControlName="type">
-            <option *ngFor="let type of exchangeTypes" [value]="type.value">
-              {{ type.label }}
-            </option>
-          </select>
-        </c-col>
       </c-row>
+      
+      <!-- Read-only fields for context -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="12">
-          <label cLabel for="vnamespace-update">Virtual Namespace</label>
-          <input cFormControl id="vnamespace-update" formControlName="vnamespace" placeholder="Enter virtual namespace (optional)" />
-          <div class="form-text">Optional: Specify a virtual namespace for this exchange</div>
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Type</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <c-badge [color]="getExchangeTypeColor(selectedExchange?.Type || selectedExchange?.type)" shape="rounded-pill">
+              {{ selectedExchange?.Type || selectedExchange?.type || 'N/A' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Type cannot be changed after creation</div>
+        </c-col>
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Virtual Namespace</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            {{ selectedExchange?.VNamespace || selectedExchange?.vNamespace || selectedExchange?.vnamespace || '-' }}
+          </div>
+          <div class="form-text">Virtual namespace cannot be changed after creation</div>
         </c-col>
       </c-row>
     </form>
