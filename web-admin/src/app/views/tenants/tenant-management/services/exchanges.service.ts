@@ -10,8 +10,12 @@ export class ExchangesService {
 
   constructor(private http: HttpClient) { }
 
-  getExchanges(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = ''): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${tenantId}/exchange?cursor=${cursor}&pageSize=${pageSize}&q=${q}`);
+  getExchanges(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = ''): Observable<any> {
+    let params = `cursor=${cursor}&pageSize=${pageSize}&q=${q}`;
+    if (vnamespace) {
+      params += `&vnamespace=${vnamespace}`;
+    }
+    return this.http.get(`${this.apiUrl}/${tenantId}/exchange?${params}`);
   }
 
   getExchange(tenantId: string, exchangeId: string): Observable<any> {

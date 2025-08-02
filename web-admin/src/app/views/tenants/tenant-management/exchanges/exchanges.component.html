@@ -28,7 +28,43 @@
           </button>
         </div>
       </c-col>
-      <c-col [md]="9" class="d-flex justify-content-end">
+      <c-col [md]="3">
+        <div class="input-group">
+          <input 
+            cFormControl 
+            id="vnamespaceFiter" 
+            [(ngModel)]="selectedVNamespaceFilter" 
+            placeholder="Select virtual namespace"
+            list="vnamespace-filter-options"
+            (input)="onFilterVNamespaceInputChange($event)"
+            (change)="onVNamespaceFilterChange($event)" />
+          <button 
+            cButton 
+            type="button" 
+            color="secondary" 
+            variant="outline" 
+            (click)="searchFilterVNamespaces()"
+            [disabled]="loadingFilterVNamespaces"
+            title="Search VNamespaces">
+            <c-spinner *ngIf="loadingFilterVNamespaces" size="sm"></c-spinner>
+            <svg *ngIf="!loadingFilterVNamespaces" cIcon name="cil-search"></svg>
+          </button>
+          <button 
+            cButton 
+            type="button" 
+            color="danger" 
+            variant="outline" 
+            (click)="clearVNamespaceFilter()"
+            [disabled]="!selectedVNamespaceFilter"
+            title="Clear Filter">
+            <svg cIcon name="cil-x"></svg>
+          </button>
+        </div>
+        <datalist id="vnamespace-filter-options">
+          <option *ngFor="let vns of filterVNamespaces" [value]="vns.Name">{{ vns.Name }}</option>
+        </datalist>
+      </c-col>
+      <c-col [md]="6" class="d-flex justify-content-end align-items-end">
         <button cButton color="primary" (click)="openCreateModal()">
           <svg cIcon name="cil-plus" class="me-1"></svg>
           Create Exchange

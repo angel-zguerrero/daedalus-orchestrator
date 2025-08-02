@@ -14,11 +14,12 @@ func init() {
 }
 
 type PaginateExchangesCommand struct {
-	Query    string
-	Cursor   string
-	PageSize int
-	CF       string
-	CFS      string
+	Query      string
+	Cursor     string
+	PageSize   int
+	VNamespace string
+	CF         string
+	CFS        string
 }
 
 func (cmd *PaginateExchangesCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -31,7 +32,7 @@ func (cmd *PaginateExchangesCommand) Execute(uow *db.UnitOfWork, now time.Time) 
 		return *commandResult
 	}
 
-	findResult, err := exchangeRepo.Paginate(cmd.Query, cmd.PageSize, cmd.Cursor, now)
+	findResult, err := exchangeRepo.Paginate(cmd.Query, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

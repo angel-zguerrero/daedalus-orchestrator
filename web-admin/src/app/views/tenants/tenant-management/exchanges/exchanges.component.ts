@@ -76,6 +76,12 @@ export class ExchangesComponent implements OnInit {
   vnamespaceSearchQuery = '';
   loadingVNamespaces = false;
 
+  // VNamespace filter properties
+  filterVNamespaces: any[] = [];
+  filterVNamespaceQuery = '';
+  loadingFilterVNamespaces = false;
+  selectedVNamespaceFilter = '';
+
   public file: File | null = null;
 
   constructor(
@@ -98,6 +104,7 @@ export class ExchangesComponent implements OnInit {
       this.cursors.push('');
       this.loadExchanges();
       this.loadVNamespaces();
+      this.loadFilterVNamespaces();
     }
   }
 
@@ -105,7 +112,8 @@ export class ExchangesComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
-    this.exchangesService.getExchanges(this.tenantId, cursor, this.pageSize, this.searchQuery).subscribe({
+    
+    this.exchangesService.getExchanges(this.tenantId, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter).subscribe({
       next: (response) => {
         this.exchanges = response.result.Entities || [];
         this.cursor = response.result.Cursor;
@@ -137,6 +145,21 @@ export class ExchangesComponent implements OnInit {
     });
   }
 
+  loadFilterVNamespaces(query: string = ''): void {
+    this.loadingFilterVNamespaces = true;
+    this.vNamespacesService.getVNamespaces(this.tenantId, '', 50, query).subscribe({
+      next: (response) => {
+        this.filterVNamespaces = response.data || [];
+        this.loadingFilterVNamespaces = false;
+      },
+      error: (error) => {
+        console.error('Failed to load Filter VNamespaces:', error);
+        this.filterVNamespaces = [];
+        this.loadingFilterVNamespaces = false;
+      }
+    });
+  }
+
   searchVNamespaces(): void {
     this.loadVNamespaces(this.vnamespaceSearchQuery);
   }
@@ -149,6 +172,36 @@ export class ExchangesComponent implements OnInit {
     } else if (value.length === 0) {
       this.loadVNamespaces();
     }
+  }
+
+  searchFilterVNamespaces(): void {
+    this.loadFilterVNamespaces(this.filterVNamespaceQuery);
+  }
+
+  onFilterVNamespaceInputChange(event: any): void {
+    const value = event.target.value;
+    this.filterVNamespaceQuery = value;
+    if (value.length >= 2) {
+      this.searchFilterVNamespaces();
+    } else if (value.length === 0) {
+      this.loadFilterVNamespaces();
+    }
+  }
+
+  onVNamespaceFilterChange(event: any): void {
+    this.selectedVNamespaceFilter = event.target.value;
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    this.cursors = [''];
+    this.loadExchanges();
+  }
+
+  clearVNamespaceFilter(): void {
+    this.selectedVNamespaceFilter = '';
+    this.filterVNamespaceQuery = '';
+    this.applyFilters();
   }
 
   nextPage(): void {

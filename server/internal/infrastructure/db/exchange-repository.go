@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	models "deadalus-orch/shared/models"
@@ -40,12 +41,33 @@ func (r *ExchangeRepository) GetExchangeById(id string, now time.Time) (*models.
 	return r.FindByField("ID", id, now)
 }
 
-func (r *ExchangeRepository) Paginate(q string, pageSize int, cursor string, now time.Time) (*FindResult[models.Exchange], error) {
-	if q == "" {
-		return r.Find("ID != 0", pageSize, cursor, now) // ID != 0 Workaround
+func (r *ExchangeRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Exchange], error) {
+	var query string
+
+	if q == "" && vNamespace == "" {
+		query = "ID != 0" // ID != 0 Workaround
 	} else {
-		return r.Find("Name LIKE *"+q+"*", pageSize, cursor, now) // ID != 0 Workaround
+		var conditions []string
+
+		// Add name search condition if q is provided
+		if q != "" {
+			conditions = append(conditions, "Name LIKE *"+q+"*")
+		}
+
+		// Add vNamespace filter condition if vNamespace is provided
+		if vNamespace != "" {
+			conditions = append(conditions, "VNamespace LIKE *"+vNamespace+"*")
+		}
+
+		// If no conditions but we got here, use the workaround
+		if len(conditions) == 0 {
+			query = "ID != 0"
+		} else {
+			query = strings.Join(conditions, " AND ")
+		}
 	}
+
+	return r.Find(query, pageSize, cursor, now)
 }
 
 func (r *ExchangeRepository) DeleteExchangeByName(name string, now time.Time) (bool, error) {

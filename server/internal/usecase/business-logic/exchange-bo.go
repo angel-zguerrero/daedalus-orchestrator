@@ -186,13 +186,14 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeID, cf, cfs st
 	return nil
 }
 
-func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string, pageSize int, cf, cfs string) (db.FindResult[models.Exchange], error) {
+func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, cf, cfs string) (db.FindResult[models.Exchange], error) {
 	paginateExchangesCommand := &exchange_command.PaginateExchangesCommand{
-		Query:    q,
-		Cursor:   cursor,
-		PageSize: pageSize,
-		CF:       cf,
-		CFS:      cfs,
+		Query:      q,
+		Cursor:     cursor,
+		PageSize:   pageSize,
+		VNamespace: vNamespace,
+		CF:         cf,
+		CFS:        cfs,
 	}
 
 	queryCommand := &general_command.Query_Command{
