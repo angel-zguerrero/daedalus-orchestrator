@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
+	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	metricsController := metrics.NewMetricsController(s.Config)
 	tenantController := tenant.NewTenantController(s.Config)
 	exchangeController := exchange.NewExchangeController(s.Config)
+	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 
 	restAPIGroup := engine.Group("/rest-api")
 	{
@@ -41,6 +43,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.GET("/:id/exchange", exchangeController.GetExchangesHandler)
 				tenantsGroup.GET("/:id/exchange/:exchangeId", exchangeController.GetExchangeHandler)
 				tenantsGroup.DELETE("/:id/exchange/:exchangeId", exchangeController.DeleteExchangeHandler)
+
+				tenantsGroup.GET("/:id/vnamespaces", vnamespaceController.GetVNamespacesHandler)
 			}
 		}
 

@@ -6,6 +6,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
 	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -33,6 +34,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	paginateExchangesCommand, ok := cmd.(exchange_command.PaginateExchangesCommand)
 	if ok {
 		return paginateExchangesCommand.Execute(uow, now)
+	}
+
+	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
+	if ok {
+		return paginateVNamespacesCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

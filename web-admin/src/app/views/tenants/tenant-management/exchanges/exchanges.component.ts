@@ -1,6 +1,7 @@
 import { Component, OnInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ExchangesService } from '../services/exchanges.service';
+import { VNamespacesService } from '../services/vnamespaces.service';
 import { 
   TableModule, 
   UtilitiesModule, 
@@ -70,16 +71,22 @@ export class ExchangesComponent implements OnInit {
     { value: 'dead-letter', label: 'Dead Letter' }
   ];
 
+  // VNamespace properties
+  vnamespaces: any[] = [];
+  vnamespaceSearchQuery = '';
+  loadingVNamespaces = false;
+
   public file: File | null = null;
 
   constructor(
     private exchangesService: ExchangesService,
+    private vNamespacesService: VNamespacesService,
     private fb: FormBuilder
   ) {
     this.exchangeForm = this.fb.group({
       name: ['', Validators.required],
       type: ['direct', Validators.required],
-      vnamespace: ['']
+      vnamespace: ['', Validators.required]
     });
     this.exchangeFormUpdate = this.fb.group({
       name: ['', Validators.required]
@@ -90,6 +97,7 @@ export class ExchangesComponent implements OnInit {
     if (this.tenantId) {
       this.cursors.push('');
       this.loadExchanges();
+      this.loadVNamespaces();
     }
   }
 
@@ -114,6 +122,35 @@ export class ExchangesComponent implements OnInit {
     this.loadExchanges();
   }
 
+  loadVNamespaces(query: string = ''): void {
+    this.loadingVNamespaces = true;
+    this.vNamespacesService.getVNamespaces(this.tenantId, '', 20, query).subscribe({
+      next: (response) => {
+        this.vnamespaces = response.data || [];
+        this.loadingVNamespaces = false;
+      },
+      error: (error) => {
+        console.error('Failed to load VNamespaces:', error);
+        this.vnamespaces = [];
+        this.loadingVNamespaces = false;
+      }
+    });
+  }
+
+  searchVNamespaces(): void {
+    this.loadVNamespaces(this.vnamespaceSearchQuery);
+  }
+
+  onVNamespaceInputChange(event: any): void {
+    const value = event.target.value;
+    this.vnamespaceSearchQuery = value;
+    if (value.length >= 2) {
+      this.searchVNamespaces();
+    } else if (value.length === 0) {
+      this.loadVNamespaces();
+    }
+  }
+
   nextPage(): void {
     if (this.cursor) {
       this.loadExchanges(this.cursor);
@@ -131,6 +168,8 @@ export class ExchangesComponent implements OnInit {
     this.createModalVisible = true;
     this.exchangeForm.reset();
     this.exchangeForm.patchValue({ type: 'direct' });
+    this.vnamespaceSearchQuery = '';
+    this.loadVNamespaces();
     this.showAlert = false;
   }
 

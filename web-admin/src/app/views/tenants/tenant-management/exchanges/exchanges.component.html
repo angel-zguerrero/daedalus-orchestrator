@@ -159,9 +159,30 @@
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
-          <label cLabel for="vnamespace">Virtual Namespace</label>
-          <input cFormControl id="vnamespace" formControlName="vnamespace" placeholder="Enter virtual namespace (optional)" />
-          <div class="form-text">Optional: Specify a virtual namespace for this exchange</div>
+          <label cLabel for="vnamespace">Virtual Namespace *</label>
+          <div class="input-group">
+            <input 
+              cFormControl 
+              id="vnamespace" 
+              formControlName="vnamespace" 
+              placeholder="Search or enter virtual namespace"
+              list="vnamespace-options"
+              (input)="onVNamespaceInputChange($event)" />
+            <button 
+              cButton 
+              type="button" 
+              color="secondary" 
+              variant="outline" 
+              (click)="searchVNamespaces()"
+              [disabled]="loadingVNamespaces">
+              <c-spinner *ngIf="loadingVNamespaces" size="sm"></c-spinner>
+              <svg *ngIf="!loadingVNamespaces" cIcon name="cil-search"></svg>
+            </button>
+          </div>
+          <datalist id="vnamespace-options">
+            <option *ngFor="let vns of vnamespaces" [value]="vns.Name">{{ vns.Name }}</option>
+          </datalist>
+          <div class="form-text">Required: Select or enter a virtual namespace for this exchange</div>
         </c-col>
       </c-row>
     </form>
@@ -330,7 +351,7 @@
       <ul class="list-unstyled">
         <li><strong>Name</strong>: The name of the exchange</li>
         <li><strong>Type</strong>: The exchange type (direct, fanout, topic, headers, dead-letter)</li>
-        <li><strong>VNamespace</strong>: Virtual namespace (optional)</li>
+        <li><strong>VNamespace</strong>: Virtual namespace (required)</li>
       </ul>
     </div>
     <div class="mb-3">
