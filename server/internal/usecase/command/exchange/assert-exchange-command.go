@@ -29,10 +29,37 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
+	vNamespaceRepo, err := db.NewVNamespaceRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
 
 	var resultExchanges []models.Exchange
 
 	for _, exchange := range cmd.Exchanges {
+
+		// Upsert VNamespace if it exists
+		if exchange.VNamespace != "" {
+			existingVNamespace, err := vNamespaceRepo.GetVNamespaceByName(exchange.VNamespace, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+
+			if existingVNamespace == nil {
+				// Create new VNamespace
+				vNamespace := models.VNamespace{
+					ID:   exchange.ID, // Use Exchange ID as VNamespace ID
+					Name: exchange.VNamespace,
+				}
+				_, err = vNamespaceRepo.CreateVNamespace(&vNamespace, now)
+				if err != nil {
+					commandResult.Error = err.Error()
+					return *commandResult
+				}
+			}
+		}
 
 		existing, err := exchangeRepo.GetExchangeByName(exchange.Name, now)
 		if err != nil {
