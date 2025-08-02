@@ -1,0 +1,36 @@
+/* Exchanges Component Styles */
+
+.table-responsive {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.btn-group .btn {
+  margin: 0 2px;
+}
+
+.btn-group .btn:first-child {
+  margin-left: 0;
+}
+
+.btn-group .btn:last-child {
+  margin-right: 0;
+}
+
+.exchange-type-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.empty-state {
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.search-input-group {
+  max-width: 300px;
+}
+
+.actions-container {
+  gap: 0.5rem;
+}

@@ -7,5 +7,12 @@ export const routes: Routes = [
     data: {
       title: 'Tenants'
     }
+  },
+  {
+    path: ':id/management',
+    loadComponent: () => import('./tenant-management/tenant-management.component').then(m => m.TenantManagementComponent),
+    data: {
+      title: 'Tenant Management'
+    }
   }
 ];

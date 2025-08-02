@@ -1,9 +1,13 @@
 <c-card class="mb-4">
-  <c-card-header>
-    Tenants
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-share" class="me-2"></svg>
+      Exchanges Management
+    </h5>
   </c-card-header>
   <c-card-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    
     <!-- Search and Actions Row -->
     <c-row class="mb-3">
       <c-col [md]="3">
@@ -11,15 +15,15 @@
           <input 
             type="text" 
             cFormControl 
-            placeholder="Search by name or code" 
+            placeholder="Search by name" 
             [(ngModel)]="searchQuery" 
-            (keydown.enter)="searchTenants()"/>
+            (keydown.enter)="searchExchanges()"/>
           <button 
             cButton 
             type="button" 
             color="secondary" 
             variant="outline" 
-            (click)="searchTenants()">
+            (click)="searchExchanges()">
             <svg cIcon name="cil-search"></svg>
           </button>
         </div>
@@ -27,7 +31,7 @@
       <c-col [md]="9" class="d-flex justify-content-end">
         <button cButton color="primary" (click)="openCreateModal()">
           <svg cIcon name="cil-plus" class="me-1"></svg>
-          Create Tenant
+          Create Exchange
         </button>
         <button cButton color="secondary" (click)="openBulkUploadModal()" class="ms-2">
           <svg cIcon name="cil-cloud-upload" class="me-1"></svg>
@@ -35,85 +39,77 @@
         </button>
       </c-col>
     </c-row>
-    <!-- Tenants Table -->
+
+    <!-- Exchanges Table -->
     <div class="table-responsive">
       <table cTable class="mt-4" [hover]="true">
         <thead>
           <tr>
             <th>ID</th>
             <th>Name</th>
-            <th>Code</th>
-            <th>Shard ID</th>
-            <th>Column Family Index</th>
-            <th>Status</th>
+            <th>Type</th>
+            <th>VNamespace</th>
+            <th>Created At</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let tenant of tenants" class="align-middle">
-            <td class="text-truncate" style="max-width: 200px;">{{ tenant.ID }}</td>
+          <tr *ngFor="let exchange of exchanges" class="align-middle">
+            <td class="text-truncate" style="max-width: 200px;">{{ exchange.ID }}</td>
             <td>
-              <strong>{{ tenant.Name }}</strong>
+              <strong>{{ exchange.Name }}</strong>
             </td>
-            <td>{{ tenant.Code }}</td>
-            <td>{{ tenant.ShardId }}</td>
-            <td>{{ tenant.ColumnFamilyIndex }}</td>
             <td>
-              <c-badge [color]="getTenantStatusColor(tenant.Status)" shape="rounded-pill">
-                {{ tenant.Status }}
+              <c-badge [color]="getExchangeTypeColor(exchange.Type)" shape="rounded-pill">
+                {{ exchange.Type }}
               </c-badge>
             </td>
-          <td>
-            <div class="btn-group" role="group">
-              <button 
-                cButton 
-                color="secondary" 
-                size="sm" 
-                (click)="openTenantManagement(tenant)" 
-                title="Manage Tenant">
-                <svg cIcon name="cil-settings"></svg>
-              </button>
-              <button 
-                cButton 
-                color="info" 
-                size="sm" 
-                (click)="openDetailsModal(tenant)"
-                title="View Details">
-                <svg cIcon name="cil-info"></svg>
-              </button>
-              <button 
-                cButton 
-                color="warning" 
-                size="sm" 
-                (click)="openEditModal(tenant)"
-                title="Edit">
-                <svg cIcon name="cil-pencil"></svg>
-              </button>
-              <button 
-                cButton 
-                color="danger" 
-                size="sm" 
-                (click)="openDeleteModal(tenant)"
-                title="Delete">
-                <svg cIcon name="cil-trash"></svg>
-              </button>
-            </div>
-          </td>
-        </tr>
-        <tr *ngIf="tenants.length === 0">
-          <td colspan="7" class="text-center py-4">
-            <div class="text-muted">
-              <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
-              <h6>No tenants found</h6>
-              <p class="mb-0">Create your first tenant to get started.</p>
-            </div>
-          </td>
-        </tr>
-      </tbody>
+            <td>{{ exchange.VNamespace || '-' }}</td>
+            <td>{{ exchange.CreatedAt | date:'medium' }}</td>
+            <td>
+              <div class="btn-group" role="group">
+                <button 
+                  cButton 
+                  color="info" 
+                  size="sm" 
+                  (click)="openDetailsModal(exchange)"
+                  title="View Details">
+                  <svg cIcon name="cil-info"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="warning" 
+                  size="sm" 
+                  (click)="openEditModal(exchange)"
+                  title="Edit">
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="danger" 
+                  size="sm" 
+                  (click)="openDeleteModal(exchange)"
+                  title="Delete">
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="exchanges.length === 0">
+            <td colspan="6" class="text-center py-4">
+              <div class="text-muted">
+                <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                <h6>No exchanges found</h6>
+                <p class="mb-0">Create your first exchange to get started.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
       </table>
     </div>
+
     <!-- Pagination -->
-    <div class="d-flex justify-content-end mt-3" *ngIf="tenants.length > 0">
+    <div class="d-flex justify-content-end mt-3" *ngIf="exchanges.length > 0">
       <button 
         cButton 
         color="secondary" 
@@ -135,26 +131,37 @@
   </c-card-body>
 </c-card>
 
-<!-- Create Tenant Modal -->
+<!-- Create Exchange Modal -->
 <c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" size="lg">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-plus" class="me-2"></svg>
-      Create Tenant
+      Create Exchange
     </h5>
     <button (click)="createModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="tenantForm">
+    <form [formGroup]="exchangeForm">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="name">Name *</label>
-          <input cFormControl id="name" formControlName="name" placeholder="Enter tenant name" />
+          <input cFormControl id="name" formControlName="name" placeholder="Enter exchange name" />
         </c-col>
         <c-col [md]="6">
-          <label cLabel for="code">Code *</label>
-          <input cFormControl id="code" formControlName="code" placeholder="Enter tenant code" />
+          <label cLabel for="type">Type *</label>
+          <select cSelect id="type" formControlName="type">
+            <option *ngFor="let type of exchangeTypes" [value]="type.value">
+              {{ type.label }}
+            </option>
+          </select>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <label cLabel for="vnamespace">Virtual Namespace</label>
+          <input cFormControl id="vnamespace" formControlName="vnamespace" placeholder="Enter virtual namespace (optional)" />
+          <div class="form-text">Optional: Specify a virtual namespace for this exchange</div>
         </c-col>
       </c-row>
     </form>
@@ -163,34 +170,44 @@
     <button (click)="createModalVisible = false" cButton color="secondary">
       Cancel
     </button>
-    <button cButton color="primary" (click)="createTenant()" [disabled]="!tenantForm.valid">
+    <button cButton color="primary" (click)="createExchange()" [disabled]="!exchangeForm.valid">
       <svg cIcon name="cil-check" class="me-1"></svg>
-      Create Tenant
+      Create Exchange
     </button>
   </c-modal-footer>
 </c-modal>
 
-<!-- Edit Tenant Modal -->
+<!-- Edit Exchange Modal -->
 <c-modal id="editModal" [visible]="editModalVisible" (visibleChange)="editModalVisible = $event" size="lg">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-pencil" class="me-2"></svg>
-      Edit Tenant
+      Edit Exchange
     </h5>
     <button (click)="editModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="tenantFormUpdate">
+    <form [formGroup]="exchangeFormUpdate">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="name-update">Name *</label>
-          <input cFormControl id="name-update" formControlName="name" placeholder="Enter tenant name" />
+          <input cFormControl id="name-update" formControlName="name" placeholder="Enter exchange name" />
         </c-col>
         <c-col [md]="6">
-          <label cLabel for="code-update">Code</label>
-          <input cFormControl id="code-update" formControlName="code" [disabled]="true" />
-          <div class="form-text">Code cannot be modified after creation</div>
+          <label cLabel for="type-update">Type *</label>
+          <select cSelect id="type-update" formControlName="type">
+            <option *ngFor="let type of exchangeTypes" [value]="type.value">
+              {{ type.label }}
+            </option>
+          </select>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <label cLabel for="vnamespace-update">Virtual Namespace</label>
+          <input cFormControl id="vnamespace-update" formControlName="vnamespace" placeholder="Enter virtual namespace (optional)" />
+          <div class="form-text">Optional: Specify a virtual namespace for this exchange</div>
         </c-col>
       </c-row>
     </form>
@@ -199,28 +216,28 @@
     <button (click)="editModalVisible = false" cButton color="secondary">
       Cancel
     </button>
-    <button cButton color="primary" (click)="updateTenant()" [disabled]="!tenantFormUpdate.valid">
+    <button cButton color="primary" (click)="updateExchange()" [disabled]="!exchangeFormUpdate.valid">
       <svg cIcon name="cil-check" class="me-1"></svg>
       Save Changes
     </button>
   </c-modal-footer>
 </c-modal>
 
-<!-- Delete Tenant Modal -->
+<!-- Delete Exchange Modal -->
 <c-modal id="deleteModal" [visible]="deleteModalVisible" (visibleChange)="deleteModalVisible = $event">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-trash" class="me-2"></svg>
-      Delete Tenant
+      Delete Exchange
     </h5>
     <button (click)="deleteModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
     <div class="text-center">
       <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
-      <h6>Are you sure you want to delete this tenant?</h6>
+      <h6>Are you sure you want to delete this exchange?</h6>
       <p class="text-muted mb-0">
-        <strong>{{ selectedTenant?.Name }}</strong>
+        <strong>{{ selectedExchange?.Name }}</strong>
         <br>This action cannot be undone.
       </p>
     </div>
@@ -229,23 +246,23 @@
     <button (click)="deleteModalVisible = false" cButton color="secondary">
       Cancel
     </button>
-    <button cButton color="danger" (click)="deleteTenant()">
+    <button cButton color="danger" (click)="deleteExchange()">
       <svg cIcon name="cil-trash" class="me-1"></svg>
-      Delete Tenant
+      Delete Exchange
     </button>
   </c-modal-footer>
 </c-modal>
 
-<!-- Tenant Details Modal -->
+<!-- Exchange Details Modal -->
 <c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-info" class="me-2"></svg>
-      Tenant Details
+      Exchange Details
     </h5>
     <button (click)="detailsModalVisible = false" cButtonClose></button>
   </c-modal-header>
-  <c-modal-body *ngIf="selectedTenant">
+  <c-modal-body *ngIf="selectedExchange">
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
 
     
@@ -253,41 +270,33 @@
       <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">ID</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ID || selectedTenant?.id || 'N/A' }}</div>
+          <div class="p-2 bg-dark rounded">{{ selectedExchange?.ID || selectedExchange?.id || 'N/A' }}</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Name</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.Name || selectedTenant?.name || 'N/A' }}</div>
+          <div class="p-2 bg-dark rounded">{{ selectedExchange?.Name || selectedExchange?.name || 'N/A' }}</div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-bold">Code</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.Code || selectedTenant?.code || 'N/A' }}</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Status</label>
+          <label class="form-label fw-bold">Type</label>
           <div class="p-2 bg-dark rounded">
-            <c-badge [color]="getTenantStatusColor(selectedTenant?.Status || selectedTenant?.status)" shape="rounded-pill">
-              {{ selectedTenant?.Status || selectedTenant?.status || 'N/A' }}
+            <c-badge [color]="getExchangeTypeColor(selectedExchange?.Type || selectedExchange?.type)" shape="rounded-pill">
+              {{ selectedExchange?.Type || selectedExchange?.type || 'N/A' }}
             </c-badge>
           </div>
         </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
-          <label class="form-label fw-bold">Shard ID</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ShardId || selectedTenant?.shardId || 'N/A' }}</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Column Family Index</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ColumnFamilyIndex || selectedTenant?.columnFamilyIndex || 'N/A' }}</div>
+          <label class="form-label fw-bold">Virtual Namespace</label>
+          <div class="p-2 bg-dark rounded">{{ selectedExchange?.VNamespace || selectedExchange?.vNamespace || selectedExchange?.vnamespace || '-' }}</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Created At</label>
-          <div class="p-2 bg-dark rounded">{{ (selectedTenant?.CreatedAt || selectedTenant?.createdAt) | date:'full' }}</div>
+          <div class="p-2 bg-dark rounded">{{ (selectedExchange?.CreatedAt || selectedExchange?.createdAt) | date:'full' }}</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Updated At</label>
-          <div class="p-2 bg-dark rounded">{{ (selectedTenant?.UpdatedAt || selectedTenant?.updatedAt) | date:'full' }}</div>
+          <div class="p-2 bg-dark rounded">{{ (selectedExchange?.UpdatedAt || selectedExchange?.updatedAt) | date:'full' }}</div>
         </div>
       </div>
     </div>
@@ -304,7 +313,7 @@
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-cloud-upload" class="me-2"></svg>
-      Bulk Upload Tenants
+      Bulk Upload Exchanges
     </h5>
     <button (click)="bulkUploadModalVisible = false" cButtonClose [disabled]="loading"></button>
   </c-modal-header>
@@ -314,8 +323,9 @@
       <h6>Upload Instructions</h6>
       <p>Upload a .xlsx or .csv file with the following columns:</p>
       <ul class="list-unstyled">
-        <li><strong>Name</strong>: The name of the tenant</li>
-        <li><strong>Code</strong>: The code of the tenant</li>
+        <li><strong>Name</strong>: The name of the exchange</li>
+        <li><strong>Type</strong>: The exchange type (direct, fanout, topic, headers, dead-letter)</li>
+        <li><strong>VNamespace</strong>: Virtual namespace (optional)</li>
       </ul>
     </div>
     <div class="mb-3">
@@ -333,10 +343,10 @@
     <button (click)="bulkUploadModalVisible = false" cButton color="secondary" [disabled]="loading">
       Cancel
     </button>
-    <button cButton color="primary" (click)="uploadTenants()" [disabled]="loading || !file">
+    <button cButton color="primary" (click)="uploadExchanges()" [disabled]="loading || !file">
       <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
       <svg *ngIf="!loading" cIcon name="cil-cloud-upload" class="me-1"></svg>
-      {{ loading ? 'Uploading...' : 'Upload Tenants' }}
+      {{ loading ? 'Uploading...' : 'Upload Exchanges' }}
     </button>
   </c-modal-footer>
 </c-modal>
