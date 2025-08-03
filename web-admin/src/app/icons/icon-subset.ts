@@ -77,10 +77,12 @@ import {
   cilPen,
   cilPencil,
   cilPeople,
+  cilPlus,
   cilPrint,
   cilPuzzle,
   cilReportSlash,
   cilSave,
+  cilSearch,
   cilSettings,
   cilShare,
   cilShareAll,
@@ -98,7 +100,8 @@ import {
   cilUserFemale,
   cilUserFollow,
   cilUserUnfollow,
-  cilWarning
+  cilWarning,
+  cilX
 } from '@coreui/icons';
 
 import { signet } from './signet';
@@ -183,10 +186,12 @@ export const iconSubset = {
   cilPen,
   cilPencil,
   cilPeople,
+  cilPlus,
   cilPrint,
   cilPuzzle,
   cilReportSlash,
   cilSave,
+  cilSearch,
   cilSettings,
   cilShare,
   cilShareAll,
@@ -205,6 +210,7 @@ export const iconSubset = {
   cilUserFollow,
   cilUserUnfollow,
   cilWarning,
+  cilX,
   logo,
   signet
 };
