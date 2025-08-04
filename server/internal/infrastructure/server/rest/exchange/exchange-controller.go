@@ -27,6 +27,7 @@ func NewExchangeController(Config *common.ServerConfing) *ExchangeController {
 }
 
 type createExchangeRequest struct {
+	Code       string `json:"code" binding:"required"`
 	Name       string `json:"name" binding:"required"`
 	Type       string `json:"type" binding:"required"`
 	VNamespace string `json:"vnamespace" binding:"required"`
@@ -52,7 +53,7 @@ func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
 		return
 	}
 
-	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), req.VNamespace, req.Name, models.ExchangeType(req.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), req.Code, req.VNamespace, req.Name, models.ExchangeType(req.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -84,6 +85,7 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 
 	for _, t := range req.Exchanges {
 		exchange := &models.Exchange{
+			Code:       t.Code,
 			VNamespace: t.VNamespace,
 			Name:       t.Name,
 			Type:       models.ExchangeType(t.Type),

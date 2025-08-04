@@ -31,9 +31,10 @@ func NewExchangeBO(Config *common.ServerConfing) *ExchangeBO {
 	}
 }
 
-func (bo *ExchangeBO) CreateExchange(ctx context.Context, vnamespace, name string, exchangeType models.ExchangeType, cf, cfs string) (models.Exchange, error) {
+func (bo *ExchangeBO) CreateExchange(ctx context.Context, code, vnamespace, name string, exchangeType models.ExchangeType, cf, cfs string) (models.Exchange, error) {
 	exchange := &models.Exchange{
 		ID:         strings.ReplaceAll(uuid.New().String(), "-", ""),
+		Code:       code,
 		Name:       name,
 		Type:       exchangeType,
 		VNamespace: vnamespace,

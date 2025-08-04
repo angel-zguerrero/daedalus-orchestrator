@@ -12,11 +12,15 @@ const (
 	DeadLetter ExchangeType = "dead-letter"
 )
 
-// Exchange represents a message exchange with compound uniqueness constraint.
-// The combination of Name + VNamespace must be unique across all exchanges.
+// Exchange represents a message exchange with both unique code and compound uniqueness constraint.
+// The Code field must be unique across all exchanges.
+// Additionally, the combination of Name + VNamespace must be unique across all exchanges.
 // This allows multiple exchanges with the same name as long as they are in different namespaces.
 type Exchange struct {
 	ID string `orm:"primary-key"`
+
+	// Code is unique identifier for the exchange, used for upsert operations
+	Code string `orm:"unique"`
 
 	// Name is part of the compound uniqueness constraint with index 0
 	Name string `orm:"unique-compound:0"`

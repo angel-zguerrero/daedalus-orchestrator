@@ -91,6 +91,7 @@ export class ExchangesComponent implements OnInit {
   ) {
     this.exchangeForm = this.fb.group({
       name: ['', Validators.required],
+      code: ['', Validators.required],
       type: ['direct', Validators.required],
       vnamespace: ['', Validators.required]
     });
@@ -269,6 +270,7 @@ export class ExchangesComponent implements OnInit {
     if (this.exchangeFormUpdate.valid) {
       const exchangeData = {
         name: this.exchangeFormUpdate.value.name,
+        code: this.selectedExchange.Code, // Preserve existing code (frontend cannot edit)
         type: this.selectedExchange.Type, // Preserve original type
         vnamespace: this.selectedExchange.VNamespace, // Preserve original vnamespace
         id: this.selectedExchange.ID

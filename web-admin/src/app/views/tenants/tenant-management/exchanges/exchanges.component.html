@@ -83,6 +83,7 @@
           <tr>
             <th>ID</th>
             <th>Name</th>
+            <th>Code</th>
             <th>Type</th>
             <th>VNamespace</th>
             <th>Created At</th>
@@ -94,6 +95,9 @@
             <td class="text-truncate" style="max-width: 200px;">{{ exchange.ID }}</td>
             <td>
               <strong>{{ exchange.Name }}</strong>
+            </td>
+            <td>
+              <code>{{ exchange.Code }}</code>
             </td>
             <td>
               <c-badge [color]="getExchangeTypeColor(exchange.Type)" shape="rounded-pill">
@@ -184,6 +188,13 @@
           <label cLabel for="name">Name *</label>
           <input cFormControl id="name" formControlName="name" placeholder="Enter exchange name" />
         </c-col>
+        <c-col [md]="6">
+          <label cLabel for="code">Code *</label>
+          <input cFormControl id="code" formControlName="code" placeholder="Enter unique exchange code" />
+          <small class="form-text text-muted">Unique identifier for the exchange (cannot be changed later)</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="type">Type *</label>
           <select cSelect id="type" formControlName="type">
@@ -337,6 +348,12 @@
         <div class="mb-3">
           <label class="form-label fw-bold">Name</label>
           <div class="p-2 bg-dark rounded">{{ selectedExchange?.Name || selectedExchange?.name || 'N/A' }}</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedExchange?.Code || selectedExchange?.code || 'N/A' }}</code>
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Type</label>

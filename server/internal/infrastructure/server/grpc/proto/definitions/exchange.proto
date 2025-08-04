@@ -14,9 +14,10 @@ service ExchangeService {
 
 message CreateExchangeRequest {
   string tenantId = 1;
-  string name = 2;
-  string type = 3;
-  string vnamespace = 4;
+  string code = 2;
+  string name = 3;
+  string type = 4;
+  string vnamespace = 5;
 }
 
 message CreateExchangeResponse {
@@ -30,9 +31,10 @@ message BulkCreateExchangeRequest {
 }
 
 message CreateExchangeItem {
-  string name = 1;
-  string type = 2;
-  string vnamespace = 3;
+  string code = 1;
+  string name = 2;
+  string type = 3;
+  string vnamespace = 4;
 }
 
 message BulkCreateExchangeResponse {
@@ -60,11 +62,12 @@ message GetExchangesRequest {
 
 message Exchange {
   string ID = 1;
-  string Name = 2;
-  string Type = 3;
-  string VNamespace = 4;
-  string CreatedAt = 5;
-  string UpdatedAt = 6;
+  string Code = 2;
+  string Name = 3;
+  string Type = 4;
+  string VNamespace = 5;
+  string CreatedAt = 6;
+  string UpdatedAt = 7;
 }
 
 message ExchangeFindResult {
