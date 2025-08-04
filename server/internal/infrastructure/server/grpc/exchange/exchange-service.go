@@ -35,7 +35,7 @@ func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchan
 		return nil, err
 	}
 
-	exchange, err := s.ExchangeBO.CreateExchange(ctx, r.Vnamespace, r.Name, models.ExchangeType(r.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := s.ExchangeBO.CreateExchange(ctx, r.Code, r.Vnamespace, r.Name, models.ExchangeType(r.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +44,7 @@ func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchan
 		Message: "Exchange was asserted",
 		Result: &pb.Exchange{
 			ID:         exchange.ID,
+			Code:       exchange.Code,
 			Name:       exchange.Name,
 			Type:       string(exchange.Type),
 			VNamespace: exchange.VNamespace,
@@ -62,6 +63,7 @@ func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCrea
 	exchanges := []*models.Exchange{}
 	for _, t := range r.Exchanges {
 		exchange := &models.Exchange{
+			Code:       t.Code,
 			VNamespace: t.Vnamespace,
 			Name:       t.Name,
 			Type:       models.ExchangeType(t.Type),
@@ -78,6 +80,7 @@ func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCrea
 	for _, e := range exchangesResult {
 		ex := &pb.Exchange{
 			ID:         e.ID,
+			Code:       e.Code,
 			Name:       e.Name,
 			Type:       string(e.Type),
 			VNamespace: e.VNamespace,
@@ -108,6 +111,7 @@ func (s *ExchangeService) GetExchange(ctx context.Context, r *pb.GetExchangeRequ
 		Message: "Exchange",
 		Result: &pb.Exchange{
 			ID:         exchange.ID,
+			Code:       exchange.Code,
 			Name:       exchange.Name,
 			Type:       string(exchange.Type),
 			VNamespace: exchange.VNamespace,
@@ -139,6 +143,7 @@ func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRe
 	for i, e := range findResult.Entities {
 		exchanges[i] = &pb.Exchange{
 			ID:         e.ID,
+			Code:       e.Code,
 			Name:       e.Name,
 			Type:       string(e.Type),
 			VNamespace: e.VNamespace,

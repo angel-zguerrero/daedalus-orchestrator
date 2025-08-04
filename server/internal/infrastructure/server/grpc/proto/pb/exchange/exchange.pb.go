@@ -24,9 +24,10 @@ const (
 type CreateExchangeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,4,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -64,6 +65,13 @@ func (*CreateExchangeRequest) Descriptor() ([]byte, []int) {
 func (x *CreateExchangeRequest) GetTenantId() string {
 	if x != nil {
 		return x.TenantId
+	}
+	return ""
+}
+
+func (x *CreateExchangeRequest) GetCode() string {
+	if x != nil {
+		return x.Code
 	}
 	return ""
 }
@@ -195,9 +203,10 @@ func (x *BulkCreateExchangeRequest) GetExchanges() []*CreateExchangeItem {
 
 type CreateExchangeItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,4,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -230,6 +239,13 @@ func (x *CreateExchangeItem) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateExchangeItem.ProtoReflect.Descriptor instead.
 func (*CreateExchangeItem) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CreateExchangeItem) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
 }
 
 func (x *CreateExchangeItem) GetName() string {
@@ -488,11 +504,12 @@ func (x *GetExchangesRequest) GetVnamespace() string {
 type Exchange struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=Type,proto3" json:"Type,omitempty"`
-	VNamespace    string                 `protobuf:"bytes,4,opt,name=VNamespace,proto3" json:"VNamespace,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,5,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,6,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=Code,proto3" json:"Code,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=Name,proto3" json:"Name,omitempty"`
+	Type          string                 `protobuf:"bytes,4,opt,name=Type,proto3" json:"Type,omitempty"`
+	VNamespace    string                 `protobuf:"bytes,5,opt,name=VNamespace,proto3" json:"VNamespace,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -530,6 +547,13 @@ func (*Exchange) Descriptor() ([]byte, []int) {
 func (x *Exchange) GetID() string {
 	if x != nil {
 		return x.ID
+	}
+	return ""
+}
+
+func (x *Exchange) GetCode() string {
+	if x != nil {
+		return x.Code
 	}
 	return ""
 }
@@ -773,25 +797,27 @@ var File_internal_infrastructure_server_grpc_proto_definitions_exchange_proto pr
 
 const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc = "" +
 	"\n" +
-	"Dinternal/infrastructure/server/grpc/proto/definitions/exchange.proto\x12\bexchange\"{\n" +
+	"Dinternal/infrastructure/server/grpc/proto/definitions/exchange.proto\x12\bexchange\"\x8f\x01\n" +
 	"\x15CreateExchangeRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1e\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1e\n" +
 	"\n" +
-	"vnamespace\x18\x04 \x01(\tR\n" +
+	"vnamespace\x18\x05 \x01(\tR\n" +
 	"vnamespace\"^\n" +
 	"\x16CreateExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
 	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"s\n" +
 	"\x19BulkCreateExchangeRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12:\n" +
-	"\texchanges\x18\x02 \x03(\v2\x1c.exchange.CreateExchangeItemR\texchanges\"\\\n" +
+	"\texchanges\x18\x02 \x03(\v2\x1c.exchange.CreateExchangeItemR\texchanges\"p\n" +
 	"\x12CreateExchangeItem\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1e\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1e\n" +
 	"\n" +
-	"vnamespace\x18\x03 \x01(\tR\n" +
+	"vnamespace\x18\x04 \x01(\tR\n" +
 	"vnamespace\"b\n" +
 	"\x1aBulkCreateExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
@@ -811,16 +837,17 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"\x9e\x01\n" +
+	"vnamespace\"\xb2\x01\n" +
 	"\bExchange\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
-	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x03 \x01(\tR\x04Type\x12\x1e\n" +
+	"\x04Code\x18\x02 \x01(\tR\x04Code\x12\x12\n" +
+	"\x04Name\x18\x03 \x01(\tR\x04Name\x12\x12\n" +
+	"\x04Type\x18\x04 \x01(\tR\x04Type\x12\x1e\n" +
 	"\n" +
-	"VNamespace\x18\x04 \x01(\tR\n" +
+	"VNamespace\x18\x05 \x01(\tR\n" +
 	"VNamespace\x12\x1c\n" +
-	"\tCreatedAt\x18\x05 \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\x06 \x01(\tR\tUpdatedAt\"\\\n" +
+	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\"\\\n" +
 	"\x12ExchangeFindResult\x12.\n" +
 	"\bEntities\x18\x01 \x03(\v2\x12.exchange.ExchangeR\bEntities\x12\x16\n" +
 	"\x06Cursor\x18\x02 \x01(\tR\x06Cursor\"f\n" +

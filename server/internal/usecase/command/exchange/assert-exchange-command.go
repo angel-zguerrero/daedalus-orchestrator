@@ -39,46 +39,61 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 	for _, exchange := range cmd.Exchanges {
 
+		// Validate that code is not empty
+		if exchange.Code == "" {
+			commandResult.Error = "Exchange code is required"
+			return *commandResult
+		}
+
 		// Validate that VNamespace is not empty
 		if exchange.VNamespace == "" {
 			exchange.VNamespace = "default"
 		}
 
-		// Upsert VNamespace if it exists
-		if exchange.VNamespace != "" {
-			existingVNamespace, err := vNamespaceRepo.GetVNamespaceByName(exchange.VNamespace, now)
-			if err != nil {
-				commandResult.Error = err.Error()
-				return *commandResult
-			}
-
-			if existingVNamespace == nil {
-				// Create new VNamespace
-				vNamespace := models.VNamespace{
-					ID:   exchange.ID, // Use Exchange ID as VNamespace ID
-					Name: exchange.VNamespace,
-				}
-				_, err = vNamespaceRepo.CreateVNamespace(&vNamespace, now)
-				if err != nil {
-					commandResult.Error = err.Error()
-					return *commandResult
-				}
-			}
-		}
-
-		existing, err := exchangeRepo.GetExchangeByName(exchange.Name, now)
+		// Look for existing exchange by code (primary upsert strategy)
+		existing, err := exchangeRepo.GetExchangeByCode(exchange.Code, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
 
 		if existing != nil {
+			// Update: preserve the existing code and other immutable fields
 			exchange.ID = existing.ID
-			exchange.CreatedAt = existing.CreatedAt
-			exchange.VNamespace = existing.VNamespace
+			exchange.Code = existing.Code // Frontend cannot edit code
 			exchange.Type = existing.Type
+			exchange.VNamespace = existing.VNamespace
+			exchange.CreatedAt = existing.CreatedAt
+
 			_, err = exchangeRepo.UpdateExchange(&exchange, now)
 		} else {
+			// For new exchanges, generate ID first if empty
+			if exchange.ID == "" {
+				exchange.ID = idFactory.GenerateID()
+			}
+
+			// Upsert VNamespace if it exists (now that we have an ID)
+			if exchange.VNamespace != "" {
+				existingVNamespace, err := vNamespaceRepo.GetVNamespaceByName(exchange.VNamespace, now)
+				if err != nil {
+					commandResult.Error = err.Error()
+					return *commandResult
+				}
+
+				if existingVNamespace == nil {
+					// Create new VNamespace
+					vNamespace := models.VNamespace{
+						ID:   exchange.ID, // Use Exchange ID as VNamespace ID
+						Name: exchange.VNamespace,
+					}
+					_, err = vNamespaceRepo.CreateVNamespace(&vNamespace, now)
+					if err != nil {
+						commandResult.Error = err.Error()
+						return *commandResult
+					}
+				}
+			}
+
 			_, err = exchangeRepo.CreateExchange(&exchange, now)
 		}
 

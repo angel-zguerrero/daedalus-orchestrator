@@ -1948,3 +1948,565 @@ func TestRepository_PutAndGet_Deterministic_Id_Generator_Pebble(t *testing.T) {
 	assert.Equal(t, "det-123", found.ID)
 	assert.Equal(t, entity.Name, found.Name)
 }
+
+// Helper functions for compound uniqueness tests
+func newTestExchangeRepositoryPebble(t *testing.T) (*db.Repository[Exchange], db.KVStore, error) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, []string{TemporalFC})
+	iGF := &db.DefaultIDGeneratorFactory{}
+	repository, err := db.NewRepository[Exchange](store, TestFC, testColumnFamilySector, "test_schema", iGF)
+	return repository, store, err
+}
+
+func TestRepository_UniqueCompound_Pebble_CreateAndFind(t *testing.T) {
+	repo, _, err := newTestExchangeRepositoryPebble(t)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test 1: Create two exchanges with same name but different namespaces - should succeed
+	exchange1 := &Exchange{
+		Name:       "test-exchange",
+		Type:       "direct",
+		VNamespace: "namespace-1",
+		CreatedAt:  now.Format(time.RFC3339),
+		UpdatedAt:  now.Format(time.RFC3339),
+	}
+
+	exchange2 := &Exchange{
+		Name:       "test-exchange", // Same name
+		Type:       "topic",
+		VNamespace: "namespace-2", // Different namespace
+		CreatedAt:  now.Format(time.RFC3339),
+		UpdatedAt:  now.Format(time.RFC3339),
+	}
+
+	id1, err := repo.Create(exchange1, now)
+	require.NoError(t, err)
+	assert.NotEmpty(t, id1)
+
+	id2, err := repo.Create(exchange2, now)
+	require.NoError(t, err)
+	assert.NotEmpty(t, id2)
+	assert.NotEqual(t, id1, id2)
+
+	// Test 2: Try to create an exchange with same name and namespace - should fail
+	exchange3 := &Exchange{
+		Name:       "test-exchange", // Same name
+		Type:       "fanout",
+		VNamespace: "namespace-1", // Same namespace as exchange1
+		CreatedAt:  now.Format(time.RFC3339),
+		UpdatedAt:  now.Format(time.RFC3339),
+	}
+
+	_, err = repo.Create(exchange3, now)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique compound constraint")
+
+	// Test 3: Find by compound fields using Find method
+	filter1 := "Name='test-exchange' & VNamespace='namespace-1'"
+
+	result1, err := repo.Find(filter1, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, result1)
+	require.Len(t, result1.Entities, 1)
+	found1 := result1.Entities[0]
+	assert.Equal(t, id1, found1.ID)
+	assert.Equal(t, "test-exchange", found1.Name)
+	assert.Equal(t, "namespace-1", found1.VNamespace)
+	assert.Equal(t, "direct", found1.Type)
+
+	filter2 := "Name='test-exchange' & VNamespace='namespace-2'"
+
+	result2, err := repo.Find(filter2, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, result2)
+	require.Len(t, result2.Entities, 1)
+	found2 := result2.Entities[0]
+	assert.Equal(t, id2, found2.ID)
+	assert.Equal(t, "test-exchange", found2.Name)
+	assert.Equal(t, "namespace-2", found2.VNamespace)
+	assert.Equal(t, "topic", found2.Type)
+
+	// Test 4: Find non-existent compound
+	filterNotFound := "Name='non-existent' & VNamespace='namespace-1'"
+
+	resultNotFound, err := repo.Find(filterNotFound, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, resultNotFound)
+	require.Len(t, resultNotFound.Entities, 0)
+}
+
+func TestRepository_UniqueCompound_Pebble_BulkCreate(t *testing.T) {
+	repo, _, err := newTestExchangeRepositoryPebble(t)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test 1: Bulk create with valid compound uniqueness
+	exchanges := []*Exchange{
+		{
+			Name:       "exchange-1",
+			Type:       "direct",
+			VNamespace: "namespace-1",
+			CreatedAt:  now.Format(time.RFC3339),
+			UpdatedAt:  now.Format(time.RFC3339),
+		},
+		{
+			Name:       "exchange-1", // Same name, different namespace
+			Type:       "topic",
+			VNamespace: "namespace-2",
+			CreatedAt:  now.Format(time.RFC3339),
+			UpdatedAt:  now.Format(time.RFC3339),
+		},
+		{
+			Name:       "exchange-2", // Different name, same namespace as first
+			Type:       "fanout",
+			VNamespace: "namespace-1",
+			CreatedAt:  now.Format(time.RFC3339),
+			UpdatedAt:  now.Format(time.RFC3339),
+		},
+	}
+
+	ids, err := repo.BulkCreate(exchanges, now)
+	require.NoError(t, err)
+	assert.Len(t, ids, 3)
+
+	// Verify all exchanges can be found
+	for i, id := range ids {
+		filter := fmt.Sprintf("Name='%s' & VNamespace='%s'", exchanges[i].Name, exchanges[i].VNamespace)
+
+		result, err := repo.Find(filter, 10, "", now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Entities, 1)
+		found := result.Entities[0]
+		assert.Equal(t, id, found.ID)
+		assert.Equal(t, exchanges[i].Name, found.Name)
+		assert.Equal(t, exchanges[i].VNamespace, found.VNamespace)
+		assert.Equal(t, exchanges[i].Type, found.Type)
+	}
+
+	// Test 2: Bulk create with duplicate compound constraint in batch - should fail
+	duplicateExchanges := []*Exchange{
+		{
+			Name:       "new-exchange",
+			Type:       "direct",
+			VNamespace: "new-namespace",
+		},
+		{
+			Name:       "new-exchange", // Same name and namespace - should fail
+			Type:       "topic",
+			VNamespace: "new-namespace",
+		},
+	}
+
+	_, err = repo.BulkCreate(duplicateExchanges, now)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique compound constraint in input batch")
+}
+
+func TestRepository_UniqueCompound_Pebble_ValidationErrors(t *testing.T) {
+	repo, _, err := newTestExchangeRepositoryPebble(t)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test that non-compound fields fall back to normal query behavior
+	t.Run("Non-compound field query", func(t *testing.T) {
+		// Create an exchange to test with
+		exchange := &Exchange{
+			Name:       "test-exchange",
+			Type:       "direct",
+			VNamespace: "namespace-1",
+		}
+
+		id, err := repo.Create(exchange, now)
+		require.NoError(t, err)
+
+		// Query by a single field (should work normally)
+		result, err := repo.Find("Name='test-exchange'", 10, "", now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Entities, 1)
+		assert.Equal(t, id, result.Entities[0].ID)
+	})
+}
+
+func TestRepository_UniqueCompound_Pebble_Delete_DatabaseCleanup(t *testing.T) {
+	repo, store, err := newTestExchangeRepositoryPebble(t)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test: Create exchanges with compound unique constraints, then delete them
+	// and verify the database is completely clean (no orphaned compound indexes)
+
+	// Create multiple exchanges with compound uniqueness
+	exchanges := []*Exchange{
+		{
+			Name:       "exchange-1",
+			Type:       "direct",
+			VNamespace: "namespace-1",
+			CreatedAt:  "2023-01-01T00:00:00Z",
+			UpdatedAt:  "2023-01-01T00:00:00Z",
+		},
+		{
+			Name:       "exchange-1", // Same name, different namespace
+			Type:       "topic",
+			VNamespace: "namespace-2",
+			CreatedAt:  "2023-01-01T00:00:00Z",
+			UpdatedAt:  "2023-01-01T00:00:00Z",
+		},
+		{
+			Name:       "exchange-2",
+			Type:       "fanout",
+			VNamespace: "namespace-1",
+			CreatedAt:  "2023-01-01T00:00:00Z",
+			UpdatedAt:  "2023-01-01T00:00:00Z",
+		},
+	}
+
+	var ids []string
+	for _, exchange := range exchanges {
+		id, err := repo.Create(exchange, now)
+		require.NoError(t, err)
+		ids = append(ids, id)
+	}
+
+	// Verify all exchanges can be found by compound fields
+	for i, id := range ids {
+		filter := fmt.Sprintf("Name='%s' & VNamespace='%s'", exchanges[i].Name, exchanges[i].VNamespace)
+		result, err := repo.Find(filter, 10, "", now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Entities, 1)
+		assert.Equal(t, id, result.Entities[0].ID)
+	}
+
+	// Verify compound index keys exist before deletion
+	schema := "test_schema"
+	table := "exchanges"
+
+	for i, id := range ids {
+		// Check that compound index keys exist
+		compoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:0:Name:%s|VNamespace:%s", schema, table, exchanges[i].Name, exchanges[i].VNamespace)
+
+		// Verify the compound index key exists
+		compoundBytes, err := store.Get(TestFC, testColumnFamilySector, compoundIdxKey, now)
+		require.NoError(t, err)
+		require.NotNil(t, compoundBytes)
+		assert.Equal(t, id, string(compoundBytes))
+
+		// Check that data key exists
+		dataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, id)
+		dataBytes, err := store.Get(TestFC, testColumnFamilySector, dataKey, now)
+		require.NoError(t, err)
+		require.NotNil(t, dataBytes)
+
+		// Check that regular index keys exist (for Name field)
+		nameIdxKey := fmt.Sprintf("%s:%s:idx:Name:%s:%s", schema, table, exchanges[i].Name, id)
+		nameBytes, err := store.Get(TestFC, testColumnFamilySector, nameIdxKey, now)
+		require.NoError(t, err)
+		require.NotNil(t, nameBytes)
+		assert.Equal(t, id, string(nameBytes))
+
+		// Check that VNamespace index keys exist
+		vnameIdxKey := fmt.Sprintf("%s:%s:idx:VNamespace:%s:%s", schema, table, exchanges[i].VNamespace, id)
+		vnameBytes, err := store.Get(TestFC, testColumnFamilySector, vnameIdxKey, now)
+		require.NoError(t, err)
+		require.NotNil(t, vnameBytes)
+		assert.Equal(t, id, string(vnameBytes))
+
+		// Check that Type index keys exist
+		typeIdxKey := fmt.Sprintf("%s:%s:idx:Type:%s:%s", schema, table, exchanges[i].Type, id)
+		typeBytes, err := store.Get(TestFC, testColumnFamilySector, typeIdxKey, now)
+		require.NoError(t, err)
+		require.NotNil(t, typeBytes)
+		assert.Equal(t, id, string(typeBytes))
+	}
+
+	// Now delete all exchanges
+	for _, id := range ids {
+		deleted, err := repo.Delete(id, now)
+		require.NoError(t, err)
+		require.True(t, deleted)
+	}
+
+	// Verify all exchanges are gone
+	for i := range exchanges {
+		filter := fmt.Sprintf("Name='%s' & VNamespace='%s'", exchanges[i].Name, exchanges[i].VNamespace)
+		result, err := repo.Find(filter, 10, "", now)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Entities, 0)
+	}
+
+	// Verify all keys related to our test data are completely removed
+	for i, id := range ids {
+		// Check that compound index keys are gone
+		compoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:0:Name:%s|VNamespace:%s", schema, table, exchanges[i].Name, exchanges[i].VNamespace)
+		compoundBytes, err := store.Get(TestFC, testColumnFamilySector, compoundIdxKey, now)
+		require.NoError(t, err)
+		assert.Nil(t, compoundBytes, "Compound index key should be deleted: %s", compoundIdxKey)
+
+		// Check that data keys are gone
+		dataKey := fmt.Sprintf("%s:%s:data:%s", schema, table, id)
+		dataBytes, err := store.Get(TestFC, testColumnFamilySector, dataKey, now)
+		require.NoError(t, err)
+		assert.Nil(t, dataBytes, "Data key should be deleted: %s", dataKey)
+
+		// Check that regular index keys are gone
+		nameIdxKey := fmt.Sprintf("%s:%s:idx:Name:%s:%s", schema, table, exchanges[i].Name, id)
+		nameBytes, err := store.Get(TestFC, testColumnFamilySector, nameIdxKey, now)
+		require.NoError(t, err)
+		assert.Nil(t, nameBytes, "Name index key should be deleted: %s", nameIdxKey)
+
+		// Check that VNamespace index keys are gone
+		vnameIdxKey := fmt.Sprintf("%s:%s:idx:VNamespace:%s:%s", schema, table, exchanges[i].VNamespace, id)
+		vnameBytes, err := store.Get(TestFC, testColumnFamilySector, vnameIdxKey, now)
+		require.NoError(t, err)
+		assert.Nil(t, vnameBytes, "VNamespace index key should be deleted: %s", vnameIdxKey)
+
+		// Check that Type index keys are gone
+		typeIdxKey := fmt.Sprintf("%s:%s:idx:Type:%s:%s", schema, table, exchanges[i].Type, id)
+		typeBytes, err := store.Get(TestFC, testColumnFamilySector, typeIdxKey, now)
+		require.NoError(t, err)
+		assert.Nil(t, typeBytes, "Type index key should be deleted: %s", typeIdxKey)
+	}
+
+	// Get final dump and verify database is clean for our test data
+	finalDump, err := store.DumpAll()
+	require.NoError(t, err)
+
+	// The dump should not contain any references to our test data
+	if finalDump != nil {
+		dumpStr := fmt.Sprintf("%v", finalDump)
+		assert.NotContains(t, dumpStr, "exchange-1", "Dump should not contain exchange-1 references")
+		assert.NotContains(t, dumpStr, "exchange-2", "Dump should not contain exchange-2 references")
+		assert.NotContains(t, dumpStr, "namespace-1", "Dump should not contain namespace-1 references")
+		assert.NotContains(t, dumpStr, "namespace-2", "Dump should not contain namespace-2 references")
+	}
+
+	t.Logf("Database cleanup verification completed successfully")
+}
+
+func TestRepository_UniqueCompound_Pebble_Update_NoStaleIndexes(t *testing.T) {
+	repo, store, err := newTestExchangeRepositoryPebble(t)
+	require.NoError(t, err)
+
+	now := time.Now()
+	schema := "test_schema"
+	table := "exchanges"
+
+	// Test: Create an exchange with compound unique constraint, then update it
+	// and verify no stale compound indexes remain in the database
+
+	exchange := &Exchange{
+		Name:       "test-exchange",
+		Type:       "direct",
+		VNamespace: "namespace-1",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+
+	// Create the exchange
+	id, err := repo.Create(exchange, now)
+	require.NoError(t, err)
+	require.NotEmpty(t, id)
+
+	// Verify initial compound index exists
+	initialCompoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:0:Name:%s|VNamespace:%s", schema, table, exchange.Name, exchange.VNamespace)
+	compoundBytes, err := store.Get(TestFC, testColumnFamilySector, initialCompoundIdxKey, now)
+	require.NoError(t, err)
+	require.NotNil(t, compoundBytes)
+	assert.Equal(t, id, string(compoundBytes))
+
+	// Verify we can find it using compound constraint
+	filter := fmt.Sprintf("Name='%s' & VNamespace='%s'", exchange.Name, exchange.VNamespace)
+	result, err := repo.Find(filter, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Entities, 1)
+	assert.Equal(t, id, result.Entities[0].ID)
+
+	// Update the exchange - change the VNamespace (part of compound constraint)
+	updatedExchange := &Exchange{
+		ID:         id,
+		Name:       "test-exchange", // Same name
+		Type:       "topic",         // Different type
+		VNamespace: "namespace-2",   // Different namespace - this changes compound constraint
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-02T00:00:00Z",
+	}
+
+	updated, err := repo.Update(updatedExchange, now)
+	require.NoError(t, err)
+	require.True(t, updated)
+
+	// Verify old compound index is gone
+	oldCompoundBytes, err := store.Get(TestFC, testColumnFamilySector, initialCompoundIdxKey, now)
+	require.NoError(t, err)
+	assert.Nil(t, oldCompoundBytes, "Old compound index should be deleted: %s", initialCompoundIdxKey)
+
+	// Verify new compound index exists
+	newCompoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:0:Name:%s|VNamespace:%s", schema, table, updatedExchange.Name, updatedExchange.VNamespace)
+	newCompoundBytes, err := store.Get(TestFC, testColumnFamilySector, newCompoundIdxKey, now)
+	require.NoError(t, err)
+	require.NotNil(t, newCompoundBytes)
+	assert.Equal(t, id, string(newCompoundBytes))
+
+	// Verify we can find it using the new compound constraint
+	newFilter := fmt.Sprintf("Name='%s' & VNamespace='%s'", updatedExchange.Name, updatedExchange.VNamespace)
+	newResult, err := repo.Find(newFilter, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, newResult)
+	require.Len(t, newResult.Entities, 1)
+	assert.Equal(t, id, newResult.Entities[0].ID)
+	assert.Equal(t, "namespace-2", newResult.Entities[0].VNamespace)
+	assert.Equal(t, "topic", string(newResult.Entities[0].Type))
+
+	// Verify we cannot find it using the old compound constraint
+	oldResult, err := repo.Find(filter, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, oldResult)
+	require.Len(t, oldResult.Entities, 0)
+
+	// Verify database dump doesn't contain the old compound index
+	dump, err := store.DumpAll()
+	require.NoError(t, err)
+	if dump != nil {
+		dumpStr := fmt.Sprintf("%v", dump)
+		assert.NotContains(t, dumpStr, "Name:test-exchange|VNamespace:namespace-1", "Dump should not contain old compound index")
+		assert.Contains(t, dumpStr, "Name:test-exchange|VNamespace:namespace-2", "Dump should contain new compound index")
+	}
+
+	t.Logf("Update compound index cleanup verification completed successfully")
+}
+
+func TestRepository_UniqueCompound_Pebble_Update_BothFieldsChange(t *testing.T) {
+	repo, store, err := newTestExchangeRepositoryPebble(t)
+	require.NoError(t, err)
+
+	now := time.Now()
+	schema := "test_schema"
+	table := "exchanges"
+
+	// Test: Update both fields of a compound constraint and verify proper cleanup
+
+	exchange := &Exchange{
+		Name:       "original-exchange",
+		Type:       "direct",
+		VNamespace: "original-namespace",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+
+	// Create the exchange
+	id, err := repo.Create(exchange, now)
+	require.NoError(t, err)
+
+	// Verify initial compound index
+	initialCompoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:0:Name:%s|VNamespace:%s", schema, table, exchange.Name, exchange.VNamespace)
+	compoundBytes, err := store.Get(TestFC, testColumnFamilySector, initialCompoundIdxKey, now)
+	require.NoError(t, err)
+	require.NotNil(t, compoundBytes)
+
+	// Update BOTH fields that are part of the compound constraint
+	updatedExchange := &Exchange{
+		ID:         id,
+		Name:       "updated-exchange", // Changed
+		Type:       "fanout",
+		VNamespace: "updated-namespace", // Changed
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-02T00:00:00Z",
+	}
+
+	updated, err := repo.Update(updatedExchange, now)
+	require.NoError(t, err)
+	require.True(t, updated)
+
+	// Verify old compound index is completely gone
+	oldCompoundBytes, err := store.Get(TestFC, testColumnFamilySector, initialCompoundIdxKey, now)
+	require.NoError(t, err)
+	assert.Nil(t, oldCompoundBytes, "Old compound index should be deleted")
+
+	// Verify new compound index exists
+	newCompoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:0:Name:%s|VNamespace:%s", schema, table, updatedExchange.Name, updatedExchange.VNamespace)
+	newCompoundBytes, err := store.Get(TestFC, testColumnFamilySector, newCompoundIdxKey, now)
+	require.NoError(t, err)
+	require.NotNil(t, newCompoundBytes)
+	assert.Equal(t, id, string(newCompoundBytes))
+
+	// Verify search behavior
+	oldFilter := fmt.Sprintf("Name='%s' & VNamespace='%s'", exchange.Name, exchange.VNamespace)
+	oldResult, err := repo.Find(oldFilter, 10, "", now)
+	require.NoError(t, err)
+	require.Len(t, oldResult.Entities, 0)
+
+	newFilter := fmt.Sprintf("Name='%s' & VNamespace='%s'", updatedExchange.Name, updatedExchange.VNamespace)
+	newResult, err := repo.Find(newFilter, 10, "", now)
+	require.NoError(t, err)
+	require.Len(t, newResult.Entities, 1)
+	assert.Equal(t, id, newResult.Entities[0].ID)
+
+	t.Logf("Both fields compound update verification completed successfully")
+}
+
+func TestRepository_UniqueCompound_Pebble_Update_ConstraintViolation(t *testing.T) {
+	repo, _, err := newTestExchangeRepositoryPebble(t)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test: Verify that updating to values that would violate compound constraint fails
+
+	// Create first exchange
+	exchange1 := &Exchange{
+		Name:       "exchange-1",
+		Type:       "direct",
+		VNamespace: "namespace-1",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+	id1, err := repo.Create(exchange1, now)
+	require.NoError(t, err)
+
+	// Create second exchange
+	exchange2 := &Exchange{
+		Name:       "exchange-2",
+		Type:       "topic",
+		VNamespace: "namespace-2",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+	id2, err := repo.Create(exchange2, now)
+	require.NoError(t, err)
+
+	// Try to update exchange2 to have the same Name+VNamespace as exchange1 - should fail
+	conflictingUpdate := &Exchange{
+		ID:         id2,
+		Name:       "exchange-1", // Same as exchange1
+		Type:       "fanout",
+		VNamespace: "namespace-1", // Same as exchange1
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-02T00:00:00Z",
+	}
+
+	updated, err := repo.Update(conflictingUpdate, now)
+	require.Error(t, err)
+	require.False(t, updated)
+	assert.Contains(t, err.Error(), "duplicate compound unique constraint")
+
+	// Verify original exchanges remain unchanged
+	result1, err := repo.Find(fmt.Sprintf("Name='%s' & VNamespace='%s'", exchange1.Name, exchange1.VNamespace), 10, "", now)
+	require.NoError(t, err)
+	require.Len(t, result1.Entities, 1)
+	assert.Equal(t, id1, result1.Entities[0].ID)
+
+	result2, err := repo.Find(fmt.Sprintf("Name='%s' & VNamespace='%s'", exchange2.Name, exchange2.VNamespace), 10, "", now)
+	require.NoError(t, err)
+	require.Len(t, result2.Entities, 1)
+	assert.Equal(t, id2, result2.Entities[0].ID)
+
+	t.Logf("Compound constraint violation test completed successfully")
+}

@@ -151,8 +151,12 @@ export class TenantsComponent implements OnInit {
           this.errorMessage = error.error;
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.tenantForm.markAllAsTouched();
     }
   }
+
   updateTenant(): void {
     if (this.tenantFormUpdate.valid) {
       const tenantData = this.tenantFormUpdate.getRawValue();
@@ -167,6 +171,9 @@ export class TenantsComponent implements OnInit {
           this.errorMessage = error.error;
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.tenantFormUpdate.markAllAsTouched();
     }
   }
 

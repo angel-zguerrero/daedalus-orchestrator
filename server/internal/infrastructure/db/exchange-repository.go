@@ -34,8 +34,19 @@ func (r *ExchangeRepository) UpdateExchange(input *models.Exchange, now time.Tim
 	return r.Update(input, now)
 }
 
-func (r *ExchangeRepository) GetExchangeByName(name string, now time.Time) (*models.Exchange, error) {
-	return r.FindByField("Name", name, now)
+func (r *ExchangeRepository) GetExchangeByCode(code string, now time.Time) (*models.Exchange, error) {
+	return r.FindByField("Code", code, now)
+}
+
+func (r *ExchangeRepository) GetExchangeByNameVNamespace(name string, vNamespace string, now time.Time) (*models.Exchange, error) {
+	result, err := r.Find("Name="+name+" & VNamespace="+vNamespace, 1, "", now)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Entities) == 0 {
+		return nil, nil
+	}
+	return &result.Entities[0], nil
 }
 func (r *ExchangeRepository) GetExchangeById(id string, now time.Time) (*models.Exchange, error) {
 	return r.FindByField("ID", id, now)
@@ -56,7 +67,7 @@ func (r *ExchangeRepository) Paginate(q string, pageSize int, cursor string, vNa
 
 		// Add vNamespace filter condition if vNamespace is provided
 		if vNamespace != "" {
-			conditions = append(conditions, "VNamespace LIKE *"+vNamespace+"*")
+			conditions = append(conditions, "VNamespace = "+vNamespace)
 		}
 
 		// If no conditions but we got here, use the workaround

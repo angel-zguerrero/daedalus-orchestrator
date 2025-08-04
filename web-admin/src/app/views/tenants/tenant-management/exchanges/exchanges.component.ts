@@ -101,6 +101,7 @@ export class ExchangesComponent implements OnInit {
   ) {
     this.exchangeForm = this.fb.group({
       name: ['', Validators.required],
+      code: ['', Validators.required],
       type: ['direct', Validators.required],
       vnamespace: this.vnamespaceCtrl
     });
@@ -226,6 +227,9 @@ export class ExchangesComponent implements OnInit {
           this.errorMessage = error.error?.message || 'Failed to create exchange';
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.exchangeForm.markAllAsTouched();
     }
   }
 
@@ -233,6 +237,7 @@ export class ExchangesComponent implements OnInit {
     if (this.exchangeFormUpdate.valid) {
       const exchangeData = {
         name: this.exchangeFormUpdate.value.name,
+        code: this.selectedExchange.Code, // Preserve existing code (frontend cannot edit)
         type: this.selectedExchange.Type, // Preserve original type
         vnamespace: this.selectedExchange.VNamespace, // Preserve original vnamespace
         id: this.selectedExchange.ID
@@ -248,6 +253,9 @@ export class ExchangesComponent implements OnInit {
           this.errorMessage = error.error?.message || 'Failed to update exchange';
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.exchangeFormUpdate.markAllAsTouched();
     }
   }
 
