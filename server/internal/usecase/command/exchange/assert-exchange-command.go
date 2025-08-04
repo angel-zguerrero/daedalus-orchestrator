@@ -66,7 +66,7 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 			}
 		}
 
-		existing, err := exchangeRepo.GetExchangeByName(exchange.Name, now)
+		existing, err := exchangeRepo.GetExchangeByNameVNamespace(exchange.Name, exchange.VNamespace, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

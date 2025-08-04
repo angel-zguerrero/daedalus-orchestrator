@@ -34,7 +34,7 @@ func (r *ExchangeRepository) UpdateExchange(input *models.Exchange, now time.Tim
 	return r.Update(input, now)
 }
 
-func (r *ExchangeRepository) GetExchangeByName(name string, vNamespace string, now time.Time) (*models.Exchange, error) {
+func (r *ExchangeRepository) GetExchangeByNameVNamespace(name string, vNamespace string, now time.Time) (*models.Exchange, error) {
 	result, err := r.Find("Name="+name+" & VNamespace="+vNamespace, 1, "", now)
 	if err != nil {
 		return nil, err
