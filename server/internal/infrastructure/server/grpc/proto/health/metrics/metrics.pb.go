@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: internal/infrastructure/common/proto/definitions/metrics.proto
+// source: internal/infrastructure/server/grpc/proto/definitions/metrics.proto
 
 package metrics
 
@@ -29,7 +29,7 @@ type SystemMetricsRequest struct {
 
 func (x *SystemMetricsRequest) Reset() {
 	*x = SystemMetricsRequest{}
-	mi := &file_internal_infrastructure_common_proto_definitions_metrics_proto_msgTypes[0]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -41,7 +41,7 @@ func (x *SystemMetricsRequest) String() string {
 func (*SystemMetricsRequest) ProtoMessage() {}
 
 func (x *SystemMetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_common_proto_definitions_metrics_proto_msgTypes[0]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -54,7 +54,7 @@ func (x *SystemMetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemMetricsRequest.ProtoReflect.Descriptor instead.
 func (*SystemMetricsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescGZIP(), []int{0}
+	return file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescGZIP(), []int{0}
 }
 
 type SystemMetricsResponse struct {
@@ -73,7 +73,7 @@ type SystemMetricsResponse struct {
 
 func (x *SystemMetricsResponse) Reset() {
 	*x = SystemMetricsResponse{}
-	mi := &file_internal_infrastructure_common_proto_definitions_metrics_proto_msgTypes[1]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -85,7 +85,7 @@ func (x *SystemMetricsResponse) String() string {
 func (*SystemMetricsResponse) ProtoMessage() {}
 
 func (x *SystemMetricsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_common_proto_definitions_metrics_proto_msgTypes[1]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -98,7 +98,7 @@ func (x *SystemMetricsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemMetricsResponse.ProtoReflect.Descriptor instead.
 func (*SystemMetricsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescGZIP(), []int{1}
+	return file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SystemMetricsResponse) GetCpuUsagePercent() float32 {
@@ -157,11 +157,11 @@ func (x *SystemMetricsResponse) GetTimestamp() int64 {
 	return 0
 }
 
-var File_internal_infrastructure_common_proto_definitions_metrics_proto protoreflect.FileDescriptor
+var File_internal_infrastructure_server_grpc_proto_definitions_metrics_proto protoreflect.FileDescriptor
 
-const file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDesc = "" +
+const file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDesc = "" +
 	"\n" +
-	">internal/infrastructure/common/proto/definitions/metrics.proto\x12\ametrics\"\x16\n" +
+	"Cinternal/infrastructure/server/grpc/proto/definitions/metrics.proto\x12\ametrics\"\x16\n" +
 	"\x14SystemMetricsRequest\"\xc7\x02\n" +
 	"\x15SystemMetricsResponse\x12*\n" +
 	"\x11cpu_usage_percent\x18\x01 \x01(\x02R\x0fcpuUsagePercent\x12,\n" +
@@ -176,23 +176,23 @@ const file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDes
 	"\x10GetSystemMetrics\x12\x1d.metrics.SystemMetricsRequest\x1a\x1e.metrics.SystemMetricsResponseB\x18Z\x16health/metrics;metricsb\x06proto3"
 
 var (
-	file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescOnce sync.Once
-	file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescData []byte
+	file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescOnce sync.Once
+	file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescData []byte
 )
 
-func file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescGZIP() []byte {
-	file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescOnce.Do(func() {
-		file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDesc), len(file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDesc)))
+func file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescGZIP() []byte {
+	file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescOnce.Do(func() {
+		file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDesc)))
 	})
-	return file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDescData
+	return file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDescData
 }
 
-var file_internal_infrastructure_common_proto_definitions_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_internal_infrastructure_common_proto_definitions_metrics_proto_goTypes = []any{
+var file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_goTypes = []any{
 	(*SystemMetricsRequest)(nil),  // 0: metrics.SystemMetricsRequest
 	(*SystemMetricsResponse)(nil), // 1: metrics.SystemMetricsResponse
 }
-var file_internal_infrastructure_common_proto_definitions_metrics_proto_depIdxs = []int32{
+var file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_depIdxs = []int32{
 	0, // 0: metrics.MetricsService.GetSystemMetrics:input_type -> metrics.SystemMetricsRequest
 	1, // 1: metrics.MetricsService.GetSystemMetrics:output_type -> metrics.SystemMetricsResponse
 	1, // [1:2] is the sub-list for method output_type
@@ -202,26 +202,26 @@ var file_internal_infrastructure_common_proto_definitions_metrics_proto_depIdxs 
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_internal_infrastructure_common_proto_definitions_metrics_proto_init() }
-func file_internal_infrastructure_common_proto_definitions_metrics_proto_init() {
-	if File_internal_infrastructure_common_proto_definitions_metrics_proto != nil {
+func init() { file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_init() }
+func file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_init() {
+	if File_internal_infrastructure_server_grpc_proto_definitions_metrics_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDesc), len(file_internal_infrastructure_common_proto_definitions_metrics_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_infrastructure_common_proto_definitions_metrics_proto_goTypes,
-		DependencyIndexes: file_internal_infrastructure_common_proto_definitions_metrics_proto_depIdxs,
-		MessageInfos:      file_internal_infrastructure_common_proto_definitions_metrics_proto_msgTypes,
+		GoTypes:           file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_goTypes,
+		DependencyIndexes: file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_depIdxs,
+		MessageInfos:      file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_msgTypes,
 	}.Build()
-	File_internal_infrastructure_common_proto_definitions_metrics_proto = out.File
-	file_internal_infrastructure_common_proto_definitions_metrics_proto_goTypes = nil
-	file_internal_infrastructure_common_proto_definitions_metrics_proto_depIdxs = nil
+	File_internal_infrastructure_server_grpc_proto_definitions_metrics_proto = out.File
+	file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_goTypes = nil
+	file_internal_infrastructure_server_grpc_proto_definitions_metrics_proto_depIdxs = nil
 }

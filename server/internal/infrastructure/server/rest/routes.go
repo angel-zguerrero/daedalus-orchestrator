@@ -2,8 +2,10 @@ package rest_server
 
 import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
+	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
+	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +16,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	adminController := auth.NewAdminController(s.Config)
 	metricsController := metrics.NewMetricsController(s.Config)
 	tenantController := tenant.NewTenantController(s.Config)
+	exchangeController := exchange.NewExchangeController(s.Config)
+	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 
 	restAPIGroup := engine.Group("/rest-api")
 	{
@@ -33,7 +37,17 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
 			tenantsGroup.GET("/:id", tenantController.GetTenantHandler)
 			tenantsGroup.DELETE("/:id", tenantController.DeleteTenantHandler)
+			{
+				tenantsGroup.POST("/:id/exchange", exchangeController.CreateExchangeHandler)
+				tenantsGroup.POST("/:id/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
+				tenantsGroup.GET("/:id/exchange", exchangeController.GetExchangesHandler)
+				tenantsGroup.GET("/:id/exchange/:exchangeId", exchangeController.GetExchangeHandler)
+				tenantsGroup.DELETE("/:id/exchange/:exchangeId", exchangeController.DeleteExchangeHandler)
+
+				tenantsGroup.GET("/:id/vnamespaces", vnamespaceController.GetVNamespacesHandler)
+			}
 		}
+
 	}
 	metricsAPIGroup := engine.Group("/metrics")
 	metricsAPIGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))

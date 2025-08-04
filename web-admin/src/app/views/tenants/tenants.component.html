@@ -4,148 +4,321 @@
   </c-card-header>
   <c-card-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <!-- Search and Actions Row -->
     <c-row class="mb-3">
       <c-col [md]="3">
         <div class="input-group">
-          <input type="text" cFormControl placeholder="Search by name or code" [(ngModel)]="searchQuery" (keydown.enter)="searchTenants()"/>
-          <button cButton type="button" color="secondary" variant="outline" (click)="searchTenants()">Search</button>
+          <input 
+            type="text" 
+            cFormControl 
+            placeholder="Search by name or code" 
+            [(ngModel)]="searchQuery" 
+            (keydown.enter)="searchTenants()"/>
+          <button 
+            cButton 
+            type="button" 
+            color="secondary" 
+            variant="outline" 
+            (click)="searchTenants()">
+            <svg cIcon name="cil-search"></svg>
+          </button>
         </div>
       </c-col>
       <c-col [md]="9" class="d-flex justify-content-end">
-        <button cButton color="primary" (click)="openCreateModal()">Create Tenant</button>
-        <button cButton color="secondary" (click)="openBulkUploadModal()" class="ms-2">Bulk Upload</button>
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create Tenant
+        </button>
+        <button cButton color="secondary" (click)="openBulkUploadModal()" class="ms-2">
+          <svg cIcon name="cil-cloud-upload" class="me-1"></svg>
+          Bulk Upload
+        </button>
       </c-col>
     </c-row>
-    <table cTable class="mt-4">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Code</th>
-          <th>Shard ID</th>
-          <th>Column Family Index</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let tenant of tenants">
-          <td  class="text-truncate" style="max-width: 200px;">{{ tenant.ID }}</td>
-          <td>{{ tenant.Name }}</td>
-          <td>{{ tenant.Code }}</td>
-          <td>{{ tenant.ShardId }}</td>
-          <td>{{ tenant.ColumnFamilyIndex }}</td>
-          <td>{{ tenant.Status }}</td>
+    <!-- Tenants Table -->
+    <div class="table-responsive">
+      <table cTable class="mt-4" [hover]="true">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Code</th>
+            <th>Shard ID</th>
+            <th>Column Family Index</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tenant of tenants" class="align-middle">
+            <td class="text-truncate" style="max-width: 200px;">{{ tenant.ID }}</td>
+            <td>
+              <strong>{{ tenant.Name }}</strong>
+            </td>
+            <td>{{ tenant.Code }}</td>
+            <td>{{ tenant.ShardId }}</td>
+            <td>{{ tenant.ColumnFamilyIndex }}</td>
+            <td>
+              <c-badge [color]="getTenantStatusColor(tenant.Status)" shape="rounded-pill">
+                {{ tenant.Status }}
+              </c-badge>
+            </td>
           <td>
-            <button cButton color="info" size="sm" (click)="openDetailsModal(tenant)">Details</button>
-            <button cButton color="warning" size="sm" (click)="openEditModal(tenant)">Edit</button>
-            <button cButton color="danger" size="sm" (click)="openDeleteModal(tenant)">Delete</button>
+            <div class="btn-group" role="group">
+              <button 
+                cButton 
+                color="secondary" 
+                size="sm" 
+                (click)="openTenantManagement(tenant)" 
+                title="Manage Tenant">
+                <svg cIcon name="cil-settings"></svg>
+              </button>
+              <button 
+                cButton 
+                color="info" 
+                size="sm" 
+                (click)="openDetailsModal(tenant)"
+                title="View Details">
+                <svg cIcon name="cil-info"></svg>
+              </button>
+              <button 
+                cButton 
+                color="warning" 
+                size="sm" 
+                (click)="openEditModal(tenant)"
+                title="Edit">
+                <svg cIcon name="cil-pencil"></svg>
+              </button>
+              <button 
+                cButton 
+                color="danger" 
+                size="sm" 
+                (click)="openDeleteModal(tenant)"
+                title="Delete">
+                <svg cIcon name="cil-trash"></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="tenants.length === 0">
+          <td colspan="7" class="text-center py-4">
+            <div class="text-muted">
+              <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+              <h6>No tenants found</h6>
+              <p class="mb-0">Create your first tenant to get started.</p>
+            </div>
           </td>
         </tr>
       </tbody>
-    </table>
-    <div class="d-flex justify-content-end mt-3">
-      <button cButton color="secondary" [disabled]="cursors.length === 1" (click)="previousPage()">Previous</button>
-      <button cButton color="secondary" [disabled]="!cursor" (click)="nextPage()">Next</button>
+      </table>
+    </div>
+    <!-- Pagination -->
+    <div class="d-flex justify-content-end mt-3" *ngIf="tenants.length > 0">
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="cursors.length === 1" 
+        (click)="previousPage()">
+        <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+        Previous
+      </button>
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="!cursor" 
+        (click)="nextPage()" 
+        class="ms-2">
+        Next
+        <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+      </button>
     </div>
   </c-card-body>
 </c-card>
 
 <!-- Create Tenant Modal -->
-<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" (keydown.enter)="createTenant()">
+<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" size="lg">
   <c-modal-header>
-    <h5 cModalTitle>Create Tenant</h5>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-plus" class="me-2"></svg>
+      Create Tenant
+    </h5>
     <button (click)="createModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="tenantForm">
+    <form [formGroup]="tenantForm" (ngSubmit)="createTenant()" (keydown.enter)="createTenant()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col>
-          <label cLabel for="name">Name</label>
-          <input cFormControl id="name" formControlName="name" />
+        <c-col [md]="6">
+          <label cLabel for="name">Name *</label>
+          <input cFormControl id="name" formControlName="name" placeholder="Enter tenant name" />
+          <small class="form-text text-muted">Display name for the tenant</small>
         </c-col>
-      </c-row>
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col>
-          <label cLabel for="code">Code</label>
-          <input cFormControl id="code" formControlName="code" />
+        <c-col [md]="6">
+          <label cLabel for="code">Code *</label>
+          <input cFormControl id="code" formControlName="code" placeholder="Enter unique tenant code" />
+          <small class="form-text text-muted">Unique identifier for the tenant (cannot be changed later)</small>
         </c-col>
       </c-row>
     </form>
   </c-modal-body>
   <c-modal-footer>
     <button (click)="createModalVisible = false" cButton color="secondary">
-      Close
+      Cancel
     </button>
-    <button cButton color="primary" (click)="createTenant()">Save changes</button>
+    <button cButton color="primary" (click)="createTenant()" [disabled]="!tenantForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Create Tenant
+    </button>
   </c-modal-footer>
 </c-modal>
 
 <!-- Edit Tenant Modal -->
-<c-modal id="editModal" [visible]="editModalVisible" (visibleChange)="editModalVisible = $event" (keydown.enter)="updateTenant()">
+<c-modal id="editModal" [visible]="editModalVisible" (visibleChange)="editModalVisible = $event" size="lg">
   <c-modal-header>
-    <h5 cModalTitle>Edit Tenant</h5>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-pencil" class="me-2"></svg>
+      Edit Tenant
+    </h5>
     <button (click)="editModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="tenantFormUpdate">
+    <form [formGroup]="tenantFormUpdate" (ngSubmit)="updateTenant()" (keydown.enter)="updateTenant()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col>
-          <label cLabel for="name">Name</label>
-          <input cFormControl id="name-update" formControlName="name" />
+        <c-col [md]="12">
+          <label cLabel for="name-update">Name *</label>
+          <input cFormControl id="name-update" formControlName="name" placeholder="Enter tenant name" />
+          <small class="form-text text-muted">Display name for the tenant</small>
         </c-col>
       </c-row>
+      
+      <!-- Read-only fields for context -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col>
-          <label cLabel for="code">Code</label>
-          <input cFormControl id="code-update" formControlName="code" [disabled]="true"/>
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <code>{{ selectedTenant?.Code || selectedTenant?.code || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Code cannot be changed after creation</div>
+        </c-col>
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Status</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <c-badge [color]="getTenantStatusColor(selectedTenant?.Status || selectedTenant?.status)" shape="rounded-pill">
+              {{ selectedTenant?.Status || selectedTenant?.status || 'N/A' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Status is managed automatically by the system</div>
         </c-col>
       </c-row>
     </form>
   </c-modal-body>
   <c-modal-footer>
     <button (click)="editModalVisible = false" cButton color="secondary">
-      Close
+      Cancel
     </button>
-    <button cButton color="primary" (click)="updateTenant()">Save changes</button>
+    <button cButton color="primary" (click)="updateTenant()" [disabled]="!tenantFormUpdate.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Save Changes
+    </button>
   </c-modal-footer>
 </c-modal>
 
 <!-- Delete Tenant Modal -->
 <c-modal id="deleteModal" [visible]="deleteModalVisible" (visibleChange)="deleteModalVisible = $event">
   <c-modal-header>
-    <h5 cModalTitle>Delete Tenant</h5>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-trash" class="me-2"></svg>
+      Delete Tenant
+    </h5>
     <button (click)="deleteModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
-    Are you sure you want to delete tenant {{ selectedTenant?.Name }}?
+    <div class="text-center">
+      <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
+      <h6>Are you sure you want to delete this tenant?</h6>
+      <p class="text-muted mb-0">
+        <strong>{{ selectedTenant?.Name }}</strong>
+        <br>This action cannot be undone.
+      </p>
+    </div>
   </c-modal-body>
   <c-modal-footer>
     <button (click)="deleteModalVisible = false" cButton color="secondary">
       Cancel
     </button>
-    <button cButton color="danger" (click)="deleteTenant()">Delete</button>
+    <button cButton color="danger" (click)="deleteTenant()">
+      <svg cIcon name="cil-trash" class="me-1"></svg>
+      Delete Tenant
+    </button>
   </c-modal-footer>
 </c-modal>
 
 <!-- Tenant Details Modal -->
-<c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event">
+<c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
   <c-modal-header>
-    <h5 cModalTitle>Tenant Details</h5>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-info" class="me-2"></svg>
+      Tenant Details
+    </h5>
     <button (click)="detailsModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body *ngIf="selectedTenant">
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <p><strong>ID:</strong> {{ selectedTenant.ID }}</p>
-    <p><strong>Name:</strong> {{ selectedTenant.Name }}</p>
-    <p><strong>Code:</strong> {{ selectedTenant.Code }}</p>
-    <p><strong>Shard ID:</strong> {{ selectedTenant.ShardId }}</p>
-    <p><strong>Column Family Index:</strong> {{ selectedTenant.ColumnFamilyIndex }}</p>
-    <p><strong>Status:</strong> {{ selectedTenant.Status }}</p>
-    <p><strong>Created At:</strong> {{ selectedTenant.CreatedAt | date:'medium' }}</p>
-    <p><strong>Updated At:</strong> {{ selectedTenant.UpdatedAt | date:'medium' }}</p>
+
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">ID</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ID || selectedTenant?.id || 'N/A' }}</div>
+          <div class="form-text">Unique system identifier</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Name</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.Name || selectedTenant?.name || 'N/A' }}</div>
+          <div class="form-text">Display name for the tenant</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedTenant?.Code || selectedTenant?.code || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Unique business identifier (immutable)</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Status</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="getTenantStatusColor(selectedTenant?.Status || selectedTenant?.status)" shape="rounded-pill">
+              {{ selectedTenant?.Status || selectedTenant?.status || 'N/A' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Current operational status</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Shard ID</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ShardId || selectedTenant?.shardId || 'N/A' }}</div>
+          <div class="form-text">Database shard identifier for data distribution</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Column Family Index</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ColumnFamilyIndex || selectedTenant?.columnFamilyIndex || 'N/A' }}</div>
+          <div class="form-text">Database column family index for organization</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Created At</label>
+          <div class="p-2 bg-dark rounded">{{ (selectedTenant?.CreatedAt || selectedTenant?.createdAt) | date:'full' }}</div>
+          <div class="form-text">Tenant creation timestamp</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Updated At</label>
+          <div class="p-2 bg-dark rounded">{{ (selectedTenant?.UpdatedAt || selectedTenant?.updatedAt) | date:'full' }}</div>
+          <div class="form-text">Last modification timestamp</div>
+        </div>
+      </div>
+    </div>
   </c-modal-body>
   <c-modal-footer>
     <button (click)="detailsModalVisible = false" cButton color="secondary">
@@ -155,27 +328,44 @@
 </c-modal>
 
 <!-- Bulk Upload Modal -->
-<c-modal id="bulkUploadModal" [visible]="bulkUploadModalVisible" (visibleChange)="bulkUploadModalVisible = $event">
+<c-modal id="bulkUploadModal" [visible]="bulkUploadModalVisible" (visibleChange)="bulkUploadModalVisible = $event" size="lg">
   <c-modal-header>
-    <h5 cModalTitle>Bulk Upload Tenants</h5>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-cloud-upload" class="me-2"></svg>
+      Bulk Upload Tenants
+    </h5>
     <button (click)="bulkUploadModalVisible = false" cButtonClose [disabled]="loading"></button>
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <p>Upload a .xlsx or .csv file with the following columns:</p>
-    <ul>
-      <li><strong>Name</strong>: The name of the tenant.</li>
-      <li><strong>Code</strong>: The code of the tenant.</li>
-    </ul>
-    <input type="file" (change)="onFileChange($event)" accept=".xlsx, .csv" [disabled]="loading" />
+    <div class="mb-3">
+      <h6>Upload Instructions</h6>
+      <p>Upload a .xlsx or .csv file with the following columns:</p>
+      <ul class="list-unstyled">
+        <li><strong>Name</strong>: Display name for the tenant</li>
+        <li><strong>Code</strong>: Unique identifier for the tenant</li>
+      </ul>
+      <div class="form-text">Both fields are required and code must be unique across all tenants</div>
+    </div>
+    <div class="mb-3">
+      <label cLabel for="file-upload">Select File</label>
+      <input 
+        type="file" 
+        id="file-upload"
+        class="form-control"
+        (change)="onFileChange($event)" 
+        accept=".xlsx, .csv" 
+        [disabled]="loading" />
+    </div>
   </c-modal-body>
   <c-modal-footer>
     <button (click)="bulkUploadModalVisible = false" cButton color="secondary" [disabled]="loading">
-      Close
+      Cancel
     </button>
-    <button cButton color="primary" (click)="uploadTenants()" [disabled]="loading">
-      <c-spinner *ngIf="loading" size="sm"></c-spinner>
-      <span *ngIf="!loading">Upload</span>
+    <button cButton color="primary" (click)="uploadTenants()" [disabled]="loading || !file">
+      <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
+      <svg *ngIf="!loading" cIcon name="cil-cloud-upload" class="me-1"></svg>
+      {{ loading ? 'Uploading...' : 'Upload Tenants' }}
     </button>
   </c-modal-footer>
 </c-modal>

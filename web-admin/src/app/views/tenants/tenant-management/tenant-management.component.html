@@ -1,0 +1,66 @@
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header class="d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">
+          <svg cIcon name="cil-settings" class="me-2"></svg>
+          Management Dashboard - {{ tenantName }}
+        </h4>
+        <button 
+          cButton 
+          color="secondary" 
+          variant="outline" 
+          size="sm" 
+          (click)="goBackToTenants()">
+          <svg cIcon name="cil-arrow-left" class="me-1"></svg>
+          Back to Tenants
+        </button>
+      </c-card-header>
+      <c-card-body>
+        <!-- Navigation Tabs -->
+        <c-tabs [activeItemKey]="activeTab" (activeItemKeyChange)="navigateToTab($event)">
+          <c-tabs-list variant="pills" layout="justified" class="mb-4">
+            <button cTab itemKey="summary">
+              <svg cIcon name="cil-chart-pie" class="me-2"></svg>
+              Summary
+            </button>
+            <button cTab itemKey="exchanges">
+              <svg cIcon name="cil-share" class="me-2"></svg>
+              Exchanges
+            </button>
+          </c-tabs-list>
+          
+          <c-tabs-content>
+            <!-- Summary Tab -->
+            <c-tab-panel itemKey="summary" class="p-3">
+              <c-card>
+                <c-card-header>
+                  <h5 class="mb-0">
+                    <svg cIcon name="cil-info" class="me-2"></svg>
+                    Tenant Summary
+                  </h5>
+                </c-card-header>
+                <c-card-body>
+                  <div class="text-center py-5">
+                    <svg cIcon name="cil-chart-pie" size="4xl" class="text-primary mb-3"></svg>
+                    <h4 class="text-muted">Resumen de elementos del tenant aquí</h4>
+                    <p class="text-body-secondary">
+                      Esta sección mostrará un resumen completo de todos los elementos y métricas relacionados con este tenant.
+                    </p>
+                  </div>
+                </c-card-body>
+              </c-card>
+            </c-tab-panel>
+
+            <!-- Exchanges Tab -->
+            <c-tab-panel itemKey="exchanges" class="p-3">
+              <ng-container *ngIf="activeTab === 'exchanges'">
+                <app-exchanges [tenantId]="tenantId"></app-exchanges>
+              </ng-container>
+            </c-tab-panel>
+          </c-tabs-content>
+        </c-tabs>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

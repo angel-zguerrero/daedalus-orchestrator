@@ -9,10 +9,12 @@ import (
 	"google.golang.org/grpc"
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
-	"deadalus-orch/server/internal/infrastructure/server/grpc/auth" // Import new auth service
+	"deadalus-orch/server/internal/infrastructure/server/grpc/auth"     // Import new auth service
+	"deadalus-orch/server/internal/infrastructure/server/grpc/exchange" // Import new exchange service
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
-	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth" // Import new auth pb
+	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth"         // Import new auth pb
+	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange" // Import new exchange pb
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
 	"deadalus-orch/server/internal/pkg/config"
@@ -52,6 +54,10 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	authBO := bo.NewAuthBO(cfg.MasterNode, cfg.JwtKey, cfg.JwtDuration, &cfg.Logger)
 	authSvc := auth.NewAuthService(cfg, authBO)
 	pbAuth.RegisterAuthServiceServer(server, authSvc)
+
+	// Register new ExchangeService
+	exchangeSvc := exchange.NewExchangeService(cfg)
+	pbExchange.RegisterExchangeServiceServer(server, exchangeSvc)
 
 	return &GrpcServer{
 		Config:     cfg,

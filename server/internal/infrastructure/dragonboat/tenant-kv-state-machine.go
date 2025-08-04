@@ -4,7 +4,9 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
 	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -23,6 +25,22 @@ func (r *TenantKVBaseStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
 }
 
 func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
+
+	findExchangeCommand, ok := cmd.(exchange_command.FindExchangeCommand)
+	if ok {
+		return findExchangeCommand.Execute(uow, now)
+	}
+
+	paginateExchangesCommand, ok := cmd.(exchange_command.PaginateExchangesCommand)
+	if ok {
+		return paginateExchangesCommand.Execute(uow, now)
+	}
+
+	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
+	if ok {
+		return paginateVNamespacesCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
@@ -38,6 +56,16 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	deleteColumnFamilyCommand, ok := cmd.(general_command.DeleteColumnFamilyCommand)
 	if ok {
 		return deleteColumnFamilyCommand.Execute(uow, now)
+	}
+
+	AssertExchangeCommand, ok := cmd.(exchange_command.AssertExchangeCommand)
+	if ok {
+		return AssertExchangeCommand.Execute(uow, now)
+	}
+
+	deleteExchangeCommand, ok := cmd.(exchange_command.DeleteExchangeCommand)
+	if ok {
+		return deleteExchangeCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

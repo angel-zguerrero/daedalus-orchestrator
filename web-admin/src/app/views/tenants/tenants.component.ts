@@ -1,8 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { TenantsService } from './services/tenants.service';
-import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent, SpinnerComponent } from '@coreui/angular';
+import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent, SpinnerComponent, BadgeComponent } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { IconDirective } from '@coreui/icons-angular';
 import * as XLSX from 'xlsx';
 
 @Component({
@@ -22,7 +24,9 @@ import * as XLSX from 'xlsx';
     GridModule,
     ReactiveFormsModule,
     FormsModule,
-    SpinnerComponent
+    SpinnerComponent,
+    BadgeComponent,
+    IconDirective
   ]
 })
 export class TenantsComponent implements OnInit {
@@ -48,7 +52,8 @@ export class TenantsComponent implements OnInit {
 
   constructor(
     private tenantsService: TenantsService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private router: Router
   ) {
     this.tenantForm = this.fb.group({
       name: ['', Validators.required],
@@ -120,15 +125,16 @@ export class TenantsComponent implements OnInit {
   }
 
   openDetailsModal(tenant: any): void {
-    this.tenantsService.getTenant(tenant.ID).subscribe({
-      next: (response) => {
-        this.selectedTenant = response.result;
-        this.detailsModalVisible = true;
-      },
-      error: (error) => {
-        this.showAlert = true;
-        this.errorMessage = error.error;
-      }
+    console.log('Selected tenant from table:', tenant);
+    // Use the tenant data directly from the table instead of making an API call
+    this.selectedTenant = tenant;
+    this.detailsModalVisible = true;
+    this.showAlert = false; // Clear any previous alerts
+  }
+
+  openTenantManagement(tenant: any): void {
+    this.router.navigate(['/tenants', tenant.ID, 'management'], {
+      queryParams: { name: tenant.Name }
     });
   }
 
@@ -145,8 +151,12 @@ export class TenantsComponent implements OnInit {
           this.errorMessage = error.error;
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.tenantForm.markAllAsTouched();
     }
   }
+
   updateTenant(): void {
     if (this.tenantFormUpdate.valid) {
       const tenantData = this.tenantFormUpdate.getRawValue();
@@ -161,6 +171,9 @@ export class TenantsComponent implements OnInit {
           this.errorMessage = error.error;
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.tenantFormUpdate.markAllAsTouched();
     }
   }
 
@@ -175,7 +188,7 @@ export class TenantsComponent implements OnInit {
     this.bulkUploadModalVisible = true;
   }
 
-  private file: File | null = null;
+  protected file: File | null = null;
 
   onFileChange(event: any): void {
     this.file = event.target.files[0];
@@ -220,5 +233,20 @@ export class TenantsComponent implements OnInit {
       });
     };
     fileReader.readAsArrayBuffer(this.file);
+  }
+
+  getTenantStatusColor(status: string): string {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'success';
+      case 'inactive':
+        return 'secondary';
+      case 'suspended':
+        return 'warning';
+      case 'deleted':
+        return 'danger';
+      default:
+        return 'info';
+    }
   }
 }

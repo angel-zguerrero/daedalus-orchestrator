@@ -1,0 +1,422 @@
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-share" class="me-2"></svg>
+      Exchanges Management
+    </h5>
+  </c-card-header>
+  <c-card-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    
+    <!-- Search and Actions Row -->
+    <c-row class="mb-3">
+      <c-col [md]="3">
+        <div class="input-group">
+          <input 
+            type="text" 
+            cFormControl 
+            placeholder="Search by name" 
+            [(ngModel)]="searchQuery" 
+            (keydown.enter)="searchExchanges()"/>
+          <button 
+            cButton 
+            type="button" 
+            color="secondary" 
+            variant="outline" 
+            (click)="searchExchanges()">
+            <svg cIcon name="cil-search"></svg>
+          </button>
+        </div>
+      </c-col>
+      <c-col [md]="3">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by VNamespace</mat-label>
+          <input 
+            type="text"
+            matInput
+            [formControl]="vnamespaceFilterCtrl"
+            [matAutocomplete]="autoFilter"
+            (ngModelChange)="onVNamespaceFilterChange($event)">
+          <mat-autocomplete #autoFilter="matAutocomplete">
+            <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+              {{vns.Name}}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+      <c-col [md]="6" class="d-flex justify-content-end align-items-end">
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create Exchange
+        </button>
+        <button cButton color="secondary" (click)="openBulkUploadModal()" class="ms-2">
+          <svg cIcon name="cil-cloud-upload" class="me-1"></svg>
+          Bulk Upload
+        </button>
+      </c-col>
+    </c-row>
+
+    <!-- Exchanges Table -->
+    <div class="table-responsive">
+      <table cTable class="mt-4" [hover]="true">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Code</th>
+            <th>Type</th>
+            <th>VNamespace</th>
+            <th>Created At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let exchange of exchanges" class="align-middle">
+            <td class="text-truncate" style="max-width: 200px;">{{ exchange.ID }}</td>
+            <td>
+              <strong>{{ exchange.Name }}</strong>
+            </td>
+            <td>
+              <code>{{ exchange.Code }}</code>
+            </td>
+            <td>
+              <c-badge [color]="getExchangeTypeColor(exchange.Type)" shape="rounded-pill">
+                {{ exchange.Type }}
+              </c-badge>
+            </td>
+            <td>{{ exchange.VNamespace || '-' }}</td>
+            <td>{{ exchange.CreatedAt | date:'medium' }}</td>
+            <td>
+              <div class="btn-group" role="group">
+                <button 
+                  cButton 
+                  color="info" 
+                  size="sm" 
+                  (click)="openDetailsModal(exchange)"
+                  title="View Details">
+                  <svg cIcon name="cil-info"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="warning" 
+                  size="sm" 
+                  (click)="openEditModal(exchange)"
+                  title="Edit">
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="danger" 
+                  size="sm" 
+                  (click)="openDeleteModal(exchange)"
+                  title="Delete">
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="exchanges.length === 0">
+            <td colspan="6" class="text-center py-4">
+              <div class="text-muted">
+                <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                <h6>No exchanges found</h6>
+                <p class="mb-0">Create your first exchange to get started.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex justify-content-end mt-3" *ngIf="exchanges.length > 0">
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="cursors.length === 1" 
+        (click)="previousPage()">
+        <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+        Previous
+      </button>
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="!cursor" 
+        (click)="nextPage()" 
+        class="ms-2">
+        Next
+        <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create Exchange Modal -->
+<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-plus" class="me-2"></svg>
+      Create Exchange
+    </h5>
+    <button (click)="createModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <form [formGroup]="exchangeForm" (ngSubmit)="createExchange()" (keydown.enter)="createExchange()">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="name">Name *</label>
+          <input cFormControl id="name" formControlName="name" placeholder="Enter exchange name" />
+          <small class="form-text text-muted">Display name for the exchange</small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="code">Code *</label>
+          <input cFormControl id="code" formControlName="code" placeholder="Enter unique exchange code" />
+          <small class="form-text text-muted">Unique identifier for the exchange (cannot be changed later)</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="type">Type *</label>
+          <select cSelect id="type" formControlName="type">
+            <option *ngFor="let type of exchangeTypes" [value]="type.value">
+              {{ type.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted">Exchange type determines message routing behavior</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <mat-form-field class="w-100">
+            <mat-label>Virtual Namespace *</mat-label>
+            <input 
+              type="text"
+              matInput
+              formControlName="vnamespace" 
+              [matAutocomplete]="auto">
+            <mat-autocomplete #auto="matAutocomplete">
+              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+                {{vns.Name}}
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Required: Select or enter a virtual namespace for this exchange</div>
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="createModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="createExchange()" [disabled]="!exchangeForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Create Exchange
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Edit Exchange Modal -->
+<c-modal id="editModal" [visible]="editModalVisible" (visibleChange)="editModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-pencil" class="me-2"></svg>
+      Edit Exchange
+    </h5>
+    <button (click)="editModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <form [formGroup]="exchangeFormUpdate" (ngSubmit)="updateExchange()" (keydown.enter)="updateExchange()">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <label cLabel for="name-update">Name *</label>
+          <input cFormControl id="name-update" formControlName="name" placeholder="Enter exchange name" />
+          <small class="form-text text-muted">Display name for the exchange</small>
+        </c-col>
+      </c-row>
+      
+      <!-- Read-only fields for context -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <code>{{ selectedExchange?.Code || selectedExchange?.code || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Code cannot be changed after creation</div>
+        </c-col>
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Type</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <c-badge [color]="getExchangeTypeColor(selectedExchange?.Type || selectedExchange?.type)" shape="rounded-pill">
+              {{ selectedExchange?.Type || selectedExchange?.type || 'N/A' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Type cannot be changed after creation</div>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <label class="form-label fw-bold">Virtual Namespace</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            {{ selectedExchange?.VNamespace || selectedExchange?.vNamespace || selectedExchange?.vnamespace || '-' }}
+          </div>
+          <div class="form-text">Virtual namespace cannot be changed after creation</div>
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="editModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="updateExchange()" [disabled]="!exchangeFormUpdate.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Save Changes
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Delete Exchange Modal -->
+<c-modal id="deleteModal" [visible]="deleteModalVisible" (visibleChange)="deleteModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-trash" class="me-2"></svg>
+      Delete Exchange
+    </h5>
+    <button (click)="deleteModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center">
+      <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
+      <h6>Are you sure you want to delete this exchange?</h6>
+      <p class="text-muted mb-0">
+        <strong>{{ selectedExchange?.Name }}</strong>
+        <br>This action cannot be undone.
+      </p>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="deleteModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="danger" (click)="deleteExchange()">
+      <svg cIcon name="cil-trash" class="me-1"></svg>
+      Delete Exchange
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Exchange Details Modal -->
+<c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-info" class="me-2"></svg>
+      Exchange Details
+    </h5>
+    <button (click)="detailsModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedExchange">
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">ID</label>
+          <div class="p-2 bg-dark rounded">{{ selectedExchange?.ID || selectedExchange?.id || 'N/A' }}</div>
+          <div class="form-text">Unique system identifier</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Name</label>
+          <div class="p-2 bg-dark rounded">{{ selectedExchange?.Name || selectedExchange?.name || 'N/A' }}</div>
+          <div class="form-text">Display name for the exchange</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedExchange?.Code || selectedExchange?.code || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Unique business identifier (immutable)</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Type</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="getExchangeTypeColor(selectedExchange?.Type || selectedExchange?.type)" shape="rounded-pill">
+              {{ selectedExchange?.Type || selectedExchange?.type || 'N/A' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Exchange type determines message routing behavior</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Virtual Namespace</label>
+          <div class="p-2 bg-dark rounded">{{ selectedExchange?.VNamespace || selectedExchange?.vNamespace || selectedExchange?.vnamespace || '-' }}</div>
+          <div class="form-text">Virtual namespace for logical grouping</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Created At</label>
+          <div class="p-2 bg-dark rounded">{{ (selectedExchange?.CreatedAt || selectedExchange?.createdAt) | date:'full' }}</div>
+          <div class="form-text">Exchange creation timestamp</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Updated At</label>
+          <div class="p-2 bg-dark rounded">{{ (selectedExchange?.UpdatedAt || selectedExchange?.updatedAt) | date:'full' }}</div>
+          <div class="form-text">Last modification timestamp</div>
+        </div>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="detailsModalVisible = false" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Bulk Upload Modal -->
+<c-modal id="bulkUploadModal" [visible]="bulkUploadModalVisible" (visibleChange)="bulkUploadModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-cloud-upload" class="me-2"></svg>
+      Bulk Upload Exchanges
+    </h5>
+    <button (click)="bulkUploadModalVisible = false" cButtonClose [disabled]="loading"></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <div class="mb-3">
+      <h6>Upload Instructions</h6>
+      <p>Upload a .xlsx or .csv file with the following columns:</p>
+      <ul class="list-unstyled">
+        <li><strong>Name</strong>: Display name for the exchange</li>
+        <li><strong>Code</strong>: Unique identifier for the exchange</li>
+        <li><strong>Type</strong>: Exchange type (direct, fanout, topic, headers, dead-letter)</li>
+        <li><strong>VNamespace</strong>: Virtual namespace for logical grouping</li>
+      </ul>
+      <div class="form-text">All fields are required and code must be unique within the tenant</div>
+    </div>
+    <div class="mb-3">
+      <label cLabel for="file-upload">Select File</label>
+      <input 
+        type="file" 
+        id="file-upload"
+        class="form-control"
+        (change)="onFileChange($event)" 
+        accept=".xlsx, .csv" 
+        [disabled]="loading" />
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="bulkUploadModalVisible = false" cButton color="secondary" [disabled]="loading">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="uploadExchanges()" [disabled]="loading || !file">
+      <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
+      <svg *ngIf="!loading" cIcon name="cil-cloud-upload" class="me-1"></svg>
+      {{ loading ? 'Uploading...' : 'Upload Exchanges' }}
+    </button>
+  </c-modal-footer>
+</c-modal>

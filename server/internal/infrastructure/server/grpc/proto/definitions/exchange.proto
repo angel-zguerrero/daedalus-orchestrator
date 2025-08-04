@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package exchange;
+
+option go_package = "pb/exchange;exchange";
+
+service ExchangeService {
+  rpc CreateExchange (CreateExchangeRequest) returns (CreateExchangeResponse);
+  rpc BulkCreateExchange (BulkCreateExchangeRequest) returns (BulkCreateExchangeResponse);
+  rpc GetExchange (GetExchangeRequest) returns (GetExchangeResponse);
+  rpc GetExchanges (GetExchangesRequest) returns (GetExchangesResponse);
+  rpc DeleteExchange (DeleteExchangeRequest) returns (DeleteExchangeResponse);
+}
+
+message CreateExchangeRequest {
+  string tenantId = 1;
+  string code = 2;
+  string name = 3;
+  string type = 4;
+  string vnamespace = 5;
+}
+
+message CreateExchangeResponse {
+  string message = 1;
+  Exchange result = 2;
+}
+
+message BulkCreateExchangeRequest {
+  string tenantId = 1;
+  repeated CreateExchangeItem exchanges = 2;
+}
+
+message CreateExchangeItem {
+  string code = 1;
+  string name = 2;
+  string type = 3;
+  string vnamespace = 4;
+}
+
+message BulkCreateExchangeResponse {
+  string message = 1;
+  repeated Exchange result = 2;
+}
+
+message GetExchangeRequest {
+  string tenantId = 1;
+  string exchangeId = 2;
+}
+
+message GetExchangeResponse {
+  string message = 1;
+  Exchange result = 2;
+}
+
+message GetExchangesRequest {
+  string tenantId = 1;
+  string q = 2;
+  string cursor = 3;
+  int32 pageSize = 4;
+  string vnamespace = 5;
+}
+
+message Exchange {
+  string ID = 1;
+  string Code = 2;
+  string Name = 3;
+  string Type = 4;
+  string VNamespace = 5;
+  string CreatedAt = 6;
+  string UpdatedAt = 7;
+}
+
+message ExchangeFindResult {
+  repeated Exchange Entities = 1;
+  string Cursor = 2;
+}
+
+message GetExchangesResponse {
+  string message = 1;
+  ExchangeFindResult result = 2;
+}
+
+message DeleteExchangeRequest {
+  string tenantId = 1;
+  string exchangeId = 2;
+}
+
+message DeleteExchangeResponse {
+  string message = 1;
+}
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/exchange.proto

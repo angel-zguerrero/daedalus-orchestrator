@@ -1,0 +1,181 @@
+package exchange
+
+import (
+	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/server/common"
+	bo "deadalus-orch/server/internal/usecase/business-logic"
+	"deadalus-orch/shared/models"
+	"net/http"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+)
+
+type ExchangeController struct {
+	Config     *common.ServerConfing
+	ExchangeBO *bo.ExchangeBO
+	TenantBO   *bo.TenantBO
+}
+
+func NewExchangeController(Config *common.ServerConfing) *ExchangeController {
+	api := &ExchangeController{
+		Config:     Config,
+		ExchangeBO: bo.NewExchangeBO(Config),
+		TenantBO:   bo.NewTenantBO(Config),
+	}
+	return api
+}
+
+type createExchangeRequest struct {
+	Code       string `json:"code" binding:"required"`
+	Name       string `json:"name" binding:"required"`
+	Type       string `json:"type" binding:"required"`
+	VNamespace string `json:"vnamespace" binding:"required"`
+}
+
+type createBulkExchangeRequest struct {
+	Exchanges []createExchangeRequest `json:"exchanges" binding:"required"`
+}
+
+// CreateExchangeHandler handles POST /rest-api/tenants
+func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
+	var req createExchangeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ctrl.Config.Logger.Warn().Err(err).Msg("create tenant attempt with invalid payload")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	tenantID := c.Param("id")
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), req.Code, req.VNamespace, req.Name, models.ExchangeType(req.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Exchange was asserted",
+		"result":  exchange,
+	})
+}
+
+func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
+	var req createBulkExchangeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ctrl.Config.Logger.Warn().Err(err).Msg("create tenant attempt with invalid payload")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+	tenantID := c.Param("id")
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	exchanges := []*models.Exchange{}
+
+	for _, t := range req.Exchanges {
+		exchange := &models.Exchange{
+			Code:       t.Code,
+			VNamespace: t.VNamespace,
+			Name:       t.Name,
+			Type:       models.ExchangeType(t.Type),
+		}
+		exchanges = append(exchanges, exchange)
+	}
+	exchangesResult, err := ctrl.ExchangeBO.BulkCreateExchange(c.Request.Context(), exchanges, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Exchanges were asserted",
+		"result":  exchangesResult,
+	})
+}
+
+// GetExchangeHandler handles GET /rest-api/exchanges/:id
+func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
+	exchangeID := c.Param("exchangeId")
+	tenantID := c.Param("id")
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	exchange, err := ctrl.ExchangeBO.GetExchange(c.Request.Context(), exchangeID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Exchange",
+		"result":  exchange,
+	})
+}
+
+// DeleteExchangeHandler handles DELETE /rest-api/exchanges/:id
+func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
+	exchangeID := c.Param("exchangeId")
+	tenantID := c.Param("id")
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = ctrl.ExchangeBO.DeleteExchange(c.Request.Context(), exchangeID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Exchange " + exchangeID + " was deleted",
+	})
+}
+
+func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
+	pageParam := c.Query("pageSize")
+	tenantID := c.Param("id")
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	page, err := strconv.Atoi(pageParam)
+	if err != nil || page < 2 {
+		page = 50
+	} else if page > 1000 {
+		page = 1000
+	}
+
+	findResult, err := ctrl.ExchangeBO.GetExchanges(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.Exchange{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Exchange list",
+		"result":  findResult,
+	})
+}

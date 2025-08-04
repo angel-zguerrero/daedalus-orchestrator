@@ -35,21 +35,21 @@ func NewTenantBO(Config *common.ServerConfing) *TenantBO {
 }
 
 func (bo *TenantBO) SetTenantNode(shardID int, tenantId string) *dragonboat.RaftNode {
-	var tenant *dragonboat.RaftNode
+	var tenantNode *dragonboat.RaftNode
 
 	bo.Config.TenantNodesLock.Lock()
 	for i := range bo.Config.TenantNodes {
 		if bo.Config.TenantNodes[i].ShardID == uint64(shardID) {
-			tenant = bo.Config.TenantNodes[i]
+			tenantNode = bo.Config.TenantNodes[i]
 			break
 		}
 	}
 	bo.Config.TenantNodesLock.Unlock()
 
 	bo.Config.TenantNodesLock.Lock()
-	bo.Config.TenantNodesDictionary[tenantId] = tenant
+	bo.Config.TenantNodesDictionary[tenantId] = tenantNode
 	bo.Config.TenantNodesLock.Unlock()
-	return tenant
+	return tenantNode
 }
 func (bo *TenantBO) CreateTenant(ctx context.Context, code, name string) (models.TenantInMaster, error) {
 	tenant := &models.TenantInMaster{
