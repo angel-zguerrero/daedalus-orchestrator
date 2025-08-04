@@ -182,11 +182,12 @@
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="exchangeForm">
+    <form [formGroup]="exchangeForm" (ngSubmit)="createExchange()" (keydown.enter)="createExchange()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="name">Name *</label>
           <input cFormControl id="name" formControlName="name" placeholder="Enter exchange name" />
+          <small class="form-text text-muted">Display name for the exchange</small>
         </c-col>
         <c-col [md]="6">
           <label cLabel for="code">Code *</label>
@@ -202,6 +203,7 @@
               {{ type.label }}
             </option>
           </select>
+          <small class="form-text text-muted">Exchange type determines message routing behavior</small>
         </c-col>
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
@@ -256,16 +258,24 @@
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="exchangeFormUpdate">
+    <form [formGroup]="exchangeFormUpdate" (ngSubmit)="updateExchange()" (keydown.enter)="updateExchange()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
           <label cLabel for="name-update">Name *</label>
           <input cFormControl id="name-update" formControlName="name" placeholder="Enter exchange name" />
+          <small class="form-text text-muted">Display name for the exchange</small>
         </c-col>
       </c-row>
       
       <!-- Read-only fields for context -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <code>{{ selectedExchange?.Code || selectedExchange?.code || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Code cannot be changed after creation</div>
+        </c-col>
         <c-col [md]="6">
           <label class="form-label fw-bold">Type</label>
           <div class="p-2 bg-dark rounded text-muted">
@@ -275,7 +285,9 @@
           </div>
           <div class="form-text">Type cannot be changed after creation</div>
         </c-col>
-        <c-col [md]="6">
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
           <label class="form-label fw-bold">Virtual Namespace</label>
           <div class="p-2 bg-dark rounded text-muted">
             {{ selectedExchange?.VNamespace || selectedExchange?.vNamespace || selectedExchange?.vnamespace || '-' }}
@@ -344,16 +356,19 @@
         <div class="mb-3">
           <label class="form-label fw-bold">ID</label>
           <div class="p-2 bg-dark rounded">{{ selectedExchange?.ID || selectedExchange?.id || 'N/A' }}</div>
+          <div class="form-text">Unique system identifier</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Name</label>
           <div class="p-2 bg-dark rounded">{{ selectedExchange?.Name || selectedExchange?.name || 'N/A' }}</div>
+          <div class="form-text">Display name for the exchange</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Code</label>
           <div class="p-2 bg-dark rounded">
             <code>{{ selectedExchange?.Code || selectedExchange?.code || 'N/A' }}</code>
           </div>
+          <div class="form-text">Unique business identifier (immutable)</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Type</label>
@@ -362,20 +377,24 @@
               {{ selectedExchange?.Type || selectedExchange?.type || 'N/A' }}
             </c-badge>
           </div>
+          <div class="form-text">Exchange type determines message routing behavior</div>
         </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">Virtual Namespace</label>
           <div class="p-2 bg-dark rounded">{{ selectedExchange?.VNamespace || selectedExchange?.vNamespace || selectedExchange?.vnamespace || '-' }}</div>
+          <div class="form-text">Virtual namespace for logical grouping</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Created At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedExchange?.CreatedAt || selectedExchange?.createdAt) | date:'full' }}</div>
+          <div class="form-text">Exchange creation timestamp</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Updated At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedExchange?.UpdatedAt || selectedExchange?.updatedAt) | date:'full' }}</div>
+          <div class="form-text">Last modification timestamp</div>
         </div>
       </div>
     </div>
@@ -402,10 +421,12 @@
       <h6>Upload Instructions</h6>
       <p>Upload a .xlsx or .csv file with the following columns:</p>
       <ul class="list-unstyled">
-        <li><strong>Name</strong>: The name of the exchange</li>
-        <li><strong>Type</strong>: The exchange type (direct, fanout, topic, headers, dead-letter)</li>
-        <li><strong>VNamespace</strong>: Virtual namespace (required)</li>
+        <li><strong>Name</strong>: Display name for the exchange</li>
+        <li><strong>Code</strong>: Unique identifier for the exchange</li>
+        <li><strong>Type</strong>: Exchange type (direct, fanout, topic, headers, dead-letter)</li>
+        <li><strong>VNamespace</strong>: Virtual namespace for logical grouping</li>
       </ul>
+      <div class="form-text">All fields are required and code must be unique within the tenant</div>
     </div>
     <div class="mb-3">
       <label cLabel for="file-upload">Select File</label>

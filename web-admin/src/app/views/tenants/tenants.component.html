@@ -146,15 +146,17 @@
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="tenantForm">
+    <form [formGroup]="tenantForm" (ngSubmit)="createTenant()" (keydown.enter)="createTenant()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="name">Name *</label>
           <input cFormControl id="name" formControlName="name" placeholder="Enter tenant name" />
+          <small class="form-text text-muted">Display name for the tenant</small>
         </c-col>
         <c-col [md]="6">
           <label cLabel for="code">Code *</label>
-          <input cFormControl id="code" formControlName="code" placeholder="Enter tenant code" />
+          <input cFormControl id="code" formControlName="code" placeholder="Enter unique tenant code" />
+          <small class="form-text text-muted">Unique identifier for the tenant (cannot be changed later)</small>
         </c-col>
       </c-row>
     </form>
@@ -181,16 +183,32 @@
   </c-modal-header>
   <c-modal-body>
     <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
-    <form [formGroup]="tenantFormUpdate">
+    <form [formGroup]="tenantFormUpdate" (ngSubmit)="updateTenant()" (keydown.enter)="updateTenant()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="6">
+        <c-col [md]="12">
           <label cLabel for="name-update">Name *</label>
           <input cFormControl id="name-update" formControlName="name" placeholder="Enter tenant name" />
+          <small class="form-text text-muted">Display name for the tenant</small>
+        </c-col>
+      </c-row>
+      
+      <!-- Read-only fields for context -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <code>{{ selectedTenant?.Code || selectedTenant?.code || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Code cannot be changed after creation</div>
         </c-col>
         <c-col [md]="6">
-          <label cLabel for="code-update">Code</label>
-          <input cFormControl id="code-update" formControlName="code" [disabled]="true" />
-          <div class="form-text">Code cannot be modified after creation</div>
+          <label class="form-label fw-bold">Status</label>
+          <div class="p-2 bg-dark rounded text-muted">
+            <c-badge [color]="getTenantStatusColor(selectedTenant?.Status || selectedTenant?.status)" shape="rounded-pill">
+              {{ selectedTenant?.Status || selectedTenant?.status || 'N/A' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Status is managed automatically by the system</div>
         </c-col>
       </c-row>
     </form>
@@ -254,14 +272,19 @@
         <div class="mb-3">
           <label class="form-label fw-bold">ID</label>
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.ID || selectedTenant?.id || 'N/A' }}</div>
+          <div class="form-text">Unique system identifier</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Name</label>
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.Name || selectedTenant?.name || 'N/A' }}</div>
+          <div class="form-text">Display name for the tenant</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Code</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.Code || selectedTenant?.code || 'N/A' }}</div>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedTenant?.Code || selectedTenant?.code || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Unique business identifier (immutable)</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Status</label>
@@ -270,24 +293,29 @@
               {{ selectedTenant?.Status || selectedTenant?.status || 'N/A' }}
             </c-badge>
           </div>
+          <div class="form-text">Current operational status</div>
         </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">Shard ID</label>
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.ShardId || selectedTenant?.shardId || 'N/A' }}</div>
+          <div class="form-text">Database shard identifier for data distribution</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Column Family Index</label>
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.ColumnFamilyIndex || selectedTenant?.columnFamilyIndex || 'N/A' }}</div>
+          <div class="form-text">Database column family index for organization</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Created At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedTenant?.CreatedAt || selectedTenant?.createdAt) | date:'full' }}</div>
+          <div class="form-text">Tenant creation timestamp</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Updated At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedTenant?.UpdatedAt || selectedTenant?.updatedAt) | date:'full' }}</div>
+          <div class="form-text">Last modification timestamp</div>
         </div>
       </div>
     </div>
@@ -314,9 +342,10 @@
       <h6>Upload Instructions</h6>
       <p>Upload a .xlsx or .csv file with the following columns:</p>
       <ul class="list-unstyled">
-        <li><strong>Name</strong>: The name of the tenant</li>
-        <li><strong>Code</strong>: The code of the tenant</li>
+        <li><strong>Name</strong>: Display name for the tenant</li>
+        <li><strong>Code</strong>: Unique identifier for the tenant</li>
       </ul>
+      <div class="form-text">Both fields are required and code must be unique across all tenants</div>
     </div>
     <div class="mb-3">
       <label cLabel for="file-upload">Select File</label>

@@ -263,6 +263,9 @@ export class ExchangesComponent implements OnInit {
           this.errorMessage = error.error?.message || 'Failed to create exchange';
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.exchangeForm.markAllAsTouched();
     }
   }
 
@@ -286,6 +289,9 @@ export class ExchangesComponent implements OnInit {
           this.errorMessage = error.error?.message || 'Failed to update exchange';
         }
       });
+    } else {
+      // Mark all fields as touched to show validation errors
+      this.exchangeFormUpdate.markAllAsTouched();
     }
   }
 
