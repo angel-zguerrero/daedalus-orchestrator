@@ -1,5 +1,5 @@
 import { Component, OnInit, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, AsyncPipe } from '@angular/common';
 import { ExchangesService } from '../services/exchanges.service';
 import { VNamespacesService } from '../services/vnamespaces.service';
 import { 
@@ -14,9 +14,14 @@ import {
   SpinnerComponent,
   BadgeComponent
 } from '@coreui/angular';
-import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
 import * as XLSX from 'xlsx';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { Observable, of } from 'rxjs';
+import { startWith, map, debounceTime, switchMap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-exchanges',
@@ -37,7 +42,11 @@ import * as XLSX from 'xlsx';
     FormsModule,
     SpinnerComponent,
     BadgeComponent,
-    IconDirective
+    IconDirective,
+    MatFormFieldModule,
+    MatInputModule,
+    MatAutocompleteModule,
+    AsyncPipe
   ]
 })
 export class ExchangesComponent implements OnInit {
@@ -73,12 +82,13 @@ export class ExchangesComponent implements OnInit {
 
   // VNamespace properties
   vnamespaces: any[] = [];
-  vnamespaceSearchQuery = '';
+  vnamespaceCtrl = new FormControl('');
+  filteredVNamespaces: Observable<any[]>;
   loadingVNamespaces = false;
 
   // VNamespace filter properties
-  filterVNamespaces: any[] = [];
-  filterVNamespaceQuery = '';
+  vnamespaceFilterCtrl = new FormControl('');
+  filteredFilterVNamespaces: Observable<any[]>;
   loadingFilterVNamespaces = false;
   selectedVNamespaceFilter = '';
 
@@ -92,20 +102,40 @@ export class ExchangesComponent implements OnInit {
     this.exchangeForm = this.fb.group({
       name: ['', Validators.required],
       type: ['direct', Validators.required],
-      vnamespace: ['', Validators.required]
+      vnamespace: this.vnamespaceCtrl
     });
     this.exchangeFormUpdate = this.fb.group({
       name: ['', Validators.required]
     });
+
+    this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      switchMap(value => this._filterVNamespaces(value || ''))
+    );
+
+    this.filteredFilterVNamespaces = this.vnamespaceFilterCtrl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      switchMap(value => this._filterVNamespaces(value || ''))
+    );
   }
 
   ngOnInit(): void {
     if (this.tenantId) {
       this.cursors.push('');
       this.loadExchanges();
-      this.loadVNamespaces();
-      this.loadFilterVNamespaces();
     }
+  }
+
+  private _filterVNamespaces(value: string): Observable<any[]> {
+    this.loadingVNamespaces = true;
+    return this.vNamespacesService.getVNamespaces(this.tenantId, '', 20, value).pipe(
+      map(response => {
+        this.loadingVNamespaces = false;
+        return response.data || [];
+      })
+    );
   }
 
   loadExchanges(cursor: string = '', isPrevious: boolean = false): void {
@@ -130,78 +160,14 @@ export class ExchangesComponent implements OnInit {
     this.loadExchanges();
   }
 
-  loadVNamespaces(query: string = ''): void {
-    this.loadingVNamespaces = true;
-    this.vNamespacesService.getVNamespaces(this.tenantId, '', 20, query).subscribe({
-      next: (response) => {
-        this.vnamespaces = response.data || [];
-        this.loadingVNamespaces = false;
-      },
-      error: (error) => {
-        console.error('Failed to load VNamespaces:', error);
-        this.vnamespaces = [];
-        this.loadingVNamespaces = false;
-      }
-    });
-  }
-
-  loadFilterVNamespaces(query: string = ''): void {
-    this.loadingFilterVNamespaces = true;
-    this.vNamespacesService.getVNamespaces(this.tenantId, '', 50, query).subscribe({
-      next: (response) => {
-        this.filterVNamespaces = response.data || [];
-        this.loadingFilterVNamespaces = false;
-      },
-      error: (error) => {
-        console.error('Failed to load Filter VNamespaces:', error);
-        this.filterVNamespaces = [];
-        this.loadingFilterVNamespaces = false;
-      }
-    });
-  }
-
-  searchVNamespaces(): void {
-    this.loadVNamespaces(this.vnamespaceSearchQuery);
-  }
-
-  onVNamespaceInputChange(event: any): void {
-    const value = event.target.value;
-    this.vnamespaceSearchQuery = value;
-    if (value.length >= 2) {
-      this.searchVNamespaces();
-    } else if (value.length === 0) {
-      this.loadVNamespaces();
-    }
-  }
-
-  searchFilterVNamespaces(): void {
-    this.loadFilterVNamespaces(this.filterVNamespaceQuery);
-  }
-
-  onFilterVNamespaceInputChange(event: any): void {
-    const value = event.target.value;
-    this.filterVNamespaceQuery = value;
-    if (value.length >= 2) {
-      this.searchFilterVNamespaces();
-    } else if (value.length === 0) {
-      this.loadFilterVNamespaces();
-    }
-  }
-
-  onVNamespaceFilterChange(event: any): void {
-    this.selectedVNamespaceFilter = event.target.value;
+  onVNamespaceFilterChange(value: string): void {
+    this.selectedVNamespaceFilter = value;
     this.applyFilters();
   }
 
   applyFilters(): void {
     this.cursors = [''];
     this.loadExchanges();
-  }
-
-  clearVNamespaceFilter(): void {
-    this.selectedVNamespaceFilter = '';
-    this.filterVNamespaceQuery = '';
-    this.applyFilters();
   }
 
   nextPage(): void {
@@ -221,8 +187,6 @@ export class ExchangesComponent implements OnInit {
     this.createModalVisible = true;
     this.exchangeForm.reset();
     this.exchangeForm.patchValue({ type: 'direct' });
-    this.vnamespaceSearchQuery = '';
-    this.loadVNamespaces();
     this.showAlert = false;
   }
 

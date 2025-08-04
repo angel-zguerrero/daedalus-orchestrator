@@ -29,40 +29,20 @@
         </div>
       </c-col>
       <c-col [md]="3">
-        <div class="input-group">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by VNamespace</mat-label>
           <input 
-            cFormControl 
-            id="vnamespaceFiter" 
-            [(ngModel)]="selectedVNamespaceFilter" 
-            placeholder="Select virtual namespace"
-            list="vnamespace-filter-options"
-            (input)="onFilterVNamespaceInputChange($event)"
-            (change)="onVNamespaceFilterChange($event)" />
-          <button 
-            cButton 
-            type="button" 
-            color="secondary" 
-            variant="outline" 
-            (click)="searchFilterVNamespaces()"
-            [disabled]="loadingFilterVNamespaces"
-            title="Search VNamespaces">
-            <c-spinner *ngIf="loadingFilterVNamespaces" size="sm"></c-spinner>
-            <svg *ngIf="!loadingFilterVNamespaces" cIcon name="cil-search"></svg>
-          </button>
-          <button 
-            cButton 
-            type="button" 
-            color="danger" 
-            variant="outline" 
-            (click)="clearVNamespaceFilter()"
-            [disabled]="!selectedVNamespaceFilter"
-            title="Clear Filter">
-            <svg cIcon name="cil-x"></svg>
-          </button>
-        </div>
-        <datalist id="vnamespace-filter-options">
-          <option *ngFor="let vns of filterVNamespaces" [value]="vns.Name">{{ vns.Name }}</option>
-        </datalist>
+            type="text"
+            matInput
+            [formControl]="vnamespaceFilterCtrl"
+            [matAutocomplete]="autoFilter"
+            (ngModelChange)="onVNamespaceFilterChange($event)">
+          <mat-autocomplete #autoFilter="matAutocomplete">
+            <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+              {{vns.Name}}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
       </c-col>
       <c-col [md]="6" class="d-flex justify-content-end align-items-end">
         <button cButton color="primary" (click)="openCreateModal()">
@@ -195,29 +175,19 @@
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
-          <label cLabel for="vnamespace">Virtual Namespace *</label>
-          <div class="input-group">
+          <mat-form-field class="w-100">
+            <mat-label>Virtual Namespace *</mat-label>
             <input 
-              cFormControl 
-              id="vnamespace" 
+              type="text"
+              matInput
               formControlName="vnamespace" 
-              placeholder="Search or enter virtual namespace"
-              list="vnamespace-options"
-              (input)="onVNamespaceInputChange($event)" />
-            <button 
-              cButton 
-              type="button" 
-              color="secondary" 
-              variant="outline" 
-              (click)="searchVNamespaces()"
-              [disabled]="loadingVNamespaces">
-              <c-spinner *ngIf="loadingVNamespaces" size="sm"></c-spinner>
-              <svg *ngIf="!loadingVNamespaces" cIcon name="cil-search"></svg>
-            </button>
-          </div>
-          <datalist id="vnamespace-options">
-            <option *ngFor="let vns of vnamespaces" [value]="vns.Name">{{ vns.Name }}</option>
-          </datalist>
+              [matAutocomplete]="auto">
+            <mat-autocomplete #auto="matAutocomplete">
+              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+                {{vns.Name}}
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
           <div class="form-text">Required: Select or enter a virtual namespace for this exchange</div>
         </c-col>
       </c-row>
