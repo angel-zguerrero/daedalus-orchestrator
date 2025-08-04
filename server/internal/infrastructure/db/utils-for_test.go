@@ -334,3 +334,41 @@ type TestNotification struct {
 func (TestNotification) TableName() string {
 	return "cars"
 }
+
+// Exchange entity for testing unique compound constraints
+type Exchange struct {
+	ID         string `orm:"primary-key"`
+	Name       string `orm:"unique-compound:0"`
+	Type       string
+	VNamespace string `orm:"unique-compound:0"`
+	CreatedAt  string
+	UpdatedAt  string
+}
+
+func (Exchange) TableName() string {
+	return "exchanges"
+}
+
+// UserWithCompoundUnique entity for testing multiple compound constraints
+type UserWithCompoundUnique struct {
+	ID       string `orm:"primary-key"`
+	Email    string `orm:"unique-compound:0"`
+	Domain   string `orm:"unique-compound:0"`
+	Username string `orm:"unique-compound:1"`
+	Tenant   string `orm:"unique-compound:1"`
+	Age      int
+}
+
+func (UserWithCompoundUnique) TableName() string {
+	return "users_compound"
+}
+
+// InvalidCompoundSingle entity for testing validation - single field compound constraint
+type InvalidCompoundSingle struct {
+	ID   string `orm:"primary-key"`
+	Name string `orm:"unique-compound:0"`
+}
+
+func (InvalidCompoundSingle) TableName() string {
+	return "invalid_compound_single"
+}

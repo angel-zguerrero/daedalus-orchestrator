@@ -1210,3 +1210,296 @@ func TestRepository_Create_Success_Deterministic_Generator(t *testing.T) {
 
 	mockStore.AssertExpectations(t)
 }
+
+func TestNewRepositoryUniqueCompoundValidations(t *testing.T) {
+	mockStore := new(MockKVStore) // Does not hit DB for these validations
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	t.Run("Valid Exchange with compound uniqueness", func(t *testing.T) {
+		repo, err := db.NewRepository[Exchange](mockStore, "cf_valid", testColumnFamilySector, "test_valid", iGF)
+		require.NoError(t, err)
+
+		// Verify that the compound groups are properly configured
+		expectedGroups := map[int][]string{
+			0: {"Name", "VNamespace"}, // Should be sorted
+		}
+		for idx, expectedFields := range expectedGroups {
+			actualFields, exists := repo.GetTableDefinition().UniqueCompoundGroups[idx]
+			require.True(t, exists, "Compound group %d should exist", idx)
+			assert.Equal(t, expectedFields, actualFields, "Compound group %d fields mismatch", idx)
+		}
+	})
+
+	t.Run("Valid UserWithCompoundUnique with multiple compound constraints", func(t *testing.T) {
+		repo, err := db.NewRepository[UserWithCompoundUnique](mockStore, "cf_valid", testColumnFamilySector, "test_valid", iGF)
+		require.NoError(t, err)
+
+		// Verify that the compound groups are properly configured
+		expectedGroups := map[int][]string{
+			0: {"Domain", "Email"},    // Should be sorted
+			1: {"Tenant", "Username"}, // Should be sorted
+		}
+		for idx, expectedFields := range expectedGroups {
+			actualFields, exists := repo.GetTableDefinition().UniqueCompoundGroups[idx]
+			require.True(t, exists, "Compound group %d should exist", idx)
+			assert.Equal(t, expectedFields, actualFields, "Compound group %d fields mismatch", idx)
+		}
+	})
+
+	t.Run("Invalid compound constraint - single field", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidCompoundSingle](mockStore, "cf_invalid", testColumnFamilySector, "test_invalid", iGF)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unique-compound:0 must have at least 2 fields, found only 1 field(s): [Name]")
+	})
+}
+
+func TestRepository_CreateExchangeWithCompoundUniqueness_Success(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"exchange-123"})
+
+	repo, err := db.NewRepository[Exchange](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
+	require.NoError(t, err)
+
+	exchange := &Exchange{
+		ID:         "",
+		Name:       "test-exchange",
+		Type:       "direct",
+		VNamespace: "namespace-1",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+
+	now := time.Now()
+
+	// Mock expectations for existence checks
+	dataKey := "admin:exchanges:data:exchange-123"
+	compoundIdxKey := "admin:exchanges:idx-uc:0:Name:test-exchange|VNamespace:namespace-1"
+
+	// Check primary key doesn't exist
+	mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(false, nil)
+	// Check compound uniqueness doesn't exist
+	mockStore.On("Exists", "cf1", testColumnFamilySector, compoundIdxKey, mock.Anything).Return(false, nil)
+
+	// Mock the batch write
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	}), mock.Anything).Return(nil)
+
+	id, err := repo.Create(exchange, now)
+	require.NoError(t, err)
+	assert.Equal(t, "exchange-123", id)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_CreateExchangeWithCompoundUniqueness_DuplicateCompound(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"exchange-123"})
+
+	repo, err := db.NewRepository[Exchange](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
+	require.NoError(t, err)
+
+	exchange := &Exchange{
+		ID:         "",
+		Name:       "test-exchange",
+		Type:       "direct",
+		VNamespace: "namespace-1",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+
+	now := time.Now()
+
+	// Mock expectations - primary key doesn't exist but compound key does
+	dataKey := "admin:exchanges:data:exchange-123"
+	compoundIdxKey := "admin:exchanges:idx-uc:0:Name:test-exchange|VNamespace:namespace-1"
+
+	mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, compoundIdxKey, mock.Anything).Return(true, nil)
+
+	_, err = repo.Create(exchange, now)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique compound constraint")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkCreateWithCompoundUniqueness_Success(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"exchange-1", "exchange-2"})
+
+	repo, err := db.NewRepository[Exchange](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
+	require.NoError(t, err)
+
+	exchanges := []*Exchange{
+		{
+			Name:       "exchange-1",
+			Type:       "direct",
+			VNamespace: "namespace-1",
+		},
+		{
+			Name:       "exchange-1", // Same name but different namespace - should be allowed
+			Type:       "topic",
+			VNamespace: "namespace-2",
+		},
+	}
+
+	now := time.Now()
+
+	// Mock existence checks for primary keys
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:exchanges:data:exchange-1", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:exchanges:data:exchange-2", mock.Anything).Return(false, nil)
+
+	// Mock existence checks for compound constraints
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:exchanges:idx-uc:0:Name:exchange-1|VNamespace:namespace-1", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:exchanges:idx-uc:0:Name:exchange-1|VNamespace:namespace-2", mock.Anything).Return(false, nil)
+
+	// Mock batch write
+	mockStore.On("Write", mock.MatchedBy(func(b *db.WriteBatch) bool {
+		return true
+	}), mock.Anything).Return(nil)
+
+	ids, err := repo.BulkCreate(exchanges, now)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"exchange-1", "exchange-2"}, ids)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_BulkCreateWithCompoundUniqueness_DuplicateInBatch(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"exchange-1", "exchange-2"})
+
+	repo, err := db.NewRepository[Exchange](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
+	require.NoError(t, err)
+
+	exchanges := []*Exchange{
+		{
+			Name:       "exchange-1",
+			Type:       "direct",
+			VNamespace: "namespace-1",
+		},
+		{
+			Name:       "exchange-1", // Same name and same namespace - should fail
+			Type:       "topic",
+			VNamespace: "namespace-1",
+		},
+	}
+
+	now := time.Now()
+
+	// Mock existence checks for primary keys
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:exchanges:data:exchange-1", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:exchanges:data:exchange-2", mock.Anything).Return(false, nil)
+
+	_, err = repo.BulkCreate(exchanges, now)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate unique compound constraint in input batch")
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Find_AutoDetectCompoundConstraint(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	repo, err := db.NewRepository[Exchange](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test compound query using Find method with automatic detection
+	filter := "Name='test-exchange' & VNamespace='namespace-1'"
+
+	expectedExchange := &Exchange{
+		ID:         "exchange-123",
+		Name:       "test-exchange",
+		Type:       "direct",
+		VNamespace: "namespace-1",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+
+	// Mock compound index lookup
+	compoundIdxKey := "admin:exchanges:idx-uc:0:Name:test-exchange|VNamespace:namespace-1"
+	mockStore.On("Get", "cf1", testColumnFamilySector, compoundIdxKey, mock.Anything).Return([]byte("exchange-123"), nil)
+
+	// Mock data lookup
+	dataKey := "admin:exchanges:data:exchange-123"
+	exchangeData, _ := json.Marshal(expectedExchange)
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(exchangeData, nil)
+
+	result, err := repo.Find(filter, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Entities, 1)
+	assert.Equal(t, expectedExchange.ID, result.Entities[0].ID)
+	assert.Equal(t, expectedExchange.Name, result.Entities[0].Name)
+	assert.Equal(t, expectedExchange.VNamespace, result.Entities[0].VNamespace)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Find_AutoDetectCompoundConstraint_NotFound(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	repo, err := db.NewRepository[Exchange](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test compound query that returns no results
+	filter := "Name='nonexistent' & VNamespace='namespace-1'"
+
+	// Mock compound index lookup returning nil (not found)
+	compoundIdxKey := "admin:exchanges:idx-uc:0:Name:nonexistent|VNamespace:namespace-1"
+	mockStore.On("Get", "cf1", testColumnFamilySector, compoundIdxKey, mock.Anything).Return(nil, nil)
+
+	result, err := repo.Find(filter, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Entities, 0)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestRepository_Find_FallbackToNormalQuery(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	repo, err := db.NewRepository[Exchange](mockStore, "cf1", testColumnFamilySector, "admin", iGF)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Test query that doesn't match compound constraint (should fall back to normal processing)
+	filter := "Name='test-exchange' & Type='direct'"
+
+	// Mock normal query processing
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:exchanges:idx:Name:test-exchange:*", "", 10, mock.Anything).
+		Return([]db.KeyValuePair{{Value: []byte("exchange-123")}}, "", nil)
+	mockStore.On("SearchByPatternPaginatedKV", "cf1", testColumnFamilySector, "admin:exchanges:idx:Type:direct:*", "", 10, mock.Anything).
+		Return([]db.KeyValuePair{{Value: []byte("exchange-123")}}, "", nil)
+
+	expectedExchange := &Exchange{
+		ID:         "exchange-123",
+		Name:       "test-exchange",
+		Type:       "direct",
+		VNamespace: "namespace-1",
+		CreatedAt:  "2023-01-01T00:00:00Z",
+		UpdatedAt:  "2023-01-01T00:00:00Z",
+	}
+
+	dataKey := "admin:exchanges:data:exchange-123"
+	exchangeData, _ := json.Marshal(expectedExchange)
+	mockStore.On("Get", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(exchangeData, nil)
+
+	result, err := repo.Find(filter, 10, "", now)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Entities, 1)
+	assert.Equal(t, expectedExchange.ID, result.Entities[0].ID)
+
+	mockStore.AssertExpectations(t)
+}

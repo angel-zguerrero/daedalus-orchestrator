@@ -48,6 +48,13 @@ type FieldDefinition struct {
 	IgnoreIsTrueFieldName string
 	// HasConditionalUniqueness indicates if the 'ignore-is-true' tag is used for this field.
 	HasConditionalUniqueness bool
+
+	// UniqueCompoundIndex indicates the index of this field in a compound uniqueness constraint.
+	// If this field is part of a compound uniqueness constraint, this value is >= 0.
+	// If this field is not part of a compound uniqueness constraint, this value is -1.
+	UniqueCompoundIndex int
+	// IsUniqueCompound indicates whether this field is part of a compound uniqueness constraint.
+	IsUniqueCompound bool
 }
 
 // TableDefinition describes the schema of a table in the key-value store.
@@ -62,6 +69,9 @@ type TableDefinition struct {
 	Name string
 	// Fields is a map of field names to their definitions.
 	Fields map[string]FieldDefinition
+	// UniqueCompoundGroups maps compound index numbers to the field names that are part of that compound constraint.
+	// For example, if fields Name and VNamespace both have unique-compound:0, then UniqueCompoundGroups[0] = ["Name", "VNamespace"]
+	UniqueCompoundGroups map[int][]string
 }
 
 // Repository provides a generic implementation for interacting with a key-value store.
@@ -200,6 +210,7 @@ func parse(tokens []token) (*exprNode, error) {
 	return output[0], nil
 }
 func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) (map[string]bool, error) {
+	// Regular field condition parsing
 	conditionRegex := regexp.MustCompile(`(?i)^([\w.]+)\s*(=|!=|<=|>=|<|>|LIKE|BETWEEN)\s*(.+)$`)
 	parts := conditionRegex.FindStringSubmatch(strings.TrimSpace(condStr))
 	if len(parts) != 4 {
@@ -361,7 +372,163 @@ func (r *Repository[T]) evalExpr(node *exprNode, limit int, now time.Time) (map[
 // Returns:
 //   - A pointer to a FindResult struct containing the matched entities and the next cursor.
 //   - An error if the operation fails.
+//
+// tryCompoundQuery attempts to detect and optimize queries that match compound unique constraints.
+// It analyzes the filter string to find patterns like "field1='value1' & field2='value2'" that
+// correspond to compound unique constraints.
+//
+// Returns:
+//   - entity: The found entity if the query matches a compound constraint
+//   - isCompound: true if this was identified as a compound query
+//   - error: any error that occurred during processing
+func (r *Repository[T]) tryCompoundQuery(filter string, now time.Time) (*T, bool, error) {
+	// Parse the filter to extract field=value conditions connected by &
+	fieldValues, isCompoundPattern := r.parseCompoundPattern(filter)
+	if !isCompoundPattern {
+		return nil, false, nil
+	}
+
+	// Check if the extracted fields form a compound unique constraint
+	compoundIndex, isCompoundConstraint := r.isCompoundUniqueConstraint(fieldValues)
+	if !isCompoundConstraint {
+		return nil, false, nil
+	}
+
+	// Perform compound field lookup directly
+	expectedFieldNames := r.definition.UniqueCompoundGroups[compoundIndex]
+
+	// Build composite key parts using the same ordering as used during creation
+	var compositeKeyParts []string
+	for _, fieldName := range expectedFieldNames { // expectedFieldNames is already sorted
+		fieldValue := fieldValues[fieldName]
+		compositeKeyParts = append(compositeKeyParts, fmt.Sprintf("%s:%s", fieldName, fieldValue))
+	}
+
+	// Create composite value by joining all field:value pairs
+	compositeValue := strings.Join(compositeKeyParts, "|")
+
+	// Create compound unique index key
+	compoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:%d:%s", r.definition.Schema, r.definition.Name, compoundIndex, compositeValue)
+
+	// Get the ID from the compound index
+	idBytes, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, compoundIdxKey, now)
+	if err != nil {
+		return nil, true, fmt.Errorf("error searching compound index: %w", err)
+	}
+
+	if idBytes == nil {
+		return nil, true, nil // Not found, but it was a compound query
+	}
+
+	// Get the actual entity data
+	dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, string(idBytes))
+	dataBytes, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, now)
+	if err != nil {
+		return nil, true, fmt.Errorf("error getting entity data: %w", err)
+	}
+
+	if dataBytes == nil {
+		return nil, true, nil // Data not found (inconsistent state), but it was a compound query
+	}
+
+	var result T
+	err = json.Unmarshal(dataBytes, &result)
+	if err != nil {
+		return nil, true, fmt.Errorf("error unmarshaling entity: %w", err)
+	}
+
+	return &result, true, nil
+}
+
+// parseCompoundPattern analyzes a filter string to detect patterns that could be compound queries.
+// It looks for patterns like "field1='value1' & field2='value2'" (with any number of fields).
+// Returns the extracted field-value pairs and whether this looks like a compound pattern.
+func (r *Repository[T]) parseCompoundPattern(filter string) (map[string]string, bool) {
+	// Split by & to get individual conditions
+	conditions := strings.Split(filter, "&")
+	if len(conditions) < 2 {
+		return nil, false // Need at least 2 conditions for compound
+	}
+
+	fieldValues := make(map[string]string)
+	equalityRegex := regexp.MustCompile(`^\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*=\s*'([^']*)'\s*$`)
+
+	for _, condition := range conditions {
+		condition = strings.TrimSpace(condition)
+
+		// Check if this is a simple equality condition
+		matches := equalityRegex.FindStringSubmatch(condition)
+		if len(matches) != 3 {
+			return nil, false // Not a simple equality, can't optimize
+		}
+
+		fieldName := matches[1]
+		fieldValue := matches[2]
+
+		// Verify the field exists in our table definition
+		if _, exists := r.definition.Fields[fieldName]; !exists {
+			return nil, false // Unknown field
+		}
+
+		fieldValues[fieldName] = fieldValue
+	}
+
+	return fieldValues, len(fieldValues) >= 2
+}
+
+// isCompoundUniqueConstraint checks if the provided field values match a compound unique constraint
+// Returns the compound index and true if it matches, or -1 and false if it doesn't match
+func (r *Repository[T]) isCompoundUniqueConstraint(fieldValues map[string]string) (int, bool) {
+	// Extract field names from the provided map
+	providedFields := make(map[string]bool)
+	for fieldName := range fieldValues {
+		providedFields[fieldName] = true
+	}
+
+	// Check each compound unique group
+	for compoundIndex, expectedFields := range r.definition.UniqueCompoundGroups {
+		// Check if the number of fields matches
+		if len(expectedFields) != len(providedFields) {
+			continue
+		}
+
+		// Check if all expected fields are present
+		allFieldsMatch := true
+		for _, expectedField := range expectedFields {
+			if !providedFields[expectedField] {
+				allFieldsMatch = false
+				break
+			}
+		}
+
+		if allFieldsMatch {
+			return compoundIndex, true
+		}
+	}
+
+	return -1, false
+}
+
 func (r *Repository[T]) Find(filter string, limit int, cursor string, now time.Time) (*FindResult[T], error) {
+	// First, try to optimize the query by detecting compound unique constraints
+	compoundResult, isCompoundQuery, err := r.tryCompoundQuery(filter, now)
+	if err != nil {
+		return nil, err
+	}
+	if isCompoundQuery {
+		// Convert single entity result to FindResult format
+		results := []T{}
+		if compoundResult != nil {
+			results = append(results, *compoundResult)
+		}
+
+		return &FindResult[T]{
+			Entities: results,
+			Cursor:   "", // No pagination needed for single result
+		}, nil
+	}
+
+	// If not a compound query, process normally
 	tokens, err := tokenize(filter)
 	if err != nil {
 		return nil, err
@@ -488,10 +655,20 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		FieldName string
 		Value     string
 	}
+
+	type uniqueCompoundCheck struct {
+		Key            string
+		CompoundIndex  int
+		FieldValues    map[string]string // fieldName -> value
+		CompositeValue string            // concatenated field values for key generation
+	}
 	var uniqueChecks []uniqueCheck
+	var uniqueCompoundChecks []uniqueCompoundCheck
 
 	// Map para detectar duplicados en el batch, clave = campo+valor
 	uniqueInBatch := make(map[string]struct{})
+	// Map to detect duplicate compound uniqueness in the batch, key = compoundIndex:compositeValue
+	uniqueCompoundInBatch := make(map[string]struct{})
 	// Map to detect duplicate primary keys in the batch
 	primaryKeysInBatch := make(map[string]struct{})
 
@@ -587,6 +764,53 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 	}
 
+	// Check unique compound constraints
+	for _, entity := range entities {
+		val := reflect.ValueOf(entity)
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
+
+		// For each compound constraint group
+		for compoundIndex, fieldNames := range r.definition.UniqueCompoundGroups {
+			fieldValues := make(map[string]string)
+			var compositeKeyParts []string
+
+			// Get all field values for this compound constraint
+			for _, fieldName := range fieldNames {
+				fieldVal, err := getNestedFieldValue(reflect.ValueOf(entity), fieldName)
+				if err != nil {
+					return nil, fmt.Errorf("error getting compound field '%s' for entity: %w", fieldName, err)
+				}
+				if !fieldVal.IsValid() {
+					return nil, fmt.Errorf("compound field '%s' is invalid for entity", fieldName)
+				}
+				fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
+				fieldValues[fieldName] = fieldValue
+				compositeKeyParts = append(compositeKeyParts, fmt.Sprintf("%s:%s", fieldName, fieldValue))
+			}
+
+			// Create composite value by joining all field:value pairs
+			compositeValue := strings.Join(compositeKeyParts, "|")
+
+			// Check for duplicates in batch
+			batchKey := fmt.Sprintf("%d:%s", compoundIndex, compositeValue)
+			if _, exists := uniqueCompoundInBatch[batchKey]; exists {
+				return nil, fmt.Errorf("duplicate unique compound constraint in input batch: compound-index=%d, fields=%v", compoundIndex, fieldValues)
+			}
+			uniqueCompoundInBatch[batchKey] = struct{}{}
+
+			// Create key for database check
+			compoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:%d:%s", r.definition.Schema, r.definition.Name, compoundIndex, compositeValue)
+			uniqueCompoundChecks = append(uniqueCompoundChecks, uniqueCompoundCheck{
+				Key:            compoundIdxKey,
+				CompoundIndex:  compoundIndex,
+				FieldValues:    fieldValues,
+				CompositeValue: compositeValue,
+			})
+		}
+	}
+
 	// Validar duplicados en la base
 	// This check inherently respects shouldSkipUniqueness because items are not added to uniqueChecks
 	for _, check := range uniqueChecks {
@@ -596,6 +820,17 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 		if exists {
 			return nil, fmt.Errorf("duplicate unique field: %s = %s", check.FieldName, check.Value)
+		}
+	}
+
+	// Validate unique compound constraints in database
+	for _, check := range uniqueCompoundChecks {
+		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, r.definition.ColumnFamilySector, check.Key, now)
+		if err != nil {
+			return nil, fmt.Errorf("error checking compound uniqueness constraint: %w", err)
+		}
+		if exists {
+			return nil, fmt.Errorf("duplicate unique compound constraint: compound-index=%d, fields=%v", check.CompoundIndex, check.FieldValues)
 		}
 	}
 
@@ -660,6 +895,37 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 						batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, uniqueIdxKey, []byte(id), now)
 					}
 				}
+			}
+		}
+
+		// Create compound unique indexes
+		for compoundIndex, fieldNames := range r.definition.UniqueCompoundGroups {
+			fieldValues := make(map[string]string)
+			var compositeKeyParts []string
+
+			// Get all field values for this compound constraint
+			for _, fieldName := range fieldNames {
+				fieldVal, err := getNestedFieldValue(entityPtrVal, fieldName)
+				if err != nil {
+					return nil, fmt.Errorf("error getting compound field '%s' for entity with ID '%s': %w", fieldName, id, err)
+				}
+				if !fieldVal.IsValid() {
+					return nil, fmt.Errorf("compound field '%s' is invalid for entity with ID '%s'", fieldName, id)
+				}
+				fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
+				fieldValues[fieldName] = fieldValue
+				compositeKeyParts = append(compositeKeyParts, fmt.Sprintf("%s:%s", fieldName, fieldValue))
+			}
+
+			// Create composite value by joining all field:value pairs
+			compositeValue := strings.Join(compositeKeyParts, "|")
+
+			// Create compound unique index key
+			compoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:%d:%s", r.definition.Schema, r.definition.Name, compoundIndex, compositeValue)
+			if hasTTL {
+				batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, compoundIdxKey, []byte(id), ttl, now)
+			} else {
+				batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, compoundIdxKey, []byte(id), now)
 			}
 		}
 
@@ -858,6 +1124,65 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		currentEntityReflectVal := reflect.ValueOf(currentEntityStored)
 		newEntityReflectVal := entityPtrVal // *T
 
+		// Store compound field values before any changes for comparison
+		compoundFieldChanges := make(map[int]struct {
+			oldCompositeValue string
+			newCompositeValue string
+			changed           bool
+		})
+
+		// Pre-calculate compound constraint changes
+		for compoundIndex, fieldNames := range r.definition.UniqueCompoundGroups {
+			var oldCompositeKeyParts []string
+			var newCompositeKeyParts []string
+			compoundChanged := false
+			allFieldsValid := true
+
+			for _, fieldName := range fieldNames {
+				currentFieldVal, err := getNestedFieldValue(currentEntityReflectVal, fieldName)
+				if err != nil {
+					fmt.Printf("Warning: could not get current compound field %s for updating compound index of entity ID %s: %v. Stale index might remain.\n", fieldName, id, err)
+					allFieldsValid = false
+					break
+				}
+				newFieldVal, err := getNestedFieldValue(newEntityReflectVal, fieldName)
+				if err != nil {
+					fmt.Printf("Warning: could not get new compound field %s for updating compound index of entity ID %s: %v. Stale index might remain.\n", fieldName, id, err)
+					allFieldsValid = false
+					break
+				}
+				if !currentFieldVal.IsValid() || !newFieldVal.IsValid() {
+					fmt.Printf("Warning: compound field %s is invalid for updating compound index of entity ID %s. Stale index might remain.\n", fieldName, id)
+					allFieldsValid = false
+					break
+				}
+
+				oldValue := fmt.Sprintf("%v", currentFieldVal.Interface())
+				newValue := fmt.Sprintf("%v", newFieldVal.Interface())
+
+				oldCompositeKeyParts = append(oldCompositeKeyParts, fmt.Sprintf("%s:%s", fieldName, oldValue))
+				newCompositeKeyParts = append(newCompositeKeyParts, fmt.Sprintf("%s:%s", fieldName, newValue))
+
+				if oldValue != newValue {
+					compoundChanged = true
+				}
+			}
+
+			if allFieldsValid {
+				oldCompositeValue := strings.Join(oldCompositeKeyParts, "|")
+				newCompositeValue := strings.Join(newCompositeKeyParts, "|")
+				compoundFieldChanges[compoundIndex] = struct {
+					oldCompositeValue string
+					newCompositeValue string
+					changed           bool
+				}{
+					oldCompositeValue: oldCompositeValue,
+					newCompositeValue: newCompositeValue,
+					changed:           compoundChanged,
+				}
+			}
+		}
+
 		// Pass pointer to checkForTTL
 		hasTTL, ttl, err := r.checkForTTL(newEntityReflectVal)
 		if err != nil {
@@ -963,6 +1288,34 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 			}
 		}
 
+		// Handle compound unique constraints using pre-calculated values
+		for compoundIndex, changeInfo := range compoundFieldChanges {
+			if changeInfo.changed {
+				// Delete old compound index
+				oldCompoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:%d:%s", r.definition.Schema, r.definition.Name, compoundIndex, changeInfo.oldCompositeValue)
+				batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, oldCompoundIdxKey, now)
+
+				// Check for new compound value collision in DB
+				newCompoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:%d:%s", r.definition.Schema, r.definition.Name, compoundIndex, changeInfo.newCompositeValue)
+				existingIDBytes, errDb := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, newCompoundIdxKey, now)
+				if errDb != nil {
+					return nil, fmt.Errorf("error checking compound unique constraint for compound-index=%d, composite=%s: %w", compoundIndex, changeInfo.newCompositeValue, errDb)
+				}
+				if len(existingIDBytes) > 0 && string(existingIDBytes) != id {
+					return nil, fmt.Errorf("duplicate compound unique constraint: compound-index=%d, composite=%s (conflicts with existing ID %s)", compoundIndex, changeInfo.newCompositeValue, string(existingIDBytes))
+				}
+
+				// Add new compound index
+				if hasTTL {
+					batch.PutTTl(r.definition.ColumnFamily, r.definition.ColumnFamilySector, newCompoundIdxKey, []byte(id), ttl, now)
+				} else {
+					batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, newCompoundIdxKey, []byte(id), now)
+				}
+
+				changed = true
+			}
+		}
+
 		if changed {
 			dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 			// Marshal the modified currentEntityStored, which now contains the merged changes
@@ -1040,6 +1393,38 @@ func (r *Repository[T]) BulkDelete(ids []string, now time.Time) ([]bool, error) 
 
 		entityPtrVal := reflect.ValueOf(entity) // entity is *T (result from FindByField)
 
+		// Delete compound unique indexes for this entity
+		for compoundIndex, fieldNames := range r.definition.UniqueCompoundGroups {
+			var compositeKeyParts []string
+
+			// Get all field values for this compound constraint
+			allFieldsValid := true
+			for _, fieldName := range fieldNames {
+				fieldVal, err := getNestedFieldValue(entityPtrVal, fieldName)
+				if err != nil {
+					fmt.Printf("Warning: could not get compound field %s for deleting compound index of entity ID %s: %v. Stale index might remain.\n", fieldName, id, err)
+					allFieldsValid = false
+					break
+				}
+				if !fieldVal.IsValid() {
+					fmt.Printf("Warning: compound field %s is invalid for deleting compound index of entity ID %s. Stale index might remain.\n", fieldName, id)
+					allFieldsValid = false
+					break
+				}
+				fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
+				compositeKeyParts = append(compositeKeyParts, fmt.Sprintf("%s:%s", fieldName, fieldValue))
+			}
+
+			// Only delete compound index if all fields are valid
+			if allFieldsValid {
+				// Create composite value by joining all field:value pairs
+				compositeValue := strings.Join(compositeKeyParts, "|")
+				compoundIdxKey := fmt.Sprintf("%s:%s:idx-uc:%d:%s", r.definition.Schema, r.definition.Name, compoundIndex, compositeValue)
+				batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, compoundIdxKey, now)
+			}
+		}
+
+		// Delete regular field indexes for this entity
 		for _, def := range r.definition.Fields {
 			if def.TTL { // TTL fields don't have separate general indexes
 				continue
@@ -1186,11 +1571,12 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySecto
 	}
 
 	table := &TableDefinition{
-		ColumnFamily:       ColumnFamily,
-		ColumnFamilySector: columnFamilySector,
-		Schema:             schema,
-		Name:               tableName,
-		Fields:             map[string]FieldDefinition{},
+		ColumnFamily:         ColumnFamily,
+		ColumnFamilySector:   columnFamilySector,
+		Schema:               schema,
+		Name:                 tableName,
+		Fields:               map[string]FieldDefinition{},
+		UniqueCompoundGroups: map[int][]string{},
 	}
 
 	fields, err := extractFieldsRecursively(t, "")
@@ -1220,6 +1606,27 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySecto
 		return nil, fmt.Errorf("struct %s must have a string field named 'ID' with `orm:\"primary-key\"`", t.Name())
 	}
 
+	// Build unique compound groups
+	for fieldName, fieldDef := range table.Fields {
+		if fieldDef.IsUniqueCompound {
+			index := fieldDef.UniqueCompoundIndex
+			if _, exists := table.UniqueCompoundGroups[index]; !exists {
+				table.UniqueCompoundGroups[index] = []string{}
+			}
+			table.UniqueCompoundGroups[index] = append(table.UniqueCompoundGroups[index], fieldName)
+		}
+	}
+
+	// Validate unique compound groups - each group must have at least 2 fields
+	for index, fieldNames := range table.UniqueCompoundGroups {
+		if len(fieldNames) < 2 {
+			return nil, fmt.Errorf("unique-compound:%d must have at least 2 fields, found only %d field(s): %v", index, len(fieldNames), fieldNames)
+		}
+		// Sort field names for consistent ordering
+		sort.Strings(fieldNames)
+		table.UniqueCompoundGroups[index] = fieldNames
+	}
+
 	// Validate conditional uniqueness fields
 	for fieldName, fieldDef := range table.Fields {
 		if fieldDef.HasConditionalUniqueness {
@@ -1241,6 +1648,11 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySecto
 	}
 
 	return &Repository[T]{definition: table, kvStore: kvStore, idGeneratorFactory: idGeneratorFactory}, nil
+}
+
+// GetTableDefinition returns the table definition for testing purposes
+func (r *Repository[T]) GetTableDefinition() *TableDefinition {
+	return r.definition
 }
 
 // extractFieldsRecursively extracts field definitions from a struct type.
@@ -1294,8 +1706,10 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 	fullName := prefix + field.Name
 
 	def := FieldDefinition{
-		Name: fullName,
-		Type: field.Type.Name(),
+		Name:                fullName,
+		Type:                field.Type.Name(),
+		UniqueCompoundIndex: -1, // Default: not part of compound uniqueness
+		IsUniqueCompound:    false,
 	}
 
 	for _, rule := range strings.Split(tag, ",") {
@@ -1303,6 +1717,20 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 		switch {
 		case rule == "unique":
 			def.Unique = true
+		case strings.HasPrefix(rule, "unique-compound:"):
+			parts := strings.SplitN(rule, ":", 2)
+			if len(parts) != 2 {
+				return FieldDefinition{}, fmt.Errorf("invalid unique-compound format for field '%s': %s", fullName, rule)
+			}
+			index, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return FieldDefinition{}, fmt.Errorf("invalid unique-compound index for field '%s': %s", fullName, parts[1])
+			}
+			if index < 0 {
+				return FieldDefinition{}, fmt.Errorf("unique-compound index must be >= 0 for field '%s': %d", fullName, index)
+			}
+			def.IsUniqueCompound = true
+			def.UniqueCompoundIndex = index
 		case strings.HasPrefix(rule, "ignore-is-true:"):
 			parts := strings.SplitN(rule, ":", 2)
 			if len(parts) == 2 && parts[1] != "" {
