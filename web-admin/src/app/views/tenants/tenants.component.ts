@@ -6,6 +6,7 @@ import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, Fo
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
 import * as XLSX from 'xlsx';
+import { ErrorUtil } from '../../shared/utils/error.util';
 
 @Component({
   selector: 'app-tenants',
@@ -81,7 +82,7 @@ export class TenantsComponent implements OnInit {
       },
       error: (error) => {
         this.showAlert = true;
-        this.errorMessage = error.error;
+        this.errorMessage = ErrorUtil.formatErrorMessage(error);
       }
     });
   }
@@ -148,7 +149,7 @@ export class TenantsComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error;
+          this.errorMessage = ErrorUtil.formatErrorMessage(error);
         }
       });
     } else {
@@ -168,7 +169,7 @@ export class TenantsComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error;
+          this.errorMessage = ErrorUtil.formatErrorMessage(error);
         }
       });
     } else {
@@ -227,7 +228,7 @@ export class TenantsComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error;
+          this.errorMessage = ErrorUtil.formatErrorMessage(error);
           this.loading = false;
         }
       });

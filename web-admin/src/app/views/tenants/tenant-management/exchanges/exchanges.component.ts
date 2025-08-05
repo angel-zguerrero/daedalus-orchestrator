@@ -22,6 +22,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { Observable, of } from 'rxjs';
 import { startWith, map, debounceTime, switchMap } from 'rxjs/operators';
+import { ErrorUtil } from '../../../../shared/utils/error.util';
 
 @Component({
   selector: 'app-exchanges',
@@ -151,7 +152,7 @@ export class ExchangesComponent implements OnInit {
       },
       error: (error) => {
         this.showAlert = true;
-        this.errorMessage = error.error?.message || 'Failed to load exchanges';
+        this.errorMessage = ErrorUtil.formatErrorMessage(error);
       }
     });
   }
@@ -224,7 +225,7 @@ export class ExchangesComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error?.message || 'Failed to create exchange';
+          this.errorMessage = ErrorUtil.formatErrorMessage(error);
         }
       });
     } else {
@@ -250,7 +251,7 @@ export class ExchangesComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error?.message || 'Failed to update exchange';
+          this.errorMessage = ErrorUtil.formatErrorMessage(error);
         }
       });
     } else {
@@ -267,7 +268,7 @@ export class ExchangesComponent implements OnInit {
       },
       error: (error) => {
         this.showAlert = true;
-        this.errorMessage = error.error?.message || 'Failed to delete exchange';
+        this.errorMessage = ErrorUtil.formatErrorMessage(error);
       }
     });
   }
@@ -315,7 +316,7 @@ export class ExchangesComponent implements OnInit {
         },
         error: (error) => {
           this.showAlert = true;
-          this.errorMessage = error.error?.message || 'Failed to upload exchanges';
+          this.errorMessage = ErrorUtil.formatErrorMessage(error);
           this.loading = false;
         }
       });

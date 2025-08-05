@@ -3,7 +3,7 @@
     Tenants
   </c-card-header>
   <c-card-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <!-- Search and Actions Row -->
     <c-row class="mb-3">
       <c-col [md]="3">
@@ -147,7 +147,7 @@
     <button (click)="createModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <form [formGroup]="tenantForm" (ngSubmit)="createTenant()" (keydown.enter)="createTenant()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
@@ -184,7 +184,7 @@
     <button (click)="editModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <form [formGroup]="tenantFormUpdate" (ngSubmit)="updateTenant()" (keydown.enter)="updateTenant()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
@@ -266,7 +266,7 @@
     <button (click)="detailsModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body *ngIf="selectedTenant">
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
 
     
     <div class="row">
@@ -306,7 +306,9 @@
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Column Family Index</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ColumnFamilyIndex || selectedTenant?.columnFamilyIndex || 'N/A' }}</div>
+          <div class="p-2 bg-dark rounded">
+            {{ selectedTenant?.ColumnFamilyIndex ?? selectedTenant?.columnFamilyIndex ?? 'N/A' }}
+          </div>
           <div class="form-text">Database column family index for organization</div>
         </div>
         <div class="mb-3">
@@ -339,7 +341,7 @@
     <button (click)="bulkUploadModalVisible = false" cButtonClose [disabled]="loading"></button>
   </c-modal-header>
   <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <div class="mb-3">
       <h6>Upload Instructions</h6>
       <p>Upload a .xlsx or .csv file with the following columns:</p>

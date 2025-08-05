@@ -6,7 +6,7 @@
     </h5>
   </c-card-header>
   <c-card-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     
     <!-- Search and Actions Row -->
     <c-row class="mb-3">
@@ -161,7 +161,7 @@
     <button (click)="createModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <form [formGroup]="exchangeForm" (ngSubmit)="createExchange()" (keydown.enter)="createExchange()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
@@ -227,7 +227,7 @@
     <button (click)="editModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <form [formGroup]="exchangeFormUpdate" (ngSubmit)="updateExchange()" (keydown.enter)="updateExchange()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
@@ -318,7 +318,7 @@
     <button (click)="detailsModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body *ngIf="selectedExchange">
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
 
     
     <div class="row">
@@ -386,7 +386,7 @@
     <button (click)="bulkUploadModalVisible = false" cButtonClose [disabled]="loading"></button>
   </c-modal-header>
   <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert">{{errorMessage}}</c-alert>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <div class="mb-3">
       <h6>Upload Instructions</h6>
       <p>Upload a .xlsx or .csv file with the following columns:</p>
