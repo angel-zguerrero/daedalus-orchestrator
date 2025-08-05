@@ -58,6 +58,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return deleteColumnFamilyCommand.Execute(uow, now)
 	}
 
+	deleteColumnFamilySectorCommand, ok := cmd.(general_command.DeleteColumnFamilySectorCommand)
+	if ok {
+		return deleteColumnFamilySectorCommand.Execute(uow, now)
+	}
+
 	AssertExchangeCommand, ok := cmd.(exchange_command.AssertExchangeCommand)
 	if ok {
 		return AssertExchangeCommand.Execute(uow, now)

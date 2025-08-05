@@ -72,11 +72,11 @@
         </thead>
         <tbody>
           <tr *ngFor="let exchange of exchanges" class="align-middle">
-            <td class="text-truncate" style="max-width: 200px;">{{ exchange.ID }}</td>
-            <td>
+            <td class="text-truncate" style="max-width: 200px;" title="{{ exchange.ID }}">{{ exchange.ID }}</td>
+            <td class="text-truncate" style="max-width: 180px;" title="{{ exchange.Name }}">
               <strong>{{ exchange.Name }}</strong>
             </td>
-            <td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ exchange.Code }}">
               <code>{{ exchange.Code }}</code>
             </td>
             <td>
@@ -84,8 +84,8 @@
                 {{ exchange.Type }}
               </c-badge>
             </td>
-            <td>{{ exchange.VNamespace || '-' }}</td>
-            <td>{{ exchange.CreatedAt | date:'medium' }}</td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ exchange.VNamespace || '-' }}">{{ exchange.VNamespace || '-' }}</td>
+            <td class="text-truncate" style="max-width: 140px;" title="{{ exchange.CreatedAt | date:'full' }}">{{ exchange.CreatedAt | date:'medium' }}</td>
             <td>
               <div class="btn-group" role="group">
                 <button 

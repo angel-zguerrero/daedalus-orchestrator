@@ -12,6 +12,8 @@ import (
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -73,19 +75,40 @@ func (app *Application) StartAssignTenants() {
 					}
 
 					if tenant.Status == models.PendingForDeletion {
-						deleteColumnFamilyCommand := &general_command.DeleteColumnFamilyCommand{
-							Name: tenant.ID,
+
+						deleteColumnFamilyCommandSector := &general_command.DeleteColumnFamilySectorCommand{
+							ColumnFamily:       db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex),
+							ColumnFamilySector: tenant.ID,
 						}
 
 						ccfCmd := general_command.FSM_Command{
 							Now:  utils.GetNowInInt(),
 							Type: general_command.REPOSITORY_COMMAND,
-							CMD:  deleteColumnFamilyCommand,
+							CMD:  deleteColumnFamilyCommandSector,
 						}
 
-						result, err = tenantNode.Write(writeCtx, ccfCmd)
+						_, err = tenantNode.Write(writeCtx, ccfCmd)
 						if err != nil {
-							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete column family")
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							return
+						}
+
+						// Delete from TTL column family
+						deleteColumnFamilyTTLCommandSector := &general_command.DeleteColumnFamilySectorCommand{
+							ColumnFamily:       db.ColumnFamilyTTLPrefix + strconv.Itoa(tenant.ColumnFamilyIndex),
+							ColumnFamilySector: tenant.ID,
+						}
+
+						ccfTTLCmd := general_command.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: general_command.REPOSITORY_COMMAND,
+							CMD:  deleteColumnFamilyTTLCommandSector,
+						}
+
+						_, err = tenantNode.Write(writeCtx, ccfTTLCmd)
+						if err != nil {
+							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							return
 						}
 
 						deleteTenantInMasterCommand := &tenant_command.DeleteTenantInMasterCommand{
@@ -102,6 +125,7 @@ func (app *Application) StartAssignTenants() {
 						if err != nil {
 							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
 						}
+						fmt.Printf("Tenant %s deleted successfully\n", tenant.Code)
 					}
 
 					break

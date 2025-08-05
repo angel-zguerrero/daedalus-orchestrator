@@ -238,42 +238,10 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 		return errors.New("Failed to delete tenant error: " + parsedResult.Error)
 	}
 
-	deleteColumnFamilyCommand := &general_command.DeleteColumnFamilyCommand{
-		Name: tenantID,
-	}
-
-	ccfCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  deleteColumnFamilyCommand,
-	}
-
-	tenantNode := bo.Config.TenantNodesDictionary[tenantID]
-	if tenantNode == nil {
-		return errors.New("Failed to delete tenant error: Tenant node not found")
-	}
-
-	_, err = tenantNode.Write(writeCtx, ccfCmd)
 	if err != nil {
 		return errors.New("Failed to delete tenant error: " + err.Error())
 	}
 
-	deleteTenantInMasterCommand := &tenant_command.DeleteTenantInMasterCommand{
-		TenantId: tenantID,
-	}
-
-	atstCmd = general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  deleteTenantInMasterCommand,
-	}
-
-	_, err = bo.Config.MasterNode.Write(writeCtx, atstCmd)
-	if err != nil {
-		return errors.New("Failed to delete tenant error: " + err.Error())
-	}
-
-	bo.Config.Logger.Info().Str("TenantID", tenantID).Msg("new tenant deleted successfully")
 	return nil
 }
 
