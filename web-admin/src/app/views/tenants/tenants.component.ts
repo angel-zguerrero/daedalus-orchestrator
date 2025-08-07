@@ -244,6 +244,8 @@ export class TenantsComponent implements OnInit {
         return 'secondary';
       case 'suspended':
         return 'warning';
+      case 'pending-for-deletion':
+        return 'warning';
       case 'deleted':
         return 'danger';
       default:
