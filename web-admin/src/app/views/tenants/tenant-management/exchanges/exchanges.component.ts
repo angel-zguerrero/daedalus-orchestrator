@@ -295,7 +295,7 @@ export class ExchangesComponent implements OnInit {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const exchanges = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Type', 'VNamespace'] });
+      const exchanges = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Code', 'Type', 'VNamespace'] });
 
       // Remove header row
       exchanges.shift();
