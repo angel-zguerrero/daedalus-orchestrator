@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/lni/goutils/syncutil"
 	"github.com/rs/zerolog/log"
 )
 
@@ -87,7 +88,12 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 				log.Info().Msg("✅ Master + all tenants ready for consensus.")
 				app.MasterNodeIsReady = true
 
-				app.StartAssignTenants()
+				if app.AssignTenantsStopper != nil {
+					app.AssignTenantsStopper.Stop()
+				}
+				app.AssignTenantsStopper = syncutil.NewStopper()
+				app.AssignTenants()
+				app.StartAssignTenantsWorker(10 * time.Minute)
 				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConsensus) {
 					bootstrapRootUserCmd := &auth_command.BootstrapRootUserCommand{}
 					cmd := general_command.FSM_Command{
@@ -125,6 +131,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			if !allReady && app.MasterNodeIsReady {
 				log.Warn().Msg("⚠️️ One or more nodes are not ready. Marking node as not ready.")
 				app.MasterNodeIsReady = false
+				app.AssignTenantsStopper.Stop()
 				app.CloseRestAPI()
 				app.CloseGrpcAPI()
 			}
@@ -155,7 +162,7 @@ func defineColumnFamilies(app *Application) {
 				CMD:  createColumnFamilyCommand,
 			}
 
-			writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+			writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Hour)
 			defer writeCancel()
 
 			_, err := tenantNode.Write(writeCtx, ccfCmd)

@@ -63,6 +63,7 @@ type Application struct {
 	GrpcAPI                    *grpc_server.GrpcServer
 	NodeReadyWatcherStopper    *syncutil.Stopper
 	NodeClearExpiredTTLStopper *syncutil.Stopper
+	AssignTenantsStopper       *syncutil.Stopper
 	ApiLock                    sync.Mutex
 	GrpcLock                   sync.Mutex
 	NH                         *dragonboatV4.NodeHost
@@ -306,6 +307,14 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ NodeClearExpiredTTLStopper stopped.")
 	}()
 
+	// Stop Assign Tenants Worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.AssignTenantsStopper.Stop()
+		log.Info().Msg("✅ AssignTenantsStopper stopped.")
+	}()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -340,6 +349,7 @@ func NewApplication() *Application {
 		RestAPI:                    nil,
 		NodeReadyWatcherStopper:    syncutil.NewStopper(),
 		NodeClearExpiredTTLStopper: syncutil.NewStopper(),
+		AssignTenantsStopper:       syncutil.NewStopper(),
 		TenantNodes:                make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary:      make(map[string]*dragonboat.RaftNode),
 	}

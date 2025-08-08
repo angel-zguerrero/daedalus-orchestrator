@@ -5,7 +5,6 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
-	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
@@ -19,7 +18,42 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (app *Application) StartAssignTenants() {
+func (app *Application) StartAssignTenantsWorker(interval time.Duration) {
+	app.AssignTenantsStopper.RunWorker(func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if !app.MasterNodeIsReady {
+					log.Warn().Msg("⏳ Assign tenants worker is waiting for the master node to be ready")
+					continue
+				}
+
+				if !app.MasterNodeIsLeader {
+					log.Warn().Msg("⏳ Only leader can assign tenants")
+					continue
+				}
+
+				select {
+				case <-app.AssignTenantsStopper.ShouldStop():
+					log.Info().Msg("🛑 Assign tenants worker received stop signal before starting")
+					return
+				default:
+				}
+
+				app.AssignTenants()
+
+			case <-app.AssignTenantsStopper.ShouldStop():
+				log.Info().Msg("ℹ️  Assign tenants worker stopped gracefully")
+				return
+			}
+		}
+	})
+}
+
+func (app *Application) AssignTenants() {
 	cursor := ""
 	pageSize := 10
 
@@ -36,7 +70,7 @@ func (app *Application) StartAssignTenants() {
 			Now: time.Now().UnixNano(),
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 
 		result, err := app.MasterNode.Read(ctx, *queryCommand)
@@ -59,7 +93,7 @@ func (app *Application) StartAssignTenants() {
 		}
 
 		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
-		writeCtx, writeCancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+		writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Hour)
 		defer writeCancel()
 
 		var assignableTenantCodes []string
