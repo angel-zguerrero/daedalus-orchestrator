@@ -372,3 +372,40 @@ type InvalidCompoundSingle struct {
 func (InvalidCompoundSingle) TableName() string {
 	return "invalid_compound_single"
 }
+
+// DataOnlyEntity for testing data-only fields
+type DataOnlyEntity struct {
+	ID          string            `orm:"primary-key"`
+	Name        string            `orm:"unique"`
+	SearchField string            // Normal searchable field
+	Config      map[string]string `orm:"data-only"`
+	Metadata    map[int]int       `orm:"data-only"`
+	Tags        []string          `orm:"data-only"`
+	Statistics  interface{}       `orm:"data-only"`
+	CreatedAt   time.Time
+}
+
+func (DataOnlyEntity) TableName() string {
+	return "data_only_entities"
+}
+
+// InvalidDataOnlyUniqueEntity for testing validation - data-only fields cannot be unique
+type InvalidDataOnlyUniqueEntity struct {
+	ID     string            `orm:"primary-key"`
+	Config map[string]string `orm:"data-only,unique"`
+}
+
+func (InvalidDataOnlyUniqueEntity) TableName() string {
+	return "invalid_data_only_unique"
+}
+
+// InvalidDataOnlyCompoundEntity for testing validation - data-only fields cannot be in compound constraints
+type InvalidDataOnlyCompoundEntity struct {
+	ID     string            `orm:"primary-key"`
+	Name   string            `orm:"unique-compound:0"`
+	Config map[string]string `orm:"data-only,unique-compound:0"`
+}
+
+func (InvalidDataOnlyCompoundEntity) TableName() string {
+	return "invalid_data_only_compound"
+}

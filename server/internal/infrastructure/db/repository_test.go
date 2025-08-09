@@ -1503,3 +1503,192 @@ func TestRepository_Find_FallbackToNormalQuery(t *testing.T) {
 
 	mockStore.AssertExpectations(t)
 }
+
+// MARK: Data-Only Field Tests
+
+func TestNewRepositoryDataOnlyValidations(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	t.Run("Valid DataOnlyEntity", func(t *testing.T) {
+		repo, err := db.NewRepository[DataOnlyEntity](mockStore, "cf_data_only", testColumnFamilySector, "test_data_only", iGF)
+		require.NoError(t, err)
+		assert.NotNil(t, repo)
+	})
+
+	t.Run("InvalidDataOnlyUniqueEntity - data-only fields cannot be unique", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidDataOnlyUniqueEntity](mockStore, "cf_invalid_unique", testColumnFamilySector, "test_invalid_unique", iGF)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'Config' cannot be both data-only and unique")
+	})
+
+	t.Run("InvalidDataOnlyCompoundEntity - data-only fields cannot be in compound constraints", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidDataOnlyCompoundEntity](mockStore, "cf_invalid_compound", testColumnFamilySector, "test_invalid_compound", iGF)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'Config' cannot be both data-only and part of compound uniqueness")
+	})
+}
+
+func TestDataOnlyFields_CreateAndRead(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{"entity-123"})
+
+	repo, err := db.NewRepository[DataOnlyEntity](mockStore, "cf_data_only", testColumnFamilySector, "test_data_only", iGF)
+	require.NoError(t, err)
+
+	now := time.Now()
+	entity := &DataOnlyEntity{
+		Name:        "test-entity",
+		SearchField: "searchable-value",
+		Config: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+		Metadata: map[int]int{
+			1: 10,
+			2: 20,
+		},
+		Tags:       []string{"tag1", "tag2", "tag3"},
+		Statistics: map[string]interface{}{"count": 42, "rate": 3.14},
+		CreatedAt:  now,
+	}
+
+	// Mock expectations for create operation
+	// Should create indices for Name and SearchField but NOT for data-only fields
+	mockStore.On("Exists", "cf_data_only", testColumnFamilySector, "test_data_only:data_only_entities:data:entity-123", mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf_data_only", testColumnFamilySector, "test_data_only:data_only_entities:idx-u:Name:test-entity", mock.Anything).Return(false, nil)
+
+	// Mock Write for data and indices (should NOT include data-only fields in indices)
+	mockStore.On("Write", mock.AnythingOfType("*db.WriteBatch"), mock.Anything).Return(nil)
+
+	// Create entity
+	id, err := repo.Create(entity, now)
+	require.NoError(t, err)
+	assert.Equal(t, "entity-123", id)
+	assert.Equal(t, "entity-123", entity.ID)
+
+	// Mock expectations for read operation
+	entityData, _ := json.Marshal(entity)
+	mockStore.On("Get", "cf_data_only", testColumnFamilySector, "test_data_only:data_only_entities:data:entity-123", mock.Anything).Return(entityData, nil)
+
+	// Read entity back using FindByField with ID
+	readEntity, err := repo.FindByField("ID", "entity-123", now)
+	require.NoError(t, err)
+	assert.Equal(t, entity.ID, readEntity.ID)
+	assert.Equal(t, entity.Name, readEntity.Name)
+	assert.Equal(t, entity.SearchField, readEntity.SearchField)
+	assert.Equal(t, entity.Config, readEntity.Config)
+	assert.Equal(t, entity.Metadata, readEntity.Metadata)
+	assert.Equal(t, entity.Tags, readEntity.Tags)
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestDataOnlyFields_QueryRestrictions(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	repo, err := db.NewRepository[DataOnlyEntity](mockStore, "cf_data_only", testColumnFamilySector, "test_data_only", iGF)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	t.Run("Query on normal field should work", func(t *testing.T) {
+		// Mock for searchable field query
+		mockStore.On("SearchByPatternPaginatedKV", "cf_data_only", testColumnFamilySector, "test_data_only:data_only_entities:idx:SearchField:searchable-value:*", "", 10, mock.Anything).
+			Return([]db.KeyValuePair{{Value: []byte("entity-123")}}, "", nil)
+
+		entityData, _ := json.Marshal(&DataOnlyEntity{ID: "entity-123", SearchField: "searchable-value"})
+		mockStore.On("Get", "cf_data_only", testColumnFamilySector, "test_data_only:data_only_entities:data:entity-123", mock.Anything).Return(entityData, nil)
+
+		result, err := repo.Find("SearchField='searchable-value'", 10, "", now)
+		require.NoError(t, err)
+		assert.Len(t, result.Entities, 1)
+	})
+
+	t.Run("Query on data-only field should fail", func(t *testing.T) {
+		_, err := repo.Find("Config='value1'", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Config' is marked as data-only and cannot be used in queries")
+	})
+
+	t.Run("Query on data-only Metadata field should fail", func(t *testing.T) {
+		_, err := repo.Find("Metadata=10", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Metadata' is marked as data-only and cannot be used in queries")
+	})
+
+	t.Run("Query on data-only Tags field should fail", func(t *testing.T) {
+		_, err := repo.Find("Tags='tag1'", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Tags' is marked as data-only and cannot be used in queries")
+	})
+
+	t.Run("Query on data-only Statistics field should fail", func(t *testing.T) {
+		_, err := repo.Find("Statistics=42", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Statistics' is marked as data-only and cannot be used in queries")
+	})
+
+	mockStore.AssertExpectations(t)
+}
+
+func TestDataOnlyFields_UpdatePreservesData(t *testing.T) {
+	mockStore := new(MockKVStore)
+	iGF := NewTestIDGeneratorFactory([]string{})
+
+	repo, err := db.NewRepository[DataOnlyEntity](mockStore, "cf_data_only", testColumnFamilySector, "test_data_only", iGF)
+	require.NoError(t, err)
+
+	now := time.Now()
+	originalEntity := &DataOnlyEntity{
+		ID:          "entity-123",
+		Name:        "original-name",
+		SearchField: "original-search",
+		Config: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+		Metadata: map[int]int{
+			1: 10,
+			2: 20,
+		},
+		Tags:       []string{"tag1", "tag2"},
+		Statistics: map[string]interface{}{"count": 42},
+		CreatedAt:  now,
+	}
+
+	updatedEntity := &DataOnlyEntity{
+		ID:          "entity-123",
+		Name:        "updated-name",
+		SearchField: "updated-search",
+		Config: map[string]string{
+			"key1": "updated-value1",
+			"key3": "value3",
+		},
+		Metadata: map[int]int{
+			1: 15,
+			3: 30,
+		},
+		Tags:       []string{"tag1", "tag3", "tag4"},
+		Statistics: map[string]interface{}{"count": 84, "rate": 2.71},
+		CreatedAt:  now,
+	}
+
+	// Mock expectations for update operation
+	originalData, _ := json.Marshal(originalEntity)
+	mockStore.On("Get", "cf_data_only", testColumnFamilySector, "test_data_only:data_only_entities:data:entity-123", mock.Anything).Return(originalData, nil)
+
+	// Mock unique constraint check for updated name (index existence check)
+	mockStore.On("Get", "cf_data_only", testColumnFamilySector, "test_data_only:data_only_entities:idx-u:Name:updated-name", mock.Anything).Return(nil, nil)
+
+	// Mock Write for update (should update indices for searchable fields but not data-only fields)
+	mockStore.On("Write", mock.AnythingOfType("*db.WriteBatch"), mock.Anything).Return(nil)
+
+	// Update entity
+	updated, err := repo.Update(updatedEntity, now)
+	require.NoError(t, err)
+	assert.True(t, updated)
+
+	mockStore.AssertExpectations(t)
+}

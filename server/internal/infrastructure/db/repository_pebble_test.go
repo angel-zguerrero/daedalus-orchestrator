@@ -2510,3 +2510,179 @@ func TestRepository_UniqueCompound_Pebble_Update_ConstraintViolation(t *testing.
 
 	t.Logf("Compound constraint violation test completed successfully")
 }
+
+// MARK: Data-Only Field Tests for Pebble
+
+func TestDataOnlyFields_PebbleValidations(t *testing.T) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, nil)
+
+	t.Run("Valid DataOnlyEntity", func(t *testing.T) {
+		repo, err := db.NewRepository[DataOnlyEntity](store, TestFC, testColumnFamilySector, "test_data_only", &db.DefaultIDGeneratorFactory{})
+		require.NoError(t, err)
+		assert.NotNil(t, repo)
+	})
+
+	t.Run("InvalidDataOnlyUniqueEntity - data-only fields cannot be unique", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidDataOnlyUniqueEntity](store, TestFC, testColumnFamilySector, "test_invalid_unique", &db.DefaultIDGeneratorFactory{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'Config' cannot be both data-only and unique")
+	})
+
+	t.Run("InvalidDataOnlyCompoundEntity - data-only fields cannot be in compound constraints", func(t *testing.T) {
+		_, err := db.NewRepository[InvalidDataOnlyCompoundEntity](store, TestFC, testColumnFamilySector, "test_invalid_compound", &db.DefaultIDGeneratorFactory{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field 'Config' cannot be both data-only and part of compound uniqueness")
+	})
+}
+
+func TestDataOnlyFields_PebbleCreateAndRead(t *testing.T) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, nil)
+
+	repo, err := db.NewRepository[DataOnlyEntity](store, TestFC, testColumnFamilySector, "test_data_only", &db.DefaultIDGeneratorFactory{})
+	require.NoError(t, err)
+
+	now := time.Now()
+	entity := &DataOnlyEntity{
+		Name:        "test-entity",
+		SearchField: "searchable-value",
+		Config: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+		Metadata: map[int]int{
+			1: 10,
+			2: 20,
+		},
+		Tags:       []string{"tag1", "tag2", "tag3"},
+		Statistics: map[string]interface{}{"count": 42, "rate": 3.14},
+		CreatedAt:  now,
+	}
+
+	// Create entity
+	id, err := repo.Create(entity, now)
+	require.NoError(t, err)
+	assert.NotEmpty(t, id)
+	assert.Equal(t, id, entity.ID)
+
+	// Read entity back using FindByField with ID
+	readEntity, err := repo.FindByField("ID", id, now)
+	require.NoError(t, err)
+	assert.Equal(t, entity.ID, readEntity.ID)
+	assert.Equal(t, entity.Name, readEntity.Name)
+	assert.Equal(t, entity.SearchField, readEntity.SearchField)
+	assert.Equal(t, entity.Config, readEntity.Config)
+	assert.Equal(t, entity.Metadata, readEntity.Metadata)
+	assert.Equal(t, entity.Tags, readEntity.Tags)
+
+	// Verify we can search by normal fields
+	result, err := repo.Find("Name='test-entity'", 10, "", now)
+	require.NoError(t, err)
+	assert.Len(t, result.Entities, 1)
+	assert.Equal(t, entity.ID, result.Entities[0].ID)
+
+	// Verify we can search by SearchField
+	result2, err := repo.Find("SearchField='searchable-value'", 10, "", now)
+	require.NoError(t, err)
+	assert.Len(t, result2.Entities, 1)
+	assert.Equal(t, entity.ID, result2.Entities[0].ID)
+}
+
+func TestDataOnlyFields_PebbleQueryRestrictions(t *testing.T) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, nil)
+
+	repo, err := db.NewRepository[DataOnlyEntity](store, TestFC, testColumnFamilySector, "test_data_only", &db.DefaultIDGeneratorFactory{})
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	t.Run("Query on data-only Config field should fail", func(t *testing.T) {
+		_, err := repo.Find("Config='value1'", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Config' is marked as data-only and cannot be used in queries")
+	})
+
+	t.Run("Query on data-only Metadata field should fail", func(t *testing.T) {
+		_, err := repo.Find("Metadata=10", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Metadata' is marked as data-only and cannot be used in queries")
+	})
+
+	t.Run("Query on data-only Tags field should fail", func(t *testing.T) {
+		_, err := repo.Find("Tags='tag1'", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Tags' is marked as data-only and cannot be used in queries")
+	})
+
+	t.Run("Query on data-only Statistics field should fail", func(t *testing.T) {
+		_, err := repo.Find("Statistics=42", 10, "", now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Field 'Statistics' is marked as data-only and cannot be used in queries")
+	})
+}
+
+func TestDataOnlyFields_PebbleUpdate(t *testing.T) {
+	store := newTestPebbleStore(t, []string{DefaultFC, TestFC}, nil)
+
+	repo, err := db.NewRepository[DataOnlyEntity](store, TestFC, testColumnFamilySector, "test_data_only", &db.DefaultIDGeneratorFactory{})
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Create initial entity
+	originalEntity := &DataOnlyEntity{
+		Name:        "original-name",
+		SearchField: "original-search",
+		Config: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+		Metadata: map[int]int{
+			1: 10,
+			2: 20,
+		},
+		Tags:       []string{"tag1", "tag2"},
+		Statistics: map[string]interface{}{"count": 42},
+		CreatedAt:  now,
+	}
+
+	id, err := repo.Create(originalEntity, now)
+	require.NoError(t, err)
+
+	// Update entity with new data-only field values
+	updatedEntity := &DataOnlyEntity{
+		ID:          id,
+		Name:        "updated-name",
+		SearchField: "updated-search",
+		Config: map[string]string{
+			"key1": "updated-value1",
+			"key3": "value3",
+		},
+		Metadata: map[int]int{
+			1: 15,
+			3: 30,
+		},
+		Tags:       []string{"tag1", "tag3", "tag4"},
+		Statistics: map[string]interface{}{"count": 84, "rate": 2.71},
+		CreatedAt:  now,
+	}
+
+	// Update entity
+	updated, err := repo.Update(updatedEntity, now)
+	require.NoError(t, err)
+	assert.True(t, updated)
+
+	// Verify the update was successful
+	readEntity, err := repo.FindByField("ID", id, now)
+	require.NoError(t, err)
+	assert.Equal(t, updatedEntity.Name, readEntity.Name)
+	assert.Equal(t, updatedEntity.SearchField, readEntity.SearchField)
+	assert.Equal(t, updatedEntity.Config, readEntity.Config)
+	assert.Equal(t, updatedEntity.Metadata, readEntity.Metadata)
+	assert.Equal(t, updatedEntity.Tags, readEntity.Tags)
+
+	// Verify we can still search by the updated searchable fields
+	result, err := repo.Find("Name='updated-name'", 10, "", now)
+	require.NoError(t, err)
+	assert.Len(t, result.Entities, 1)
+	assert.Equal(t, id, result.Entities[0].ID)
+}

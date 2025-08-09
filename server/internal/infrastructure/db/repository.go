@@ -55,6 +55,8 @@ type FieldDefinition struct {
 	UniqueCompoundIndex int
 	// IsUniqueCompound indicates whether this field is part of a compound uniqueness constraint.
 	IsUniqueCompound bool
+	// DataOnly indicates whether this field is for data storage only and should not be indexed or searchable.
+	DataOnly bool
 }
 
 // TableDefinition describes the schema of a table in the key-value store.
@@ -224,6 +226,9 @@ func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) 
 	}
 	if def.TTL {
 		return nil, fmt.Errorf("TTL columns are not supported in query operations")
+	}
+	if def.DataOnly {
+		return nil, fmt.Errorf("Field '%s' is marked as data-only and cannot be used in queries", field)
 	}
 	operator := strings.ToUpper(strings.TrimSpace(parts[2]))
 	value := strings.TrimSpace(strings.Trim(parts[3], "'"))
@@ -723,6 +728,9 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 
 		for _, def := range r.definition.Fields {
+			if def.DataOnly { // Skip data-only fields from all indexing operations
+				continue
+			}
 			if def.Unique { // This handles non-primary unique fields
 				shouldSkipUniqueness := false
 				if def.HasConditionalUniqueness {
@@ -847,7 +855,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 
 		for _, def := range r.definition.Fields {
-			if def.TTL { // TTL field itself is not indexed like other fields.
+			if def.TTL || def.DataOnly { // TTL field and data-only fields are not indexed like other fields.
 				continue
 			}
 			// Pass entityPtrVal (which is *T) to getNestedFieldValue
@@ -1055,7 +1063,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		id := fmt.Sprintf("%v", idFieldVal.Interface())
 
 		for _, def := range r.definition.Fields {
-			if def.Primary || !def.Unique {
+			if def.Primary || !def.Unique || def.DataOnly {
 				continue
 			}
 
@@ -1197,7 +1205,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		currentEntityDataVal := currentEntityReflectVal.Elem() // For setting fields if changed
 
 		for _, def := range r.definition.Fields {
-			if def.Primary || def.TTL { // Primary key and TTL managed separately
+			if def.Primary || def.TTL || def.DataOnly { // Primary key, TTL and data-only fields managed separately
 				continue
 			}
 
@@ -1600,6 +1608,18 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySecto
 			}
 			hasTTL = true
 		}
+		// Validate data-only field constraints
+		if def.DataOnly {
+			if def.Unique {
+				return nil, fmt.Errorf("field '%s' cannot be both data-only and unique in struct %s", def.Name, t.Name())
+			}
+			if def.IsUniqueCompound {
+				return nil, fmt.Errorf("field '%s' cannot be both data-only and part of compound uniqueness in struct %s", def.Name, t.Name())
+			}
+			if def.Primary {
+				return nil, fmt.Errorf("field '%s' cannot be both data-only and primary key in struct %s", def.Name, t.Name())
+			}
+		}
 	}
 
 	if !hasPrimaryKey {
@@ -1710,6 +1730,7 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 		Type:                field.Type.Name(),
 		UniqueCompoundIndex: -1, // Default: not part of compound uniqueness
 		IsUniqueCompound:    false,
+		DataOnly:            false, // Default: field is searchable
 	}
 
 	for _, rule := range strings.Split(tag, ",") {
@@ -1773,6 +1794,8 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 				return FieldDefinition{}, fmt.Errorf("max-length must be positive for field '%s': %d", fullName, max)
 			}
 			def.MaxLength = &max
+		case rule == "data-only":
+			def.DataOnly = true
 		case rule == "":
 			// ignore empty rule
 		default:
