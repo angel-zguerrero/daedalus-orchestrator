@@ -6,8 +6,6 @@ type QueueType string
 
 const (
 	StandardQueue   QueueType = "standard"
-	FairQueue       QueueType = "fair"
-	PriorityQueue   QueueType = "priority"
 	DelayedQueue    QueueType = "delayed"
 	DeadLetterQueue QueueType = "dead-letter"
 )
