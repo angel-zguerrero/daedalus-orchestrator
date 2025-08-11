@@ -6,6 +6,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
 	"time"
 
@@ -34,6 +35,16 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	paginateExchangesCommand, ok := cmd.(exchange_command.PaginateExchangesCommand)
 	if ok {
 		return paginateExchangesCommand.Execute(uow, now)
+	}
+
+	findQueueCommand, ok := cmd.(queue_command.FindQueueCommand)
+	if ok {
+		return findQueueCommand.Execute(uow, now)
+	}
+
+	paginateQueuesCommand, ok := cmd.(queue_command.PaginateQueuesCommand)
+	if ok {
+		return paginateQueuesCommand.Execute(uow, now)
 	}
 
 	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
@@ -71,6 +82,16 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	deleteExchangeCommand, ok := cmd.(exchange_command.DeleteExchangeCommand)
 	if ok {
 		return deleteExchangeCommand.Execute(uow, now)
+	}
+
+	AssertQueueCommand, ok := cmd.(queue_command.AssertQueueCommand)
+	if ok {
+		return AssertQueueCommand.Execute(uow, now)
+	}
+
+	deleteQueueCommand, ok := cmd.(queue_command.DeleteQueueCommand)
+	if ok {
+		return deleteQueueCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

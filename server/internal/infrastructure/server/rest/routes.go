@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
+	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
 	"time"
@@ -17,6 +18,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	metricsController := metrics.NewMetricsController(s.Config)
 	tenantController := tenant.NewTenantController(s.Config)
 	exchangeController := exchange.NewExchangeController(s.Config)
+	queueController := queue.NewQueueController(s.Config)
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 
 	restAPIGroup := engine.Group("/rest-api")
@@ -43,6 +45,12 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.GET("/:id/exchange", exchangeController.GetExchangesHandler)
 				tenantsGroup.GET("/:id/exchange/:exchangeId", exchangeController.GetExchangeHandler)
 				tenantsGroup.DELETE("/:id/exchange/:exchangeId", exchangeController.DeleteExchangeHandler)
+
+				tenantsGroup.POST("/:id/queue", queueController.CreateQueueHandler)
+				tenantsGroup.POST("/:id/queue/bulk", queueController.BulkCreateQueueHandler)
+				tenantsGroup.GET("/:id/queue", queueController.GetQueuesHandler)
+				tenantsGroup.GET("/:id/queue/:queueId", queueController.GetQueueHandler)
+				tenantsGroup.DELETE("/:id/queue/:queueId", queueController.DeleteQueueHandler)
 
 				tenantsGroup.GET("/:id/vnamespaces", vnamespaceController.GetVNamespacesHandler)
 			}

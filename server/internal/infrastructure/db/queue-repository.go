@@ -8,41 +8,41 @@ import (
 	models "deadalus-orch/shared/models"
 )
 
-type ExchangeRepository struct {
-	*Repository[models.Exchange]
+type QueueRepository struct {
+	*Repository[models.Queue]
 }
 
-func NewExchangeRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs string) (*ExchangeRepository, error) {
+func NewQueueRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs string) (*QueueRepository, error) {
 	if uow == nil {
 		return nil, fmt.Errorf("UnitOfWork is required")
 	}
-	repo, err := GetRepository[models.Exchange](uow, cf, cfs, "admin_schema", factory)
+	repo, err := GetRepository[models.Queue](uow, cf, cfs, "admin_schema", factory)
 	if err != nil {
 		return nil, err
 	}
-	return &ExchangeRepository{Repository: repo}, nil
+	return &QueueRepository{Repository: repo}, nil
 }
 
-func (r *ExchangeRepository) CreateExchange(input *models.Exchange, now time.Time) (string, error) {
+func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (string, error) {
 	input.CreatedAt = now
 	input.UpdatedAt = now
 	return r.Create(input, now)
 }
 
-func (r *ExchangeRepository) UpdateExchange(input *models.Exchange, now time.Time) (bool, error) {
+func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool, error) {
 	input.UpdatedAt = now
 	return r.Update(input, now)
 }
 
-func (r *ExchangeRepository) GetExchangeByCode(code string, now time.Time) (*models.Exchange, error) {
+func (r *QueueRepository) GetQueueByCode(code string, now time.Time) (*models.Queue, error) {
 	return r.FindByField("Code", code, now)
 }
 
-func (r *ExchangeRepository) GetExchangeById(id string, now time.Time) (*models.Exchange, error) {
+func (r *QueueRepository) GetQueueById(id string, now time.Time) (*models.Queue, error) {
 	return r.FindByField("ID", id, now)
 }
 
-func (r *ExchangeRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Exchange], error) {
+func (r *QueueRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
 	var query string
 
 	if q == "" && vNamespace == "" {
@@ -71,6 +71,6 @@ func (r *ExchangeRepository) Paginate(q string, pageSize int, cursor string, vNa
 	return r.Find(query, pageSize, cursor, now)
 }
 
-func (r *ExchangeRepository) DeleteExchangeById(id string, now time.Time) (bool, error) {
+func (r *QueueRepository) DeleteQueueById(id string, now time.Time) (bool, error) {
 	return r.Delete(id, now)
 }
