@@ -28,6 +28,10 @@
               <svg cIcon name="cil-share" class="me-2"></svg>
               Exchanges
             </button>
+            <button cTab itemKey="queues">
+              <svg cIcon name="cil-list" class="me-2"></svg>
+              Queues
+            </button>
           </c-tabs-list>
           
           <c-tabs-content>
@@ -56,6 +60,13 @@
             <c-tab-panel itemKey="exchanges" class="p-3">
               <ng-container *ngIf="activeTab === 'exchanges'">
                 <app-exchanges [tenantId]="tenantId"></app-exchanges>
+              </ng-container>
+            </c-tab-panel>
+
+            <!-- Queues Tab -->
+            <c-tab-panel itemKey="queues" class="p-3">
+              <ng-container *ngIf="activeTab === 'queues'">
+                <app-queues [tenantId]="tenantId"></app-queues>
               </ng-container>
             </c-tab-panel>
           </c-tabs-content>

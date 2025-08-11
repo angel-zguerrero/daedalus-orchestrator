@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package queue;
+
+option go_package = "pb/queue;queue";
+
+service QueueService {
+  rpc CreateQueue (CreateQueueRequest) returns (CreateQueueResponse);
+  rpc BulkCreateQueue (BulkCreateQueueRequest) returns (BulkCreateQueueResponse);
+  rpc GetQueue (GetQueueRequest) returns (GetQueueResponse);
+  rpc GetQueues (GetQueuesRequest) returns (GetQueuesResponse);
+  rpc DeleteQueue (DeleteQueueRequest) returns (DeleteQueueResponse);
+}
+
+message CreateQueueRequest {
+  string tenantId = 1;
+  string code = 2;
+  string name = 3;
+  string type = 4;
+  string state = 5;
+  string vnamespace = 6;
+}
+
+message CreateQueueResponse {
+  string message = 1;
+  Queue result = 2;
+}
+
+message BulkCreateQueueRequest {
+  string tenantId = 1;
+  repeated CreateQueueItem queues = 2;
+}
+
+message CreateQueueItem {
+  string code = 1;
+  string name = 2;
+  string type = 3;
+  string state = 4;
+  string vnamespace = 5;
+}
+
+message BulkCreateQueueResponse {
+  string message = 1;
+  repeated Queue result = 2;
+}
+
+message GetQueueRequest {
+  string tenantId = 1;
+  string queueId = 2;
+}
+
+message GetQueueResponse {
+  string message = 1;
+  Queue result = 2;
+}
+
+message GetQueuesRequest {
+  string tenantId = 1;
+  string q = 2;
+  string cursor = 3;
+  int32 pageSize = 4;
+  string vnamespace = 5;
+}
+
+message Queue {
+  string ID = 1;
+  string Code = 2;
+  string Name = 3;
+  string Type = 4;
+  string State = 5;
+  string VNamespace = 6;
+  string CreatedAt = 7;
+  string UpdatedAt = 8;
+}
+
+message QueueFindResult {
+  repeated Queue Entities = 1;
+  string Cursor = 2;
+}
+
+message GetQueuesResponse {
+  string message = 1;
+  QueueFindResult result = 2;
+}
+
+message DeleteQueueRequest {
+  string tenantId = 1;
+  string queueId = 2;
+}
+
+message DeleteQueueResponse {
+  string message = 1;
+}
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/queue.proto

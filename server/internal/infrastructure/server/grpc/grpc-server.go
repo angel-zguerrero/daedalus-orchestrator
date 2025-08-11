@@ -15,7 +15,9 @@ import (
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth"         // Import new auth pb
 	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange" // Import new exchange pb
+	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"       // Import new queue pb
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/queue" // Import new queue service
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
 	"deadalus-orch/server/internal/pkg/config"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -58,6 +60,10 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	// Register new ExchangeService
 	exchangeSvc := exchange.NewExchangeService(cfg)
 	pbExchange.RegisterExchangeServiceServer(server, exchangeSvc)
+
+	// Register new QueueService
+	queueSvc := queue.NewQueueService(cfg)
+	pbQueue.RegisterQueueServiceServer(server, queueSvc)
 
 	return &GrpcServer{
 		Config:     cfg,

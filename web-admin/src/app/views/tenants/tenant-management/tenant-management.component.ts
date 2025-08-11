@@ -13,6 +13,7 @@ import {
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { ExchangesComponent } from './exchanges/exchanges.component';
+import { QueuesComponent } from './queues/queues.component';
 
 @Component({
   selector: 'app-tenant-management',
@@ -30,7 +31,8 @@ import { ExchangesComponent } from './exchanges/exchanges.component';
     TabsContentComponent,
     TabsListComponent,
     IconDirective,
-    ExchangesComponent
+    ExchangesComponent,
+    QueuesComponent
   ]
 })
 export class TenantManagementComponent implements OnInit {

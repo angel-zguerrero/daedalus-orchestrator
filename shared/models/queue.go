@@ -36,3 +36,7 @@ type Queue struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+func (Queue) TableName() string {
+	return "queues"
+}
