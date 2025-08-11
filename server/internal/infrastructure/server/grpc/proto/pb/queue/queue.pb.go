@@ -22,15 +22,18 @@ const (
 )
 
 type CreateQueueRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	State         string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TenantId        string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	Code            string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name            string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type            string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	State           string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace      string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	TtlQueue        int32                  `protobuf:"varint,7,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
+	AllowDuplicated bool                   `protobuf:"varint,8,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts     int32                  `protobuf:"varint,9,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateQueueRequest) Reset() {
@@ -103,6 +106,27 @@ func (x *CreateQueueRequest) GetVnamespace() string {
 		return x.Vnamespace
 	}
 	return ""
+}
+
+func (x *CreateQueueRequest) GetTtlQueue() int32 {
+	if x != nil {
+		return x.TtlQueue
+	}
+	return 0
+}
+
+func (x *CreateQueueRequest) GetAllowDuplicated() bool {
+	if x != nil {
+		return x.AllowDuplicated
+	}
+	return false
+}
+
+func (x *CreateQueueRequest) GetMaxAttempts() int32 {
+	if x != nil {
+		return x.MaxAttempts
+	}
+	return 0
 }
 
 type CreateQueueResponse struct {
@@ -210,14 +234,17 @@ func (x *BulkCreateQueueRequest) GetQueues() []*CreateQueueItem {
 }
 
 type CreateQueueItem struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Code            string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Type            string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	State           string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace      string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	TtlQueue        int32                  `protobuf:"varint,6,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
+	AllowDuplicated bool                   `protobuf:"varint,7,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts     int32                  `protobuf:"varint,8,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateQueueItem) Reset() {
@@ -283,6 +310,27 @@ func (x *CreateQueueItem) GetVnamespace() string {
 		return x.Vnamespace
 	}
 	return ""
+}
+
+func (x *CreateQueueItem) GetTtlQueue() int32 {
+	if x != nil {
+		return x.TtlQueue
+	}
+	return 0
+}
+
+func (x *CreateQueueItem) GetAllowDuplicated() bool {
+	if x != nil {
+		return x.AllowDuplicated
+	}
+	return false
+}
+
+func (x *CreateQueueItem) GetMaxAttempts() int32 {
+	if x != nil {
+		return x.MaxAttempts
+	}
+	return 0
 }
 
 type BulkCreateQueueResponse struct {
@@ -518,17 +566,20 @@ func (x *GetQueuesRequest) GetVnamespace() string {
 }
 
 type Queue struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Code          string                 `protobuf:"bytes,2,opt,name=Code,proto3" json:"Code,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=Name,proto3" json:"Name,omitempty"`
-	Type          string                 `protobuf:"bytes,4,opt,name=Type,proto3" json:"Type,omitempty"`
-	State         string                 `protobuf:"bytes,5,opt,name=State,proto3" json:"State,omitempty"`
-	VNamespace    string                 `protobuf:"bytes,6,opt,name=VNamespace,proto3" json:"VNamespace,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,7,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,8,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ID              string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Code            string                 `protobuf:"bytes,2,opt,name=Code,proto3" json:"Code,omitempty"`
+	Name            string                 `protobuf:"bytes,3,opt,name=Name,proto3" json:"Name,omitempty"`
+	Type            string                 `protobuf:"bytes,4,opt,name=Type,proto3" json:"Type,omitempty"`
+	State           string                 `protobuf:"bytes,5,opt,name=State,proto3" json:"State,omitempty"`
+	VNamespace      string                 `protobuf:"bytes,6,opt,name=VNamespace,proto3" json:"VNamespace,omitempty"`
+	CreatedAt       string                 `protobuf:"bytes,7,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt       string                 `protobuf:"bytes,8,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	TTLQueue        int32                  `protobuf:"varint,9,opt,name=TTLQueue,proto3" json:"TTLQueue,omitempty"`
+	AllowDuplicated bool                   `protobuf:"varint,10,opt,name=AllowDuplicated,proto3" json:"AllowDuplicated,omitempty"`
+	MaxAttempts     int32                  `protobuf:"varint,11,opt,name=MaxAttempts,proto3" json:"MaxAttempts,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Queue) Reset() {
@@ -615,6 +666,27 @@ func (x *Queue) GetUpdatedAt() string {
 		return x.UpdatedAt
 	}
 	return ""
+}
+
+func (x *Queue) GetTTLQueue() int32 {
+	if x != nil {
+		return x.TTLQueue
+	}
+	return 0
+}
+
+func (x *Queue) GetAllowDuplicated() bool {
+	if x != nil {
+		return x.AllowDuplicated
+	}
+	return false
+}
+
+func (x *Queue) GetMaxAttempts() int32 {
+	if x != nil {
+		return x.MaxAttempts
+	}
+	return 0
 }
 
 type QueueFindResult struct {
@@ -821,7 +893,7 @@ var File_internal_infrastructure_server_grpc_proto_definitions_queue_proto proto
 
 const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc = "" +
 	"\n" +
-	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xa2\x01\n" +
+	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\x8a\x02\n" +
 	"\x12CreateQueueRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -830,13 +902,16 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x05state\x18\x05 \x01(\tR\x05state\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x06 \x01(\tR\n" +
-	"vnamespace\"U\n" +
+	"vnamespace\x12\x1a\n" +
+	"\bttlQueue\x18\a \x01(\x05R\bttlQueue\x12(\n" +
+	"\x0fallowDuplicated\x18\b \x01(\bR\x0fallowDuplicated\x12 \n" +
+	"\vmaxAttempts\x18\t \x01(\x05R\vmaxAttempts\"U\n" +
 	"\x13CreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
 	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"d\n" +
 	"\x16BulkCreateQueueRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\x83\x01\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xeb\x01\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -844,7 +919,10 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x05state\x18\x04 \x01(\tR\x05state\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"Y\n" +
+	"vnamespace\x12\x1a\n" +
+	"\bttlQueue\x18\x06 \x01(\x05R\bttlQueue\x12(\n" +
+	"\x0fallowDuplicated\x18\a \x01(\bR\x0fallowDuplicated\x12 \n" +
+	"\vmaxAttempts\x18\b \x01(\x05R\vmaxAttempts\"Y\n" +
 	"\x17BulkCreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
 	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"G\n" +
@@ -861,7 +939,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"\xc5\x01\n" +
+	"vnamespace\"\xad\x02\n" +
 	"\x05Queue\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
 	"\x04Code\x18\x02 \x01(\tR\x04Code\x12\x12\n" +
@@ -872,7 +950,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"VNamespace\x18\x06 \x01(\tR\n" +
 	"VNamespace\x12\x1c\n" +
 	"\tCreatedAt\x18\a \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\b \x01(\tR\tUpdatedAt\"S\n" +
+	"\tUpdatedAt\x18\b \x01(\tR\tUpdatedAt\x12\x1a\n" +
+	"\bTTLQueue\x18\t \x01(\x05R\bTTLQueue\x12(\n" +
+	"\x0fAllowDuplicated\x18\n" +
+	" \x01(\bR\x0fAllowDuplicated\x12 \n" +
+	"\vMaxAttempts\x18\v \x01(\x05R\vMaxAttempts\"S\n" +
 	"\x0fQueueFindResult\x12(\n" +
 	"\bEntities\x18\x01 \x03(\v2\f.queue.QueueR\bEntities\x12\x16\n" +
 	"\x06Cursor\x18\x02 \x01(\tR\x06Cursor\"]\n" +

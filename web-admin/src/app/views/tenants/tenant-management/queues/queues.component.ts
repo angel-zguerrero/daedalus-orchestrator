@@ -103,7 +103,10 @@ export class QueuesComponent implements OnInit {
       name: ['', Validators.required],
       code: ['', Validators.required],
       type: ['standard', Validators.required],
-      vnamespace: this.vnamespaceCtrl
+      vnamespace: this.vnamespaceCtrl,
+      ttlQueue: [0, [Validators.min(0)]],
+      allowDuplicated: [true],
+      maxAttempts: [1, [Validators.required, Validators.min(1)]]
     });
     this.queueFormUpdate = this.fb.group({
       name: ['', Validators.required]
@@ -187,7 +190,12 @@ export class QueuesComponent implements OnInit {
   openCreateModal(): void {
     this.createModalVisible = true;
     this.queueForm.reset();
-    this.queueForm.patchValue({ type: 'standard' });
+    this.queueForm.patchValue({ 
+      type: 'standard',
+      ttlQueue: 0,
+      allowDuplicated: true,
+      maxAttempts: 1
+    });
     this.showAlert = false;
   }
 

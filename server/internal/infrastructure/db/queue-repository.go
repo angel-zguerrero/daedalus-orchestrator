@@ -24,12 +24,37 @@ func NewQueueRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs str
 }
 
 func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (string, error) {
+	// Validate TTLQueue
+	if input.TTLQueue < 0 {
+		return "", fmt.Errorf("TTLQueue cannot be negative, got: %d", input.TTLQueue)
+	}
+
+	// Validate MaxAttempts
+	if input.MaxAttempts <= 0 {
+		return "", fmt.Errorf("MaxAttempts must be greater than 0, got: %d", input.MaxAttempts)
+	}
+
+	// Set default values if not provided
+	if input.MaxAttempts == 0 {
+		input.MaxAttempts = 1
+	}
+
 	input.CreatedAt = now
 	input.UpdatedAt = now
 	return r.Create(input, now)
 }
 
 func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool, error) {
+	// Validate TTLQueue
+	if input.TTLQueue < 0 {
+		return false, fmt.Errorf("TTLQueue cannot be negative, got: %d", input.TTLQueue)
+	}
+
+	// Validate MaxAttempts
+	if input.MaxAttempts <= 0 {
+		return false, fmt.Errorf("MaxAttempts must be greater than 0, got: %d", input.MaxAttempts)
+	}
+
 	input.UpdatedAt = now
 	return r.Update(input, now)
 }

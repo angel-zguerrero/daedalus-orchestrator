@@ -27,11 +27,14 @@ func NewQueueController(Config *common.ServerConfing) *QueueController {
 }
 
 type createQueueRequest struct {
-	Code       string `json:"code" binding:"required"`
-	Name       string `json:"name" binding:"required"`
-	Type       string `json:"type" binding:"required"`
-	State      string `json:"state"`
-	VNamespace string `json:"vnamespace" binding:"required"`
+	Code            string `json:"code" binding:"required"`
+	Name            string `json:"name" binding:"required"`
+	Type            string `json:"type" binding:"required"`
+	State           string `json:"state"`
+	VNamespace      string `json:"vnamespace" binding:"required"`
+	TTLQueue        int    `json:"ttlQueue"`
+	AllowDuplicated bool   `json:"allowDuplicated"`
+	MaxAttempts     int    `json:"maxAttempts"`
 }
 
 type createBulkQueueRequest struct {
@@ -59,7 +62,24 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		req.State = string(models.QueueActive)
 	}
 
-	queue, err := ctrl.QueueBO.CreateQueue(c.Request.Context(), req.Code, req.VNamespace, req.Name, models.QueueType(req.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	// Set default values for new properties
+	if req.MaxAttempts == 0 {
+		req.MaxAttempts = 1
+	}
+
+	// Create queue with all properties
+	queue := &models.Queue{
+		Code:            req.Code,
+		VNamespace:      req.VNamespace,
+		Name:            req.Name,
+		Type:            models.QueueType(req.Type),
+		State:           models.QueueState(req.State),
+		TTLQueue:        req.TTLQueue,
+		AllowDuplicated: req.AllowDuplicated,
+		MaxAttempts:     req.MaxAttempts,
+	}
+
+	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), []*models.Queue{queue}, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -67,7 +87,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Queue was asserted",
-		"result":  queue,
+		"result":  queuesResult[0],
 	})
 }
 
@@ -94,12 +114,19 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 		if t.State == "" {
 			t.State = string(models.QueueActive)
 		}
+		// Set default values for new properties
+		if t.MaxAttempts == 0 {
+			t.MaxAttempts = 1
+		}
 		queue := &models.Queue{
-			Code:       t.Code,
-			VNamespace: t.VNamespace,
-			Name:       t.Name,
-			Type:       models.QueueType(t.Type),
-			State:      models.QueueState(t.State),
+			Code:            t.Code,
+			VNamespace:      t.VNamespace,
+			Name:            t.Name,
+			Type:            models.QueueType(t.Type),
+			State:           models.QueueState(t.State),
+			TTLQueue:        t.TTLQueue,
+			AllowDuplicated: t.AllowDuplicated,
+			MaxAttempts:     t.MaxAttempts,
 		}
 		queues = append(queues, queue)
 	}

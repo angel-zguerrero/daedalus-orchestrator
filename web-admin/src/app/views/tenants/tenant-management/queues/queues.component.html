@@ -66,6 +66,9 @@
             <th>Code</th>
             <th>Type</th>
             <th>VNamespace</th>
+            <th>TTL</th>
+            <th>Max Attempts</th>
+            <th>Allow Duplicated</th>
             <th>Created At</th>
             <th>Actions</th>
           </tr>
@@ -85,6 +88,13 @@
               </c-badge>
             </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ queue.VNamespace || '-' }}">{{ queue.VNamespace || '-' }}</td>
+            <td class="text-center">{{ queue.TTLQueue || 0 }}</td>
+            <td class="text-center">{{ queue.MaxAttempts || 1 }}</td>
+            <td class="text-center">
+              <c-badge [color]="queue.AllowDuplicated ? 'success' : 'danger'" shape="rounded-pill">
+                {{ queue.AllowDuplicated ? 'Yes' : 'No' }}
+              </c-badge>
+            </td>
             <td class="text-truncate" style="max-width: 140px;" title="{{ queue.CreatedAt | date:'full' }}">{{ queue.CreatedAt | date:'medium' }}</td>
             <td>
               <div class="btn-group" role="group">
@@ -116,7 +126,7 @@
             </td>
           </tr>
           <tr *ngIf="queues.length === 0">
-            <td colspan="6" class="text-center py-4">
+            <td colspan="10" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No queues found</h6>
@@ -202,6 +212,25 @@
             </mat-autocomplete>
           </mat-form-field>
           <div class="form-text">Required: Select or enter a virtual namespace for this queue</div>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="4">
+          <label cLabel for="ttlQueue">TTL Queue</label>
+          <input cFormControl id="ttlQueue" formControlName="ttlQueue" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Time to live value (must be >= 0)</small>
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="maxAttempts">Max Attempts *</label>
+          <input cFormControl id="maxAttempts" formControlName="maxAttempts" type="number" min="1" placeholder="1" />
+          <small class="form-text text-muted">Maximum number of attempts (must be > 0)</small>
+        </c-col>
+        <c-col [md]="4" class="d-flex align-items-center">
+          <div class="form-check">
+            <input cFormCheck id="allowDuplicated" formControlName="allowDuplicated" type="checkbox" />
+            <label cLabel for="allowDuplicated" class="form-check-label">Allow Duplicated</label>
+          </div>
+          <small class="form-text text-muted d-block w-100">Allow duplicate messages in the queue</small>
         </c-col>
       </c-row>
     </form>
@@ -365,6 +394,25 @@
           <label class="form-label fw-bold">Updated At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedQueue?.UpdatedAt || selectedQueue?.updatedAt) | date:'full' }}</div>
           <div class="form-text">Last modification timestamp</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">TTL Queue</label>
+          <div class="p-2 bg-dark rounded">{{ selectedQueue?.TTLQueue || selectedQueue?.ttlQueue || 0 }}</div>
+          <div class="form-text">Time to live value for queue processing</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Max Attempts</label>
+          <div class="p-2 bg-dark rounded">{{ selectedQueue?.MaxAttempts || selectedQueue?.maxAttempts || 1 }}</div>
+          <div class="form-text">Maximum number of processing attempts</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Allow Duplicated</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="(selectedQueue?.AllowDuplicated || selectedQueue?.allowDuplicated) ? 'success' : 'danger'" shape="rounded-pill">
+              {{ (selectedQueue?.AllowDuplicated || selectedQueue?.allowDuplicated) ? 'Yes' : 'No' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Whether duplicate messages are allowed in the queue</div>
         </div>
       </div>
     </div>

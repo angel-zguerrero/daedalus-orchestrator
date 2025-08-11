@@ -19,6 +19,9 @@ message CreateQueueRequest {
   string type = 4;
   string state = 5;
   string vnamespace = 6;
+  int32 ttlQueue = 7;
+  bool allowDuplicated = 8;
+  int32 maxAttempts = 9;
 }
 
 message CreateQueueResponse {
@@ -37,6 +40,9 @@ message CreateQueueItem {
   string type = 3;
   string state = 4;
   string vnamespace = 5;
+  int32 ttlQueue = 6;
+  bool allowDuplicated = 7;
+  int32 maxAttempts = 8;
 }
 
 message BulkCreateQueueResponse {
@@ -71,6 +77,9 @@ message Queue {
   string VNamespace = 6;
   string CreatedAt = 7;
   string UpdatedAt = 8;
+  int32 TTLQueue = 9;
+  bool AllowDuplicated = 10;
+  int32 MaxAttempts = 11;
 }
 
 message QueueFindResult {

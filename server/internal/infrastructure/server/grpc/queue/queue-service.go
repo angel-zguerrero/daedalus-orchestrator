@@ -34,22 +34,44 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 		return nil, err
 	}
 
-	queue, err := s.QueueBO.CreateQueue(ctx, r.Code, r.Vnamespace, r.Name, models.QueueType(r.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	// Create queue with new properties
+	queue := &models.Queue{
+		Code:            r.Code,
+		VNamespace:      r.Vnamespace,
+		Name:            r.Name,
+		Type:            models.QueueType(r.Type),
+		State:           models.QueueActive, // Default state
+		TTLQueue:        int(r.TtlQueue),
+		AllowDuplicated: r.AllowDuplicated,
+		MaxAttempts:     int(r.MaxAttempts),
+	}
+
+	// Set defaults if not provided
+	if queue.MaxAttempts == 0 {
+		queue.MaxAttempts = 1
+	}
+
+	queuesResult, err := s.QueueBO.BulkCreateQueue(ctx, []*models.Queue{queue}, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
 
+	result := queuesResult[0]
+
 	return &pb.CreateQueueResponse{
 		Message: "Queue was asserted",
 		Result: &pb.Queue{
-			ID:         queue.ID,
-			Code:       queue.Code,
-			Name:       queue.Name,
-			Type:       string(queue.Type),
-			State:      string(queue.State),
-			VNamespace: queue.VNamespace,
-			CreatedAt:  queue.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:  queue.UpdatedAt.Format(time.RFC3339),
+			ID:              result.ID,
+			Code:            result.Code,
+			Name:            result.Name,
+			Type:            string(result.Type),
+			State:           string(result.State),
+			VNamespace:      result.VNamespace,
+			CreatedAt:       result.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:       result.UpdatedAt.Format(time.RFC3339),
+			TTLQueue:        int32(result.TTLQueue),
+			AllowDuplicated: result.AllowDuplicated,
+			MaxAttempts:     int32(result.MaxAttempts),
 		},
 	}, nil
 }
@@ -63,11 +85,18 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 	queues := []*models.Queue{}
 	for _, t := range r.Queues {
 		queue := &models.Queue{
-			Code:       t.Code,
-			VNamespace: t.Vnamespace,
-			Name:       t.Name,
-			Type:       models.QueueType(t.Type),
-			State:      models.QueueState(t.State),
+			Code:            t.Code,
+			VNamespace:      t.Vnamespace,
+			Name:            t.Name,
+			Type:            models.QueueType(t.Type),
+			State:           models.QueueState(t.State),
+			TTLQueue:        int(t.TtlQueue),
+			AllowDuplicated: t.AllowDuplicated,
+			MaxAttempts:     int(t.MaxAttempts),
+		}
+		// Set defaults if not provided
+		if queue.MaxAttempts == 0 {
+			queue.MaxAttempts = 1
 		}
 		queues = append(queues, queue)
 	}
@@ -80,14 +109,17 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 	rQueues := []*pb.Queue{}
 	for _, e := range queuesResult {
 		ex := &pb.Queue{
-			ID:         e.ID,
-			Code:       e.Code,
-			Name:       e.Name,
-			Type:       string(e.Type),
-			State:      string(e.State),
-			VNamespace: e.VNamespace,
-			CreatedAt:  e.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:  e.UpdatedAt.Format(time.RFC3339),
+			ID:              e.ID,
+			Code:            e.Code,
+			Name:            e.Name,
+			Type:            string(e.Type),
+			State:           string(e.State),
+			VNamespace:      e.VNamespace,
+			CreatedAt:       e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:       e.UpdatedAt.Format(time.RFC3339),
+			TTLQueue:        int32(e.TTLQueue),
+			AllowDuplicated: e.AllowDuplicated,
+			MaxAttempts:     int32(e.MaxAttempts),
 		}
 		rQueues = append(rQueues, ex)
 	}
@@ -112,14 +144,17 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 	return &pb.GetQueueResponse{
 		Message: "Queue",
 		Result: &pb.Queue{
-			ID:         queue.ID,
-			Code:       queue.Code,
-			Name:       queue.Name,
-			Type:       string(queue.Type),
-			State:      string(queue.State),
-			VNamespace: queue.VNamespace,
-			CreatedAt:  queue.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:  queue.UpdatedAt.Format(time.RFC3339),
+			ID:              queue.ID,
+			Code:            queue.Code,
+			Name:            queue.Name,
+			Type:            string(queue.Type),
+			State:           string(queue.State),
+			VNamespace:      queue.VNamespace,
+			CreatedAt:       queue.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:       queue.UpdatedAt.Format(time.RFC3339),
+			TTLQueue:        int32(queue.TTLQueue),
+			AllowDuplicated: queue.AllowDuplicated,
+			MaxAttempts:     int32(queue.MaxAttempts),
 		},
 	}, nil
 }
@@ -138,14 +173,17 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 	rQueues := []*pb.Queue{}
 	for _, e := range findResult.Entities {
 		ex := &pb.Queue{
-			ID:         e.ID,
-			Code:       e.Code,
-			Name:       e.Name,
-			Type:       string(e.Type),
-			State:      string(e.State),
-			VNamespace: e.VNamespace,
-			CreatedAt:  e.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:  e.UpdatedAt.Format(time.RFC3339),
+			ID:              e.ID,
+			Code:            e.Code,
+			Name:            e.Name,
+			Type:            string(e.Type),
+			State:           string(e.State),
+			VNamespace:      e.VNamespace,
+			CreatedAt:       e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:       e.UpdatedAt.Format(time.RFC3339),
+			TTLQueue:        int32(e.TTLQueue),
+			AllowDuplicated: e.AllowDuplicated,
+			MaxAttempts:     int32(e.MaxAttempts),
 		}
 		rQueues = append(rQueues, ex)
 	}

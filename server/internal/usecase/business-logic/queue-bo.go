@@ -33,12 +33,15 @@ func NewQueueBO(Config *common.ServerConfing) *QueueBO {
 
 func (bo *QueueBO) CreateQueue(ctx context.Context, code, vnamespace, name string, queueType models.QueueType, cf, cfs string) (models.Queue, error) {
 	queue := &models.Queue{
-		ID:         strings.ReplaceAll(uuid.New().String(), "-", ""),
-		Code:       code,
-		Name:       name,
-		Type:       queueType,
-		VNamespace: vnamespace,
-		State:      models.QueueActive, // Default state
+		ID:              strings.ReplaceAll(uuid.New().String(), "-", ""),
+		Code:            code,
+		Name:            name,
+		Type:            queueType,
+		VNamespace:      vnamespace,
+		State:           models.QueueActive, // Default state
+		TTLQueue:        0,                  // Default TTL
+		AllowDuplicated: true,               // Default allow duplicated
+		MaxAttempts:     1,                  // Default max attempts
 	}
 
 	createdList, err := bo.BulkCreateQueue(ctx, []*models.Queue{queue}, cf, cfs)
@@ -62,6 +65,13 @@ func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, 
 		if t.State == "" {
 			t.State = models.QueueActive
 		}
+		// Set default values for new properties if not provided
+		if t.MaxAttempts == 0 {
+			t.MaxAttempts = 1
+		}
+		// TTLQueue defaults to 0, which is valid
+		// AllowDuplicated defaults to false (Go bool default), but we want true
+		// Note: In bulk creation, the caller should set these values explicitly
 	}
 
 	assertQueueCommand := &queue_command.AssertQueueCommand{
