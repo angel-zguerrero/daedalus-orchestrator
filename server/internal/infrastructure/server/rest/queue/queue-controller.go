@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -47,6 +48,12 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ctrl.Config.Logger.Warn().Err(err).Msg("create queue attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	// Validate queue type
+	if !isValidQueueType(req.Type) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", req.Type)})
 		return
 	}
 
@@ -98,6 +105,15 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
+
+	// Validate queue types
+	for _, queue := range req.Queues {
+		if !isValidQueueType(queue.Type) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", queue.Type)})
+			return
+		}
+	}
+
 	tenantID := c.Param("id")
 
 	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
@@ -217,4 +233,14 @@ func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 		"message": "Queue list",
 		"result":  findResult,
 	})
+}
+
+// isValidQueueType validates if the queue type is one of the allowed types
+func isValidQueueType(queueType string) bool {
+	switch queueType {
+	case "standard", "delayed", "dead-letter":
+		return true
+	default:
+		return false
+	}
 }

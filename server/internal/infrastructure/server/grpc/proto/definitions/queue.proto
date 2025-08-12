@@ -4,6 +4,12 @@ package queue;
 
 option go_package = "pb/queue;queue";
 
+enum QueueType {
+  STANDARD = 0;
+  DELAYED = 1;
+  DEAD_LETTER = 2;
+}
+
 service QueueService {
   rpc CreateQueue (CreateQueueRequest) returns (CreateQueueResponse);
   rpc BulkCreateQueue (BulkCreateQueueRequest) returns (BulkCreateQueueResponse);

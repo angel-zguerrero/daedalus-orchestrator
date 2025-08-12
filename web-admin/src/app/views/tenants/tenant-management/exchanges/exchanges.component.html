@@ -61,18 +61,15 @@
       <table cTable class="mt-4" [hover]="true">
         <thead>
           <tr>
-            <th>ID</th>
             <th>Name</th>
             <th>Code</th>
             <th>Type</th>
             <th>VNamespace</th>
-            <th>Created At</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let exchange of exchanges" class="align-middle">
-            <td class="text-truncate" style="max-width: 200px;" title="{{ exchange.ID }}">{{ exchange.ID }}</td>
             <td class="text-truncate" style="max-width: 180px;" title="{{ exchange.Name }}">
               <strong>{{ exchange.Name }}</strong>
             </td>
@@ -85,7 +82,6 @@
               </c-badge>
             </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ exchange.VNamespace || '-' }}">{{ exchange.VNamespace || '-' }}</td>
-            <td class="text-truncate" style="max-width: 140px;" title="{{ exchange.CreatedAt | date:'full' }}">{{ exchange.CreatedAt | date:'medium' }}</td>
             <td>
               <div class="btn-group" role="group">
                 <button 
@@ -116,7 +112,7 @@
             </td>
           </tr>
           <tr *ngIf="exchanges.length === 0">
-            <td colspan="6" class="text-center py-4">
+            <td colspan="5" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No exchanges found</h6>

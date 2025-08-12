@@ -75,8 +75,7 @@ export class QueuesComponent implements OnInit {
 
   queueTypes = [
     { value: 'standard', label: 'Standard' },
-    { value: 'priority', label: 'Priority' },
-    { value: 'delay', label: 'Delay' },
+    { value: 'delayed', label: 'Delayed' },
     { value: 'dead-letter', label: 'Dead Letter' }
   ];
 
@@ -94,6 +93,15 @@ export class QueuesComponent implements OnInit {
 
   public file: File | null = null;
 
+  // Valid queue types
+  private validQueueTypes = ['standard', 'delayed', 'dead-letter'];
+
+  // Custom validator for queue type
+  private queueTypeValidator = (control: any) => {
+    if (!control.value) return null;
+    return this.validQueueTypes.includes(control.value) ? null : { invalidQueueType: true };
+  };
+
   constructor(
     private queuesService: QueuesService,
     private vNamespacesService: VNamespacesService,
@@ -102,7 +110,7 @@ export class QueuesComponent implements OnInit {
     this.queueForm = this.fb.group({
       name: ['', Validators.required],
       code: ['', Validators.required],
-      type: ['standard', Validators.required],
+      type: ['standard', [Validators.required, this.queueTypeValidator]],
       vnamespace: this.vnamespaceCtrl,
       ttlQueue: [0, [Validators.min(0)]],
       allowDuplicated: [true],
@@ -334,8 +342,7 @@ export class QueuesComponent implements OnInit {
   getQueueTypeColor(type: string): string {
     const typeColors: { [key: string]: string } = {
       'standard': 'primary',
-      'priority': 'success',
-      'delay': 'warning',
+      'delayed': 'warning',
       'dead-letter': 'danger'
     };
     return typeColors[type] || 'secondary';

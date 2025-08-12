@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -32,6 +33,11 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate queue type
+	if !isValidQueueType(r.Type) {
+		return nil, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", r.Type)
 	}
 
 	// Create queue with new properties
@@ -84,6 +90,11 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 
 	queues := []*models.Queue{}
 	for _, t := range r.Queues {
+		// Validate queue type
+		if !isValidQueueType(t.Type) {
+			return nil, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", t.Type)
+		}
+
 		queue := &models.Queue{
 			Code:            t.Code,
 			VNamespace:      t.Vnamespace,
@@ -211,4 +222,14 @@ func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest
 	return &pb.DeleteQueueResponse{
 		Message: "Queue " + r.QueueId + " was deleted",
 	}, nil
+}
+
+// isValidQueueType validates if the queue type is one of the allowed types
+func isValidQueueType(queueType string) bool {
+	switch queueType {
+	case "standard", "delayed", "dead-letter":
+		return true
+	default:
+		return false
+	}
 }

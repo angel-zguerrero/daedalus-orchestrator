@@ -40,19 +40,16 @@
       <table cTable class="mt-4" [hover]="true">
         <thead>
           <tr>
-            <th>ID</th>
             <th>Name</th>
             <th>Code</th>
             <th>Shard ID</th>
             <th>Column Family Index</th>
             <th>Status</th>
-            <th>Created At</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let tenant of tenants" class="align-middle">
-            <td class="text-truncate" style="max-width: 200px;" title="{{ tenant.ID }}">{{ tenant.ID }}</td>
             <td class="text-truncate" style="max-width: 180px;" title="{{ tenant.Name }}">
               <strong>{{ tenant.Name }}</strong>
             </td>
@@ -66,7 +63,6 @@
                 {{ tenant.Status }}
               </c-badge>
             </td>
-            <td class="text-truncate" style="max-width: 140px;" title="{{ tenant.CreatedAt | date:'full' }}">{{ tenant.CreatedAt | date:'medium' }}</td>
           <td>
             <div class="btn-group" role="group">
               <button 
@@ -105,7 +101,7 @@
           </td>
         </tr>
         <tr *ngIf="tenants.length === 0">
-          <td colspan="8" class="text-center py-4">
+          <td colspan="6" class="text-center py-4">
             <div class="text-muted">
               <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
               <h6>No tenants found</h6>
