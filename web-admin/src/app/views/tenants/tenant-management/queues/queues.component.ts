@@ -307,34 +307,91 @@ export class QueuesComponent implements OnInit {
     this.loading = true;
     const fileReader = new FileReader();
     fileReader.onload = (e: any) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const queues = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Code', 'Type', 'VNamespace'] });
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rawQueues = XLSX.utils.sheet_to_json(worksheet, { 
+          header: ['Name', 'Code', 'Type', 'VNamespace', 'TTLQueue', 'AllowDuplicated', 'MaxAttempts'] 
+        });
 
-      // Remove header row
-      queues.shift();
+        // Remove header row
+        rawQueues.shift();
 
-      if (queues.length === 0) {
-        this.showAlert = true;
-        this.errorMessage = 'The uploaded file is empty.';
-        this.loading = false;
-        return;
-      }
-
-      this.queuesService.bulkCreateQueues(this.tenantId, { queues }).subscribe({
-        next: () => {
-          this.bulkUploadModalVisible = false;
-          this.loadQueues();
-          this.showAlert = false;
-          this.loading = false;
-        },
-        error: (error) => {
+        if (rawQueues.length === 0) {
           this.showAlert = true;
-          this.errorMessage = ErrorUtil.formatErrorMessage(error);
+          this.errorMessage = 'The uploaded file is empty.';
           this.loading = false;
+          return;
         }
-      });
+
+        // Process and validate the data
+        const processedQueues = rawQueues.map((queue: any, index: number) => {
+          // Validate queue type
+          if (!this.validQueueTypes.includes(queue.Type)) {
+            throw new Error(`Row ${index + 2}: Invalid queue type: ${queue.Type}. Valid types are: ${this.validQueueTypes.join(', ')}`);
+          }
+
+          // Process AllowDuplicated field - handle various formats
+          let allowDuplicated = true; // default value
+          if (queue.AllowDuplicated !== undefined && queue.AllowDuplicated !== null) {
+            const allowDupStr = String(queue.AllowDuplicated).toLowerCase().trim();
+            if (allowDupStr === 'false' || allowDupStr === '0' || allowDupStr === 'no') {
+              allowDuplicated = false;
+            } else if (allowDupStr === 'true' || allowDupStr === '1' || allowDupStr === 'yes') {
+              allowDuplicated = true;
+            } else {
+              throw new Error(`Row ${index + 2}: Invalid AllowDuplicated value: ${queue.AllowDuplicated}. Must be true/false, yes/no, or 1/0`);
+            }
+          }
+
+          // Process TTLQueue - ensure it's a number >= 0
+          let ttlQueue = 0; // default value
+          if (queue.TTLQueue !== undefined && queue.TTLQueue !== null && queue.TTLQueue !== '') {
+            ttlQueue = parseInt(queue.TTLQueue, 10);
+            if (isNaN(ttlQueue) || ttlQueue < 0) {
+              throw new Error(`Row ${index + 2}: Invalid TTLQueue value: ${queue.TTLQueue}. Must be a number >= 0`);
+            }
+          }
+
+          // Process MaxAttempts - ensure it's a number > 0
+          let maxAttempts = 1; // default value
+          if (queue.MaxAttempts !== undefined && queue.MaxAttempts !== null && queue.MaxAttempts !== '') {
+            maxAttempts = parseInt(queue.MaxAttempts, 10);
+            if (isNaN(maxAttempts) || maxAttempts <= 0) {
+              throw new Error(`Row ${index + 2}: Invalid MaxAttempts value: ${queue.MaxAttempts}. Must be a number > 0`);
+            }
+          }
+
+          return {
+            name: queue.Name,
+            code: queue.Code,
+            type: queue.Type,
+            vnamespace: queue.VNamespace,
+            ttlQueue: ttlQueue,
+            allowDuplicated: allowDuplicated,
+            maxAttempts: maxAttempts
+          };
+        });
+
+        this.queuesService.bulkCreateQueues(this.tenantId, { queues: processedQueues }).subscribe({
+          next: () => {
+            this.bulkUploadModalVisible = false;
+            this.loadQueues();
+            this.showAlert = false;
+            this.loading = false;
+          },
+          error: (error) => {
+            this.showAlert = true;
+            this.errorMessage = ErrorUtil.formatErrorMessage(error);
+            this.loading = false;
+          }
+        });
+      } catch (error: any) {
+        this.showAlert = true;
+        this.errorMessage = error.message || 'Error processing the uploaded file.';
+        this.loading = false;
+      }
     };
     fileReader.readAsArrayBuffer(this.file);
   }

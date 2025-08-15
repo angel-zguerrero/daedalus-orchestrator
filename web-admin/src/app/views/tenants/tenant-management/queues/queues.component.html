@@ -445,10 +445,13 @@
       <ul class="list-unstyled">
         <li><strong>Name</strong>: Display name for the queue</li>
         <li><strong>Code</strong>: Unique identifier for the queue</li>
-        <li><strong>Type</strong>: Queue type (standard, priority, delay, dead-letter)</li>
+        <li><strong>Type</strong>: Queue type (standard, delayed, dead-letter)</li>
         <li><strong>VNamespace</strong>: Virtual namespace for logical grouping</li>
+        <li><strong>TTLQueue</strong>: Time to live in seconds (number >= 0, optional, default: 0)</li>
+        <li><strong>AllowDuplicated</strong>: Allow duplicates (true/false, yes/no, 1/0, optional, default: true)</li>
+        <li><strong>MaxAttempts</strong>: Maximum attempts (number > 0, optional, default: 1)</li>
       </ul>
-      <div class="form-text">All fields are required and code must be unique within the tenant</div>
+      <div class="form-text">First 4 fields are required. Code must be unique within the tenant. File must include header row.</div>
     </div>
     <div class="mb-3">
       <label cLabel for="file-upload">Select File</label>
