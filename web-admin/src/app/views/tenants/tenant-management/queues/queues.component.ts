@@ -233,23 +233,32 @@ export class QueuesComponent implements OnInit {
     this.selectedQueue = queue;
     this.queueFormUpdate.reset();
     
+    // Calculate the correct priority type based on thresholds
+    const calculatedPriorityType = this.getCalculatedPriorityType(queue);
+    
     // Set current values
     this.queueFormUpdate.patchValue({
       name: queue.Name,
       ttlQueue: queue.TTLQueue || 0,
       allowDuplicated: queue.AllowDuplicated !== undefined ? queue.AllowDuplicated : true,
       maxAttempts: queue.MaxAttempts || 1,
-      priorityType: queue.PriorityType || 'normal',
+      priorityType: calculatedPriorityType,
       maxPriority: queue.MaxPriority || 1
     });
     
     // Set update priority management state
-    this.updatePriorityType = queue.PriorityType || 'normal';
+    this.updatePriorityType = calculatedPriorityType;
     this.updateMaxPriority = queue.MaxPriority || 1;
     
     // Set priority thresholds if they exist
     if (queue.PriorityThresholds && this.updatePriorityType === 'fair') {
       this.updatePriorityThresholds = this.getPriorityThresholdsArray(queue.PriorityThresholds);
+    } else if (this.updatePriorityType === 'normal') {
+      // For normal priority, auto-generate the thresholds array based on maxPriority
+      this.updatePriorityThresholds = [];
+      for (let i = 0; i < this.updateMaxPriority; i++) {
+        this.updatePriorityThresholds.push(0);
+      }
     } else {
       this.updatePriorityThresholds = [];
     }
@@ -696,7 +705,14 @@ export class QueuesComponent implements OnInit {
 
   getCalculatedPriorityType(queue: any): string {
     if (queue && queue.PriorityThresholds && Object.keys(queue.PriorityThresholds).length > 0) {
-      return 'fair';
+      // Check if all values in priorityThresholds are 0
+      const allValuesAreZero = Object.values(queue.PriorityThresholds).every((value: any) => Number(value) === 0);
+      
+      if (allValuesAreZero) {
+        return 'normal';
+      } else {
+        return 'fair';
+      }
     }
     return 'normal';
   }

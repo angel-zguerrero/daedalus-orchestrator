@@ -600,8 +600,8 @@
         <div class="mb-3">
           <label class="form-label fw-bold">Priority Type</label>
           <div class="p-2 bg-dark rounded">
-            <c-badge [color]="getPriorityTypeColor(selectedQueue?.PriorityType || selectedQueue?.priorityType)" shape="rounded-pill">
-              {{ getPriorityTypeLabel(selectedQueue?.PriorityType || selectedQueue?.priorityType) }}
+            <c-badge [color]="getPriorityTypeColor(getCalculatedPriorityType(selectedQueue))" shape="rounded-pill">
+              {{ getPriorityTypeLabel(getCalculatedPriorityType(selectedQueue)) }}
             </c-badge>
             <span *ngIf="selectedQueue?.MaxPriority || selectedQueue?.maxPriority" class="ms-2 text-muted">
               (Max: {{selectedQueue?.MaxPriority || selectedQueue?.maxPriority}})
@@ -609,17 +609,62 @@
           </div>
           <div class="form-text">Priority management type and maximum priority level</div>
         </div>
-        <div class="mb-3" *ngIf="(selectedQueue?.PriorityType || selectedQueue?.priorityType) === 'fair' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
+        <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'fair' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
           <label class="form-label fw-bold">Priority Thresholds</label>
-          <div class="p-2 bg-dark rounded">
-            <div class="row">
-              <div class="col-6 col-md-4 mb-1" *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds); let i = index">
-                <small class="text-muted">Priority {{i + 1}}:</small>
-                <strong class="ms-1">{{threshold}}</strong>
+          <div class="p-3 bg-dark rounded">
+            <div class="row g-2">
+              <div class="col-6 col-lg-3" *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds); let i = index">
+                <div class="border border-secondary rounded p-2 text-center bg-light">
+                  <div class="small text-muted fw-bold mb-1">Priority {{i + 1}}</div>
+                  <div class="h6 mb-0 text-primary">
+                    <c-badge color="primary" shape="rounded-pill" class="px-3">
+                      {{ threshold === 0 ? 'All' : threshold }}
+                    </c-badge>
+                  </div>
+                  <div class="small text-muted mt-1">
+                    {{ threshold === 0 ? 'Process all tasks' : 'tasks' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 p-2 bg-info bg-opacity-10 border border-info rounded">
+              <small class="text-info">
+                <svg cIcon name="cil-info" class="me-1"></svg>
+                <strong>Fair Priority Processing:</strong> 
+                Tasks are processed by priority level. When a threshold is reached, the system moves to the next priority.
+                <br><strong>0 = Process all tasks</strong> of the current priority before moving to the next level.
+              </small>
+            </div>
+          </div>
+          <div class="form-text mt-2">
+            Visual representation of task processing thresholds per priority level
+          </div>
+        </div>
+        
+        <!-- Show priority thresholds for normal type as well -->
+        <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'normal' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
+          <label class="form-label fw-bold">Priority Configuration</label>
+          <div class="p-3 bg-dark rounded">
+            <div class="text-center p-3 bg-secondary bg-opacity-10 border border-secondary rounded">
+              <div class="h5 mb-2">
+                <c-badge color="secondary" shape="rounded-pill" class="px-4 py-2">
+                  <svg cIcon name="cil-sort-alpha-down" class="me-2"></svg>
+                  Normal Priority Mode
+                </c-badge>
+              </div>
+              <div class="text-muted">
+                Tasks are processed strictly by priority order (highest priority first)
+              </div>
+              <div class="mt-2">
+                <small class="text-muted">
+                  Max Priority Levels: <strong>{{ selectedQueue?.MaxPriority || selectedQueue?.maxPriority || 1 }}</strong>
+                </small>
               </div>
             </div>
           </div>
-          <div class="form-text">Number of tasks to process per priority before moving to next level (0 = process all tasks of current priority first)</div>
+          <div class="form-text mt-2">
+            Normal priority processes all high-priority tasks before moving to lower priorities
+          </div>
         </div>
       </div>
     </div>
