@@ -93,6 +93,16 @@ export class QueuesComponent implements OnInit {
 
   public file: File | null = null;
 
+  // Priority management properties
+  priorityType: string = 'normal';
+  maxPriority: number = 1;
+  priorityThresholds: number[] = [];
+
+  // Update priority management properties
+  updatePriorityType: string = 'normal';
+  updateMaxPriority: number = 1;
+  updatePriorityThresholds: number[] = [];
+
   // Valid queue types
   private validQueueTypes = ['standard', 'delayed', 'dead-letter'];
 
@@ -114,10 +124,17 @@ export class QueuesComponent implements OnInit {
       vnamespace: this.vnamespaceCtrl,
       ttlQueue: [0, [Validators.min(0)]],
       allowDuplicated: [true],
-      maxAttempts: [1, [Validators.required, Validators.min(1)]]
+      maxAttempts: [1, [Validators.required, Validators.min(1)]],
+      priorityType: ['normal', Validators.required],
+      maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]]
     });
     this.queueFormUpdate = this.fb.group({
-      name: ['', Validators.required]
+      name: ['', Validators.required],
+      ttlQueue: [0, [Validators.min(0)]],
+      allowDuplicated: [true],
+      maxAttempts: [1, [Validators.required, Validators.min(1)]],
+      priorityType: ['normal', Validators.required],
+      maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]]
     });
 
     this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
@@ -202,17 +219,41 @@ export class QueuesComponent implements OnInit {
       type: 'standard',
       ttlQueue: 0,
       allowDuplicated: true,
-      maxAttempts: 1
+      maxAttempts: 1,
+      priorityType: 'normal',
+      maxPriority: 1
     });
+    this.priorityType = 'normal';
+    this.maxPriority = 1;
+    this.priorityThresholds = [];
     this.showAlert = false;
   }
 
   openEditModal(queue: any): void {
     this.selectedQueue = queue;
     this.queueFormUpdate.reset();
+    
+    // Set current values
     this.queueFormUpdate.patchValue({
-      name: queue.Name
+      name: queue.Name,
+      ttlQueue: queue.TTLQueue || 0,
+      allowDuplicated: queue.AllowDuplicated !== undefined ? queue.AllowDuplicated : true,
+      maxAttempts: queue.MaxAttempts || 1,
+      priorityType: queue.PriorityType || 'normal',
+      maxPriority: queue.MaxPriority || 1
     });
+    
+    // Set update priority management state
+    this.updatePriorityType = queue.PriorityType || 'normal';
+    this.updateMaxPriority = queue.MaxPriority || 1;
+    
+    // Set priority thresholds if they exist
+    if (queue.PriorityThresholds && this.updatePriorityType === 'fair') {
+      this.updatePriorityThresholds = this.getPriorityThresholdsArray(queue.PriorityThresholds);
+    } else {
+      this.updatePriorityThresholds = [];
+    }
+    
     this.editModalVisible = true;
     this.showAlert = false;
   }
@@ -232,7 +273,24 @@ export class QueuesComponent implements OnInit {
 
   createQueue(): void {
     if (this.queueForm.valid) {
-      this.queuesService.createQueue(this.tenantId, this.queueForm.value).subscribe({
+      const formValue = this.queueForm.value;
+      
+      // Build priority thresholds for fair priority type
+      let priorityThresholds: { [key: number]: number } | undefined;
+      if (formValue.priorityType === 'fair') {
+        priorityThresholds = {};
+        for (let i = 0; i < this.maxPriority; i++) {
+          priorityThresholds[i + 1] = this.priorityThresholds[i] || 0;
+        }
+      }
+
+      const queueData = {
+        ...formValue,
+        priorityThresholds,
+        maxPriority: this.maxPriority
+      };
+
+      this.queuesService.createQueue(this.tenantId, queueData).subscribe({
         next: () => {
           this.createModalVisible = false;
           this.loadQueues();
@@ -251,13 +309,31 @@ export class QueuesComponent implements OnInit {
 
   updateQueue(): void {
     if (this.queueFormUpdate.valid) {
+      const formValue = this.queueFormUpdate.value;
+      
+      // Build priority thresholds for fair priority type
+      let priorityThresholds: { [key: number]: number } | undefined;
+      if (formValue.priorityType === 'fair') {
+        priorityThresholds = {};
+        for (let i = 0; i < this.updateMaxPriority; i++) {
+          priorityThresholds[i + 1] = this.updatePriorityThresholds[i] || 0;
+        }
+      }
+
       const queueData = {
-        name: this.queueFormUpdate.value.name,
+        name: formValue.name,
         code: this.selectedQueue.Code, // Preserve existing code (frontend cannot edit)
         type: this.selectedQueue.Type, // Preserve original type
         vnamespace: this.selectedQueue.VNamespace, // Preserve original vnamespace
-        id: this.selectedQueue.ID
+        id: this.selectedQueue.ID,
+        ttlQueue: formValue.ttlQueue,
+        allowDuplicated: formValue.allowDuplicated,
+        maxAttempts: formValue.maxAttempts,
+        priorityType: formValue.priorityType,
+        maxPriority: this.updateMaxPriority,
+        priorityThresholds
       };
+      
       this.queuesService.createQueue(this.tenantId, queueData).subscribe({
         next: () => {
           this.editModalVisible = false;
@@ -312,7 +388,7 @@ export class QueuesComponent implements OnInit {
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawQueues = XLSX.utils.sheet_to_json(worksheet, { 
-          header: ['Name', 'Code', 'Type', 'VNamespace', 'TTLQueue', 'AllowDuplicated', 'MaxAttempts'] 
+          header: ['Name', 'Code', 'Type', 'VNamespace', 'TTLQueue', 'AllowDuplicated', 'MaxAttempts', 'PriorityType', 'MaxPriority', 'PriorityThresholds'] 
         });
 
         // Remove header row
@@ -363,6 +439,55 @@ export class QueuesComponent implements OnInit {
             }
           }
 
+          // Process PriorityType
+          let priorityType = 'normal'; // default value
+          if (queue.PriorityType !== undefined && queue.PriorityType !== null && queue.PriorityType !== '') {
+            const priorityTypeStr = String(queue.PriorityType).toLowerCase().trim();
+            if (priorityTypeStr === 'normal' || priorityTypeStr === 'fair') {
+              priorityType = priorityTypeStr;
+            } else {
+              throw new Error(`Row ${index + 2}: Invalid PriorityType value: ${queue.PriorityType}. Must be 'normal' or 'fair'`);
+            }
+          }
+
+          // Process MaxPriority
+          let maxPriority = 1; // default value
+          if (queue.MaxPriority !== undefined && queue.MaxPriority !== null && queue.MaxPriority !== '') {
+            maxPriority = parseInt(queue.MaxPriority, 10);
+            if (isNaN(maxPriority) || maxPriority < 1 || maxPriority > 100) {
+              throw new Error(`Row ${index + 2}: Invalid MaxPriority value: ${queue.MaxPriority}. Must be a number between 1 and 100`);
+            }
+          }
+
+          // Process PriorityThresholds
+          let priorityThresholds: { [key: number]: number } | undefined;
+          if (priorityType === 'fair' && queue.PriorityThresholds !== undefined && queue.PriorityThresholds !== null && queue.PriorityThresholds !== '') {
+            try {
+              const thresholdStr = String(queue.PriorityThresholds).trim();
+              const thresholdValues = thresholdStr.split(',').map(v => parseInt(v.trim(), 10));
+              
+              if (thresholdValues.length !== maxPriority) {
+                throw new Error(`Row ${index + 2}: PriorityThresholds count (${thresholdValues.length}) must match MaxPriority (${maxPriority})`);
+              }
+              
+              priorityThresholds = {};
+              thresholdValues.forEach((value, idx) => {
+                if (isNaN(value) || value < 0) {
+                  throw new Error(`Row ${index + 2}: Invalid threshold value at position ${idx + 1}: ${value}. Must be >= 0`);
+                }
+                priorityThresholds![idx + 1] = value;
+              });
+            } catch (error: any) {
+              throw new Error(`Row ${index + 2}: Error parsing PriorityThresholds: ${error.message}`);
+            }
+          } else if (priorityType === 'fair') {
+            // Default thresholds for fair priority
+            priorityThresholds = {};
+            for (let i = 1; i <= maxPriority; i++) {
+              priorityThresholds[i] = 0;
+            }
+          }
+
           return {
             name: queue.Name,
             code: queue.Code,
@@ -370,7 +495,10 @@ export class QueuesComponent implements OnInit {
             vnamespace: queue.VNamespace,
             ttlQueue: ttlQueue,
             allowDuplicated: allowDuplicated,
-            maxAttempts: maxAttempts
+            maxAttempts: maxAttempts,
+            priorityType: priorityType,
+            maxPriority: maxPriority,
+            priorityThresholds: priorityThresholds
           };
         });
 
@@ -403,5 +531,137 @@ export class QueuesComponent implements OnInit {
       'dead-letter': 'danger'
     };
     return typeColors[type] || 'secondary';
+  }
+
+  // Priority management methods
+  onPriorityTypeChange(): void {
+    const formValue = this.queueForm.get('priorityType')?.value;
+    this.priorityType = formValue || 'normal';
+    
+    if (this.priorityType === 'normal') {
+      this.priorityThresholds = [];
+    } else if (this.priorityType === 'fair') {
+      this.updateFairThresholds();
+    }
+  }
+
+  onMaxPriorityChange(): void {
+    const formValue = this.queueForm.get('maxPriority')?.value;
+    this.maxPriority = Number(formValue) || 1;
+    
+    if (this.priorityType === 'fair') {
+      this.updateFairThresholds();
+    }
+  }
+
+  updateFairThresholds(): void {
+    const currentLength = this.priorityThresholds.length;
+    const targetLength = this.maxPriority;
+    
+    if (targetLength > currentLength) {
+      // Add new thresholds with default value of 0
+      for (let i = currentLength; i < targetLength; i++) {
+        this.priorityThresholds.push(0);
+      }
+    } else if (targetLength < currentLength) {
+      // Remove excess thresholds
+      this.priorityThresholds = this.priorityThresholds.slice(0, targetLength);
+    }
+  }
+
+  getPriorityArray(): any[] {
+    return Array.from({ length: this.maxPriority });
+  }
+
+  updatePriorityThreshold(index: number, value: any): void {
+    const numValue = Number(value) || 0;
+    this.priorityThresholds[index] = numValue;
+  }
+
+  getPriorityTypeColor(priorityType: string): string {
+    const colors: { [key: string]: string } = {
+      'normal': 'primary',
+      'fair': 'success'
+    };
+    return colors[priorityType] || 'secondary';
+  }
+
+  getPriorityTypeLabel(priorityType: string): string {
+    const labels: { [key: string]: string } = {
+      'normal': 'Normal',
+      'fair': 'Fair'
+    };
+    return labels[priorityType] || 'Unknown';
+  }
+
+  getPriorityThresholdsArray(thresholds: any): number[] {
+    if (!thresholds) return [];
+    
+    if (Array.isArray(thresholds)) {
+      return thresholds;
+    }
+    
+    if (typeof thresholds === 'object') {
+      // Convert object to array based on keys
+      const result: number[] = [];
+      Object.keys(thresholds).sort((a, b) => Number(a) - Number(b)).forEach(key => {
+        result.push(thresholds[key]);
+      });
+      return result;
+    }
+    
+    return [];
+  }
+
+  // Update priority management methods
+  onUpdatePriorityTypeChange(): void {
+    const formValue = this.queueFormUpdate.get('priorityType')?.value;
+    this.updatePriorityType = formValue || 'normal';
+    
+    if (this.updatePriorityType === 'normal') {
+      this.updatePriorityThresholds = [];
+    } else if (this.updatePriorityType === 'fair') {
+      this.updateUpdateFairThresholds();
+    }
+  }
+
+  onUpdateMaxPriorityChange(): void {
+    const formValue = this.queueFormUpdate.get('maxPriority')?.value;
+    this.updateMaxPriority = Number(formValue) || 1;
+    
+    if (this.updatePriorityType === 'fair') {
+      this.updateUpdateFairThresholds();
+    }
+  }
+
+  updateUpdateFairThresholds(): void {
+    const currentLength = this.updatePriorityThresholds.length;
+    const targetLength = this.updateMaxPriority;
+    
+    if (targetLength > currentLength) {
+      // Add new thresholds with default value of 0
+      for (let i = currentLength; i < targetLength; i++) {
+        this.updatePriorityThresholds.push(0);
+      }
+    } else if (targetLength < currentLength) {
+      // Remove excess thresholds
+      this.updatePriorityThresholds = this.updatePriorityThresholds.slice(0, targetLength);
+    }
+  }
+
+  getUpdatePriorityArray(): any[] {
+    return Array.from({ length: this.updateMaxPriority });
+  }
+
+  updateUpdatePriorityThreshold(index: number, value: any): void {
+    const numValue = Number(value) || 0;
+    this.updatePriorityThresholds[index] = numValue;
+  }
+
+  getCalculatedPriorityType(queue: any): string {
+    if (queue && queue.PriorityThresholds && Object.keys(queue.PriorityThresholds).length > 0) {
+      return 'fair';
+    }
+    return 'normal';
   }
 }

@@ -68,6 +68,7 @@
             <th>TTL (seconds)</th>
             <th>Max Attempts</th>
             <th>Allow Duplicated</th>
+            <th>Priority Type</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -92,6 +93,11 @@
             <td class="text-center">
               <c-badge [color]="queue.AllowDuplicated ? 'success' : 'danger'" shape="rounded-pill">
                 {{ queue.AllowDuplicated ? 'Yes' : 'No' }}
+              </c-badge>
+            </td>
+            <td class="text-center">
+              <c-badge [color]="getPriorityTypeColor(getCalculatedPriorityType(queue))" shape="rounded-pill">
+                {{ getPriorityTypeLabel(getCalculatedPriorityType(queue)) }}
               </c-badge>
             </td>
             <td>
@@ -124,7 +130,7 @@
             </td>
           </tr>
           <tr *ngIf="queues.length === 0">
-            <td colspan="8" class="text-center py-4">
+            <td colspan="9" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No queues found</h6>
@@ -235,6 +241,82 @@
           <small class="form-text text-muted d-block w-100">Allow duplicate messages in the queue</small>
         </c-col>
       </c-row>
+
+      <!-- Priority Configuration Section -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-sort" class="me-2"></svg>
+            Priority Configuration
+          </h6>
+        </c-col>
+      </c-row>
+
+      <!-- Priority Type Selector -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="priorityType">Priority Type *</label>
+          <select cSelect id="priorityType" formControlName="priorityType" (change)="onPriorityTypeChange()">
+            <option value="normal">Normal</option>
+            <option value="fair">Fair</option>
+          </select>
+          <small class="form-text text-muted">Choose how priorities are managed for this queue</small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="maxPriority">Max Priority Supported *</label>
+          <input cFormControl id="maxPriority" formControlName="maxPriority" type="number" min="1" max="100" placeholder="1" (change)="onMaxPriorityChange()" />
+          <small class="form-text text-muted">Set the highest priority value allowed (1-100)</small>
+        </c-col>
+      </c-row>
+
+      <!-- Fair Priority Thresholds Configuration -->
+      <div *ngIf="priorityType === 'fair'" class="mb-3">
+        <c-row class="mb-2">
+          <c-col [md]="12">
+            <label class="form-label fw-bold">Priority Thresholds</label>
+            <p class="text-muted small">
+              Set the number of tasks to process for each priority before moving to the next priority level.
+              Use 0 to process all tasks of a priority before moving to the next one.
+            </p>
+          </c-col>
+        </c-row>
+        <c-row [gutter]="{gy: 2, gx: 3}">
+          <c-col [md]="6" [lg]="4" *ngFor="let priority of getPriorityArray(); let i = index">
+            <div class="border rounded p-3 mb-2">
+              <label class="form-label">Priority {{i + 1}}</label>
+              <input 
+                cFormControl 
+                type="number" 
+                min="0" 
+                max="10000"
+                placeholder="0"
+                [(ngModel)]="priorityThresholds[i]" 
+                [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="updatePriorityThreshold(i, $event)"
+                class="form-control" />
+              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this priority first)</small>
+            </div>
+          </c-col>
+        </c-row>
+        <div *ngIf="priorityType === 'fair' && maxPriority > 0" class="mt-2">
+          <c-alert color="info" class="mb-0">
+            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
+            Higher priorities (lower numbers) will be processed first, but after processing the specified number 
+            of tasks, the system will move to the next priority level.
+            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
+            before moving to the next priority level.
+          </c-alert>
+        </div>
+      </div>
+
+      <!-- Normal Priority Information -->
+      <div *ngIf="priorityType === 'normal'" class="mb-3">
+        <c-alert color="info" class="mb-0">
+          <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order. 
+          Higher priorities (lower numbers) will always be processed before lower priorities.
+        </c-alert>
+      </div>
     </form>
   </c-modal-body>
   <c-modal-footer>
@@ -296,6 +378,103 @@
           <div class="form-text">Virtual namespace cannot be changed after creation</div>
         </c-col>
       </c-row>
+
+      <!-- Editable Fields -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="4">
+          <label cLabel for="ttlQueue-update">TTL Queue (seconds)</label>
+          <input cFormControl id="ttlQueue-update" formControlName="ttlQueue" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Time to live in seconds (must be >= 0)</small>
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="maxAttempts-update">Max Attempts *</label>
+          <input cFormControl id="maxAttempts-update" formControlName="maxAttempts" type="number" min="1" placeholder="1" />
+          <small class="form-text text-muted">Maximum number of attempts (must be > 0)</small>
+        </c-col>
+        <c-col [md]="4" class="d-flex align-items-center">
+          <div class="form-check">
+            <input cFormCheck id="allowDuplicated-update" formControlName="allowDuplicated" type="checkbox" />
+            <label cLabel for="allowDuplicated-update" class="form-check-label">Allow Duplicated</label>
+          </div>
+          <small class="form-text text-muted d-block w-100">Allow duplicate messages in the queue</small>
+        </c-col>
+      </c-row>
+
+      <!-- Priority Configuration Section -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-sort" class="me-2"></svg>
+            Priority Configuration
+          </h6>
+        </c-col>
+      </c-row>
+
+      <!-- Priority Type Selector -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="priorityType-update">Priority Type *</label>
+          <select cSelect id="priorityType-update" formControlName="priorityType" (change)="onUpdatePriorityTypeChange()">
+            <option value="normal">Normal</option>
+            <option value="fair">Fair</option>
+          </select>
+          <small class="form-text text-muted">Choose how priorities are managed for this queue</small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="maxPriority-update">Max Priority Supported *</label>
+          <input cFormControl id="maxPriority-update" formControlName="maxPriority" type="number" min="1" max="100" placeholder="1" (change)="onUpdateMaxPriorityChange()" />
+          <small class="form-text text-muted">Set the highest priority value allowed (1-100)</small>
+        </c-col>
+      </c-row>
+
+      <!-- Fair Priority Thresholds Configuration -->
+      <div *ngIf="updatePriorityType === 'fair'" class="mb-3">
+        <c-row class="mb-2">
+          <c-col [md]="12">
+            <label class="form-label fw-bold">Priority Thresholds</label>
+            <p class="text-muted small">
+              Set the number of tasks to process for each priority before moving to the next priority level.
+              Use 0 to process all tasks of a priority before moving to the next one.
+            </p>
+          </c-col>
+        </c-row>
+        <c-row [gutter]="{gy: 2, gx: 3}">
+          <c-col [md]="6" [lg]="4" *ngFor="let priority of getUpdatePriorityArray(); let i = index">
+            <div class="border rounded p-3 mb-2">
+              <label class="form-label">Priority {{i + 1}}</label>
+              <input 
+                cFormControl 
+                type="number" 
+                min="0" 
+                max="10000"
+                placeholder="0"
+                [(ngModel)]="updatePriorityThresholds[i]" 
+                [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="updateUpdatePriorityThreshold(i, $event)"
+                class="form-control" />
+              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this priority first)</small>
+            </div>
+          </c-col>
+        </c-row>
+        <div *ngIf="updatePriorityType === 'fair' && updateMaxPriority > 0" class="mt-2">
+          <c-alert color="info" class="mb-0">
+            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
+            Higher priorities (lower numbers) will be processed first, but after processing the specified number 
+            of tasks, the system will move to the next priority level.
+            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
+            before moving to the next priority level.
+          </c-alert>
+        </div>
+      </div>
+
+      <!-- Normal Priority Information -->
+      <div *ngIf="updatePriorityType === 'normal'" class="mb-3">
+        <c-alert color="info" class="mb-0">
+          <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order. 
+          Higher priorities (lower numbers) will always be processed before lower priorities.
+        </c-alert>
+      </div>
     </form>
   </c-modal-body>
   <c-modal-footer>
@@ -418,6 +597,30 @@
           </div>
           <div class="form-text">Whether duplicate messages are allowed in the queue</div>
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Priority Type</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="getPriorityTypeColor(selectedQueue?.PriorityType || selectedQueue?.priorityType)" shape="rounded-pill">
+              {{ getPriorityTypeLabel(selectedQueue?.PriorityType || selectedQueue?.priorityType) }}
+            </c-badge>
+            <span *ngIf="selectedQueue?.MaxPriority || selectedQueue?.maxPriority" class="ms-2 text-muted">
+              (Max: {{selectedQueue?.MaxPriority || selectedQueue?.maxPriority}})
+            </span>
+          </div>
+          <div class="form-text">Priority management type and maximum priority level</div>
+        </div>
+        <div class="mb-3" *ngIf="(selectedQueue?.PriorityType || selectedQueue?.priorityType) === 'fair' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
+          <label class="form-label fw-bold">Priority Thresholds</label>
+          <div class="p-2 bg-dark rounded">
+            <div class="row">
+              <div class="col-6 col-md-4 mb-1" *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds); let i = index">
+                <small class="text-muted">Priority {{i + 1}}:</small>
+                <strong class="ms-1">{{threshold}}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="form-text">Number of tasks to process per priority before moving to next level (0 = process all tasks of current priority first)</div>
+        </div>
       </div>
     </div>
   </c-modal-body>
@@ -450,6 +653,9 @@
         <li><strong>TTLQueue</strong>: Time to live in seconds (number >= 0, optional, default: 0)</li>
         <li><strong>AllowDuplicated</strong>: Allow duplicates (true/false, yes/no, 1/0, optional, default: true)</li>
         <li><strong>MaxAttempts</strong>: Maximum attempts (number > 0, optional, default: 1)</li>
+        <li><strong>PriorityType</strong>: Priority type (normal/fair, optional, default: normal)</li>
+        <li><strong>MaxPriority</strong>: Maximum priority level (1-100, optional, default: 1)</li>
+        <li><strong>PriorityThresholds</strong>: For fair priority, comma-separated values per priority (e.g., "10,20,30", optional, default: 0 for each priority)</li>
       </ul>
       <div class="form-text">First 4 fields are required. Code must be unique within the tenant. File must include header row.</div>
     </div>

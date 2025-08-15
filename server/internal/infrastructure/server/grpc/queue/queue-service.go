@@ -29,6 +29,29 @@ func NewQueueService(config *common.ServerConfing) *QueueService {
 	}
 }
 
+// Helper functions to convert between protobuf and model types
+func convertPriorityThresholds(protoMap map[int32]int32) map[int]int {
+	if protoMap == nil {
+		return nil
+	}
+	result := make(map[int]int)
+	for k, v := range protoMap {
+		result[int(k)] = int(v)
+	}
+	return result
+}
+
+func convertPriorityThresholdsToProto(modelMap map[int]int) map[int32]int32 {
+	if modelMap == nil {
+		return nil
+	}
+	result := make(map[int32]int32)
+	for k, v := range modelMap {
+		result[int32(k)] = int32(v)
+	}
+	return result
+}
+
 func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest) (*pb.CreateQueueResponse, error) {
 	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
 	if err != nil {
@@ -42,14 +65,15 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 
 	// Create queue with new properties
 	queue := &models.Queue{
-		Code:            r.Code,
-		VNamespace:      r.Vnamespace,
-		Name:            r.Name,
-		Type:            models.QueueType(r.Type),
-		State:           models.QueueActive, // Default state
-		TTLQueue:        int(r.TtlQueue),
-		AllowDuplicated: r.AllowDuplicated,
-		MaxAttempts:     int(r.MaxAttempts),
+		Code:               r.Code,
+		VNamespace:         r.Vnamespace,
+		Name:               r.Name,
+		Type:               models.QueueType(r.Type),
+		State:              models.QueueActive, // Default state
+		TTLQueue:           int(r.TtlQueue),
+		AllowDuplicated:    r.AllowDuplicated,
+		MaxAttempts:        int(r.MaxAttempts),
+		PriorityThresholds: convertPriorityThresholds(r.PriorityThresholds),
 	}
 
 	// Set defaults if not provided
@@ -67,17 +91,18 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 	return &pb.CreateQueueResponse{
 		Message: "Queue was asserted",
 		Result: &pb.Queue{
-			ID:              result.ID,
-			Code:            result.Code,
-			Name:            result.Name,
-			Type:            string(result.Type),
-			State:           string(result.State),
-			VNamespace:      result.VNamespace,
-			CreatedAt:       result.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:       result.UpdatedAt.Format(time.RFC3339),
-			TTLQueue:        int32(result.TTLQueue),
-			AllowDuplicated: result.AllowDuplicated,
-			MaxAttempts:     int32(result.MaxAttempts),
+			Id:                 result.ID,
+			Code:               result.Code,
+			Name:               result.Name,
+			Type:               string(result.Type),
+			State:              string(result.State),
+			Vnamespace:         result.VNamespace,
+			CreatedAt:          result.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:          result.UpdatedAt.Format(time.RFC3339),
+			TtlQueue:           int32(result.TTLQueue),
+			AllowDuplicated:    result.AllowDuplicated,
+			MaxAttempts:        int32(result.MaxAttempts),
+			PriorityThresholds: convertPriorityThresholdsToProto(result.PriorityThresholds),
 		},
 	}, nil
 }
@@ -96,14 +121,15 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 		}
 
 		queue := &models.Queue{
-			Code:            t.Code,
-			VNamespace:      t.Vnamespace,
-			Name:            t.Name,
-			Type:            models.QueueType(t.Type),
-			State:           models.QueueState(t.State),
-			TTLQueue:        int(t.TtlQueue),
-			AllowDuplicated: t.AllowDuplicated,
-			MaxAttempts:     int(t.MaxAttempts),
+			Code:               t.Code,
+			VNamespace:         t.Vnamespace,
+			Name:               t.Name,
+			Type:               models.QueueType(t.Type),
+			State:              models.QueueState(t.State),
+			TTLQueue:           int(t.TtlQueue),
+			AllowDuplicated:    t.AllowDuplicated,
+			MaxAttempts:        int(t.MaxAttempts),
+			PriorityThresholds: convertPriorityThresholds(t.PriorityThresholds),
 		}
 		// Set defaults if not provided
 		if queue.MaxAttempts == 0 {
@@ -120,17 +146,18 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 	rQueues := []*pb.Queue{}
 	for _, e := range queuesResult {
 		ex := &pb.Queue{
-			ID:              e.ID,
-			Code:            e.Code,
-			Name:            e.Name,
-			Type:            string(e.Type),
-			State:           string(e.State),
-			VNamespace:      e.VNamespace,
-			CreatedAt:       e.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:       e.UpdatedAt.Format(time.RFC3339),
-			TTLQueue:        int32(e.TTLQueue),
-			AllowDuplicated: e.AllowDuplicated,
-			MaxAttempts:     int32(e.MaxAttempts),
+			Id:                 e.ID,
+			Code:               e.Code,
+			Name:               e.Name,
+			Type:               string(e.Type),
+			State:              string(e.State),
+			Vnamespace:         e.VNamespace,
+			CreatedAt:          e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:          e.UpdatedAt.Format(time.RFC3339),
+			TtlQueue:           int32(e.TTLQueue),
+			AllowDuplicated:    e.AllowDuplicated,
+			MaxAttempts:        int32(e.MaxAttempts),
+			PriorityThresholds: convertPriorityThresholdsToProto(e.PriorityThresholds),
 		}
 		rQueues = append(rQueues, ex)
 	}
@@ -155,17 +182,18 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 	return &pb.GetQueueResponse{
 		Message: "Queue",
 		Result: &pb.Queue{
-			ID:              queue.ID,
-			Code:            queue.Code,
-			Name:            queue.Name,
-			Type:            string(queue.Type),
-			State:           string(queue.State),
-			VNamespace:      queue.VNamespace,
-			CreatedAt:       queue.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:       queue.UpdatedAt.Format(time.RFC3339),
-			TTLQueue:        int32(queue.TTLQueue),
-			AllowDuplicated: queue.AllowDuplicated,
-			MaxAttempts:     int32(queue.MaxAttempts),
+			Id:                 queue.ID,
+			Code:               queue.Code,
+			Name:               queue.Name,
+			Type:               string(queue.Type),
+			State:              string(queue.State),
+			Vnamespace:         queue.VNamespace,
+			CreatedAt:          queue.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:          queue.UpdatedAt.Format(time.RFC3339),
+			TtlQueue:           int32(queue.TTLQueue),
+			AllowDuplicated:    queue.AllowDuplicated,
+			MaxAttempts:        int32(queue.MaxAttempts),
+			PriorityThresholds: convertPriorityThresholdsToProto(queue.PriorityThresholds),
 		},
 	}, nil
 }
@@ -184,17 +212,18 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 	rQueues := []*pb.Queue{}
 	for _, e := range findResult.Entities {
 		ex := &pb.Queue{
-			ID:              e.ID,
-			Code:            e.Code,
-			Name:            e.Name,
-			Type:            string(e.Type),
-			State:           string(e.State),
-			VNamespace:      e.VNamespace,
-			CreatedAt:       e.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:       e.UpdatedAt.Format(time.RFC3339),
-			TTLQueue:        int32(e.TTLQueue),
-			AllowDuplicated: e.AllowDuplicated,
-			MaxAttempts:     int32(e.MaxAttempts),
+			Id:                 e.ID,
+			Code:               e.Code,
+			Name:               e.Name,
+			Type:               string(e.Type),
+			State:              string(e.State),
+			Vnamespace:         e.VNamespace,
+			CreatedAt:          e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:          e.UpdatedAt.Format(time.RFC3339),
+			TtlQueue:           int32(e.TTLQueue),
+			AllowDuplicated:    e.AllowDuplicated,
+			MaxAttempts:        int32(e.MaxAttempts),
+			PriorityThresholds: convertPriorityThresholdsToProto(e.PriorityThresholds),
 		}
 		rQueues = append(rQueues, ex)
 	}

@@ -71,18 +71,19 @@ func (QueueType) EnumDescriptor() ([]byte, []int) {
 }
 
 type CreateQueueRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	TenantId        string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	Code            string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name            string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Type            string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	State           string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace      string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	TtlQueue        int32                  `protobuf:"varint,7,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
-	AllowDuplicated bool                   `protobuf:"varint,8,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts     int32                  `protobuf:"varint,9,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TenantId           string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	Code               string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name               string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type               string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	State              string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace         string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	TtlQueue           int32                  `protobuf:"varint,7,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
+	AllowDuplicated    bool                   `protobuf:"varint,8,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts        int32                  `protobuf:"varint,9,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	PriorityThresholds map[int32]int32        `protobuf:"bytes,10,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CreateQueueRequest) Reset() {
@@ -176,6 +177,13 @@ func (x *CreateQueueRequest) GetMaxAttempts() int32 {
 		return x.MaxAttempts
 	}
 	return 0
+}
+
+func (x *CreateQueueRequest) GetPriorityThresholds() map[int32]int32 {
+	if x != nil {
+		return x.PriorityThresholds
+	}
+	return nil
 }
 
 type CreateQueueResponse struct {
@@ -283,17 +291,18 @@ func (x *BulkCreateQueueRequest) GetQueues() []*CreateQueueItem {
 }
 
 type CreateQueueItem struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Code            string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Type            string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	State           string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace      string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	TtlQueue        int32                  `protobuf:"varint,6,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
-	AllowDuplicated bool                   `protobuf:"varint,7,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts     int32                  `protobuf:"varint,8,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Code               string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Name               string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Type               string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	State              string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace         string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	TtlQueue           int32                  `protobuf:"varint,6,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
+	AllowDuplicated    bool                   `protobuf:"varint,7,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts        int32                  `protobuf:"varint,8,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	PriorityThresholds map[int32]int32        `protobuf:"bytes,9,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CreateQueueItem) Reset() {
@@ -380,6 +389,13 @@ func (x *CreateQueueItem) GetMaxAttempts() int32 {
 		return x.MaxAttempts
 	}
 	return 0
+}
+
+func (x *CreateQueueItem) GetPriorityThresholds() map[int32]int32 {
+	if x != nil {
+		return x.PriorityThresholds
+	}
+	return nil
 }
 
 type BulkCreateQueueResponse struct {
@@ -615,20 +631,21 @@ func (x *GetQueuesRequest) GetVnamespace() string {
 }
 
 type Queue struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	ID              string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Code            string                 `protobuf:"bytes,2,opt,name=Code,proto3" json:"Code,omitempty"`
-	Name            string                 `protobuf:"bytes,3,opt,name=Name,proto3" json:"Name,omitempty"`
-	Type            string                 `protobuf:"bytes,4,opt,name=Type,proto3" json:"Type,omitempty"`
-	State           string                 `protobuf:"bytes,5,opt,name=State,proto3" json:"State,omitempty"`
-	VNamespace      string                 `protobuf:"bytes,6,opt,name=VNamespace,proto3" json:"VNamespace,omitempty"`
-	CreatedAt       string                 `protobuf:"bytes,7,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	UpdatedAt       string                 `protobuf:"bytes,8,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
-	TTLQueue        int32                  `protobuf:"varint,9,opt,name=TTLQueue,proto3" json:"TTLQueue,omitempty"`
-	AllowDuplicated bool                   `protobuf:"varint,10,opt,name=AllowDuplicated,proto3" json:"AllowDuplicated,omitempty"`
-	MaxAttempts     int32                  `protobuf:"varint,11,opt,name=MaxAttempts,proto3" json:"MaxAttempts,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Code               string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name               string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type               string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	State              string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace         string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	CreatedAt          string                 `protobuf:"bytes,7,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt          string                 `protobuf:"bytes,8,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	TtlQueue           int32                  `protobuf:"varint,9,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
+	AllowDuplicated    bool                   `protobuf:"varint,10,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts        int32                  `protobuf:"varint,11,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	PriorityThresholds map[int32]int32        `protobuf:"bytes,12,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Queue) Reset() {
@@ -661,9 +678,9 @@ func (*Queue) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *Queue) GetID() string {
+func (x *Queue) GetId() string {
 	if x != nil {
-		return x.ID
+		return x.Id
 	}
 	return ""
 }
@@ -696,9 +713,9 @@ func (x *Queue) GetState() string {
 	return ""
 }
 
-func (x *Queue) GetVNamespace() string {
+func (x *Queue) GetVnamespace() string {
 	if x != nil {
-		return x.VNamespace
+		return x.Vnamespace
 	}
 	return ""
 }
@@ -717,9 +734,9 @@ func (x *Queue) GetUpdatedAt() string {
 	return ""
 }
 
-func (x *Queue) GetTTLQueue() int32 {
+func (x *Queue) GetTtlQueue() int32 {
 	if x != nil {
-		return x.TTLQueue
+		return x.TtlQueue
 	}
 	return 0
 }
@@ -738,10 +755,17 @@ func (x *Queue) GetMaxAttempts() int32 {
 	return 0
 }
 
+func (x *Queue) GetPriorityThresholds() map[int32]int32 {
+	if x != nil {
+		return x.PriorityThresholds
+	}
+	return nil
+}
+
 type QueueFindResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Entities      []*Queue               `protobuf:"bytes,1,rep,name=Entities,proto3" json:"Entities,omitempty"`
-	Cursor        string                 `protobuf:"bytes,2,opt,name=Cursor,proto3" json:"Cursor,omitempty"`
+	Entities      []*Queue               `protobuf:"bytes,1,rep,name=entities,proto3" json:"entities,omitempty"`
+	Cursor        string                 `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -942,7 +966,7 @@ var File_internal_infrastructure_server_grpc_proto_definitions_queue_proto proto
 
 const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc = "" +
 	"\n" +
-	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\x8a\x02\n" +
+	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xb4\x03\n" +
 	"\x12CreateQueueRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -954,13 +978,18 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"vnamespace\x12\x1a\n" +
 	"\bttlQueue\x18\a \x01(\x05R\bttlQueue\x12(\n" +
 	"\x0fallowDuplicated\x18\b \x01(\bR\x0fallowDuplicated\x12 \n" +
-	"\vmaxAttempts\x18\t \x01(\x05R\vmaxAttempts\"U\n" +
+	"\vmaxAttempts\x18\t \x01(\x05R\vmaxAttempts\x12a\n" +
+	"\x12priorityThresholds\x18\n" +
+	" \x03(\v21.queue.CreateQueueRequest.PriorityThresholdsEntryR\x12priorityThresholds\x1aE\n" +
+	"\x17PriorityThresholdsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"U\n" +
 	"\x13CreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
 	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"d\n" +
 	"\x16BulkCreateQueueRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xeb\x01\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\x92\x03\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -971,7 +1000,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"vnamespace\x12\x1a\n" +
 	"\bttlQueue\x18\x06 \x01(\x05R\bttlQueue\x12(\n" +
 	"\x0fallowDuplicated\x18\a \x01(\bR\x0fallowDuplicated\x12 \n" +
-	"\vmaxAttempts\x18\b \x01(\x05R\vmaxAttempts\"Y\n" +
+	"\vmaxAttempts\x18\b \x01(\x05R\vmaxAttempts\x12^\n" +
+	"\x12priorityThresholds\x18\t \x03(\v2..queue.CreateQueueItem.PriorityThresholdsEntryR\x12priorityThresholds\x1aE\n" +
+	"\x17PriorityThresholdsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"Y\n" +
 	"\x17BulkCreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
 	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"G\n" +
@@ -988,25 +1021,29 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"\xad\x02\n" +
+	"vnamespace\"\xca\x03\n" +
 	"\x05Queue\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
-	"\x04Code\x18\x02 \x01(\tR\x04Code\x12\x12\n" +
-	"\x04Name\x18\x03 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x04 \x01(\tR\x04Type\x12\x14\n" +
-	"\x05State\x18\x05 \x01(\tR\x05State\x12\x1e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x14\n" +
+	"\x05state\x18\x05 \x01(\tR\x05state\x12\x1e\n" +
 	"\n" +
-	"VNamespace\x18\x06 \x01(\tR\n" +
-	"VNamespace\x12\x1c\n" +
-	"\tCreatedAt\x18\a \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\b \x01(\tR\tUpdatedAt\x12\x1a\n" +
-	"\bTTLQueue\x18\t \x01(\x05R\bTTLQueue\x12(\n" +
-	"\x0fAllowDuplicated\x18\n" +
-	" \x01(\bR\x0fAllowDuplicated\x12 \n" +
-	"\vMaxAttempts\x18\v \x01(\x05R\vMaxAttempts\"S\n" +
+	"vnamespace\x18\x06 \x01(\tR\n" +
+	"vnamespace\x12\x1c\n" +
+	"\tcreatedAt\x18\a \x01(\tR\tcreatedAt\x12\x1c\n" +
+	"\tupdatedAt\x18\b \x01(\tR\tupdatedAt\x12\x1a\n" +
+	"\bttlQueue\x18\t \x01(\x05R\bttlQueue\x12(\n" +
+	"\x0fallowDuplicated\x18\n" +
+	" \x01(\bR\x0fallowDuplicated\x12 \n" +
+	"\vmaxAttempts\x18\v \x01(\x05R\vmaxAttempts\x12T\n" +
+	"\x12priorityThresholds\x18\f \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x1aE\n" +
+	"\x17PriorityThresholdsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"S\n" +
 	"\x0fQueueFindResult\x12(\n" +
-	"\bEntities\x18\x01 \x03(\v2\f.queue.QueueR\bEntities\x12\x16\n" +
-	"\x06Cursor\x18\x02 \x01(\tR\x06Cursor\"]\n" +
+	"\bentities\x18\x01 \x03(\v2\f.queue.QueueR\bentities\x12\x16\n" +
+	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"]\n" +
 	"\x11GetQueuesResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12.\n" +
 	"\x06result\x18\x02 \x01(\v2\x16.queue.QueueFindResultR\x06result\"J\n" +
@@ -1039,7 +1076,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawD
 }
 
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_goTypes = []any{
 	(QueueType)(0),                  // 0: queue.QueueType
 	(*CreateQueueRequest)(nil),      // 1: queue.CreateQueueRequest
@@ -1055,29 +1092,35 @@ var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_goTyp
 	(*GetQueuesResponse)(nil),       // 11: queue.GetQueuesResponse
 	(*DeleteQueueRequest)(nil),      // 12: queue.DeleteQueueRequest
 	(*DeleteQueueResponse)(nil),     // 13: queue.DeleteQueueResponse
+	nil,                             // 14: queue.CreateQueueRequest.PriorityThresholdsEntry
+	nil,                             // 15: queue.CreateQueueItem.PriorityThresholdsEntry
+	nil,                             // 16: queue.Queue.PriorityThresholdsEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_depIdxs = []int32{
-	9,  // 0: queue.CreateQueueResponse.result:type_name -> queue.Queue
-	4,  // 1: queue.BulkCreateQueueRequest.queues:type_name -> queue.CreateQueueItem
-	9,  // 2: queue.BulkCreateQueueResponse.result:type_name -> queue.Queue
-	9,  // 3: queue.GetQueueResponse.result:type_name -> queue.Queue
-	9,  // 4: queue.QueueFindResult.Entities:type_name -> queue.Queue
-	10, // 5: queue.GetQueuesResponse.result:type_name -> queue.QueueFindResult
-	1,  // 6: queue.QueueService.CreateQueue:input_type -> queue.CreateQueueRequest
-	3,  // 7: queue.QueueService.BulkCreateQueue:input_type -> queue.BulkCreateQueueRequest
-	6,  // 8: queue.QueueService.GetQueue:input_type -> queue.GetQueueRequest
-	8,  // 9: queue.QueueService.GetQueues:input_type -> queue.GetQueuesRequest
-	12, // 10: queue.QueueService.DeleteQueue:input_type -> queue.DeleteQueueRequest
-	2,  // 11: queue.QueueService.CreateQueue:output_type -> queue.CreateQueueResponse
-	5,  // 12: queue.QueueService.BulkCreateQueue:output_type -> queue.BulkCreateQueueResponse
-	7,  // 13: queue.QueueService.GetQueue:output_type -> queue.GetQueueResponse
-	11, // 14: queue.QueueService.GetQueues:output_type -> queue.GetQueuesResponse
-	13, // 15: queue.QueueService.DeleteQueue:output_type -> queue.DeleteQueueResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	14, // 0: queue.CreateQueueRequest.priorityThresholds:type_name -> queue.CreateQueueRequest.PriorityThresholdsEntry
+	9,  // 1: queue.CreateQueueResponse.result:type_name -> queue.Queue
+	4,  // 2: queue.BulkCreateQueueRequest.queues:type_name -> queue.CreateQueueItem
+	15, // 3: queue.CreateQueueItem.priorityThresholds:type_name -> queue.CreateQueueItem.PriorityThresholdsEntry
+	9,  // 4: queue.BulkCreateQueueResponse.result:type_name -> queue.Queue
+	9,  // 5: queue.GetQueueResponse.result:type_name -> queue.Queue
+	16, // 6: queue.Queue.priorityThresholds:type_name -> queue.Queue.PriorityThresholdsEntry
+	9,  // 7: queue.QueueFindResult.entities:type_name -> queue.Queue
+	10, // 8: queue.GetQueuesResponse.result:type_name -> queue.QueueFindResult
+	1,  // 9: queue.QueueService.CreateQueue:input_type -> queue.CreateQueueRequest
+	3,  // 10: queue.QueueService.BulkCreateQueue:input_type -> queue.BulkCreateQueueRequest
+	6,  // 11: queue.QueueService.GetQueue:input_type -> queue.GetQueueRequest
+	8,  // 12: queue.QueueService.GetQueues:input_type -> queue.GetQueuesRequest
+	12, // 13: queue.QueueService.DeleteQueue:input_type -> queue.DeleteQueueRequest
+	2,  // 14: queue.QueueService.CreateQueue:output_type -> queue.CreateQueueResponse
+	5,  // 15: queue.QueueService.BulkCreateQueue:output_type -> queue.BulkCreateQueueResponse
+	7,  // 16: queue.QueueService.GetQueue:output_type -> queue.GetQueueResponse
+	11, // 17: queue.QueueService.GetQueues:output_type -> queue.GetQueuesResponse
+	13, // 18: queue.QueueService.DeleteQueue:output_type -> queue.DeleteQueueResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_init() }
@@ -1091,7 +1134,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_init
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   13,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

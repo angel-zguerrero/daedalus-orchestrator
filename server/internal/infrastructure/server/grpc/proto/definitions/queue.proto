@@ -28,6 +28,7 @@ message CreateQueueRequest {
   int32 ttlQueue = 7;
   bool allowDuplicated = 8;
   int32 maxAttempts = 9;
+  map<int32, int32> priorityThresholds = 10;
 }
 
 message CreateQueueResponse {
@@ -49,6 +50,7 @@ message CreateQueueItem {
   int32 ttlQueue = 6;
   bool allowDuplicated = 7;
   int32 maxAttempts = 8;
+  map<int32, int32> priorityThresholds = 9;
 }
 
 message BulkCreateQueueResponse {
@@ -75,22 +77,23 @@ message GetQueuesRequest {
 }
 
 message Queue {
-  string ID = 1;
-  string Code = 2;
-  string Name = 3;
-  string Type = 4;
-  string State = 5;
-  string VNamespace = 6;
-  string CreatedAt = 7;
-  string UpdatedAt = 8;
-  int32 TTLQueue = 9;
-  bool AllowDuplicated = 10;
-  int32 MaxAttempts = 11;
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string type = 4;
+  string state = 5;
+  string vnamespace = 6;
+  string createdAt = 7;
+  string updatedAt = 8;
+  int32 ttlQueue = 9;
+  bool allowDuplicated = 10;
+  int32 maxAttempts = 11;
+  map<int32, int32> priorityThresholds = 12;
 }
 
 message QueueFindResult {
-  repeated Queue Entities = 1;
-  string Cursor = 2;
+  repeated Queue entities = 1;
+  string cursor = 2;
 }
 
 message GetQueuesResponse {
