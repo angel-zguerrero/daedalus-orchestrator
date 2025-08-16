@@ -302,7 +302,7 @@
         <div *ngIf="priorityType === 'fair' && maxPriority > 0" class="mt-2">
           <c-alert color="info" class="mb-0">
             <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
-            Higher priorities (lower numbers) will be processed first, but after processing the specified number 
+            Higher priorities (higher numbers) will be processed first, but after processing the specified number 
             of tasks, the system will move to the next priority level.
             <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
             before moving to the next priority level.
@@ -314,7 +314,7 @@
       <div *ngIf="priorityType === 'normal'" class="mb-3">
         <c-alert color="info" class="mb-0">
           <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order. 
-          Higher priorities (lower numbers) will always be processed before lower priorities.
+          Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
     </form>
@@ -460,7 +460,7 @@
         <div *ngIf="updatePriorityType === 'fair' && updateMaxPriority > 0" class="mt-2">
           <c-alert color="info" class="mb-0">
             <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
-            Higher priorities (lower numbers) will be processed first, but after processing the specified number 
+            Higher priorities (higher numbers) will be processed first, but after processing the specified number 
             of tasks, the system will move to the next priority level.
             <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
             before moving to the next priority level.
@@ -472,7 +472,7 @@
       <div *ngIf="updatePriorityType === 'normal'" class="mb-3">
         <c-alert color="info" class="mb-0">
           <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order. 
-          Higher priorities (lower numbers) will always be processed before lower priorities.
+          Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
     </form>
@@ -664,12 +664,12 @@
                 Tasks are processed strictly by priority order (highest priority first)
               </div>
               <div class="small text-muted">
-                Max Priority Levels: <strong class="text-light">{{ selectedQueue?.MaxPriority || selectedQueue?.maxPriority || 1 }}</strong>
+                Max Priority Levels: <strong class="text-light">{{ getCalculatedMaxPriorityLevels(selectedQueue) }}</strong>
               </div>
             </div>
           </div>
           <div class="form-text mt-2">
-            Normal priority processes all high-priority tasks before moving to lower priorities
+            Normal priority processes all high-priority tasks before moving to lower priority tasks
           </div>
         </div>
       </div>

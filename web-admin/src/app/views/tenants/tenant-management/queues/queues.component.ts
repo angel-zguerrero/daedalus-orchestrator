@@ -716,4 +716,23 @@ export class QueuesComponent implements OnInit {
     }
     return 'normal';
   }
+
+  getCalculatedMaxPriorityLevels(queue: any): number {
+    if (queue && (queue.PriorityThresholds || queue.priorityThresholds)) {
+      const thresholds = queue.PriorityThresholds || queue.priorityThresholds;
+      
+      if (typeof thresholds === 'object' && !Array.isArray(thresholds)) {
+        // Get the highest key number from the object
+        const keys = Object.keys(thresholds).map(key => Number(key));
+        if (keys.length > 0) {
+          return Math.max(...keys) + 1; // Add 1 because priorities are 0-indexed
+        }
+      } else if (Array.isArray(thresholds)) {
+        return thresholds.length;
+      }
+    }
+    
+    // Fallback to MaxPriority or maxPriority if available
+    return queue?.MaxPriority || queue?.maxPriority || 1;
+  }
 }
