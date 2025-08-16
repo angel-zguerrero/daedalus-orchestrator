@@ -559,13 +559,13 @@
           </div>
           <div class="form-text">Queue type determines message processing behavior</div>
         </div>
-      </div>
-      <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">Virtual Namespace</label>
           <div class="p-2 bg-dark rounded">{{ selectedQueue?.VNamespace || selectedQueue?.vNamespace || selectedQueue?.vnamespace || '-' }}</div>
           <div class="form-text">Virtual namespace for logical grouping</div>
         </div>
+      </div>
+      <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">Created At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedQueue?.CreatedAt || selectedQueue?.createdAt) | date:'full' }}</div>
@@ -597,6 +597,12 @@
           </div>
           <div class="form-text">Whether duplicate messages are allowed in the queue</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Priority Type Section - Full Width -->
+    <div class="row">
+      <div class="col-12">
         <div class="mb-3">
           <label class="form-label fw-bold">Priority Type</label>
           <div class="p-2 bg-dark rounded">
@@ -609,20 +615,22 @@
           </div>
           <div class="form-text">Priority management type and maximum priority level</div>
         </div>
+        
+        <!-- Fair Priority Thresholds -->
         <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'fair' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
           <label class="form-label fw-bold">Priority Thresholds</label>
           <div class="p-3 bg-dark rounded">
-            <div class="row g-2">
-              <div class="col-6 col-lg-3" *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds); let i = index">
-                <div class="border border-secondary rounded p-2 text-center bg-light">
-                  <div class="small text-muted fw-bold mb-1">Priority {{i + 1}}</div>
-                  <div class="h6 mb-0 text-primary">
-                    <c-badge color="primary" shape="rounded-pill" class="px-3">
+            <div class="row g-3">
+              <div class="col-6 col-md-4 col-lg-3" *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds); let i = index">
+                <div class="card bg-primary bg-opacity-75 border-0 h-100">
+                  <div class="card-body text-center p-4">
+                    <div class="text-white fw-bold mb-3">Priority {{i + 1}}</div>
+                    <div class="h4 mb-3 text-white">
                       {{ threshold === 0 ? 'All' : threshold }}
-                    </c-badge>
-                  </div>
-                  <div class="small text-muted mt-1">
-                    {{ threshold === 0 ? 'Process all tasks' : 'tasks' }}
+                    </div>
+                    <div class="small text-white-50">
+                      {{ threshold === 0 ? 'Process all tasks' : 'tasks limit' }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -641,24 +649,22 @@
           </div>
         </div>
         
-        <!-- Show priority thresholds for normal type as well -->
+        <!-- Normal Priority Configuration -->
         <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'normal' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
           <label class="form-label fw-bold">Priority Configuration</label>
           <div class="p-3 bg-dark rounded">
-            <div class="text-center p-3 bg-secondary bg-opacity-10 border border-secondary rounded">
-              <div class="h5 mb-2">
-                <c-badge color="secondary" shape="rounded-pill" class="px-4 py-2">
+            <div class="text-center p-4 bg-secondary bg-opacity-20 border border-secondary rounded">
+              <div class="h5 mb-3">
+                <c-badge color="secondary" shape="rounded-pill" class="px-4 py-2 fs-6">
                   <svg cIcon name="cil-sort-alpha-down" class="me-2"></svg>
                   Normal Priority Mode
                 </c-badge>
               </div>
-              <div class="text-muted">
+              <div class="text-light mb-3">
                 Tasks are processed strictly by priority order (highest priority first)
               </div>
-              <div class="mt-2">
-                <small class="text-muted">
-                  Max Priority Levels: <strong>{{ selectedQueue?.MaxPriority || selectedQueue?.maxPriority || 1 }}</strong>
-                </small>
+              <div class="small text-muted">
+                Max Priority Levels: <strong class="text-light">{{ selectedQueue?.MaxPriority || selectedQueue?.maxPriority || 1 }}</strong>
               </div>
             </div>
           </div>
