@@ -615,8 +615,8 @@
             <c-badge [color]="getPriorityTypeColor(getCalculatedPriorityType(selectedQueue))" shape="rounded-pill">
               {{ getPriorityTypeLabel(getCalculatedPriorityType(selectedQueue)) }}
             </c-badge>
-            <span *ngIf="selectedQueue?.MaxPriority || selectedQueue?.maxPriority" class="ms-2 text-muted">
-              (Max: {{selectedQueue?.MaxPriority || selectedQueue?.maxPriority}})
+            <span class="ms-2 text-muted">
+              (Max Priority Supported: {{getCalculatedMaxPriorityLevels(selectedQueue)}})
             </span>
           </div>
           <div class="form-text">Priority management type and maximum priority level</div>
