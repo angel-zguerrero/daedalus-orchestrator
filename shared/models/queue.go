@@ -29,12 +29,13 @@ type Queue struct {
 	State QueueState
 	Type  QueueType
 
-	TTLQueue           int
-	AllowDuplicated    bool
-	MaxAttempts        int
-	PriorityThresholds map[int]int
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	TTLQueue                  int
+	AllowDuplicated           bool
+	MaxAttempts               int
+	DesiredPriorityThresholds map[int]int
+	PriorityThresholds        map[int]int
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 }
 
 func (Queue) TableName() string {

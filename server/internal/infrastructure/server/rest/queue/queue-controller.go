@@ -28,15 +28,15 @@ func NewQueueController(Config *common.ServerConfing) *QueueController {
 }
 
 type createQueueRequest struct {
-	Code               string      `json:"code" binding:"required"`
-	Name               string      `json:"name" binding:"required"`
-	Type               string      `json:"type" binding:"required"`
-	State              string      `json:"state"`
-	VNamespace         string      `json:"vnamespace" binding:"required"`
-	TTLQueue           int         `json:"ttlQueue"`
-	AllowDuplicated    bool        `json:"allowDuplicated"`
-	MaxAttempts        int         `json:"maxAttempts"`
-	PriorityThresholds map[int]int `json:"priorityThresholds"`
+	Code                      string      `json:"code" binding:"required"`
+	Name                      string      `json:"name" binding:"required"`
+	Type                      string      `json:"type" binding:"required"`
+	State                     string      `json:"state"`
+	VNamespace                string      `json:"vnamespace" binding:"required"`
+	TTLQueue                  int         `json:"ttlQueue"`
+	AllowDuplicated           bool        `json:"allowDuplicated"`
+	MaxAttempts               int         `json:"maxAttempts"`
+	DesiredPriorityThresholds map[int]int `json:"desiredPriorityThresholds"`
 }
 
 type createBulkQueueRequest struct {
@@ -77,15 +77,15 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 
 	// Create queue with all properties
 	queue := &models.Queue{
-		Code:               req.Code,
-		VNamespace:         req.VNamespace,
-		Name:               req.Name,
-		Type:               models.QueueType(req.Type),
-		State:              models.QueueState(req.State),
-		TTLQueue:           req.TTLQueue,
-		AllowDuplicated:    req.AllowDuplicated,
-		MaxAttempts:        req.MaxAttempts,
-		PriorityThresholds: req.PriorityThresholds,
+		Code:                      req.Code,
+		VNamespace:                req.VNamespace,
+		Name:                      req.Name,
+		Type:                      models.QueueType(req.Type),
+		State:                     models.QueueState(req.State),
+		TTLQueue:                  req.TTLQueue,
+		AllowDuplicated:           req.AllowDuplicated,
+		MaxAttempts:               req.MaxAttempts,
+		DesiredPriorityThresholds: req.DesiredPriorityThresholds,
 	}
 
 	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), []*models.Queue{queue}, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
@@ -137,15 +137,15 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			t.MaxAttempts = 1
 		}
 		queue := &models.Queue{
-			Code:               t.Code,
-			VNamespace:         t.VNamespace,
-			Name:               t.Name,
-			Type:               models.QueueType(t.Type),
-			State:              models.QueueState(t.State),
-			TTLQueue:           t.TTLQueue,
-			AllowDuplicated:    t.AllowDuplicated,
-			MaxAttempts:        t.MaxAttempts,
-			PriorityThresholds: t.PriorityThresholds,
+			Code:                      t.Code,
+			VNamespace:                t.VNamespace,
+			Name:                      t.Name,
+			Type:                      models.QueueType(t.Type),
+			State:                     models.QueueState(t.State),
+			TTLQueue:                  t.TTLQueue,
+			AllowDuplicated:           t.AllowDuplicated,
+			MaxAttempts:               t.MaxAttempts,
+			DesiredPriorityThresholds: t.DesiredPriorityThresholds,
 		}
 		queues = append(queues, queue)
 	}

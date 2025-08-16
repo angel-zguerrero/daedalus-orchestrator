@@ -28,7 +28,7 @@ message CreateQueueRequest {
   int32 ttlQueue = 7;
   bool allowDuplicated = 8;
   int32 maxAttempts = 9;
-  map<int32, int32> priorityThresholds = 10;
+  map<int32, int32> desiredPriorityThresholds = 10;
 }
 
 message CreateQueueResponse {
@@ -50,7 +50,7 @@ message CreateQueueItem {
   int32 ttlQueue = 6;
   bool allowDuplicated = 7;
   int32 maxAttempts = 8;
-  map<int32, int32> priorityThresholds = 9;
+  map<int32, int32> desiredPriorityThresholds = 9;
 }
 
 message BulkCreateQueueResponse {
@@ -88,7 +88,8 @@ message Queue {
   int32 ttlQueue = 9;
   bool allowDuplicated = 10;
   int32 maxAttempts = 11;
-  map<int32, int32> priorityThresholds = 12;
+  map<int32, int32> desiredPriorityThresholds = 12;
+  map<int32, int32> priorityThresholds = 13;
 }
 
 message QueueFindResult {

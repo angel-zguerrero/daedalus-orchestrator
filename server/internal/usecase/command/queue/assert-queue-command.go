@@ -95,7 +95,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 				}
 			}
 
-			fmt.Println("Creating queue:::", queue.PriorityThresholds)
+			fmt.Println("Creating queue:::", queue.DesiredPriorityThresholds)
 
 			_, err = queueRepo.CreateQueue(&queue, now)
 		}
