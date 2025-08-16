@@ -65,6 +65,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			queue.Type = existing.Type
 			queue.VNamespace = existing.VNamespace
 			queue.CreatedAt = existing.CreatedAt
+			queue.PriorityThresholds = existing.PriorityThresholds
 
 			_, err = queueRepo.UpdateQueue(&queue, now)
 		} else {
