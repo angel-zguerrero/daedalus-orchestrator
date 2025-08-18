@@ -4,6 +4,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
+	"deadalus-orch/server/internal/pkg/config"
 	business_logic "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
 	"fmt"
@@ -72,16 +73,54 @@ func (app *Application) sendNodeSchedulerHeartbeat() {
 	// Create NodeScheduler business object
 	nodeSchedulerBO := business_logic.NewNodeSchedulerBO(serverConfig)
 
-	// Create NodeScheduler instance
-	nodeScheduler := &models.NodeScheduler{
-		Name: nodeSchedulerName,
-	}
-
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Send heartbeat by calling BulkUpsertNodeScheduler
+	// First, paginate through all existing node schedulers to update their connection status
+	pageSize := 100
+	cursor := ""
+	allNodeSchedulers := []*models.NodeScheduler{}
+
+	for {
+		findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", cursor, pageSize)
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
+			break
+		}
+
+		// Convert to pointers and add to the list (without TTL and LastHeartbeat to preserve existing values)
+		for _, ns := range findResult.Entities {
+			nodeSchedulerCopy := ns // Create a copy to avoid reference issues
+			// Don't set TTL or LastHeartbeat - let the upsert command handle these based on existing values
+			allNodeSchedulers = append(allNodeSchedulers, &nodeSchedulerCopy)
+		}
+
+		// Check if we have more pages
+		if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
+			break
+		}
+		cursor = findResult.Cursor
+	}
+
+	// Bulk upsert all existing node schedulers to update their connection status
+	if len(allNodeSchedulers) > 0 {
+		_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, allNodeSchedulers)
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
+		} else {
+			log.Debug().Int("count", len(allNodeSchedulers)).Msg("✅ Updated connection status for existing NodeSchedulers")
+		}
+	}
+
+	// Now send heartbeat for the current server
+	nodeScheduler := &models.NodeScheduler{
+		Name:          nodeSchedulerName,
+		LastHeartbeat: time.Now(),
+		TTL:           config.GlobalConfiguration.NodeSchedulerTTL * 60, // Convert minutes to seconds
+	}
+
+	// Send heartbeat by calling BulkUpsertNodeScheduler for current server
 	_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, []*models.NodeScheduler{nodeScheduler})
 	if err != nil {
 		log.Err(err).Msg("❌ Failed to send NodeScheduler heartbeat")

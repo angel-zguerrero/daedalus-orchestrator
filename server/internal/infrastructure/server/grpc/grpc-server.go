@@ -12,10 +12,12 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/grpc/auth"     // Import new auth service
 	"deadalus-orch/server/internal/infrastructure/server/grpc/exchange" // Import new exchange service
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/nodescheduler" // Import nodescheduler service
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
-	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth"         // Import new auth pb
-	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange" // Import new exchange pb
-	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"       // Import new queue pb
+	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth"                   // Import new auth pb
+	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"           // Import new exchange pb
+	pbNodeScheduler "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/nodescheduler" // Import nodescheduler pb
+	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"                 // Import new queue pb
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/queue" // Import new queue service
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
@@ -64,6 +66,10 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	// Register new QueueService
 	queueSvc := queue.NewQueueService(cfg)
 	pbQueue.RegisterQueueServiceServer(server, queueSvc)
+
+	// Register new NodeSchedulerService
+	nodeSchedulerSvc := nodescheduler.NewNodeSchedulerService(cfg)
+	pbNodeScheduler.RegisterNodeSchedulerServiceServer(server, nodeSchedulerSvc)
 
 	return &GrpcServer{
 		Config:     cfg,

@@ -68,8 +68,7 @@ func (bo *NodeSchedulerBO) BulkUpsertNodeScheduler(ctx context.Context, nodeSche
 			continue
 		}
 		t.Information = resourceUsage
-		t.LastHeartbeat = time.Now()
-		t.TTL = config.GlobalConfiguration.NodeSchedulerTTL * 60 // Convert minutes to seconds
+
 	}
 
 	upsertNodeSchedulerCommand := &node_scheduler.UpsertNodeSchedulerCommand{

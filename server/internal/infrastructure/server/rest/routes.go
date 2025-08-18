@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
+	"deadalus-orch/server/internal/infrastructure/server/rest/nodescheduler"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
@@ -20,6 +21,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	exchangeController := exchange.NewExchangeController(s.Config)
 	queueController := queue.NewQueueController(s.Config)
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
+	nodeSchedulerController := nodescheduler.NewNodeSchedulerController(s.Config)
 
 	restAPIGroup := engine.Group("/rest-api")
 	{
@@ -54,6 +56,14 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 				tenantsGroup.GET("/:id/vnamespaces", vnamespaceController.GetVNamespacesHandler)
 			}
+		}
+
+		nodeSchedulersGroup := restAPIGroup.Group("/node-schedulers")
+		nodeSchedulersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		nodeSchedulersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 20))
+		{
+			nodeSchedulersGroup.GET("", nodeSchedulerController.GetNodeSchedulersHandler)
+			nodeSchedulersGroup.GET("/:id", nodeSchedulerController.GetNodeSchedulerHandler)
 		}
 
 	}
