@@ -10,5 +10,10 @@ export const navItems: INavData[] = [
     name: 'Tenants',
     url: '/tenants',
     iconComponent: { name: 'cil-people' }
+  },
+  {
+    name: 'Node Schedulers',
+    url: '/node-schedulers',
+    iconComponent: { name: 'cil-settings' }
   }
 ];
