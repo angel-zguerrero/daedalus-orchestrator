@@ -77,39 +77,41 @@ func (app *Application) sendNodeSchedulerHeartbeat() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// First, paginate through all existing node schedulers to update their connection status
-	pageSize := 100
-	cursor := ""
-	allNodeSchedulers := []*models.NodeScheduler{}
+	if app.MasterNodeIsLeader {
+		// First, paginate through all existing node schedulers to update their connection status
+		pageSize := 100
+		cursor := ""
+		allNodeSchedulers := []*models.NodeScheduler{}
 
-	for {
-		findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", cursor, pageSize)
-		if err != nil {
-			log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
-			break
+		for {
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", cursor, pageSize)
+			if err != nil {
+				log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
+				break
+			}
+
+			// Convert to pointers and add to the list (without TTL and LastHeartbeat to preserve existing values)
+			for _, ns := range findResult.Entities {
+				nodeSchedulerCopy := ns // Create a copy to avoid reference issues
+				// Don't set TTL or LastHeartbeat - let the upsert command handle these based on existing values
+				allNodeSchedulers = append(allNodeSchedulers, &nodeSchedulerCopy)
+			}
+
+			// Check if we have more pages
+			if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
+				break
+			}
+			cursor = findResult.Cursor
 		}
 
-		// Convert to pointers and add to the list (without TTL and LastHeartbeat to preserve existing values)
-		for _, ns := range findResult.Entities {
-			nodeSchedulerCopy := ns // Create a copy to avoid reference issues
-			// Don't set TTL or LastHeartbeat - let the upsert command handle these based on existing values
-			allNodeSchedulers = append(allNodeSchedulers, &nodeSchedulerCopy)
-		}
-
-		// Check if we have more pages
-		if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
-			break
-		}
-		cursor = findResult.Cursor
-	}
-
-	// Bulk upsert all existing node schedulers to update their connection status
-	if len(allNodeSchedulers) > 0 {
-		_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, allNodeSchedulers)
-		if err != nil {
-			log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
-		} else {
-			log.Debug().Int("count", len(allNodeSchedulers)).Msg("✅ Updated connection status for existing NodeSchedulers")
+		// Bulk upsert all existing node schedulers to update their connection status
+		if len(allNodeSchedulers) > 0 {
+			_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, allNodeSchedulers)
+			if err != nil {
+				log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
+			} else {
+				log.Debug().Int("count", len(allNodeSchedulers)).Msg("✅ Updated connection status for existing NodeSchedulers")
+			}
 		}
 	}
 
