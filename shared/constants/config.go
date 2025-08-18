@@ -68,6 +68,12 @@ const ConfigGrpcServerListenAddrHostKey = "grpc_server_listen_addr_host"
 // ConfigGrpcServerListenAddrPortKey is the key for the gRPC server listen port setting in the configuration file.
 const ConfigGrpcServerListenAddrPortKey = "grpc_server_listen_addr_port"
 
+// ConfigNodeSchedulerHeartbeatTimeoutKey is the key for the node scheduler heartbeat timeout setting in the configuration file (in seconds).
+const ConfigNodeSchedulerHeartbeatTimeoutKey = "node_scheduler_heartbeat_timeout"
+
+// ConfigNodeSchedulerTTLKey is the key for the node scheduler TTL setting in the configuration file (in minutes).
+const ConfigNodeSchedulerTTLKey = "node_scheduler_ttl"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -143,6 +149,12 @@ const EnvVarGrpcServerListenAddrHost = "GRPC_SERVER_LISTEN_ADDR_HOST"
 // EnvVarGrpcServerListenAddrPort is the environment variable name for the gRPC server listen port.
 const EnvVarGrpcServerListenAddrPort = "GRPC_SERVER_LISTEN_ADDR_PORT"
 
+// EnvVarNodeSchedulerHeartbeatTimeout is the environment variable name for the node scheduler heartbeat timeout (e.g., "3m", "5m").
+const EnvVarNodeSchedulerHeartbeatTimeout = "NODE_SCHEDULER_HEARTBEAT_TIMEOUT"
+
+// EnvVarNodeSchedulerTTL is the environment variable name for the node scheduler TTL (in minutes).
+const EnvVarNodeSchedulerTTL = "NODE_SCHEDULER_TTL"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -208,3 +220,9 @@ const GrpcServerListenAddrHostFlagName = "grpc-host"
 
 // GrpcServerListenAddrPortFlagName is the command-line flag name for the gRPC server listen port.
 const GrpcServerListenAddrPortFlagName = "grpc-port"
+
+// NodeSchedulerHeartbeatTimeoutFlagName is the command-line flag name for the node scheduler heartbeat timeout.
+const NodeSchedulerHeartbeatTimeoutFlagName = "node-scheduler-heartbeat-timeout"
+
+// NodeSchedulerTTLFlagName is the command-line flag name for the node scheduler TTL (in minutes).
+const NodeSchedulerTTLFlagName = "node-scheduler-ttl"

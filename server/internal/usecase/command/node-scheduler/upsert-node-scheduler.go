@@ -2,6 +2,7 @@ package node_scheduler
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -45,15 +46,23 @@ func (cmd *UpsertNodeSchedulerCommand) Execute(uow *db.UnitOfWork, now time.Time
 			return *commandResult
 		}
 
-		nodeScheduler.TTL = 3600
+		nodeScheduler.TTL = config.GlobalConfiguration.NodeSchedulerTTL * 60 // Convert minutes to seconds
 
 		if existing != nil {
 			nodeScheduler.ID = existing.ID
 			nodeScheduler.Name = existing.Name
 			nodeScheduler.CreatedAt = existing.CreatedAt
 
+			if nodeScheduler.LastHeartbeat.UnixNano() < now.Add(-config.GlobalConfiguration.NodeSchedulerHeartbeatTimeout).UnixNano() {
+				nodeScheduler.ConnectionStatus = models.ConnectionStatusDisconnected
+			} else {
+				nodeScheduler.ConnectionStatus = models.ConnectionStatusConnected
+
+			}
+
 			_, err = exchangeRepo.UpdateNodeScheduler(&nodeScheduler, now)
 		} else {
+			nodeScheduler.ConnectionStatus = models.ConnectionStatusConnected
 			_, err = exchangeRepo.CreateNodeScheduler(&nodeScheduler, now)
 		}
 
