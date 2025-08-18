@@ -32,8 +32,8 @@ type Queue struct {
 	TTLQueue                  int
 	AllowDuplicated           bool
 	MaxAttempts               int
-	DesiredPriorityThresholds map[int]int
-	PriorityThresholds        map[int]int
+	DesiredPriorityThresholds map[int]int `orm:"data-only"`
+	PriorityThresholds        map[int]int `orm:"data-only"`
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }

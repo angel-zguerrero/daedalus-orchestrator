@@ -25,6 +25,10 @@ export const routes: Routes = [
       {
         path: 'tenants',
         loadChildren: () => import('./views/tenants/routes').then((m) => m.routes)
+      },
+      {
+        path: 'node-schedulers',
+        loadChildren: () => import('./views/node-schedulers/routes').then((m) => m.routes)
       }
     ]
   },

@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package nodescheduler;
+
+option go_package = "pb/nodescheduler;nodescheduler";
+
+service NodeSchedulerService {
+  rpc GetNodeSchedulers(GetNodeSchedulersRequest) returns (GetNodeSchedulersResponse);
+  rpc GetNodeScheduler(GetNodeSchedulerRequest) returns (GetNodeSchedulerResponse);
+}
+
+message GetNodeSchedulersRequest {
+  string q = 1;
+  string cursor = 2;
+  int32 pageSize = 3;
+}
+
+message NodeScheduler {
+  string ID = 1;
+  string Name = 2;
+  int64 TTL = 3;
+  string LastHeartbeat = 4;
+  map<string, string> Information = 5;
+  string ConnectionStatus = 6;
+  string CreatedAt = 7;
+  string UpdatedAt = 8;
+}
+
+message NodeSchedulerFindResult {
+  repeated NodeScheduler Entities = 1;
+  string Cursor = 2;
+}
+
+message GetNodeSchedulersResponse {
+  string message = 1;
+  NodeSchedulerFindResult result = 2;
+}
+
+message GetNodeSchedulerRequest {
+  string ID = 1;
+}
+
+message GetNodeSchedulerResponse {
+  string message = 1;
+  NodeScheduler result = 2;
+}
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/nodescheduler.proto

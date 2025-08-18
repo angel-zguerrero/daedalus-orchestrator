@@ -39,6 +39,8 @@ Available Flags:
   --max-column-families       Maximum number of column families (default 10, max 100 in production, 10 in non-production). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
   --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
+  --node-scheduler-heartbeat-timeout  Timeout for node scheduler heartbeats (e.g., 3m, 5m). Minimum 3 minutes. Default 3m. Overrides config file and environment variable.
+  --node-scheduler-ttl         TTL for node scheduler entries in minutes. Minimum 60. Default 1440. Overrides config file and environment variable.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -64,6 +66,8 @@ Environment Variables:
   MAX_COLUMN_FAMILIES         Maximum number of column families. (Corresponds to ` + constants.EnvVarMaxColumnFamilies + `)
   GRPC_SERVER_LISTEN_ADDR_HOST Host address for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrHost + `)
   GRPC_SERVER_LISTEN_ADDR_PORT Port for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrPort + `)
+  NODE_SCHEDULER_HEARTBEAT_TIMEOUT Timeout for node scheduler heartbeats (e.g., "3m", "5m"). (Corresponds to ` + constants.EnvVarNodeSchedulerHeartbeatTimeout + `)
+  NODE_SCHEDULER_TTL          TTL for node scheduler entries in minutes. (Corresponds to ` + constants.EnvVarNodeSchedulerTTL + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -95,6 +99,8 @@ Configuration File:
     max_column_families           Maximum number of column families.
     grpc_server_listen_addr_host   Host address for the gRPC server.
     grpc_server_listen_addr_port   Port for the gRPC server.
+    node_scheduler_heartbeat_timeout  Timeout for node scheduler heartbeats in seconds (e.g., 180 for 3m).
+    node_scheduler_ttl            TTL for node scheduler entries in minutes.
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -180,6 +186,12 @@ var GrpcServerListenAddrHostFlag = flag.String(constants.GrpcServerListenAddrHos
 
 // GrpcServerListenAddrPortFlag defines the --grpc-port command-line flag for specifying the gRPC server listen port.
 var GrpcServerListenAddrPortFlag = flag.Int(constants.GrpcServerListenAddrPortFlagName, 0, "Port for the gRPC server. Default 4545. Overrides config file and environment variable.")
+
+// NodeSchedulerHeartbeatTimeoutFlag defines the --node-scheduler-heartbeat-timeout command-line flag for specifying the node scheduler heartbeat timeout.
+var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHeartbeatTimeoutFlagName, 3*time.Minute, "Timeout for node scheduler heartbeats (e.g., 3m, 5m). Minimum 3 minutes. Overrides config file and environment variable.")
+
+// NodeSchedulerTTLFlag defines the --node-scheduler-ttl command-line flag for specifying the node scheduler TTL.
+var NodeSchedulerTTLFlag = flag.Int64(constants.NodeSchedulerTTLFlagName, 1440, "TTL for node scheduler entries in minutes. Minimum 60. Overrides config file and environment variable.")
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -380,6 +392,22 @@ func LoadDefaultConfiguration() error {
 		config.GrpcServerListenAddrPort = grpcPort
 	}
 
+	if envVal := os.Getenv(constants.EnvVarNodeSchedulerHeartbeatTimeout); envVal != "" {
+		nodeSchedulerHeartbeatTimeout, err := time.ParseDuration(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarNodeSchedulerHeartbeatTimeout, err)
+		}
+		config.NodeSchedulerHeartbeatTimeout = nodeSchedulerHeartbeatTimeout
+	}
+
+	if envVal := os.Getenv(constants.EnvVarNodeSchedulerTTL); envVal != "" {
+		nodeSchedulerTTL, err := strconv.ParseInt(envVal, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarNodeSchedulerTTL, err)
+		}
+		config.NodeSchedulerTTL = nodeSchedulerTTL
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -450,6 +478,12 @@ func LoadDefaultConfiguration() error {
 		config.GrpcServerListenAddrPort = *GrpcServerListenAddrPortFlag
 	}
 
+	// NodeScheduler flags
+	config.NodeSchedulerHeartbeatTimeout = *NodeSchedulerHeartbeatTimeoutFlag
+	if *NodeSchedulerTTLFlag != 1440 { // Only override if different from default
+		config.NodeSchedulerTTL = *NodeSchedulerTTLFlag
+	}
+
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
@@ -482,6 +516,23 @@ func LoadDefaultConfiguration() error {
 	}
 	if config.GrpcServerListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
 		config.GrpcServerListenAddrPort = 4545 // Default gRPC port
+	}
+
+	// Apply defaults and validations for NodeScheduler settings
+	if config.NodeSchedulerHeartbeatTimeout == 0 {
+		config.NodeSchedulerHeartbeatTimeout = 3 * time.Minute // Default to 3 minutes
+	}
+	if config.NodeSchedulerHeartbeatTimeout < 3*time.Minute {
+		log.Warn().Msgf("NodeSchedulerHeartbeatTimeout (%v) is less than minimum 3 minutes. Setting to 3 minutes.", config.NodeSchedulerHeartbeatTimeout)
+		config.NodeSchedulerHeartbeatTimeout = 3 * time.Minute
+	}
+
+	if config.NodeSchedulerTTL == 0 {
+		config.NodeSchedulerTTL = 1440 // Default to 1440 minutes (24 hours)
+	}
+	if config.NodeSchedulerTTL < 60 {
+		log.Warn().Msgf("NodeSchedulerTTL (%d minutes) is less than minimum 60 minutes. Setting to 60 minutes.", config.NodeSchedulerTTL)
+		config.NodeSchedulerTTL = 60
 	}
 
 	// Default for ApiRaftTimeout if not set by file, env, or flag (flag itself has a default of 5s)
@@ -766,6 +817,18 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.grpc_server_listen_addr_port = p
+		case constants.ConfigNodeSchedulerHeartbeatTimeoutKey:
+			p, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.node_scheduler_heartbeat_timeout = p
+		case constants.ConfigNodeSchedulerTTLKey:
+			p, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.node_scheduler_ttl = p
 		}
 	}
 

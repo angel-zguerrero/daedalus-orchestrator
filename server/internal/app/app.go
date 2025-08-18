@@ -54,19 +54,20 @@ import (
 // These components might be integrated in future versions of the application.
 
 type Application struct {
-	MasterNodeIsReady          bool
-	MasterNodeIsLeader         bool
-	MasterNode                 *dragonboat.RaftNode
-	TenantNodes                []*dragonboat.RaftNode
-	TenantNodesDictionary      map[string]*dragonboat.RaftNode
-	RestAPI                    *rest_server.RestServer
-	GrpcAPI                    *grpc_server.GrpcServer
-	NodeReadyWatcherStopper    *syncutil.Stopper
-	NodeClearExpiredTTLStopper *syncutil.Stopper
-	AssignTenantsStopper       *syncutil.Stopper
-	ApiLock                    sync.Mutex
-	GrpcLock                   sync.Mutex
-	NH                         *dragonboatV4.NodeHost
+	MasterNodeIsReady             bool
+	MasterNodeIsLeader            bool
+	MasterNode                    *dragonboat.RaftNode
+	TenantNodes                   []*dragonboat.RaftNode
+	TenantNodesDictionary         map[string]*dragonboat.RaftNode
+	RestAPI                       *rest_server.RestServer
+	GrpcAPI                       *grpc_server.GrpcServer
+	NodeReadyWatcherStopper       *syncutil.Stopper
+	NodeClearExpiredTTLStopper    *syncutil.Stopper
+	NodeSchedulerHeartbeatStopper *syncutil.Stopper
+	AssignTenantsStopper          *syncutil.Stopper
+	ApiLock                       sync.Mutex
+	GrpcLock                      sync.Mutex
+	NH                            *dragonboatV4.NodeHost
 }
 
 func (app *Application) Run() {
@@ -228,6 +229,8 @@ func (app *Application) Run() {
 
 	app.StartNodeClearExpiredTTLWorker(1*time.Minute, 10)
 
+	app.StartNodeSchedulerHeartbeatWorker(10 * time.Second)
+
 }
 
 func (app *Application) Stop() {
@@ -299,12 +302,20 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ NodeReadyWatcher stopped.")
 	}()
 
-	// Stop Watcher
+	// Stop NodeClearExpiredTTL Worker
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		app.NodeClearExpiredTTLStopper.Stop()
 		log.Info().Msg("✅ NodeClearExpiredTTLStopper stopped.")
+	}()
+
+	// Stop NodeSchedulerHeartbeat Worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.NodeSchedulerHeartbeatStopper.Stop()
+		log.Info().Msg("✅ NodeSchedulerHeartbeatStopper stopped.")
 	}()
 
 	// Stop Assign Tenants Worker
@@ -344,13 +355,14 @@ func (app *Application) Stop() {
 
 func NewApplication() *Application {
 	return &Application{
-		MasterNodeIsReady:          false,
-		MasterNode:                 nil,
-		RestAPI:                    nil,
-		NodeReadyWatcherStopper:    syncutil.NewStopper(),
-		NodeClearExpiredTTLStopper: syncutil.NewStopper(),
-		AssignTenantsStopper:       syncutil.NewStopper(),
-		TenantNodes:                make([]*dragonboat.RaftNode, 0),
-		TenantNodesDictionary:      make(map[string]*dragonboat.RaftNode),
+		MasterNodeIsReady:             false,
+		MasterNode:                    nil,
+		RestAPI:                       nil,
+		NodeReadyWatcherStopper:       syncutil.NewStopper(),
+		NodeClearExpiredTTLStopper:    syncutil.NewStopper(),
+		NodeSchedulerHeartbeatStopper: syncutil.NewStopper(),
+		AssignTenantsStopper:          syncutil.NewStopper(),
+		TenantNodes:                   make([]*dragonboat.RaftNode, 0),
+		TenantNodesDictionary:         make(map[string]*dragonboat.RaftNode),
 	}
 }
