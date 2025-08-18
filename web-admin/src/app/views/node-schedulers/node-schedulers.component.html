@@ -26,7 +26,7 @@
       </c-col>
       <c-col [md]="6" class="d-flex justify-content-end">
         <button cButton color="secondary" (click)="loadNodeSchedulers()" [disabled]="loading">
-          <svg cIcon name="cil-action-redo" class="me-1"></svg>
+          <svg cIcon name="cil-reload" class="me-1"></svg>
           Refresh
         </button>
       </c-col>
@@ -135,7 +135,7 @@
 <c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
   <c-modal-header>
     <h5 cModalTitle>
-      <svg cIcon name="cil-settings" class="me-2"></svg>
+      <svg cIcon name="cil-task" class="me-2"></svg>
       Node Scheduler Details
     </h5>
     <button (click)="detailsModalVisible = false" cButtonClose></button>
