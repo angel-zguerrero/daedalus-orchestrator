@@ -35,20 +35,20 @@ func NewNodeSchedulerBO(Config *common.ServerConfing) *NodeSchedulerBO {
 	}
 }
 
-func (bo *NodeSchedulerBO) CreateNodeScheduler(ctx context.Context, code, name string) (models.NodeScheduler, error) {
+func (bo *NodeSchedulerBO) UpsertNodeScheduler(ctx context.Context, code, name string) (models.NodeScheduler, error) {
 	nodeScheduler := &models.NodeScheduler{
 		ID:   strings.ReplaceAll(uuid.New().String(), "-", ""),
 		Name: name,
 	}
 
-	createdList, err := bo.BulkCreateNodeScheduler(ctx, []*models.NodeScheduler{nodeScheduler})
+	createdList, err := bo.BulkUpsertNodeScheduler(ctx, []*models.NodeScheduler{nodeScheduler})
 	if err != nil {
 		return models.NodeScheduler{}, err
 	}
 	return createdList[0], nil
 }
 
-func (bo *NodeSchedulerBO) BulkCreateNodeScheduler(ctx context.Context, nodeSchedulers []*models.NodeScheduler) ([]models.NodeScheduler, error) {
+func (bo *NodeSchedulerBO) BulkUpsertNodeScheduler(ctx context.Context, nodeSchedulers []*models.NodeScheduler) ([]models.NodeScheduler, error) {
 	if len(nodeSchedulers) == 0 {
 		return nil, errors.New("no nodeSchedulers provided")
 	}
