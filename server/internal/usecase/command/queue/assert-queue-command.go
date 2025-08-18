@@ -36,7 +36,14 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	var resultQueues []models.Queue
+	newQueuesCount := 0
 
 	for _, queue := range cmd.Queues {
 
@@ -99,6 +106,13 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			fmt.Println("Creating queue:::", queue.DesiredPriorityThresholds)
 
 			_, err = queueRepo.CreateQueue(&queue, now)
+
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+
+			newQueuesCount++
 		}
 
 		if err != nil {
@@ -106,6 +120,15 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			return *commandResult
 		}
 		resultQueues = append(resultQueues, queue)
+	}
+
+	// Update tenant summary with the total count of new queues created
+	if newQueuesCount > 0 {
+		err = tenantSummaryRepo.IncreaseQueueCount(cmd.CFS, newQueuesCount, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
 	}
 
 	commandResult.Result = resultQueues

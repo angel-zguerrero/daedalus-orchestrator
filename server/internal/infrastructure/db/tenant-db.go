@@ -16,12 +16,12 @@ func OpenTenantDB(dbPath string) (KVStore, error) {
 	switch engine {
 	case "rocksdb":
 		log.Info().Str("engine", "rocksdb").Msg("Opening tenant DB with RocksDB engine")
-		return CreateRocksdbStore(dbPath, []string{}, []string{TenantEventFC})
+		return CreateRocksdbStore(dbPath, []string{AdminFC}, []string{TenantEventFC})
 	case "pebble":
 		log.Info().Str("engine", "pebble").Msg("Opening tenant DB with Pebble engine")
-		return CreatePebbleStore(dbPath, []string{}, []string{TenantEventFC})
+		return CreatePebbleStore(dbPath, []string{AdminFC}, []string{TenantEventFC})
 	default:
 		log.Warn().Str("engine_name", engine).Msg("Unrecognized tenant DB engine specified, defaulting to pebble.")
-		return CreatePebbleStore(dbPath, []string{}, []string{TenantEventFC})
+		return CreatePebbleStore(dbPath, []string{AdminFC}, []string{TenantEventFC})
 	}
 }

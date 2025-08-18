@@ -18,6 +18,10 @@ type TenantInMaster struct {
 	ShardId           int
 	ColumnFamilyIndex int
 
+	ExchangesCount int
+	QueuesCount    int
+	MessagesCount  int
+
 	Status    TenantInMasterStatus
 	CreatedAt time.Time
 	UpdatedAt time.Time

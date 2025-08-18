@@ -115,6 +115,9 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 			tenant.CreatedAt = existing.CreatedAt
 			tenant.ShardId = existing.ShardId
 			tenant.ColumnFamilyIndex = existing.ColumnFamilyIndex
+			tenant.MessagesCount = existing.MessagesCount
+			tenant.QueuesCount = existing.QueuesCount
+			tenant.ExchangesCount = existing.ExchangesCount
 			_, err = tenantInMasterRepo.UpdateTenantInMaster(&tenant, now)
 		} else {
 			_, err = tenantInMasterRepo.CreateTenantInMaster(&tenant, now)

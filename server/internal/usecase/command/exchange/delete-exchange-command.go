@@ -27,6 +27,12 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
+	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	deleted, err := exchangeRepo.DeleteExchangeById(cmd.ID, now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -35,6 +41,12 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 	if !deleted {
 		commandResult.Error = "exchange not found or could not be deleted"
+		return *commandResult
+	}
+
+	err = tenantSummaryRepo.DecreaseExchangeCount(cmd.CFS, 1, now)
+	if err != nil {
+		commandResult.Error = err.Error()
 		return *commandResult
 	}
 

@@ -27,6 +27,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	deleted, err := queueRepo.DeleteQueueById(cmd.ID, now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -35,6 +41,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 	if !deleted {
 		commandResult.Error = "queue not found or could not be deleted"
+		return *commandResult
+	}
+
+	err = tenantSummaryRepo.DecreaseQueueCount(cmd.CFS, 1, now)
+	if err != nil {
+		commandResult.Error = err.Error()
 		return *commandResult
 	}
 

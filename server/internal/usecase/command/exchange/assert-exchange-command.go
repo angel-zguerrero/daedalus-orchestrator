@@ -35,7 +35,14 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
+	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	var resultExchanges []models.Exchange
+	newExchangesCount := 0
 
 	for _, exchange := range cmd.Exchanges {
 
@@ -66,6 +73,7 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 			exchange.CreatedAt = existing.CreatedAt
 
 			_, err = exchangeRepo.UpdateExchange(&exchange, now)
+
 		} else {
 			// For new exchanges, generate ID first if empty
 			if exchange.ID == "" {
@@ -95,6 +103,13 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 			}
 
 			_, err = exchangeRepo.CreateExchange(&exchange, now)
+
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+
+			newExchangesCount++
 		}
 
 		if err != nil {
@@ -102,6 +117,15 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 			return *commandResult
 		}
 		resultExchanges = append(resultExchanges, exchange)
+	}
+
+	// Update tenant summary with the total count of new exchanges created
+	if newExchangesCount > 0 {
+		err = tenantSummaryRepo.IncreaseExchangeCount(cmd.CFS, newExchangesCount, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
 	}
 
 	commandResult.Result = resultExchanges
