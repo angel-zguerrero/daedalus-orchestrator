@@ -49,6 +49,11 @@ func (r *TenantSummaryRepository) DeleteTenantSummaryById(id string, now time.Ti
 	return r.Delete(id, now)
 }
 
+func (r *TenantSummaryRepository) PaginateTenantUpdatedAtFrom(lastUpdatedAt time.Time, pageSize int, cursor string, now time.Time) (*FindResult[models.TenantSummary], error) {
+	filter := fmt.Sprintf("UpdatedAt >= '%s'", lastUpdatedAt.Format("2006-01-02T15:04:05.000Z"))
+	return r.Find(filter, pageSize, cursor, now)
+}
+
 // IncreaseMessageCount increases the MessageCount for a tenant by the specified amount
 // If the tenant doesn't exist, creates a new record with MessageCount = amount
 func (r *TenantSummaryRepository) IncreaseMessageCount(tenantId string, amount int, now time.Time) error {

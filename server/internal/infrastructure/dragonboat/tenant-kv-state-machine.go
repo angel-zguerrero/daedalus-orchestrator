@@ -7,6 +7,7 @@ import (
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
+	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
 	"time"
 
@@ -50,6 +51,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
 	if ok {
 		return paginateVNamespacesCommand.Execute(uow, now)
+	}
+
+	paginateTenantUpdatedAtFromCommand, ok := cmd.(tenant_summary_command.PaginateTenantUpdatedAtFromCommand)
+	if ok {
+		return paginateTenantUpdatedAtFromCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
