@@ -65,6 +65,202 @@ func (x *TenantInfoRequest) GetID() string {
 	return ""
 }
 
+type TenantSummaryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TenantSummaryRequest) Reset() {
+	*x = TenantSummaryRequest{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TenantSummaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TenantSummaryRequest) ProtoMessage() {}
+
+func (x *TenantSummaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TenantSummaryRequest.ProtoReflect.Descriptor instead.
+func (*TenantSummaryRequest) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TenantSummaryRequest) GetID() string {
+	if x != nil {
+		return x.ID
+	}
+	return ""
+}
+
+type TenantSummary struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ID             string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	TenantId       string                 `protobuf:"bytes,2,opt,name=TenantId,proto3" json:"TenantId,omitempty"`
+	Code           string                 `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
+	ExchangesCount int32                  `protobuf:"varint,4,opt,name=ExchangesCount,proto3" json:"ExchangesCount,omitempty"`
+	QueuesCount    int32                  `protobuf:"varint,5,opt,name=QueuesCount,proto3" json:"QueuesCount,omitempty"`
+	MessagesCount  int32                  `protobuf:"varint,6,opt,name=MessagesCount,proto3" json:"MessagesCount,omitempty"`
+	CreatedAt      string                 `protobuf:"bytes,7,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt      string                 `protobuf:"bytes,8,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TenantSummary) Reset() {
+	*x = TenantSummary{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TenantSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TenantSummary) ProtoMessage() {}
+
+func (x *TenantSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TenantSummary.ProtoReflect.Descriptor instead.
+func (*TenantSummary) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *TenantSummary) GetID() string {
+	if x != nil {
+		return x.ID
+	}
+	return ""
+}
+
+func (x *TenantSummary) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *TenantSummary) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *TenantSummary) GetExchangesCount() int32 {
+	if x != nil {
+		return x.ExchangesCount
+	}
+	return 0
+}
+
+func (x *TenantSummary) GetQueuesCount() int32 {
+	if x != nil {
+		return x.QueuesCount
+	}
+	return 0
+}
+
+func (x *TenantSummary) GetMessagesCount() int32 {
+	if x != nil {
+		return x.MessagesCount
+	}
+	return 0
+}
+
+func (x *TenantSummary) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *TenantSummary) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type TenantSummaryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Result        *TenantSummary         `protobuf:"bytes,2,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TenantSummaryResponse) Reset() {
+	*x = TenantSummaryResponse{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TenantSummaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TenantSummaryResponse) ProtoMessage() {}
+
+func (x *TenantSummaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TenantSummaryResponse.ProtoReflect.Descriptor instead.
+func (*TenantSummaryResponse) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TenantSummaryResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *TenantSummaryResponse) GetResult() *TenantSummary {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 type SelfMember struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IP            string                 `protobuf:"bytes,1,opt,name=IP,proto3" json:"IP,omitempty"`
@@ -75,7 +271,7 @@ type SelfMember struct {
 
 func (x *SelfMember) Reset() {
 	*x = SelfMember{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[1]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -87,7 +283,7 @@ func (x *SelfMember) String() string {
 func (*SelfMember) ProtoMessage() {}
 
 func (x *SelfMember) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[1]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -100,7 +296,7 @@ func (x *SelfMember) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelfMember.ProtoReflect.Descriptor instead.
 func (*SelfMember) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{1}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SelfMember) GetIP() string {
@@ -128,7 +324,7 @@ type Node struct {
 
 func (x *Node) Reset() {
 	*x = Node{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[2]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -140,7 +336,7 @@ func (x *Node) String() string {
 func (*Node) ProtoMessage() {}
 
 func (x *Node) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[2]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -153,7 +349,7 @@ func (x *Node) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node.ProtoReflect.Descriptor instead.
 func (*Node) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{2}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Node) GetSelfMember() *SelfMember {
@@ -188,7 +384,7 @@ type TenantInfoResponse struct {
 
 func (x *TenantInfoResponse) Reset() {
 	*x = TenantInfoResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[3]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -200,7 +396,7 @@ func (x *TenantInfoResponse) String() string {
 func (*TenantInfoResponse) ProtoMessage() {}
 
 func (x *TenantInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[3]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -213,7 +409,7 @@ func (x *TenantInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TenantInfoResponse.ProtoReflect.Descriptor instead.
 func (*TenantInfoResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{3}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TenantInfoResponse) GetMessage() string {
@@ -246,7 +442,7 @@ type DeleteTenantRequest struct {
 
 func (x *DeleteTenantRequest) Reset() {
 	*x = DeleteTenantRequest{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[4]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -258,7 +454,7 @@ func (x *DeleteTenantRequest) String() string {
 func (*DeleteTenantRequest) ProtoMessage() {}
 
 func (x *DeleteTenantRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[4]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -271,7 +467,7 @@ func (x *DeleteTenantRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTenantRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTenantRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{4}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeleteTenantRequest) GetID() string {
@@ -290,7 +486,7 @@ type DeleteTenantResponse struct {
 
 func (x *DeleteTenantResponse) Reset() {
 	*x = DeleteTenantResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[5]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -302,7 +498,7 @@ func (x *DeleteTenantResponse) String() string {
 func (*DeleteTenantResponse) ProtoMessage() {}
 
 func (x *DeleteTenantResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[5]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -315,7 +511,7 @@ func (x *DeleteTenantResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTenantResponse.ProtoReflect.Descriptor instead.
 func (*DeleteTenantResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{5}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeleteTenantResponse) GetMessage() string {
@@ -336,7 +532,7 @@ type GetTenantsRequest struct {
 
 func (x *GetTenantsRequest) Reset() {
 	*x = GetTenantsRequest{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[6]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -348,7 +544,7 @@ func (x *GetTenantsRequest) String() string {
 func (*GetTenantsRequest) ProtoMessage() {}
 
 func (x *GetTenantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[6]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -361,7 +557,7 @@ func (x *GetTenantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTenantsRequest.ProtoReflect.Descriptor instead.
 func (*GetTenantsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{6}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetTenantsRequest) GetQ() string {
@@ -386,21 +582,24 @@ func (x *GetTenantsRequest) GetPageSize() int32 {
 }
 
 type Tenant struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
-	Code          string                 `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
-	ShardId       int64                  `protobuf:"varint,4,opt,name=ShardId,proto3" json:"ShardId,omitempty"`
-	Status        string                 `protobuf:"bytes,5,opt,name=Status,proto3" json:"Status,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ID             string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
+	Code           string                 `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
+	ShardId        int64                  `protobuf:"varint,4,opt,name=ShardId,proto3" json:"ShardId,omitempty"`
+	Status         string                 `protobuf:"bytes,5,opt,name=Status,proto3" json:"Status,omitempty"`
+	CreatedAt      string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt      string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	ExchangesCount int32                  `protobuf:"varint,8,opt,name=ExchangesCount,proto3" json:"ExchangesCount,omitempty"`
+	QueuesCount    int32                  `protobuf:"varint,9,opt,name=QueuesCount,proto3" json:"QueuesCount,omitempty"`
+	MessagesCount  int32                  `protobuf:"varint,10,opt,name=MessagesCount,proto3" json:"MessagesCount,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Tenant) Reset() {
 	*x = Tenant{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[7]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -412,7 +611,7 @@ func (x *Tenant) String() string {
 func (*Tenant) ProtoMessage() {}
 
 func (x *Tenant) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[7]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -425,7 +624,7 @@ func (x *Tenant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tenant.ProtoReflect.Descriptor instead.
 func (*Tenant) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{7}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Tenant) GetID() string {
@@ -477,6 +676,27 @@ func (x *Tenant) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *Tenant) GetExchangesCount() int32 {
+	if x != nil {
+		return x.ExchangesCount
+	}
+	return 0
+}
+
+func (x *Tenant) GetQueuesCount() int32 {
+	if x != nil {
+		return x.QueuesCount
+	}
+	return 0
+}
+
+func (x *Tenant) GetMessagesCount() int32 {
+	if x != nil {
+		return x.MessagesCount
+	}
+	return 0
+}
+
 type FindResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Entities      []*Tenant              `protobuf:"bytes,1,rep,name=Entities,proto3" json:"Entities,omitempty"`
@@ -487,7 +707,7 @@ type FindResult struct {
 
 func (x *FindResult) Reset() {
 	*x = FindResult{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[8]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -499,7 +719,7 @@ func (x *FindResult) String() string {
 func (*FindResult) ProtoMessage() {}
 
 func (x *FindResult) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[8]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -512,7 +732,7 @@ func (x *FindResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindResult.ProtoReflect.Descriptor instead.
 func (*FindResult) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{8}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *FindResult) GetEntities() []*Tenant {
@@ -539,7 +759,7 @@ type GetTenantsResponse struct {
 
 func (x *GetTenantsResponse) Reset() {
 	*x = GetTenantsResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[9]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +771,7 @@ func (x *GetTenantsResponse) String() string {
 func (*GetTenantsResponse) ProtoMessage() {}
 
 func (x *GetTenantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[9]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +784,7 @@ func (x *GetTenantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTenantsResponse.ProtoReflect.Descriptor instead.
 func (*GetTenantsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{9}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetTenantsResponse) GetMessage() string {
@@ -591,7 +811,7 @@ type AssertTenantRequest struct {
 
 func (x *AssertTenantRequest) Reset() {
 	*x = AssertTenantRequest{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[10]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -603,7 +823,7 @@ func (x *AssertTenantRequest) String() string {
 func (*AssertTenantRequest) ProtoMessage() {}
 
 func (x *AssertTenantRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[10]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -616,7 +836,7 @@ func (x *AssertTenantRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssertTenantRequest.ProtoReflect.Descriptor instead.
 func (*AssertTenantRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{10}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AssertTenantRequest) GetCode() string {
@@ -642,7 +862,7 @@ type AssertBulkTenantRequest struct {
 
 func (x *AssertBulkTenantRequest) Reset() {
 	*x = AssertBulkTenantRequest{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[11]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +874,7 @@ func (x *AssertBulkTenantRequest) String() string {
 func (*AssertBulkTenantRequest) ProtoMessage() {}
 
 func (x *AssertBulkTenantRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[11]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +887,7 @@ func (x *AssertBulkTenantRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssertBulkTenantRequest.ProtoReflect.Descriptor instead.
 func (*AssertBulkTenantRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{11}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AssertBulkTenantRequest) GetTenants() []*AssertTenantRequest {
@@ -687,7 +907,7 @@ type AssertBulkTenantResponse struct {
 
 func (x *AssertBulkTenantResponse) Reset() {
 	*x = AssertBulkTenantResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[12]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -699,7 +919,7 @@ func (x *AssertBulkTenantResponse) String() string {
 func (*AssertBulkTenantResponse) ProtoMessage() {}
 
 func (x *AssertBulkTenantResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[12]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -712,7 +932,7 @@ func (x *AssertBulkTenantResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssertBulkTenantResponse.ProtoReflect.Descriptor instead.
 func (*AssertBulkTenantResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{12}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AssertBulkTenantResponse) GetMessage() string {
@@ -739,7 +959,7 @@ type AssertTenantResponse struct {
 
 func (x *AssertTenantResponse) Reset() {
 	*x = AssertTenantResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[13]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -751,7 +971,7 @@ func (x *AssertTenantResponse) String() string {
 func (*AssertTenantResponse) ProtoMessage() {}
 
 func (x *AssertTenantResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[13]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -764,7 +984,7 @@ func (x *AssertTenantResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssertTenantResponse.ProtoReflect.Descriptor instead.
 func (*AssertTenantResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{13}
+	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AssertTenantResponse) GetMessage() string {
@@ -787,7 +1007,21 @@ const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ra
 	"\n" +
 	"Binternal/infrastructure/server/grpc/proto/definitions/tenant.proto\x12\x06tenant\"#\n" +
 	"\x11TenantInfoRequest\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\tR\x02ID\"0\n" +
+	"\x02ID\x18\x01 \x01(\tR\x02ID\"&\n" +
+	"\x14TenantSummaryRequest\x12\x0e\n" +
+	"\x02ID\x18\x01 \x01(\tR\x02ID\"\xfb\x01\n" +
+	"\rTenantSummary\x12\x0e\n" +
+	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x1a\n" +
+	"\bTenantId\x18\x02 \x01(\tR\bTenantId\x12\x12\n" +
+	"\x04Code\x18\x03 \x01(\tR\x04Code\x12&\n" +
+	"\x0eExchangesCount\x18\x04 \x01(\x05R\x0eExchangesCount\x12 \n" +
+	"\vQueuesCount\x18\x05 \x01(\x05R\vQueuesCount\x12$\n" +
+	"\rMessagesCount\x18\x06 \x01(\x05R\rMessagesCount\x12\x1c\n" +
+	"\tCreatedAt\x18\a \x01(\tR\tCreatedAt\x12\x1c\n" +
+	"\tUpdatedAt\x18\b \x01(\tR\tUpdatedAt\"`\n" +
+	"\x15TenantSummaryResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12-\n" +
+	"\x06result\x18\x02 \x01(\v2\x15.tenant.TenantSummaryR\x06result\"0\n" +
 	"\n" +
 	"SelfMember\x12\x0e\n" +
 	"\x02IP\x18\x01 \x01(\tR\x02IP\x12\x12\n" +
@@ -809,7 +1043,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ra
 	"\x11GetTenantsRequest\x12\f\n" +
 	"\x01q\x18\x01 \x01(\tR\x01q\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x1a\n" +
-	"\bpageSize\x18\x03 \x01(\x05R\bpageSize\"\xae\x01\n" +
+	"\bpageSize\x18\x03 \x01(\x05R\bpageSize\"\x9e\x02\n" +
 	"\x06Tenant\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +
@@ -817,7 +1051,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ra
 	"\aShardId\x18\x04 \x01(\x03R\aShardId\x12\x16\n" +
 	"\x06Status\x18\x05 \x01(\tR\x06Status\x12\x1c\n" +
 	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\"P\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\x12&\n" +
+	"\x0eExchangesCount\x18\b \x01(\x05R\x0eExchangesCount\x12 \n" +
+	"\vQueuesCount\x18\t \x01(\x05R\vQueuesCount\x12$\n" +
+	"\rMessagesCount\x18\n" +
+	" \x01(\x05R\rMessagesCount\"P\n" +
 	"\n" +
 	"FindResult\x12*\n" +
 	"\bEntities\x18\x01 \x03(\v2\x0e.tenant.TenantR\bEntities\x12\x16\n" +
@@ -835,9 +1073,10 @@ const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ra
 	"\x06result\x18\x02 \x03(\v2\x0e.tenant.TenantR\x06result\"X\n" +
 	"\x14AssertTenantResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12&\n" +
-	"\x06result\x18\x02 \x01(\v2\x0e.tenant.TenantR\x06result2\x89\x03\n" +
+	"\x06result\x18\x02 \x01(\v2\x0e.tenant.TenantR\x06result2\xda\x03\n" +
 	"\rTenantService\x12F\n" +
-	"\rGetTenantInfo\x12\x19.tenant.TenantInfoRequest\x1a\x1a.tenant.TenantInfoResponse\x12I\n" +
+	"\rGetTenantInfo\x12\x19.tenant.TenantInfoRequest\x1a\x1a.tenant.TenantInfoResponse\x12O\n" +
+	"\x10GetTenantSummary\x12\x1c.tenant.TenantSummaryRequest\x1a\x1d.tenant.TenantSummaryResponse\x12I\n" +
 	"\fAssertTenant\x12\x1b.tenant.AssertTenantRequest\x1a\x1c.tenant.AssertTenantResponse\x12U\n" +
 	"\x10AssertBulkTenant\x12\x1f.tenant.AssertBulkTenantRequest\x1a .tenant.AssertBulkTenantResponse\x12I\n" +
 	"\fDeleteTenant\x12\x1b.tenant.DeleteTenantRequest\x1a\x1c.tenant.DeleteTenantResponse\x12C\n" +
@@ -856,47 +1095,53 @@ func file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_raw
 	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_goTypes = []any{
 	(*TenantInfoRequest)(nil),        // 0: tenant.TenantInfoRequest
-	(*SelfMember)(nil),               // 1: tenant.SelfMember
-	(*Node)(nil),                     // 2: tenant.Node
-	(*TenantInfoResponse)(nil),       // 3: tenant.TenantInfoResponse
-	(*DeleteTenantRequest)(nil),      // 4: tenant.DeleteTenantRequest
-	(*DeleteTenantResponse)(nil),     // 5: tenant.DeleteTenantResponse
-	(*GetTenantsRequest)(nil),        // 6: tenant.GetTenantsRequest
-	(*Tenant)(nil),                   // 7: tenant.Tenant
-	(*FindResult)(nil),               // 8: tenant.FindResult
-	(*GetTenantsResponse)(nil),       // 9: tenant.GetTenantsResponse
-	(*AssertTenantRequest)(nil),      // 10: tenant.AssertTenantRequest
-	(*AssertBulkTenantRequest)(nil),  // 11: tenant.AssertBulkTenantRequest
-	(*AssertBulkTenantResponse)(nil), // 12: tenant.AssertBulkTenantResponse
-	(*AssertTenantResponse)(nil),     // 13: tenant.AssertTenantResponse
+	(*TenantSummaryRequest)(nil),     // 1: tenant.TenantSummaryRequest
+	(*TenantSummary)(nil),            // 2: tenant.TenantSummary
+	(*TenantSummaryResponse)(nil),    // 3: tenant.TenantSummaryResponse
+	(*SelfMember)(nil),               // 4: tenant.SelfMember
+	(*Node)(nil),                     // 5: tenant.Node
+	(*TenantInfoResponse)(nil),       // 6: tenant.TenantInfoResponse
+	(*DeleteTenantRequest)(nil),      // 7: tenant.DeleteTenantRequest
+	(*DeleteTenantResponse)(nil),     // 8: tenant.DeleteTenantResponse
+	(*GetTenantsRequest)(nil),        // 9: tenant.GetTenantsRequest
+	(*Tenant)(nil),                   // 10: tenant.Tenant
+	(*FindResult)(nil),               // 11: tenant.FindResult
+	(*GetTenantsResponse)(nil),       // 12: tenant.GetTenantsResponse
+	(*AssertTenantRequest)(nil),      // 13: tenant.AssertTenantRequest
+	(*AssertBulkTenantRequest)(nil),  // 14: tenant.AssertBulkTenantRequest
+	(*AssertBulkTenantResponse)(nil), // 15: tenant.AssertBulkTenantResponse
+	(*AssertTenantResponse)(nil),     // 16: tenant.AssertTenantResponse
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_depIdxs = []int32{
-	1,  // 0: tenant.Node.SelfMember:type_name -> tenant.SelfMember
-	7,  // 1: tenant.TenantInfoResponse.result:type_name -> tenant.Tenant
-	2,  // 2: tenant.TenantInfoResponse.node:type_name -> tenant.Node
-	7,  // 3: tenant.FindResult.Entities:type_name -> tenant.Tenant
-	8,  // 4: tenant.GetTenantsResponse.result:type_name -> tenant.FindResult
-	10, // 5: tenant.AssertBulkTenantRequest.tenants:type_name -> tenant.AssertTenantRequest
-	7,  // 6: tenant.AssertBulkTenantResponse.result:type_name -> tenant.Tenant
-	7,  // 7: tenant.AssertTenantResponse.result:type_name -> tenant.Tenant
-	0,  // 8: tenant.TenantService.GetTenantInfo:input_type -> tenant.TenantInfoRequest
-	10, // 9: tenant.TenantService.AssertTenant:input_type -> tenant.AssertTenantRequest
-	11, // 10: tenant.TenantService.AssertBulkTenant:input_type -> tenant.AssertBulkTenantRequest
-	4,  // 11: tenant.TenantService.DeleteTenant:input_type -> tenant.DeleteTenantRequest
-	6,  // 12: tenant.TenantService.GetTenants:input_type -> tenant.GetTenantsRequest
-	3,  // 13: tenant.TenantService.GetTenantInfo:output_type -> tenant.TenantInfoResponse
-	13, // 14: tenant.TenantService.AssertTenant:output_type -> tenant.AssertTenantResponse
-	12, // 15: tenant.TenantService.AssertBulkTenant:output_type -> tenant.AssertBulkTenantResponse
-	5,  // 16: tenant.TenantService.DeleteTenant:output_type -> tenant.DeleteTenantResponse
-	9,  // 17: tenant.TenantService.GetTenants:output_type -> tenant.GetTenantsResponse
-	13, // [13:18] is the sub-list for method output_type
-	8,  // [8:13] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	2,  // 0: tenant.TenantSummaryResponse.result:type_name -> tenant.TenantSummary
+	4,  // 1: tenant.Node.SelfMember:type_name -> tenant.SelfMember
+	10, // 2: tenant.TenantInfoResponse.result:type_name -> tenant.Tenant
+	5,  // 3: tenant.TenantInfoResponse.node:type_name -> tenant.Node
+	10, // 4: tenant.FindResult.Entities:type_name -> tenant.Tenant
+	11, // 5: tenant.GetTenantsResponse.result:type_name -> tenant.FindResult
+	13, // 6: tenant.AssertBulkTenantRequest.tenants:type_name -> tenant.AssertTenantRequest
+	10, // 7: tenant.AssertBulkTenantResponse.result:type_name -> tenant.Tenant
+	10, // 8: tenant.AssertTenantResponse.result:type_name -> tenant.Tenant
+	0,  // 9: tenant.TenantService.GetTenantInfo:input_type -> tenant.TenantInfoRequest
+	1,  // 10: tenant.TenantService.GetTenantSummary:input_type -> tenant.TenantSummaryRequest
+	13, // 11: tenant.TenantService.AssertTenant:input_type -> tenant.AssertTenantRequest
+	14, // 12: tenant.TenantService.AssertBulkTenant:input_type -> tenant.AssertBulkTenantRequest
+	7,  // 13: tenant.TenantService.DeleteTenant:input_type -> tenant.DeleteTenantRequest
+	9,  // 14: tenant.TenantService.GetTenants:input_type -> tenant.GetTenantsRequest
+	6,  // 15: tenant.TenantService.GetTenantInfo:output_type -> tenant.TenantInfoResponse
+	3,  // 16: tenant.TenantService.GetTenantSummary:output_type -> tenant.TenantSummaryResponse
+	16, // 17: tenant.TenantService.AssertTenant:output_type -> tenant.AssertTenantResponse
+	15, // 18: tenant.TenantService.AssertBulkTenant:output_type -> tenant.AssertBulkTenantResponse
+	8,  // 19: tenant.TenantService.DeleteTenant:output_type -> tenant.DeleteTenantResponse
+	12, // 20: tenant.TenantService.GetTenants:output_type -> tenant.GetTenantsResponse
+	15, // [15:21] is the sub-list for method output_type
+	9,  // [9:15] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_init() }
@@ -910,7 +1155,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ini
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

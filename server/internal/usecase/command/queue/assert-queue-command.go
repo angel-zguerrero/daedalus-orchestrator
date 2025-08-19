@@ -5,7 +5,6 @@ import (
 	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
-	"fmt"
 	"time"
 )
 
@@ -102,8 +101,6 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 					}
 				}
 			}
-
-			fmt.Println("Creating queue:::", queue.DesiredPriorityThresholds)
 
 			_, err = queueRepo.CreateQueue(&queue, now)
 

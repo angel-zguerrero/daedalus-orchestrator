@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	TenantService_GetTenantInfo_FullMethodName    = "/tenant.TenantService/GetTenantInfo"
+	TenantService_GetTenantSummary_FullMethodName = "/tenant.TenantService/GetTenantSummary"
 	TenantService_AssertTenant_FullMethodName     = "/tenant.TenantService/AssertTenant"
 	TenantService_AssertBulkTenant_FullMethodName = "/tenant.TenantService/AssertBulkTenant"
 	TenantService_DeleteTenant_FullMethodName     = "/tenant.TenantService/DeleteTenant"
@@ -31,6 +32,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TenantServiceClient interface {
 	GetTenantInfo(ctx context.Context, in *TenantInfoRequest, opts ...grpc.CallOption) (*TenantInfoResponse, error)
+	GetTenantSummary(ctx context.Context, in *TenantSummaryRequest, opts ...grpc.CallOption) (*TenantSummaryResponse, error)
 	AssertTenant(ctx context.Context, in *AssertTenantRequest, opts ...grpc.CallOption) (*AssertTenantResponse, error)
 	AssertBulkTenant(ctx context.Context, in *AssertBulkTenantRequest, opts ...grpc.CallOption) (*AssertBulkTenantResponse, error)
 	DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*DeleteTenantResponse, error)
@@ -49,6 +51,16 @@ func (c *tenantServiceClient) GetTenantInfo(ctx context.Context, in *TenantInfoR
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TenantInfoResponse)
 	err := c.cc.Invoke(ctx, TenantService_GetTenantInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) GetTenantSummary(ctx context.Context, in *TenantSummaryRequest, opts ...grpc.CallOption) (*TenantSummaryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TenantSummaryResponse)
+	err := c.cc.Invoke(ctx, TenantService_GetTenantSummary_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -100,6 +112,7 @@ func (c *tenantServiceClient) GetTenants(ctx context.Context, in *GetTenantsRequ
 // for forward compatibility.
 type TenantServiceServer interface {
 	GetTenantInfo(context.Context, *TenantInfoRequest) (*TenantInfoResponse, error)
+	GetTenantSummary(context.Context, *TenantSummaryRequest) (*TenantSummaryResponse, error)
 	AssertTenant(context.Context, *AssertTenantRequest) (*AssertTenantResponse, error)
 	AssertBulkTenant(context.Context, *AssertBulkTenantRequest) (*AssertBulkTenantResponse, error)
 	DeleteTenant(context.Context, *DeleteTenantRequest) (*DeleteTenantResponse, error)
@@ -116,6 +129,9 @@ type UnimplementedTenantServiceServer struct{}
 
 func (UnimplementedTenantServiceServer) GetTenantInfo(context.Context, *TenantInfoRequest) (*TenantInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTenantInfo not implemented")
+}
+func (UnimplementedTenantServiceServer) GetTenantSummary(context.Context, *TenantSummaryRequest) (*TenantSummaryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTenantSummary not implemented")
 }
 func (UnimplementedTenantServiceServer) AssertTenant(context.Context, *AssertTenantRequest) (*AssertTenantResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AssertTenant not implemented")
@@ -164,6 +180,24 @@ func _TenantService_GetTenantInfo_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TenantServiceServer).GetTenantInfo(ctx, req.(*TenantInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_GetTenantSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TenantSummaryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).GetTenantSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_GetTenantSummary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).GetTenantSummary(ctx, req.(*TenantSummaryRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -250,6 +284,10 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTenantInfo",
 			Handler:    _TenantService_GetTenantInfo_Handler,
+		},
+		{
+			MethodName: "GetTenantSummary",
+			Handler:    _TenantService_GetTenantSummary_Handler,
 		},
 		{
 			MethodName: "AssertTenant",

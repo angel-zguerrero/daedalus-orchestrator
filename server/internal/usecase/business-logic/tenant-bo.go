@@ -11,6 +11,7 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -286,4 +287,49 @@ func (bo *TenantBO) GetTenants(ctx context.Context, q string, cursor string, pag
 	}
 
 	return findResult, nil
+}
+
+func (bo *TenantBO) GetTenantSummary(ctx context.Context, tenantID string) (models.TenantSummary, error) {
+	getTenantSummaryCommand := &tenant_summary_command.GetTenantSummaryCommand{
+		TenantId: tenantID,
+	}
+
+	queryCommand := &general_command.Query_Command{
+		Command: &general_command.Repository_Command{
+			CMD: getTenantSummaryCommand,
+		},
+		Now: time.Now().UnixNano(),
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+	defer cancel()
+	result, err := bo.Config.MasterNode.Read(readCtx, *queryCommand)
+	if err != nil {
+		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
+			return models.TenantSummary{}, errors.New("Tenant summary not found")
+		}
+		bo.Config.Logger.Error().Err(err).Msg("Get tenant summary command failed")
+		return models.TenantSummary{}, errors.New("Get tenant summary command failed: " + err.Error())
+	}
+
+	buf := bytes.NewBuffer(result.([]byte))
+	dec := gob.NewDecoder(buf)
+	parsedResult := &commands.CommandResult{}
+	if err := dec.Decode(parsedResult); err != nil {
+		bo.Config.Logger.Error().Err(err).Msg("Get tenant summary command failed")
+		return models.TenantSummary{}, errors.New("Get tenant summary command failed")
+	}
+
+	if parsedResult.Error != "" {
+		bo.Config.Logger.Error().Str("error", parsedResult.Error).Msg("Get tenant summary command failed")
+		return models.TenantSummary{}, errors.New("Get tenant summary command failed: " + parsedResult.Error)
+	}
+
+	if parsedResult.Result == nil {
+		bo.Config.Logger.Error().Str("error", parsedResult.Error).Msg("Get tenant summary command failed")
+		return models.TenantSummary{}, errors.New("Tenant summary not found")
+	}
+
+	tenantSummary := parsedResult.Result.(models.TenantSummary)
+	return tenantSummary, nil
 }

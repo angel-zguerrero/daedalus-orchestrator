@@ -27,7 +27,7 @@ func (cmd *UpdateTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time
 	}
 
 	for _, summary := range cmd.TenantSummaries {
-		// Find the existing tenant by ID (TenantSummary ID should match TenantInMaster ID)
+		// Find the existing tenant by ID (match TenantSummary.ID with TenantInMaster.ID)
 		tenant, err := tenantRepo.GetTenantInMasterByTenantId(summary.ID, now)
 		if err != nil {
 			commandResult.Error = err.Error()

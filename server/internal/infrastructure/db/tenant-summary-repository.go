@@ -30,6 +30,7 @@ func (r *TenantSummaryRepository) CreateTenantSummary(input *models.TenantSummar
 
 func (r *TenantSummaryRepository) UpdateTenantSummary(input *models.TenantSummary, now time.Time) (bool, error) {
 	input.UpdatedAt = now
+	fmt.Println("Updating TenantSummary:", input.ID, "at", now)
 	return r.Update(input, now)
 }
 
@@ -50,7 +51,7 @@ func (r *TenantSummaryRepository) DeleteTenantSummaryById(id string, now time.Ti
 }
 
 func (r *TenantSummaryRepository) PaginateTenantUpdatedAtFrom(lastUpdatedAt time.Time, pageSize int, cursor string, now time.Time) (*FindResult[models.TenantSummary], error) {
-	filter := fmt.Sprintf("UpdatedAt >= '%s'", lastUpdatedAt.Format("2006-01-02T15:04:05.000Z"))
+	filter := fmt.Sprintf("UpdatedAt >= '%s'", lastUpdatedAt)
 	return r.Find(filter, pageSize, cursor, now)
 }
 

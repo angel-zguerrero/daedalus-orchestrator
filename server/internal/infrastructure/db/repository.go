@@ -290,7 +290,13 @@ func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) 
 				if len(parts) < 5 {
 					continue
 				}
-				indexedVal := parts[4]
+
+				var indexedVal string
+				if len(parts) == 6 {
+					indexedVal = parts[4]
+				} else {
+					indexedVal = strings.Join(parts[4:len(parts)-1], ":")
+				}
 				include := false
 				switch operator {
 				case "<":

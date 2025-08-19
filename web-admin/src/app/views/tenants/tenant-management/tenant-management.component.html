@@ -45,12 +45,66 @@
                   </h5>
                 </c-card-header>
                 <c-card-body>
-                  <div class="text-center py-5">
+                  <!-- Loading state -->
+                  <div *ngIf="tenantSummaryLoading" class="text-center py-5">
                     <svg cIcon name="cil-chart-pie" size="4xl" class="text-primary mb-3"></svg>
-                    <h4 class="text-muted">Resumen de elementos del tenant aquí</h4>
+                    <h4 class="text-muted">Loading tenant summary...</h4>
                     <p class="text-body-secondary">
-                      Esta sección mostrará un resumen completo de todos los elementos y métricas relacionados con este tenant.
+                      Getting the latest tenant metrics.
                     </p>
+                  </div>
+
+                  <!-- Not found state -->
+                  <div *ngIf="tenantSummaryNotFound && !tenantSummaryLoading" class="text-center py-5">
+                    <svg cIcon name="cil-info" size="4xl" class="text-muted mb-3"></svg>
+                    <h4 class="text-muted">No summary available</h4>
+                    <p class="text-body-secondary">
+                      This tenant doesn't have an activity summary generated yet.
+                    </p>
+                  </div>
+
+                  <!-- Summary data -->
+                  <div *ngIf="tenantSummary && !tenantSummaryLoading" class="row">
+                    <div class="col-md-4">
+                      <div class="card border-success mb-3">
+                        <div class="card-body text-center">
+                          <svg cIcon name="cil-share" size="3xl" class="text-success mb-2"></svg>
+                          <h3 class="card-title text-success">{{ tenantSummary.ExchangesCount || 0 }}</h3>
+                          <p class="card-text">Exchanges</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="card border-warning mb-3">
+                        <div class="card-body text-center">
+                          <svg cIcon name="cil-list" size="3xl" class="text-warning mb-2"></svg>
+                          <h3 class="card-title text-warning">{{ tenantSummary.QueuesCount || 0 }}</h3>
+                          <p class="card-text">Queues</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="card border-info mb-3">
+                        <div class="card-body text-center">
+                          <svg cIcon name="cil-envelope-letter" size="3xl" class="text-info mb-2"></svg>
+                          <h3 class="card-title text-info">{{ tenantSummary.MessagesCount || 0 }}</h3>
+                          <p class="card-text">Messages</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Tenant Basic Information -->
+                  <div *ngIf="tenantSummary && !tenantSummaryLoading" class="mt-4">
+                    <h6 class="mb-3">Basic Information</h6>
+                    <div class="row">
+                      <div class="col-md-12">
+                        <div class="mb-3">
+                          <label class="form-label fw-bold">Last Updated</label>
+                          <div class="p-2 bg-dark rounded">{{ tenantSummary.UpdatedAt | date:'medium' }}</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </c-card-body>
               </c-card>

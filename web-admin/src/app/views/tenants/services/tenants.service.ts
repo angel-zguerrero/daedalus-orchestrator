@@ -18,6 +18,10 @@ export class TenantsService {
     return this.http.get(`${this.apiUrl}/${id}`);
   }
 
+  getTenantSummary(id: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${id}/summary`);
+  }
+
   assertTenant(tenant: any): Observable<any> {
     return this.http.post(this.apiUrl, tenant);
   }

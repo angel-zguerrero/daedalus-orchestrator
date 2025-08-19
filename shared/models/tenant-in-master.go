@@ -24,6 +24,8 @@ type TenantInMaster struct {
 
 	Status TenantInMasterStatus
 
+	LastCheckUpdatedAt time.Time
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

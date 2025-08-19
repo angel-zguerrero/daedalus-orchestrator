@@ -40,6 +40,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.POST("", tenantController.CreateTenantHandler)
 			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
 			tenantsGroup.GET("/:id", tenantController.GetTenantHandler)
+			tenantsGroup.GET("/:id/summary", tenantController.GetTenantSummaryHandler)
 			tenantsGroup.DELETE("/:id", tenantController.DeleteTenantHandler)
 			{
 				tenantsGroup.POST("/:id/exchange", exchangeController.CreateExchangeHandler)

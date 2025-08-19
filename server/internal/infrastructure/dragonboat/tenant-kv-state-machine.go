@@ -58,6 +58,16 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return paginateTenantUpdatedAtFromCommand.Execute(uow, now)
 	}
 
+	getLastUpdateAtFromCommand, ok := cmd.(tenant_summary_command.GetLastUpdateAtFromCommand)
+	if ok {
+		return getLastUpdateAtFromCommand.Execute(uow, now)
+	}
+
+	getTenantSummaryCommand, ok := cmd.(tenant_summary_command.GetTenantSummaryCommand)
+	if ok {
+		return getTenantSummaryCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
@@ -98,6 +108,16 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	deleteQueueCommand, ok := cmd.(queue_command.DeleteQueueCommand)
 	if ok {
 		return deleteQueueCommand.Execute(uow, now)
+	}
+
+	refreshLastUpdateAtFromCommand, ok := cmd.(tenant_summary_command.RefreshLastUpdateAtFromCommand)
+	if ok {
+		return refreshLastUpdateAtFromCommand.Execute(uow, now)
+	}
+
+	updateTenantSummaryCommand, ok := cmd.(tenant_summary_command.UpdateTenantSummaryCommand)
+	if ok {
+		return updateTenantSummaryCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

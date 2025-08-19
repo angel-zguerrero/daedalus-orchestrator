@@ -3,7 +3,9 @@ package models
 import "time"
 
 type TenantSummary struct {
-	ID string `orm:"primary-key"`
+	ID       string `orm:"primary-key"`
+	TenantId string
+	Code     string
 
 	ExchangesCount int
 	QueuesCount    int

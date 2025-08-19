@@ -2,8 +2,10 @@ package tenant
 
 import (
 	"context"
+	"strconv"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
@@ -13,16 +15,18 @@ import (
 
 type TenantService struct {
 	pb.UnimplementedTenantServiceServer
-	startTime time.Time
-	Config    *common.ServerConfing
-	TenantBO  *bo.TenantBO
+	startTime       time.Time
+	Config          *common.ServerConfing
+	TenantBO        *bo.TenantBO
+	TenantSummaryBO *bo.TenantSummaryBO
 }
 
 func NewTenantService(config *common.ServerConfing) *TenantService {
 	return &TenantService{
-		startTime: time.Now(),
-		Config:    config,
-		TenantBO:  bo.NewTenantBO(config),
+		startTime:       time.Now(),
+		Config:          config,
+		TenantBO:        bo.NewTenantBO(config),
+		TenantSummaryBO: bo.NewTenantSummaryBO(config),
 	}
 }
 
@@ -35,13 +39,16 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 	return &pb.AssertTenantResponse{
 		Message: "Tenant was asserted",
 		Result: &pb.Tenant{
-			ID:        tenantInMaster.ID,
-			Name:      tenantInMaster.Name,
-			ShardId:   int64(tenantInMaster.ShardId),
-			Code:      tenantInMaster.Code,
-			Status:    string(tenantInMaster.Status),
-			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+			ID:             tenantInMaster.ID,
+			Name:           tenantInMaster.Name,
+			ShardId:        int64(tenantInMaster.ShardId),
+			Code:           tenantInMaster.Code,
+			Status:         string(tenantInMaster.Status),
+			CreatedAt:      tenantInMaster.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      tenantInMaster.UpdatedAt.Format(time.RFC3339),
+			ExchangesCount: int32(tenantInMaster.ExchangesCount),
+			QueuesCount:    int32(tenantInMaster.QueuesCount),
+			MessagesCount:  int32(tenantInMaster.MessagesCount),
 		},
 	}, nil
 }
@@ -65,13 +72,16 @@ func (s *TenantService) AssertBulkTenant(ctx context.Context, r *pb.AssertBulkTe
 	rTenants := []*pb.Tenant{}
 	for _, t := range tenantsInMaster {
 		tt := &pb.Tenant{
-			ID:        t.ID,
-			Name:      t.Name,
-			ShardId:   int64(t.ShardId),
-			Code:      t.Code,
-			Status:    string(t.Status),
-			CreatedAt: t.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: t.UpdatedAt.Format(time.RFC3339),
+			ID:             t.ID,
+			Name:           t.Name,
+			ShardId:        int64(t.ShardId),
+			Code:           t.Code,
+			Status:         string(t.Status),
+			CreatedAt:      t.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
+			ExchangesCount: int32(t.ExchangesCount),
+			QueuesCount:    int32(t.QueuesCount),
+			MessagesCount:  int32(t.MessagesCount),
 		}
 		rTenants = append(rTenants, tt)
 	}
@@ -96,13 +106,16 @@ func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoReque
 	response := &pb.TenantInfoResponse{
 		Message: "Tenant",
 		Result: &pb.Tenant{
-			ID:        tenantInMaster.ID,
-			Name:      tenantInMaster.Name,
-			Code:      tenantInMaster.Code,
-			ShardId:   int64(tenantInMaster.ShardId),
-			Status:    string(tenantInMaster.Status),
-			CreatedAt: tenantInMaster.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: tenantInMaster.UpdatedAt.Format(time.RFC3339),
+			ID:             tenantInMaster.ID,
+			Name:           tenantInMaster.Name,
+			Code:           tenantInMaster.Code,
+			ShardId:        int64(tenantInMaster.ShardId),
+			Status:         string(tenantInMaster.Status),
+			CreatedAt:      tenantInMaster.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      tenantInMaster.UpdatedAt.Format(time.RFC3339),
+			ExchangesCount: int32(tenantInMaster.ExchangesCount),
+			QueuesCount:    int32(tenantInMaster.QueuesCount),
+			MessagesCount:  int32(tenantInMaster.MessagesCount),
 		},
 		Node: &pb.Node{
 			SelfMember: &pb.SelfMember{
@@ -111,6 +124,38 @@ func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoReque
 			},
 			ShardID: node.ShardID,
 			Roles:   roles,
+		},
+	}
+
+	return response, nil
+}
+
+func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummaryRequest) (*pb.TenantSummaryResponse, error) {
+	// Get tenant info first to extract CF and CFS
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
+	cfs := tenant.ID
+
+	tenantSummary, err := s.TenantSummaryBO.GetTenantSummary(ctx, r.ID, cf, cfs)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &pb.TenantSummaryResponse{
+		Message: "Tenant Summary",
+		Result: &pb.TenantSummary{
+			ID:             tenantSummary.ID,
+			TenantId:       tenantSummary.TenantId,
+			Code:           tenantSummary.Code,
+			ExchangesCount: int32(tenantSummary.ExchangesCount),
+			QueuesCount:    int32(tenantSummary.QueuesCount),
+			MessagesCount:  int32(tenantSummary.MessagesCount),
+			CreatedAt:      tenantSummary.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      tenantSummary.UpdatedAt.Format(time.RFC3339),
 		},
 	}
 
@@ -135,13 +180,16 @@ func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest)
 	tenants := make([]*pb.Tenant, len(findResult.Entities))
 	for i, t := range findResult.Entities {
 		tenants[i] = &pb.Tenant{
-			ID:        t.ID,
-			Name:      t.Name,
-			Code:      t.Code,
-			ShardId:   int64(t.ShardId),
-			Status:    string(t.Status),
-			CreatedAt: t.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: t.UpdatedAt.Format(time.RFC3339),
+			ID:             t.ID,
+			Name:           t.Name,
+			Code:           t.Code,
+			ShardId:        int64(t.ShardId),
+			Status:         string(t.Status),
+			CreatedAt:      t.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
+			ExchangesCount: int32(t.ExchangesCount),
+			QueuesCount:    int32(t.QueuesCount),
+			MessagesCount:  int32(t.MessagesCount),
 		}
 	}
 

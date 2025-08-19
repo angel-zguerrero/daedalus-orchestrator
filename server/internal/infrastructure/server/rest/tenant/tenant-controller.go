@@ -1,6 +1,7 @@
 package tenant
 
 import (
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
@@ -11,14 +12,16 @@ import (
 )
 
 type TenantController struct {
-	Config   *common.ServerConfing
-	TenantBO *bo.TenantBO
+	Config          *common.ServerConfing
+	TenantBO        *bo.TenantBO
+	TenantSummaryBO *bo.TenantSummaryBO
 }
 
 func NewTenantController(Config *common.ServerConfing) *TenantController {
 	api := &TenantController{
-		Config:   Config,
-		TenantBO: bo.NewTenantBO(Config),
+		Config:          Config,
+		TenantBO:        bo.NewTenantBO(Config),
+		TenantSummaryBO: bo.NewTenantSummaryBO(Config),
 	}
 	return api
 }
@@ -97,6 +100,32 @@ func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 			"ShardID":    node.ShardID,
 			"Roles":      node.Roles,
 		},
+	})
+}
+
+// GetTenantSummaryHandler handles GET /rest-api/tenants/:id/summary
+func (ctrl *TenantController) GetTenantSummaryHandler(c *gin.Context) {
+	tenantID := c.Param("id")
+
+	// Get tenant info first to extract CF and CFS
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
+	cfs := tenant.ID
+
+	tenantSummary, err := ctrl.TenantSummaryBO.GetTenantSummary(c.Request.Context(), tenantID, cf, cfs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Tenant Summary",
+		"result":  tenantSummary,
 	})
 }
 

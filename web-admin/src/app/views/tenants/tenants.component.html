@@ -45,6 +45,9 @@
             <th>Shard ID</th>
             <th>Column Family Index</th>
             <th>Status</th>
+            <th>Exchanges Count</th>
+            <th>Queues Count</th>
+            <th>Messages Count</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -63,53 +66,56 @@
                 {{ tenant.Status }}
               </c-badge>
             </td>
-          <td>
-            <div class="btn-group" role="group">
-              <button 
-                cButton 
-                color="secondary" 
-                size="sm" 
-                (click)="openTenantManagement(tenant)" 
-                title="Manage Tenant">
-                <svg cIcon name="cil-settings"></svg>
-              </button>
-              <button 
-                cButton 
-                color="info" 
-                size="sm" 
-                (click)="openDetailsModal(tenant)"
-                title="View Details">
-                <svg cIcon name="cil-info"></svg>
-              </button>
-              <button 
-                cButton 
-                color="warning" 
-                size="sm" 
-                (click)="openEditModal(tenant)"
-                title="Edit">
-                <svg cIcon name="cil-pencil"></svg>
-              </button>
-              <button 
-                cButton 
-                color="danger" 
-                size="sm" 
-                (click)="openDeleteModal(tenant)"
-                title="Delete">
-                <svg cIcon name="cil-trash"></svg>
-              </button>
-            </div>
-          </td>
-        </tr>
-        <tr *ngIf="tenants.length === 0">
-          <td colspan="6" class="text-center py-4">
-            <div class="text-muted">
-              <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
-              <h6>No tenants found</h6>
-              <p class="mb-0">Create your first tenant to get started.</p>
-            </div>
-          </td>
-        </tr>
-      </tbody>
+            <td>{{ tenant.ExchangesCount }}</td>
+            <td>{{ tenant.QueuesCount }}</td>
+            <td>{{ tenant.MessagesCount }}</td>
+            <td>
+              <div class="btn-group" role="group">
+                <button 
+                  cButton 
+                  color="secondary" 
+                  size="sm" 
+                  (click)="openTenantManagement(tenant)" 
+                  title="Manage Tenant">
+                  <svg cIcon name="cil-settings"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="info" 
+                  size="sm" 
+                  (click)="openDetailsModal(tenant)"
+                  title="View Details">
+                  <svg cIcon name="cil-info"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="warning" 
+                  size="sm" 
+                  (click)="openEditModal(tenant)"
+                  title="Edit">
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="danger" 
+                  size="sm" 
+                  (click)="openDeleteModal(tenant)"
+                  title="Delete">
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="tenants.length === 0">
+            <td colspan="9" class="text-center py-4">
+              <div class="text-muted">
+                <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                <h6>No tenants found</h6>
+                <p class="mb-0">Create your first tenant to get started.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
       </table>
     </div>
     <!-- Pagination -->
@@ -295,13 +301,13 @@
           </div>
           <div class="form-text">Current operational status</div>
         </div>
-      </div>
-      <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">Shard ID</label>
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.ShardId || selectedTenant?.shardId || 'N/A' }}</div>
           <div class="form-text">Database shard identifier for data distribution</div>
         </div>
+      </div>
+      <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">Column Family Index</label>
           <div class="p-2 bg-dark rounded">
@@ -318,6 +324,21 @@
           <label class="form-label fw-bold">Updated At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedTenant?.UpdatedAt || selectedTenant?.updatedAt) | date:'full' }}</div>
           <div class="form-text">Last modification timestamp</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Exchanges Count</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ExchangesCount || '0' }}</div>
+          <div class="form-text">Total number of exchanges</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Queues Count</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.QueuesCount || '0' }}</div>
+          <div class="form-text">Total number of queues</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Messages Count</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.MessagesCount || '0' }}</div>
+          <div class="form-text">Total number of messages</div>
         </div>
       </div>
     </div>
