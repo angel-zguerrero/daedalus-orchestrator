@@ -87,6 +87,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return deleteTenantInMasterCommand.Execute(uow, now)
 	}
 
+	updateLastCheckTenantInMasterCommand, ok := cmd.(tenant_command.UpdateLastCheckTenantInMasterCommand)
+	if ok {
+		return updateLastCheckTenantInMasterCommand.Execute(uow, now)
+	}
+
 	removeSessionCommand, ok := cmd.(auth_command.RemoveSessionCommand)
 	if ok {
 		return removeSessionCommand.Execute(uow, now)

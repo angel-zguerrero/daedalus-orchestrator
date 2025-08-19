@@ -22,9 +22,10 @@ type TenantInMaster struct {
 	QueuesCount    int
 	MessagesCount  int
 
-	Status    TenantInMasterStatus
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Status             TenantInMasterStatus
+	LastCheckUpdatedAt time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 func (TenantInMaster) TableName() string {
