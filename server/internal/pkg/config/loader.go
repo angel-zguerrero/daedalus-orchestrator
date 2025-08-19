@@ -41,6 +41,7 @@ Available Flags:
   --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
   --node-scheduler-heartbeat-timeout  Timeout for node scheduler heartbeats (e.g., 3m, 5m). Minimum 3 minutes. Default 3m. Overrides config file and environment variable.
   --node-scheduler-ttl         TTL for node scheduler entries in minutes. Minimum 60. Default 1440. Overrides config file and environment variable.
+  --tenant-summary-worker-interval  Interval for tenant summary worker in seconds. Minimum 10. Default 30. Overrides config file and environment variable.
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -68,6 +69,7 @@ Environment Variables:
   GRPC_SERVER_LISTEN_ADDR_PORT Port for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrPort + `)
   NODE_SCHEDULER_HEARTBEAT_TIMEOUT Timeout for node scheduler heartbeats (e.g., "3m", "5m"). (Corresponds to ` + constants.EnvVarNodeSchedulerHeartbeatTimeout + `)
   NODE_SCHEDULER_TTL          TTL for node scheduler entries in minutes. (Corresponds to ` + constants.EnvVarNodeSchedulerTTL + `)
+  TENANT_SUMMARY_WORKER_INTERVAL  Interval for tenant summary worker in seconds. (Corresponds to ` + constants.EnvVarTenantSummaryWorkerInterval + `)
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -101,6 +103,7 @@ Configuration File:
     grpc_server_listen_addr_port   Port for the gRPC server.
     node_scheduler_heartbeat_timeout  Timeout for node scheduler heartbeats in seconds (e.g., 180 for 3m).
     node_scheduler_ttl            TTL for node scheduler entries in minutes.
+    tenant_summary_worker_interval  Interval for tenant summary worker in seconds.
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -192,6 +195,9 @@ var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHea
 
 // NodeSchedulerTTLFlag defines the --node-scheduler-ttl command-line flag for specifying the node scheduler TTL.
 var NodeSchedulerTTLFlag = flag.Int64(constants.NodeSchedulerTTLFlagName, 1440, "TTL for node scheduler entries in minutes. Minimum 60. Overrides config file and environment variable.")
+
+// TenantSummaryWorkerIntervalFlag defines the --tenant-summary-worker-interval command-line flag for specifying the tenant summary worker interval.
+var TenantSummaryWorkerIntervalFlag = flag.Int64(constants.TenantSummaryWorkerIntervalFlagName, 30, "Interval for tenant summary worker in seconds. Minimum 10. Overrides config file and environment variable.")
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -408,6 +414,14 @@ func LoadDefaultConfiguration() error {
 		config.NodeSchedulerTTL = nodeSchedulerTTL
 	}
 
+	if envVal := os.Getenv(constants.EnvVarTenantSummaryWorkerInterval); envVal != "" {
+		tenantSummaryWorkerInterval, err := strconv.ParseInt(envVal, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarTenantSummaryWorkerInterval, err)
+		}
+		config.TenantSummaryWorkerInterval = tenantSummaryWorkerInterval
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -484,6 +498,11 @@ func LoadDefaultConfiguration() error {
 		config.NodeSchedulerTTL = *NodeSchedulerTTLFlag
 	}
 
+	// TenantSummaryWorker flag
+	if *TenantSummaryWorkerIntervalFlag != 30 { // Only override if different from default
+		config.TenantSummaryWorkerInterval = *TenantSummaryWorkerIntervalFlag
+	}
+
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
@@ -533,6 +552,14 @@ func LoadDefaultConfiguration() error {
 	if config.NodeSchedulerTTL < 60 {
 		log.Warn().Msgf("NodeSchedulerTTL (%d minutes) is less than minimum 60 minutes. Setting to 60 minutes.", config.NodeSchedulerTTL)
 		config.NodeSchedulerTTL = 60
+	}
+
+	if config.TenantSummaryWorkerInterval == 0 {
+		config.TenantSummaryWorkerInterval = 30 // Default to 30 seconds
+	}
+	if config.TenantSummaryWorkerInterval < 10 {
+		log.Warn().Msgf("TenantSummaryWorkerInterval (%d seconds) is less than minimum 10 seconds. Setting to 10 seconds.", config.TenantSummaryWorkerInterval)
+		config.TenantSummaryWorkerInterval = 10
 	}
 
 	// Default for ApiRaftTimeout if not set by file, env, or flag (flag itself has a default of 5s)
@@ -829,6 +856,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.node_scheduler_ttl = p
+		case constants.ConfigTenantSummaryWorkerIntervalKey:
+			p, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.tenant_summary_worker_interval = p
 		}
 	}
 

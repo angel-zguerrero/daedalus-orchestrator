@@ -65,6 +65,7 @@ type Application struct {
 	NodeClearExpiredTTLStopper    *syncutil.Stopper
 	NodeSchedulerHeartbeatStopper *syncutil.Stopper
 	AssignTenantsStopper          *syncutil.Stopper
+	TenantSummaryWorkerStopper    *syncutil.Stopper
 	ApiLock                       sync.Mutex
 	GrpcLock                      sync.Mutex
 	NH                            *dragonboatV4.NodeHost
@@ -231,6 +232,8 @@ func (app *Application) Run() {
 
 	app.StartNodeSchedulerHeartbeatWorker(10 * time.Second)
 
+	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
+
 }
 
 func (app *Application) Stop() {
@@ -326,6 +329,14 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ AssignTenantsStopper stopped.")
 	}()
 
+	// Stop Tenant Summary Worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.TenantSummaryWorkerStopper.Stop()
+		log.Info().Msg("✅ TenantSummaryWorkerStopper stopped.")
+	}()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -362,6 +373,7 @@ func NewApplication() *Application {
 		NodeClearExpiredTTLStopper:    syncutil.NewStopper(),
 		NodeSchedulerHeartbeatStopper: syncutil.NewStopper(),
 		AssignTenantsStopper:          syncutil.NewStopper(),
+		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
 		TenantNodes:                   make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary:         make(map[string]*dragonboat.RaftNode),
 	}

@@ -74,6 +74,9 @@ const ConfigNodeSchedulerHeartbeatTimeoutKey = "node_scheduler_heartbeat_timeout
 // ConfigNodeSchedulerTTLKey is the key for the node scheduler TTL setting in the configuration file (in minutes).
 const ConfigNodeSchedulerTTLKey = "node_scheduler_ttl"
 
+// ConfigTenantSummaryWorkerIntervalKey is the key for the tenant summary worker interval setting in the configuration file (in seconds).
+const ConfigTenantSummaryWorkerIntervalKey = "tenant_summary_worker_interval"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -155,6 +158,9 @@ const EnvVarNodeSchedulerHeartbeatTimeout = "NODE_SCHEDULER_HEARTBEAT_TIMEOUT"
 // EnvVarNodeSchedulerTTL is the environment variable name for the node scheduler TTL (in minutes).
 const EnvVarNodeSchedulerTTL = "NODE_SCHEDULER_TTL"
 
+// EnvVarTenantSummaryWorkerInterval is the environment variable name for the tenant summary worker interval (in seconds).
+const EnvVarTenantSummaryWorkerInterval = "TENANT_SUMMARY_WORKER_INTERVAL"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -226,3 +232,6 @@ const NodeSchedulerHeartbeatTimeoutFlagName = "node-scheduler-heartbeat-timeout"
 
 // NodeSchedulerTTLFlagName is the command-line flag name for the node scheduler TTL (in minutes).
 const NodeSchedulerTTLFlagName = "node-scheduler-ttl"
+
+// TenantSummaryWorkerIntervalFlagName is the command-line flag name for the tenant summary worker interval (in seconds).
+const TenantSummaryWorkerIntervalFlagName = "tenant-summary-worker-interval"

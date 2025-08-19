@@ -58,6 +58,8 @@ type Config struct {
 	NodeSchedulerHeartbeatTimeout time.Duration
 	// NodeSchedulerTTL is the Time-To-Live (in minutes) for node scheduler entries.
 	NodeSchedulerTTL int64
+	// TenantSummaryWorkerInterval is the interval in seconds for tenant summary updates.
+	TenantSummaryWorkerInterval int64
 
 	Env string
 }
@@ -90,6 +92,7 @@ type ConfigFromMap struct {
 	grpc_server_listen_addr_port     int
 	node_scheduler_heartbeat_timeout int64 // Timeout in seconds
 	node_scheduler_ttl               int64 // TTL in minutes
+	tenant_summary_worker_interval   int64 // Interval in seconds
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -126,6 +129,7 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		GrpcServerListenAddrPort:      configFromMapInstance.grpc_server_listen_addr_port,
 		NodeSchedulerHeartbeatTimeout: time.Duration(configFromMapInstance.node_scheduler_heartbeat_timeout) * time.Second,
 		NodeSchedulerTTL:              configFromMapInstance.node_scheduler_ttl,
+		TenantSummaryWorkerInterval:   configFromMapInstance.tenant_summary_worker_interval,
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
 		// after considering flags and env vars. We need to pass the raw string from the config file if present.
 		// However, the Config struct doesn't store the raw string.
