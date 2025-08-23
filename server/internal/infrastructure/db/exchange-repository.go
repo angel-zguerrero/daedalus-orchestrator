@@ -34,8 +34,16 @@ func (r *ExchangeRepository) UpdateExchange(input *models.Exchange, now time.Tim
 	return r.Update(input, now)
 }
 
-func (r *ExchangeRepository) GetExchangeByCode(code string, now time.Time) (*models.Exchange, error) {
-	return r.FindByField("Code", code, now)
+func (r *ExchangeRepository) GetExchangeByCode(code string, vnamespace string, now time.Time) (*models.Exchange, error) {
+	query := "Code = " + code + " & VNamespace = " + vnamespace
+	result, err := r.Find(query, 1, "", now)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Entities) == 0 {
+		return nil, nil
+	}
+	return &result.Entities[0], nil
 }
 
 func (r *ExchangeRepository) GetExchangeById(id string, now time.Time) (*models.Exchange, error) {

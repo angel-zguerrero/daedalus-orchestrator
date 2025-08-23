@@ -378,7 +378,7 @@ export class QueuesComponent implements OnInit {
   }
 
   deleteQueue(): void {
-    this.queuesService.deleteQueue(this.tenantId, this.selectedQueue.ID).subscribe({
+    this.queuesService.deleteQueue(this.tenantId, this.selectedQueue.code, this.selectedQueue.vnamespace).subscribe({
       next: () => {
         this.deleteModalVisible = false;
         this.loadQueues();

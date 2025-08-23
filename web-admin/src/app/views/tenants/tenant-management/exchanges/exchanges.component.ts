@@ -261,7 +261,7 @@ export class ExchangesComponent implements OnInit {
   }
 
   deleteExchange(): void {
-    this.exchangesService.deleteExchange(this.tenantId, this.selectedExchange.ID).subscribe({
+    this.exchangesService.deleteExchange(this.tenantId, this.selectedExchange.Code, this.selectedExchange.VNamespace).subscribe({
       next: () => {
         this.deleteModalVisible = false;
         this.loadExchanges();

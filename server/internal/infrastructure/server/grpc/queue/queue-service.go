@@ -176,7 +176,7 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 		return nil, err
 	}
 
-	queue, err := s.QueueBO.GetQueue(ctx, r.QueueId, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queue, err := s.QueueBO.GetQueue(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -247,13 +247,13 @@ func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest
 		return nil, err
 	}
 
-	err = s.QueueBO.DeleteQueue(ctx, r.QueueId, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err = s.QueueBO.DeleteQueue(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.DeleteQueueResponse{
-		Message: "Queue " + r.QueueId + " was deleted",
+		Message: "Queue " + r.Code + " in namespace " + r.Vnamespace + " was deleted",
 	}, nil
 }
 

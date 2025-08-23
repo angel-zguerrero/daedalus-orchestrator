@@ -58,7 +58,7 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		}
 
 		// Look for existing exchange by code (primary upsert strategy)
-		existing, err := exchangeRepo.GetExchangeByCode(exchange.Code, now)
+		existing, err := exchangeRepo.GetExchangeByCode(exchange.Code, exchange.VNamespace, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

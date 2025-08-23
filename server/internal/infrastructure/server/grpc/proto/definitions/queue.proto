@@ -60,7 +60,8 @@ message BulkCreateQueueResponse {
 
 message GetQueueRequest {
   string tenantId = 1;
-  string queueId = 2;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message GetQueueResponse {
@@ -104,7 +105,8 @@ message GetQueuesResponse {
 
 message DeleteQueueRequest {
   string tenantId = 1;
-  string queueId = 2;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message DeleteQueueResponse {

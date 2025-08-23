@@ -20,10 +20,9 @@ type Exchange struct {
 	ID string `orm:"primary-key"`
 
 	// Code is unique identifier for the exchange, used for upsert operations
-	Code string `orm:"unique"`
+	Code string `orm:"unique-compound:0"`
 
-	// Name is part of the compound uniqueness constraint with index 0
-	Name string `orm:"unique-compound:0"`
+	Name string
 
 	Type ExchangeType
 

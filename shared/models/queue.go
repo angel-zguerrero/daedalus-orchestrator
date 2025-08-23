@@ -21,8 +21,8 @@ const (
 
 type Queue struct {
 	ID   string `orm:"primary-key"`
-	Name string `orm:"unique-compound:0"`
-	Code string `orm:"unique"`
+	Name string
+	Code string `orm:"unique-compound:0"`
 
 	VNamespace string `orm:"unique-compound:0"`
 

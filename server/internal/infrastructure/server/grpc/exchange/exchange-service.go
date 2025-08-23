@@ -102,7 +102,7 @@ func (s *ExchangeService) GetExchange(ctx context.Context, r *pb.GetExchangeRequ
 		return nil, err
 	}
 
-	exchange, err := s.ExchangeBO.GetExchange(ctx, r.ExchangeId, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := s.ExchangeBO.GetExchange(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +167,12 @@ func (s *ExchangeService) DeleteExchange(ctx context.Context, r *pb.DeleteExchan
 		return nil, err
 	}
 
-	err = s.ExchangeBO.DeleteExchange(ctx, r.ExchangeId, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err = s.ExchangeBO.DeleteExchange(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.DeleteExchangeResponse{
-		Message: "Exchange " + r.ExchangeId + " was deleted",
+		Message: "Exchange " + r.Code + " in namespace " + r.Vnamespace + " was deleted",
 	}, nil
 }

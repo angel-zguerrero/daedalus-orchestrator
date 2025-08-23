@@ -1,4 +1,4 @@
-package queue_command
+package queue
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -58,7 +58,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		}
 
 		// Look for existing queue by code (primary upsert strategy)
-		existing, err := queueRepo.GetQueueByCode(queue.Code, now)
+		existing, err := queueRepo.GetQueueByCode(queue.Code, queue.VNamespace, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

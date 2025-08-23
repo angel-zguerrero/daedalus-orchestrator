@@ -18,8 +18,8 @@ export class QueuesService {
     return this.http.get(`${this.apiUrl}/${tenantId}/queue?${params}`);
   }
 
-  getQueue(tenantId: string, queueId: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${tenantId}/queue/${queueId}`);
+  getQueue(tenantId: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${tenantId}/queue/${code}/${vnamespace}`);
   }
 
   createQueue(tenantId: string, queue: any): Observable<any> {
@@ -30,7 +30,7 @@ export class QueuesService {
     return this.http.post(`${this.apiUrl}/${tenantId}/queue/bulk`, queues);
   }
 
-  deleteQueue(tenantId: string, queueId: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${tenantId}/queue/${queueId}`);
+  deleteQueue(tenantId: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${tenantId}/queue/${code}/${vnamespace}`);
   }
 }

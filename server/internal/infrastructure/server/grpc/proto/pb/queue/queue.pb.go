@@ -453,7 +453,8 @@ func (x *BulkCreateQueueResponse) GetResult() []*Queue {
 type GetQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	QueueId       string                 `protobuf:"bytes,2,opt,name=queueId,proto3" json:"queueId,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -495,9 +496,16 @@ func (x *GetQueueRequest) GetTenantId() string {
 	return ""
 }
 
-func (x *GetQueueRequest) GetQueueId() string {
+func (x *GetQueueRequest) GetCode() string {
 	if x != nil {
-		return x.QueueId
+		return x.Code
+	}
+	return ""
+}
+
+func (x *GetQueueRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
 	}
 	return ""
 }
@@ -877,7 +885,8 @@ func (x *GetQueuesResponse) GetResult() *QueueFindResult {
 type DeleteQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	QueueId       string                 `protobuf:"bytes,2,opt,name=queueId,proto3" json:"queueId,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -919,9 +928,16 @@ func (x *DeleteQueueRequest) GetTenantId() string {
 	return ""
 }
 
-func (x *DeleteQueueRequest) GetQueueId() string {
+func (x *DeleteQueueRequest) GetCode() string {
 	if x != nil {
-		return x.QueueId
+		return x.Code
+	}
+	return ""
+}
+
+func (x *DeleteQueueRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
 	}
 	return ""
 }
@@ -1015,10 +1031,13 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"Y\n" +
 	"\x17BulkCreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"G\n" +
+	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"a\n" +
 	"\x0fGetQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x18\n" +
-	"\aqueueId\x18\x02 \x01(\tR\aqueueId\"R\n" +
+	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x03 \x01(\tR\n" +
+	"vnamespace\"R\n" +
 	"\x10GetQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
 	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"\x90\x01\n" +
@@ -1058,10 +1077,13 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"]\n" +
 	"\x11GetQueuesResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12.\n" +
-	"\x06result\x18\x02 \x01(\v2\x16.queue.QueueFindResultR\x06result\"J\n" +
+	"\x06result\x18\x02 \x01(\v2\x16.queue.QueueFindResultR\x06result\"d\n" +
 	"\x12DeleteQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x18\n" +
-	"\aqueueId\x18\x02 \x01(\tR\aqueueId\"/\n" +
+	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x03 \x01(\tR\n" +
+	"vnamespace\"/\n" +
 	"\x13DeleteQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage*7\n" +
 	"\tQueueType\x12\f\n" +

@@ -100,11 +100,12 @@ func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*model
 	return created, nil
 }
 
-func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeID, cf, cfs string) (models.Exchange, error) {
+func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeCode, vnamespace, cf, cfs string) (models.Exchange, error) {
 	findExchangeCommand := &exchange_command.FindExchangeCommand{
-		ID:  exchangeID,
-		CF:  cf,
-		CFS: cfs,
+		Code:       exchangeCode,
+		VNamespace: vnamespace,
+		CF:         cf,
+		CFS:        cfs,
 	}
 
 	queryCommand := &general_command.Query_Command{
@@ -149,14 +150,15 @@ func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeID, cf, cfs strin
 	return exchange, nil
 }
 
-func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeID, cf, cfs string) error {
+func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespace, cf, cfs string) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
 	defer writeCancel()
 
 	deleteExchangeCommand := &exchange_command.DeleteExchangeCommand{
-		ID:  exchangeID,
-		CF:  cf,
-		CFS: cfs,
+		Code:       exchangeCode,
+		VNamespace: vnamespace,
+		CF:         cf,
+		CFS:        cfs,
 	}
 
 	atstCmd := general_command.FSM_Command{
@@ -167,7 +169,7 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeID, cf, cfs st
 
 	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, atstCmd)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("ExchangeID", exchangeID).Msg("Failed to delete exchange")
+		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Failed to delete exchange")
 		return errors.New("Failed to delete exchange: " + err.Error())
 	}
 
@@ -175,7 +177,7 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeID, cf, cfs st
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("ExchangeID", exchangeID).Msg("Exchange deletion command returned unexpected result type")
+		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Exchange deletion command returned unexpected result type")
 		return errors.New("Exchange deletion command returned unexpected error")
 	}
 
@@ -183,7 +185,7 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeID, cf, cfs st
 		return errors.New("Failed to delete exchange error: " + parsedResult.Error)
 	}
 
-	bo.Config.Logger.Info().Str("ExchangeID", exchangeID).Msg("exchange deleted successfully")
+	bo.Config.Logger.Info().Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("exchange deleted successfully")
 	return nil
 }
 

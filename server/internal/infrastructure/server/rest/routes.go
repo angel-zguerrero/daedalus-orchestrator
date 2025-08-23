@@ -46,14 +46,14 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.POST("/:id/exchange", exchangeController.CreateExchangeHandler)
 				tenantsGroup.POST("/:id/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
 				tenantsGroup.GET("/:id/exchange", exchangeController.GetExchangesHandler)
-				tenantsGroup.GET("/:id/exchange/:exchangeId", exchangeController.GetExchangeHandler)
-				tenantsGroup.DELETE("/:id/exchange/:exchangeId", exchangeController.DeleteExchangeHandler)
+				tenantsGroup.GET("/:id/exchange/:code/:vnamespace", exchangeController.GetExchangeHandler)
+				tenantsGroup.DELETE("/:id/exchange/:code/:vnamespace", exchangeController.DeleteExchangeHandler)
 
 				tenantsGroup.POST("/:id/queue", queueController.CreateQueueHandler)
 				tenantsGroup.POST("/:id/queue/bulk", queueController.BulkCreateQueueHandler)
 				tenantsGroup.GET("/:id/queue", queueController.GetQueuesHandler)
-				tenantsGroup.GET("/:id/queue/:queueId", queueController.GetQueueHandler)
-				tenantsGroup.DELETE("/:id/queue/:queueId", queueController.DeleteQueueHandler)
+				tenantsGroup.GET("/:id/queue/:code/:vnamespace", queueController.GetQueueHandler)
+				tenantsGroup.DELETE("/:id/queue/:code/:vnamespace", queueController.DeleteQueueHandler)
 
 				tenantsGroup.GET("/:id/vnamespaces", vnamespaceController.GetVNamespacesHandler)
 			}

@@ -104,9 +104,10 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 	})
 }
 
-// GetExchangeHandler handles GET /rest-api/exchanges/:id
+// GetExchangeHandler handles GET /rest-api/tenants/:id/exchange/:code/:vnamespace
 func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
-	exchangeID := c.Param("exchangeId")
+	exchangeCode := c.Param("code")
+	vnamespace := c.Param("vnamespace")
 	tenantID := c.Param("id")
 
 	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
@@ -114,7 +115,7 @@ func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	exchange, err := ctrl.ExchangeBO.GetExchange(c.Request.Context(), exchangeID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := ctrl.ExchangeBO.GetExchange(c.Request.Context(), exchangeCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -126,9 +127,10 @@ func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
 	})
 }
 
-// DeleteExchangeHandler handles DELETE /rest-api/exchanges/:id
+// DeleteExchangeHandler handles DELETE /rest-api/tenants/:id/exchange/:code/:vnamespace
 func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
-	exchangeID := c.Param("exchangeId")
+	exchangeCode := c.Param("code")
+	vnamespace := c.Param("vnamespace")
 	tenantID := c.Param("id")
 
 	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
@@ -137,14 +139,14 @@ func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.ExchangeBO.DeleteExchange(c.Request.Context(), exchangeID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err = ctrl.ExchangeBO.DeleteExchange(c.Request.Context(), exchangeCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Exchange " + exchangeID + " was deleted",
+		"message": "Exchange " + exchangeCode + " in namespace " + vnamespace + " was deleted",
 	})
 }
 

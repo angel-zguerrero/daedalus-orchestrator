@@ -1,4 +1,4 @@
-package queue_command
+package queue
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"

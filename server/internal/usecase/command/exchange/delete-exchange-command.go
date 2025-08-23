@@ -12,9 +12,10 @@ func init() {
 }
 
 type DeleteExchangeCommand struct {
-	ID  string
-	CF  string
-	CFS string
+	Code       string
+	VNamespace string
+	CF         string
+	CFS        string
 }
 
 func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -33,7 +34,20 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
-	deleted, err := exchangeRepo.DeleteExchangeById(cmd.ID, now)
+	// First find the exchange by code
+	exchange, err := exchangeRepo.GetExchangeByCode(cmd.Code, cmd.VNamespace, now)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	if exchange == nil {
+		commandResult.Error = "exchange not found"
+		return *commandResult
+	}
+
+	// Now delete by ID
+	deleted, err := exchangeRepo.DeleteExchangeById(exchange.ID, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

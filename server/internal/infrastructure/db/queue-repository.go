@@ -69,8 +69,16 @@ func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool,
 	return r.Update(input, now)
 }
 
-func (r *QueueRepository) GetQueueByCode(code string, now time.Time) (*models.Queue, error) {
-	return r.FindByField("Code", code, now)
+func (r *QueueRepository) GetQueueByCode(code string, vnamespace string, now time.Time) (*models.Queue, error) {
+	query := "Code = " + code + " & VNamespace = " + vnamespace
+	result, err := r.Find(query, 1, "", now)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Entities) == 0 {
+		return nil, nil
+	}
+	return &result.Entities[0], nil
 }
 
 func (r *QueueRepository) GetQueueById(id string, now time.Time) (*models.Queue, error) {

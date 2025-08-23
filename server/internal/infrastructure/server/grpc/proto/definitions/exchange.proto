@@ -44,7 +44,8 @@ message BulkCreateExchangeResponse {
 
 message GetExchangeRequest {
   string tenantId = 1;
-  string exchangeId = 2;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message GetExchangeResponse {
@@ -82,7 +83,8 @@ message GetExchangesResponse {
 
 message DeleteExchangeRequest {
   string tenantId = 1;
-  string exchangeId = 2;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message DeleteExchangeResponse {

@@ -162,9 +162,10 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 	})
 }
 
-// GetQueueHandler handles GET /rest-api/tenants/:id/queue/:queueId
+// GetQueueHandler handles GET /rest-api/tenants/:id/queue/:code/:vnamespace
 func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
-	queueID := c.Param("queueId")
+	queueCode := c.Param("code")
+	vnamespace := c.Param("vnamespace")
 	tenantID := c.Param("id")
 
 	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
@@ -172,7 +173,7 @@ func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -184,9 +185,10 @@ func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 	})
 }
 
-// DeleteQueueHandler handles DELETE /rest-api/tenants/:id/queue/:queueId
+// DeleteQueueHandler handles DELETE /rest-api/tenants/:id/queue/:code/:vnamespace
 func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
-	queueID := c.Param("queueId")
+	queueCode := c.Param("code")
+	vnamespace := c.Param("vnamespace")
 	tenantID := c.Param("id")
 
 	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
@@ -195,14 +197,14 @@ func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err = ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Queue " + queueID + " was deleted",
+		"message": "Queue " + queueCode + " in namespace " + vnamespace + " was deleted",
 	})
 }
 

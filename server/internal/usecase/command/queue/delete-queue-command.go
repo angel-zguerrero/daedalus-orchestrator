@@ -1,4 +1,4 @@
-package queue_command
+package queue
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -12,9 +12,10 @@ func init() {
 }
 
 type DeleteQueueCommand struct {
-	ID  string
-	CF  string
-	CFS string
+	Code       string
+	VNamespace string
+	CF         string
+	CFS        string
 }
 
 func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -33,7 +34,20 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
-	deleted, err := queueRepo.DeleteQueueById(cmd.ID, now)
+	// First find the queue by code
+	queue, err := queueRepo.GetQueueByCode(cmd.Code, cmd.VNamespace, now)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	if queue == nil {
+		commandResult.Error = "queue not found"
+		return *commandResult
+	}
+
+	// Now delete by ID
+	deleted, err := queueRepo.DeleteQueueById(queue.ID, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

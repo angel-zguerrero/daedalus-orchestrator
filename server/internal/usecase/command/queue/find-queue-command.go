@@ -1,4 +1,4 @@
-package queue_command
+package queue
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -13,23 +13,24 @@ func init() {
 }
 
 type FindQueueCommand struct {
-	ID  string
-	CF  string
-	CFS string
+	Code       string
+	VNamespace string
+	CF         string
+	CFS        string
 }
 
 func (cmd *FindQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
-	fmt.Println("Executing FindQueueCommand for ID:", cmd.ID, "CF:", cmd.CF, "CFS:", cmd.CFS)
+	fmt.Println("Executing FindQueueCommand for Code:", cmd.Code, "VNamespace:", cmd.VNamespace, "CF:", cmd.CF, "CFS:", cmd.CFS)
 	queueRepo, err := db.NewQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
 
-	queue, err := queueRepo.GetQueueById(cmd.ID, now)
+	queue, err := queueRepo.GetQueueByCode(cmd.Code, cmd.VNamespace, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

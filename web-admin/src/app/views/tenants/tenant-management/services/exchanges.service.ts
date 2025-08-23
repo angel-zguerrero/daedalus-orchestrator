@@ -18,8 +18,8 @@ export class ExchangesService {
     return this.http.get(`${this.apiUrl}/${tenantId}/exchange?${params}`);
   }
 
-  getExchange(tenantId: string, exchangeId: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${tenantId}/exchange/${exchangeId}`);
+  getExchange(tenantId: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${tenantId}/exchange/${code}/${vnamespace}`);
   }
 
   createExchange(tenantId: string, exchange: any): Observable<any> {
@@ -30,7 +30,7 @@ export class ExchangesService {
     return this.http.post(`${this.apiUrl}/${tenantId}/exchange/bulk`, exchanges);
   }
 
-  deleteExchange(tenantId: string, exchangeId: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${tenantId}/exchange/${exchangeId}`);
+  deleteExchange(tenantId: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${tenantId}/exchange/${code}/${vnamespace}`);
   }
 }

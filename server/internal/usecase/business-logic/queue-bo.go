@@ -115,11 +115,12 @@ func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, 
 	return created, nil
 }
 
-func (bo *QueueBO) GetQueue(ctx context.Context, queueID, cf, cfs string) (models.Queue, error) {
+func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace, cf, cfs string) (models.Queue, error) {
 	findQueueCommand := &queue_command.FindQueueCommand{
-		ID:  queueID,
-		CF:  cf,
-		CFS: cfs,
+		Code:       queueCode,
+		VNamespace: vnamespace,
+		CF:         cf,
+		CFS:        cfs,
 	}
 
 	queryCommand := &general_command.Query_Command{
@@ -164,14 +165,15 @@ func (bo *QueueBO) GetQueue(ctx context.Context, queueID, cf, cfs string) (model
 	return queue, nil
 }
 
-func (bo *QueueBO) DeleteQueue(ctx context.Context, queueID, cf, cfs string) error {
+func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, cfs string) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
 	defer writeCancel()
 
 	deleteQueueCommand := &queue_command.DeleteQueueCommand{
-		ID:  queueID,
-		CF:  cf,
-		CFS: cfs,
+		Code:       queueCode,
+		VNamespace: vnamespace,
+		CF:         cf,
+		CFS:        cfs,
 	}
 
 	atstCmd := general_command.FSM_Command{
@@ -182,7 +184,7 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueID, cf, cfs string) err
 
 	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, atstCmd)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("QueueID", queueID).Msg("Failed to delete queue")
+		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Failed to delete queue")
 		return errors.New("Failed to delete queue: " + err.Error())
 	}
 
@@ -190,7 +192,7 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueID, cf, cfs string) err
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("QueueID", queueID).Msg("Queue deletion command returned unexpected result type")
+		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Queue deletion command returned unexpected result type")
 		return errors.New("Queue deletion command returned unexpected error")
 	}
 
@@ -198,7 +200,7 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueID, cf, cfs string) err
 		return errors.New("Failed to delete queue error: " + parsedResult.Error)
 	}
 
-	bo.Config.Logger.Info().Str("QueueID", queueID).Msg("queue deleted successfully")
+	bo.Config.Logger.Info().Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("queue deleted successfully")
 	return nil
 }
 

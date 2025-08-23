@@ -455,30 +455,31 @@ func (r *Repository[T]) tryCompoundQuery(filter string, now time.Time) (*T, bool
 // It looks for patterns like "field1='value1' & field2='value2'" (with any number of fields).
 // Returns the extracted field-value pairs and whether this looks like a compound pattern.
 func (r *Repository[T]) parseCompoundPattern(filter string) (map[string]string, bool) {
-	// Split by & to get individual conditions
 	conditions := strings.Split(filter, "&")
 	if len(conditions) < 2 {
-		return nil, false // Need at least 2 conditions for compound
+		return nil, false
 	}
 
 	fieldValues := make(map[string]string)
-	equalityRegex := regexp.MustCompile(`^\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*=\s*'([^']*)'\s*$`)
+	equalityRegex := regexp.MustCompile(`^\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*=\s*(?:'([^']*)'|([^\s&|()]+))\s*$`)
 
 	for _, condition := range conditions {
 		condition = strings.TrimSpace(condition)
 
-		// Check if this is a simple equality condition
 		matches := equalityRegex.FindStringSubmatch(condition)
-		if len(matches) != 3 {
-			return nil, false // Not a simple equality, can't optimize
+		if len(matches) != 4 {
+			return nil, false
 		}
 
 		fieldName := matches[1]
+		// El valor puede estar en matches[2] (con comillas) o matches[3] (sin comillas)
 		fieldValue := matches[2]
+		if fieldValue == "" {
+			fieldValue = matches[3]
+		}
 
-		// Verify the field exists in our table definition
 		if _, exists := r.definition.Fields[fieldName]; !exists {
-			return nil, false // Unknown field
+			return nil, false
 		}
 
 		fieldValues[fieldName] = fieldValue
