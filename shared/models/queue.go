@@ -29,6 +29,8 @@ type Queue struct {
 	State QueueState
 	Type  QueueType
 
+	MessagesCount int
+
 	TTLQueue                  int
 	AllowDuplicated           bool
 	MaxAttempts               int

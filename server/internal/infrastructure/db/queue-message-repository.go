@@ -32,3 +32,7 @@ func (r *QueueMessageRepository) UpdateQueueMessage(input *models.QueueMessage, 
 	input.UpdatedAt = now
 	return r.Update(input, now)
 }
+
+func (r *QueueMessageRepository) GetQueueMessageById(id string, now time.Time) (*models.QueueMessage, error) {
+	return r.FindByField("ID", id, now)
+}

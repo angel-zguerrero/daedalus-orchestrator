@@ -32,3 +32,15 @@ func (r *QueuePartitionRepository) UpdateQueuePartition(input *models.QueueParti
 	input.UpdatedAt = now
 	return r.Update(input, now)
 }
+
+func (r *QueuePartitionRepository) GetQueuePartitionByQueueIDAndPriority(queueID string, priority int, now time.Time) (*models.QueuePartition, error) {
+	query := fmt.Sprintf("QueueID = '%s' & Priority = %d", queueID, priority)
+	result, err := r.Find(query, 1, "", now)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Entities) == 0 {
+		return nil, nil
+	}
+	return &result.Entities[0], nil
+}

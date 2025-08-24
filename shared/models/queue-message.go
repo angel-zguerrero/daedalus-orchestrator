@@ -9,10 +9,9 @@ type QueueMessage struct {
 	QueueID   string `orm:"unique-compound:0"`
 
 	QueuePartitionID string
+	Priority         int
 
 	NextQueueMessageID string
-
-	MessagesCount int
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
