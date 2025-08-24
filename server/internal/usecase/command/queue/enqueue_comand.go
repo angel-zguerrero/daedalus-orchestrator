@@ -28,7 +28,7 @@ type EnqueueCommand struct {
 func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
 
-	idFactory := &db.DefaultIDGeneratorFactory{}
+	idFactory := &db.DeterministicIDGeneratorFactory{}
 
 	// Initialize repositories
 	queueRepo, err := db.NewQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
