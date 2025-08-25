@@ -1,6 +1,7 @@
 package queue_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -87,6 +88,8 @@ func TestEnqueueCommand_Pebble(t *testing.T) {
 		{"QueueNotFound", testQueueNotFound_Pebble},
 		{"InactiveQueue", testInactiveQueue_Pebble},
 		{"MultipleMessagesOrdering", testMultipleMessagesOrdering_Pebble},
+		{"EmptyMessagesArray", testEmptyMessagesArray_Pebble},
+		{"BulkMessageEnqueue", testBulkMessageEnqueue_Pebble},
 	}
 
 	for _, tc := range testCases {
@@ -104,15 +107,21 @@ func testCreateNewPartitionWithFirstMessage_Pebble(t *testing.T) {
 	// Execute command
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-001", MessageID: "msg1", Priority: 1},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-001", MessageID: "msg1", Priority: 1}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result := cmd.Execute(uow, now)
+	if result.Error != "" {
+		t.Fatalf("Command execution failed: %s", result.Error)
+	}
 	require.Empty(t, result.Error)
 	err := uow.Commit()
+	if err != nil {
+		t.Fatalf("Failed to commit transaction: %s", err.Error())
+	}
 	require.NoError(t, err)
 
 	// Verify results
@@ -129,11 +138,11 @@ func testAddMessageToExistingPartition_Pebble(t *testing.T) {
 	// Add first message
 	uow1 := db.NewUnitOfWork(store, nil)
 	cmd1 := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-001", MessageID: "msg1", Priority: 1},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-001", MessageID: "msg1", Priority: 1}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result1 := cmd1.Execute(uow1, now)
 	require.Empty(t, result1.Error)
@@ -143,14 +152,14 @@ func testAddMessageToExistingPartition_Pebble(t *testing.T) {
 	// Verify first message
 	verifyEnqueueResults_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 1, 1, 1, now)
 
-	// Add second message to same partition
+	// Add second message to same partition using array with single message
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-002", MessageID: "msg2", Priority: 1},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-002", MessageID: "msg2", Priority: 1}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result2 := cmd2.Execute(uow2, now.Add(time.Second))
 	require.Empty(t, result2.Error)
@@ -174,11 +183,11 @@ func testValidatePriorityThresholds_Pebble(t *testing.T) {
 	// Test minimum priority
 	uow1 := db.NewUnitOfWork(store, nil)
 	cmd1 := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-min-001", MessageID: "msg_min", Priority: 1},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-min-001", MessageID: "msg_min", Priority: 1}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result1 := cmd1.Execute(uow1, now)
 	require.Empty(t, result1.Error)
@@ -188,11 +197,11 @@ func testValidatePriorityThresholds_Pebble(t *testing.T) {
 	// Test maximum priority
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-max-001", MessageID: "msg_max", Priority: 10},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-max-001", MessageID: "msg_max", Priority: 10}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result2 := cmd2.Execute(uow2, now.Add(time.Second))
 	require.Empty(t, result2.Error)
@@ -211,29 +220,29 @@ func testMessageChaining_Pebble(t *testing.T) {
 	// Setup queue
 	queue := setupTestQueueForEnqueue(t, store, EnqueueTestFC, EnqueueTestCFS, now)
 
-	// Add three messages to same partition
-	messageIDs := []string{"msg1", "msg2", "msg3"}
-	messageDBIDs := []string{"msg-chain-001", "msg-chain-002", "msg-chain-003"}
-	for i, msgID := range messageIDs {
-		uow := db.NewUnitOfWork(store, nil)
-		cmd := &queueCommand.EnqueueCommand{
-			Message:     models.QueueMessage{ID: messageDBIDs[i], MessageID: msgID, Priority: 1},
-			MessageCode: queue.Code,
-			VNamespace:  queue.VNamespace,
-			CF:          EnqueueTestFC,
-			CFS:         EnqueueTestCFS,
-		}
-		result := cmd.Execute(uow, now.Add(time.Duration(i)*time.Second))
-		require.Empty(t, result.Error)
-		err := uow.Commit()
-		require.NoError(t, err)
+	// Add three messages to same partition in a single command
+	uow := db.NewUnitOfWork(store, nil)
+	cmd := &queueCommand.EnqueueCommand{
+		Messages: []models.QueueMessage{
+			{ID: "msg-chain-001", MessageID: "msg1", Priority: 1},
+			{ID: "msg-chain-002", MessageID: "msg2", Priority: 1},
+			{ID: "msg-chain-003", MessageID: "msg3", Priority: 1},
+		},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
+	result := cmd.Execute(uow, now)
+	require.Empty(t, result.Error)
+	err := uow.Commit()
+	require.NoError(t, err)
 
 	// Verify final state
 	verifyEnqueueResults_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 1, 3, 3, now)
 
 	// Verify message chaining order
-	verifyMessageChaining_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 1, messageIDs, now)
+	verifyMessageChaining_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 1, []string{"msg1", "msg2", "msg3"}, now)
 }
 
 func testInvalidPriority_Pebble(t *testing.T) {
@@ -246,11 +255,11 @@ func testInvalidPriority_Pebble(t *testing.T) {
 	// Test priority too low
 	uow1 := db.NewUnitOfWork(store, nil)
 	cmd1 := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-low-001", MessageID: "msg_low", Priority: 0},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-low-001", MessageID: "msg_low", Priority: 0}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result1 := cmd1.Execute(uow1, now)
 	assert.NotEmpty(t, result1.Error)
@@ -259,11 +268,11 @@ func testInvalidPriority_Pebble(t *testing.T) {
 	// Test priority too high
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-high-001", MessageID: "msg_high", Priority: 11},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-high-001", MessageID: "msg_high", Priority: 11}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result2 := cmd2.Execute(uow2, now)
 	assert.NotEmpty(t, result2.Error)
@@ -277,11 +286,11 @@ func testQueueNotFound_Pebble(t *testing.T) {
 	// Try to enqueue to non-existent queue
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-notfound-001", MessageID: "msg1", Priority: 1},
-		MessageCode: "NON_EXISTENT",
-		VNamespace:  "test-namespace",
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-notfound-001", MessageID: "msg1", Priority: 1}},
+		QueueCode:  "NON_EXISTENT",
+		VNamespace: "test-namespace",
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result := cmd.Execute(uow, now)
 	assert.NotEmpty(t, result.Error)
@@ -325,11 +334,11 @@ func testInactiveQueue_Pebble(t *testing.T) {
 	// Try to enqueue to inactive queue
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Message:     models.QueueMessage{ID: "msg-inactive-001", MessageID: "msg1", Priority: 1},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueTestFC,
-		CFS:         EnqueueTestCFS,
+		Messages:   []models.QueueMessage{{ID: "msg-inactive-001", MessageID: "msg1", Priority: 1}},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
 	result := cmd.Execute(uow2, now)
 	assert.NotEmpty(t, result.Error)
@@ -343,33 +352,25 @@ func testMultipleMessagesOrdering_Pebble(t *testing.T) {
 	// Setup queue
 	queue := setupTestQueueForEnqueue(t, store, EnqueueTestFC, EnqueueTestCFS, now)
 
-	// Add messages to different partitions
-	messages := []struct {
-		id       string
-		dbID     string
-		priority int
-	}{
-		{"msg1_p1", "msg-multi-001", 1},
-		{"msg2_p1", "msg-multi-002", 1},
-		{"msg1_p2", "msg-multi-003", 2},
-		{"msg2_p2", "msg-multi-004", 2},
-		{"msg1_p3", "msg-multi-005", 3},
+	// Add messages to different partitions in a single command
+	uow := db.NewUnitOfWork(store, nil)
+	cmd := &queueCommand.EnqueueCommand{
+		Messages: []models.QueueMessage{
+			{ID: "msg-multi-001", MessageID: "msg1_p1", Priority: 1},
+			{ID: "msg-multi-002", MessageID: "msg2_p1", Priority: 1},
+			{ID: "msg-multi-003", MessageID: "msg1_p2", Priority: 2},
+			{ID: "msg-multi-004", MessageID: "msg2_p2", Priority: 2},
+			{ID: "msg-multi-005", MessageID: "msg1_p3", Priority: 3},
+		},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
 	}
-
-	for i, msg := range messages {
-		uow := db.NewUnitOfWork(store, nil)
-		cmd := &queueCommand.EnqueueCommand{
-			Message:     models.QueueMessage{ID: msg.dbID, MessageID: msg.id, Priority: msg.priority},
-			MessageCode: queue.Code,
-			VNamespace:  queue.VNamespace,
-			CF:          EnqueueTestFC,
-			CFS:         EnqueueTestCFS,
-		}
-		result := cmd.Execute(uow, now.Add(time.Duration(i)*time.Second))
-		require.Empty(t, result.Error)
-		err := uow.Commit()
-		require.NoError(t, err)
-	}
+	result := cmd.Execute(uow, now)
+	require.Empty(t, result.Error)
+	err := uow.Commit()
+	require.NoError(t, err)
 
 	// Verify partitions
 	verifyEnqueueResults_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 1, 2, 5, now)
@@ -435,4 +436,71 @@ func verifyMessageChaining_Pebble(t *testing.T, store db.KVStore, cf, cfs, queue
 
 	// Verify order
 	assert.Equal(t, expectedMessageIDs, actualMessageIDs, "Message chain order should match")
+}
+
+// Test empty messages array
+func testEmptyMessagesArray_Pebble(t *testing.T) {
+	store := newTestPebbleStoreForEnqueue(t, []string{EnqueueDefaultFC, EnqueueTestFC}, []string{EnqueueTemporalFC})
+	now := time.Now()
+
+	// Setup queue
+	queue := setupTestQueueForEnqueue(t, store, EnqueueTestFC, EnqueueTestCFS, now)
+
+	// Try to enqueue empty array
+	uow := db.NewUnitOfWork(store, nil)
+	cmd := &queueCommand.EnqueueCommand{
+		Messages:   []models.QueueMessage{},
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
+	}
+	result := cmd.Execute(uow, now)
+	assert.NotEmpty(t, result.Error)
+	assert.Contains(t, result.Error, "No messages provided")
+}
+
+// Test bulk message enqueue with large number of messages
+func testBulkMessageEnqueue_Pebble(t *testing.T) {
+	store := newTestPebbleStoreForEnqueue(t, []string{EnqueueDefaultFC, EnqueueTestFC}, []string{EnqueueTemporalFC})
+	now := time.Now()
+
+	// Setup queue
+	queue := setupTestQueueForEnqueue(t, store, EnqueueTestFC, EnqueueTestCFS, now)
+
+	// Create 20 messages across different priorities
+	var messages []models.QueueMessage
+	priorities := []int{1, 2, 3, 10} // Use valid priorities for this queue
+	for i := 0; i < 20; i++ {
+		priority := priorities[i%len(priorities)] // Cycle through valid priorities
+		messages = append(messages, models.QueueMessage{
+			ID:        fmt.Sprintf("msg-bulk-%03d", i+1),
+			MessageID: fmt.Sprintf("bulk_msg_%d", i+1),
+			Priority:  priority,
+		})
+	}
+
+	// Execute bulk enqueue
+	uow := db.NewUnitOfWork(store, nil)
+	cmd := &queueCommand.EnqueueCommand{
+		Messages:   messages,
+		QueueCode:  queue.Code,
+		VNamespace: queue.VNamespace,
+		CF:         EnqueueTestFC,
+		CFS:        EnqueueTestCFS,
+	}
+	result := cmd.Execute(uow, now)
+	require.Empty(t, result.Error)
+	err := uow.Commit()
+	require.NoError(t, err)
+
+	// Verify total queue message count
+	verifyEnqueueResults_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 1, 5, 20, now)  // 5 messages in priority 1
+	verifyEnqueueResults_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 2, 5, 20, now)  // 5 messages in priority 2
+	verifyEnqueueResults_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 3, 5, 20, now)  // 5 messages in priority 3
+	verifyEnqueueResults_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 10, 5, 20, now) // 5 messages in priority 10
+
+	// Verify message chaining for priority 1
+	expectedP1 := []string{"bulk_msg_1", "bulk_msg_5", "bulk_msg_9", "bulk_msg_13", "bulk_msg_17"}
+	verifyMessageChaining_Pebble(t, store, EnqueueTestFC, EnqueueTestCFS, queue.ID, 1, expectedP1, now)
 }

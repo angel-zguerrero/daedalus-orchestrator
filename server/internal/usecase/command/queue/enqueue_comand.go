@@ -18,15 +18,21 @@ func init() {
 }
 
 type EnqueueCommand struct {
-	Message     models.QueueMessage
-	MessageCode string
-	VNamespace  string
-	CF          string
-	CFS         string
+	Messages   []models.QueueMessage
+	QueueCode  string
+	VNamespace string
+	CF         string
+	CFS        string
 }
 
 func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
+
+	// Validate input
+	if len(cmd.Messages) == 0 {
+		commandResult.Error = "No messages provided"
+		return *commandResult
+	}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 
@@ -50,7 +56,7 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 	}
 
 	// Get the queue
-	queue, err := queueRepo.GetQueueByCode(cmd.MessageCode, cmd.VNamespace, now)
+	queue, err := queueRepo.GetQueueByCode(cmd.QueueCode, cmd.VNamespace, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -66,100 +72,134 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		return *commandResult
 	}
 
-	message := cmd.Message
-	message.QueueID = queue.ID
-
-	// Validate priority against DesiredPriorityThresholds
+	// Validate queue has priority thresholds configured
 	if queue.DesiredPriorityThresholds == nil {
 		commandResult.Error = "Queue has no priority thresholds configured"
 		return *commandResult
 	}
 
-	_, priorityExists := queue.DesiredPriorityThresholds[message.Priority]
-	if !priorityExists {
-		commandResult.Error = fmt.Sprintf("Priority %d is not allowed for this queue. Allowed priorities: %v",
-			message.Priority, getKeysFromMap(queue.DesiredPriorityThresholds))
-		return *commandResult
-	}
+	var processedMessages []models.QueueMessage
 
-	// Find or create the queue partition for this priority
-	partition, err := queuePartitionRepo.GetQueuePartitionByQueueIDAndPriority(queue.ID, message.Priority, now)
-	if err != nil {
-		commandResult.Error = err.Error()
-		return *commandResult
-	}
+	// First pass: Count messages per priority and prepare message data
+	messagesByPriority := make(map[int][]models.QueueMessage)
+	partitionUpdates := make(map[int]*models.QueuePartition)
 
-	// Generate message ID if not provided
-	if message.ID == "" {
-		message.ID = idFactory.GenerateID()
-	}
+	for i := range cmd.Messages {
+		message := &cmd.Messages[i] // Use pointer to modify in place
+		message.QueueID = queue.ID
 
-	if partition == nil {
-		// Create new partition with MessagesCount = 1 since we can't update after creation in UoW
-		partition = &models.QueuePartition{
-			ID:                  queue.ID + "-p-" + fmt.Sprintf("%d", message.Priority),
-			QueueID:             queue.ID,
-			Priority:            message.Priority,
-			MessagesCount:       1, // Start with 1 since we're adding the first message
-			FirstQueueMessageID: message.ID,
-			LastQueueMessageID:  message.ID,
+		// Validate priority against DesiredPriorityThresholds
+		_, priorityExists := queue.DesiredPriorityThresholds[message.Priority]
+		if !priorityExists {
+			commandResult.Error = fmt.Sprintf("Priority %d is not allowed for this queue. Allowed priorities: %v",
+				message.Priority, getKeysFromMap(queue.DesiredPriorityThresholds))
+			return *commandResult
 		}
 
-		_, err = queuePartitionRepo.CreateQueuePartition(partition, now)
+		// Generate message ID if not provided
+		if message.ID == "" {
+			message.ID = idFactory.GenerateID()
+		}
+
+		// Group messages by priority
+		if messagesByPriority[message.Priority] == nil {
+			messagesByPriority[message.Priority] = make([]models.QueueMessage, 0)
+		}
+		messagesByPriority[message.Priority] = append(messagesByPriority[message.Priority], *message)
+	}
+
+	// Second pass: Handle partitions and messages by priority
+	for priority, messages := range messagesByPriority {
+		// Try to get existing partition (this read happens before any writes)
+		existingPartition, err := queuePartitionRepo.GetQueuePartitionByQueueIDAndPriority(queue.ID, priority, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
 
-		// Set the partition ID for the message
-		message.QueuePartitionID = partition.ID
+		var partition *models.QueuePartition
+		isNewPartition := existingPartition == nil
 
-		// Create the message (this is the first message, so no chaining needed)
-		_, err = queueMessageRepo.CreateQueueMessage(&message, now)
-		if err != nil {
-			commandResult.Error = err.Error()
-			return *commandResult
-		}
-	} else {
-		// Existing partition - handle message chaining and update
-		// Set the partition ID for the message
-		message.QueuePartitionID = partition.ID
+		if isNewPartition {
+			// Create new partition with the correct initial count
+			partition = &models.QueuePartition{
+				ID:                  queue.ID + "-p-" + fmt.Sprintf("%d", priority),
+				QueueID:             queue.ID,
+				Priority:            priority,
+				MessagesCount:       len(messages), // Start with total count for this batch
+				FirstQueueMessageID: messages[0].ID,
+				LastQueueMessageID:  messages[len(messages)-1].ID,
+			}
 
-		// Handle message chaining
-		if partition.LastQueueMessageID != "" {
-			// Find the last message and update its NextQueueMessageID
-			lastMessage, err := queueMessageRepo.GetQueueMessageById(partition.LastQueueMessageID, now)
+			_, err = queuePartitionRepo.CreateQueuePartition(partition, now)
 			if err != nil {
 				commandResult.Error = err.Error()
 				return *commandResult
 			}
+		} else {
+			// Prepare update for existing partition
+			partition = &models.QueuePartition{
+				ID:                  existingPartition.ID,
+				QueueID:             existingPartition.QueueID,
+				Priority:            existingPartition.Priority,
+				MessagesCount:       existingPartition.MessagesCount + len(messages), // Increment by batch size
+				FirstQueueMessageID: existingPartition.FirstQueueMessageID,
+				LastQueueMessageID:  messages[len(messages)-1].ID, // Update to last message in this batch
+				CreatedAt:           existingPartition.CreatedAt,
+			}
 
+			// If this was an empty partition, set the first message
+			if existingPartition.MessagesCount == 0 {
+				partition.FirstQueueMessageID = messages[0].ID
+			}
+
+			partitionUpdates[priority] = partition
+		}
+
+		// Process messages for this priority and set up chaining
+		for i, message := range messages {
+			msg := message // Create a copy
+			msg.QueuePartitionID = partition.ID
+
+			// Handle message chaining within this batch
+			if i > 0 {
+				// Link to previous message in this batch
+				messages[i-1].NextQueueMessageID = msg.ID
+			}
+
+			processedMessages = append(processedMessages, msg)
+		}
+
+		// Create all messages for this priority
+		for i := range messages {
+			_, err = queueMessageRepo.CreateQueueMessage(&messages[i], now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+		}
+
+		// Handle chaining to existing partition's last message (if this is an existing partition)
+		if !isNewPartition && existingPartition.LastQueueMessageID != "" {
+			// Update the last existing message to point to our first message
+			lastMessage, err := queueMessageRepo.GetQueueMessageById(existingPartition.LastQueueMessageID, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
 			if lastMessage != nil {
-				// Update the last message to point to this new message
-				lastMessage.NextQueueMessageID = message.ID
-
+				lastMessage.NextQueueMessageID = messages[0].ID
 				_, err = queueMessageRepo.UpdateQueueMessage(lastMessage, now)
 				if err != nil {
 					commandResult.Error = err.Error()
 					return *commandResult
 				}
 			}
-		} else {
-			// This should not happen in an existing partition, but handle it gracefully
-			partition.FirstQueueMessageID = message.ID
 		}
+	}
 
-		// Create the message
-		_, err = queueMessageRepo.CreateQueueMessage(&message, now)
-		if err != nil {
-			commandResult.Error = err.Error()
-			return *commandResult
-		}
-
-		// Update partition with new last message and increment message count
-		partition.LastQueueMessageID = message.ID
-		partition.MessagesCount++
-
+	// Third pass: Update existing partitions (separate from creation)
+	for _, partition := range partitionUpdates {
 		_, err = queuePartitionRepo.UpdateQueuePartition(partition, now)
 		if err != nil {
 			commandResult.Error = err.Error()
@@ -168,14 +208,14 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 	}
 
 	// Update queue message count
-	queue.MessagesCount++
+	queue.MessagesCount += len(cmd.Messages)
 	_, err = queueRepo.UpdateQueue(queue, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
 
-	commandResult.Result = message
+	commandResult.Result = processedMessages
 	return *commandResult
 }
 
