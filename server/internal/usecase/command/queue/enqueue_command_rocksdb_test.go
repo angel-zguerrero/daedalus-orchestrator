@@ -71,8 +71,8 @@ func setupTestQueueForEnqueueRocksDB(t *testing.T, store db.KVStore, cf, cfs str
 	queue := &models.Queue{
 		ID:                        "test-queue-id-rocks-001",
 		Code:                      "TEST_QUEUE_ROCKS",
-		VNamespace:                "test-namespace",
 		Name:                      "Test Queue RocksDB",
+		VNamespace:                "test-namespace",
 		State:                     models.QueueActive,
 		Type:                      models.StandardQueue,
 		TTLQueue:                  3600,
@@ -111,6 +111,7 @@ func TestEnqueueCommand_RocksDB(t *testing.T) {
 		{"MultipleMessagesOrdering", testMultipleMessagesOrdering_RocksDB},
 		{"EmptyMessagesArray", testEmptyMessagesArray_RocksDB},
 		{"BulkMessageEnqueue", testBulkMessageEnqueue_RocksDB},
+		{"MultiQueueSupport", testMultiQueueSupport_RocksDB},
 	}
 
 	for _, tc := range testCases {
@@ -128,11 +129,9 @@ func testCreateNewPartitionWithFirstMessage_RocksDB(t *testing.T) {
 	// Execute command
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-001", MessageID: "msg1", Priority: 1}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-001", MessageID: "msg1", Priority: 1, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result := cmd.Execute(uow, now)
 	require.Empty(t, result.Error)
@@ -153,11 +152,9 @@ func testAddMessageToExistingPartition_RocksDB(t *testing.T) {
 	// Add first message
 	uow1 := db.NewUnitOfWork(store, nil)
 	cmd1 := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-001", MessageID: "msg1", Priority: 1}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-001", MessageID: "msg1", Priority: 1, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result1 := cmd1.Execute(uow1, now)
 	require.Empty(t, result1.Error)
@@ -170,11 +167,9 @@ func testAddMessageToExistingPartition_RocksDB(t *testing.T) {
 	// Add second message to same partition
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-002", MessageID: "msg2", Priority: 1}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-002", MessageID: "msg2", Priority: 1, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result2 := cmd2.Execute(uow2, now.Add(time.Second))
 	require.Empty(t, result2.Error)
@@ -198,11 +193,9 @@ func testValidatePriorityThresholds_RocksDB(t *testing.T) {
 	// Test minimum priority
 	uow1 := db.NewUnitOfWork(store, nil)
 	cmd1 := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-min-001", MessageID: "msg_min", Priority: 1}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-min-001", MessageID: "msg_min", Priority: 1, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result1 := cmd1.Execute(uow1, now)
 	require.Empty(t, result1.Error)
@@ -212,11 +205,9 @@ func testValidatePriorityThresholds_RocksDB(t *testing.T) {
 	// Test maximum priority
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-max-001", MessageID: "msg_max", Priority: 10}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-max-001", MessageID: "msg_max", Priority: 10, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result2 := cmd2.Execute(uow2, now.Add(time.Second))
 	require.Empty(t, result2.Error)
@@ -239,14 +230,12 @@ func testMessageChaining_RocksDB(t *testing.T) {
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
 		Messages: []models.QueueMessage{
-			{ID: "msg-chain-001", MessageID: "msg1", Priority: 1},
-			{ID: "msg-chain-002", MessageID: "msg2", Priority: 1},
-			{ID: "msg-chain-003", MessageID: "msg3", Priority: 1},
+			{ID: "msg-chain-001", MessageID: "msg1", Priority: 1, QueueID: queue.ID},
+			{ID: "msg-chain-002", MessageID: "msg2", Priority: 1, QueueID: queue.ID},
+			{ID: "msg-chain-003", MessageID: "msg3", Priority: 1, QueueID: queue.ID},
 		},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		CF:  EnqueueRocksTestFC,
+		CFS: EnqueueRocksTestCFS,
 	}
 	result := cmd.Execute(uow, now)
 	require.Empty(t, result.Error)
@@ -270,11 +259,9 @@ func testInvalidPriority_RocksDB(t *testing.T) {
 	// Test priority too low
 	uow1 := db.NewUnitOfWork(store, nil)
 	cmd1 := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-low-001", MessageID: "msg_low", Priority: 0}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-low-001", MessageID: "msg_low", Priority: 0, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result1 := cmd1.Execute(uow1, now)
 	assert.NotEmpty(t, result1.Error)
@@ -283,11 +270,9 @@ func testInvalidPriority_RocksDB(t *testing.T) {
 	// Test priority too high
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-high-001", MessageID: "msg_high", Priority: 11}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-high-001", MessageID: "msg_high", Priority: 11, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result2 := cmd2.Execute(uow2, now)
 	assert.NotEmpty(t, result2.Error)
@@ -301,11 +286,9 @@ func testQueueNotFound_RocksDB(t *testing.T) {
 	// Try to enqueue to non-existent queue
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-notfound-001", MessageID: "msg1", Priority: 1}},
-		MessageCode: "NON_EXISTENT",
-		VNamespace:  "test-namespace",
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-notfound-001", MessageID: "msg1", Priority: 1, QueueID: "NON_EXISTENT_QUEUE_ID"}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result := cmd.Execute(uow, now)
 	assert.NotEmpty(t, result.Error)
@@ -326,8 +309,8 @@ func testInactiveQueue_RocksDB(t *testing.T) {
 	queue := &models.Queue{
 		ID:                        "test-queue-id-rocks-inactive-001",
 		Code:                      "INACTIVE_QUEUE_ROCKS",
-		VNamespace:                "test-namespace",
 		Name:                      "Inactive Queue RocksDB",
+		VNamespace:                "test-namespace",
 		State:                     models.QueueStopped, // Inactive
 		Type:                      models.StandardQueue,
 		TTLQueue:                  3600,
@@ -349,11 +332,9 @@ func testInactiveQueue_RocksDB(t *testing.T) {
 	// Try to enqueue to inactive queue
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{{ID: "msg-inactive-001", MessageID: "msg1", Priority: 1}},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{{ID: "msg-inactive-001", MessageID: "msg1", Priority: 1, QueueID: queue.ID}},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result := cmd.Execute(uow2, now)
 	assert.NotEmpty(t, result.Error)
@@ -371,16 +352,14 @@ func testMultipleMessagesOrdering_RocksDB(t *testing.T) {
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
 		Messages: []models.QueueMessage{
-			{ID: "msg-multi-001", MessageID: "msg1_p1", Priority: 1},
-			{ID: "msg-multi-002", MessageID: "msg2_p1", Priority: 1},
-			{ID: "msg-multi-003", MessageID: "msg1_p2", Priority: 2},
-			{ID: "msg-multi-004", MessageID: "msg2_p2", Priority: 2},
-			{ID: "msg-multi-005", MessageID: "msg1_p3", Priority: 3},
+			{ID: "msg-multi-001", MessageID: "msg1_p1", Priority: 1, QueueID: queue.ID},
+			{ID: "msg-multi-002", MessageID: "msg2_p1", Priority: 1, QueueID: queue.ID},
+			{ID: "msg-multi-003", MessageID: "msg1_p2", Priority: 2, QueueID: queue.ID},
+			{ID: "msg-multi-004", MessageID: "msg2_p2", Priority: 2, QueueID: queue.ID},
+			{ID: "msg-multi-005", MessageID: "msg1_p3", Priority: 3, QueueID: queue.ID},
 		},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		CF:  EnqueueRocksTestFC,
+		CFS: EnqueueRocksTestCFS,
 	}
 	result := cmd.Execute(uow, now)
 	require.Empty(t, result.Error)
@@ -458,17 +437,12 @@ func testEmptyMessagesArray_RocksDB(t *testing.T) {
 	store := newTestRocksDBStoreForEnqueue(t)
 	now := time.Now()
 
-	// Setup queue
-	queue := setupTestQueueForEnqueueRocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, now)
-
 	// Try to enqueue empty array
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Messages:    []models.QueueMessage{},
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: []models.QueueMessage{},
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result := cmd.Execute(uow, now)
 	assert.NotEmpty(t, result.Error)
@@ -492,17 +466,16 @@ func testBulkMessageEnqueue_RocksDB(t *testing.T) {
 			ID:        fmt.Sprintf("msg-bulk-%03d", i+1),
 			MessageID: fmt.Sprintf("bulk_msg_%d", i+1),
 			Priority:  priority,
+			QueueID:   queue.ID,
 		})
 	}
 
 	// Execute bulk enqueue
 	uow := db.NewUnitOfWork(store, nil)
 	cmd := &queueCommand.EnqueueCommand{
-		Messages:    messages,
-		MessageCode: queue.Code,
-		VNamespace:  queue.VNamespace,
-		CF:          EnqueueRocksTestFC,
-		CFS:         EnqueueRocksTestCFS,
+		Messages: messages,
+		CF:       EnqueueRocksTestFC,
+		CFS:      EnqueueRocksTestCFS,
 	}
 	result := cmd.Execute(uow, now)
 	require.Empty(t, result.Error)
@@ -518,4 +491,74 @@ func testBulkMessageEnqueue_RocksDB(t *testing.T) {
 	// Verify message chaining for priority 1
 	expectedP1 := []string{"bulk_msg_1", "bulk_msg_5", "bulk_msg_9", "bulk_msg_13", "bulk_msg_17"}
 	verifyMessageChaining_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue.ID, 1, expectedP1, now)
+}
+
+// Test multi-queue support - processing messages from different queues in a single command
+func testMultiQueueSupport_RocksDB(t *testing.T) {
+	store := newTestRocksDBStoreForEnqueue(t)
+	now := time.Now()
+
+	// Setup two different queues
+	queue1 := setupTestQueueForEnqueueRocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, now)
+
+	// Create second queue
+	uow := db.NewUnitOfWork(store, nil)
+	idFactory := &db.DeterministicIDGeneratorFactory{}
+	queueRepo, err := db.NewQueueRepository(uow, idFactory, EnqueueRocksTestFC, EnqueueRocksTestCFS)
+	require.NoError(t, err)
+
+	queue2 := &models.Queue{
+		ID:                        "test-queue-id-rocks-002",
+		Code:                      "TEST_QUEUE_ROCKS_2",
+		Name:                      "Test Queue RocksDB 2",
+		VNamespace:                "test-namespace",
+		State:                     models.QueueActive,
+		Type:                      models.StandardQueue,
+		TTLQueue:                  3600,
+		AllowDuplicated:           true,
+		MaxAttempts:               3,
+		MessagesCount:             0,
+		DesiredPriorityThresholds: map[int]int{1: 100, 2: 50, 3: 30, 10: 10},
+		PriorityThresholds:        map[int]int{1: 100, 2: 50, 3: 30, 10: 10},
+		CreatedAt:                 now,
+		UpdatedAt:                 now,
+	}
+
+	queueID2, err := queueRepo.CreateQueue(queue2, now)
+	require.NoError(t, err)
+	queue2.ID = queueID2
+	err = uow.Commit()
+	require.NoError(t, err)
+
+	// Execute command with messages from both queues
+	uow2 := db.NewUnitOfWork(store, nil)
+	cmd := &queueCommand.EnqueueCommand{
+		Messages: []models.QueueMessage{
+			{ID: "msg-q1-001", MessageID: "msg1_queue1", Priority: 1, QueueID: queue1.ID},
+			{ID: "msg-q1-002", MessageID: "msg2_queue1", Priority: 1, QueueID: queue1.ID},
+			{ID: "msg-q2-001", MessageID: "msg1_queue2", Priority: 1, QueueID: queue2.ID},
+			{ID: "msg-q2-002", MessageID: "msg2_queue2", Priority: 2, QueueID: queue2.ID},
+			{ID: "msg-q1-003", MessageID: "msg3_queue1", Priority: 2, QueueID: queue1.ID},
+		},
+		CF:  EnqueueRocksTestFC,
+		CFS: EnqueueRocksTestCFS,
+	}
+	result := cmd.Execute(uow2, now)
+	require.Empty(t, result.Error)
+	err = uow2.Commit()
+	require.NoError(t, err)
+
+	// Verify results for queue1: 2 messages in priority 1, 1 message in priority 2
+	verifyEnqueueResults_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue1.ID, 1, 2, 3, now)
+	verifyEnqueueResults_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue1.ID, 2, 1, 3, now)
+
+	// Verify results for queue2: 1 message in priority 1, 1 message in priority 2
+	verifyEnqueueResults_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue2.ID, 1, 1, 2, now)
+	verifyEnqueueResults_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue2.ID, 2, 1, 2, now)
+
+	// Verify message chaining for each queue and priority
+	verifyMessageChaining_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue1.ID, 1, []string{"msg1_queue1", "msg2_queue1"}, now)
+	verifyMessageChaining_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue1.ID, 2, []string{"msg3_queue1"}, now)
+	verifyMessageChaining_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue2.ID, 1, []string{"msg1_queue2"}, now)
+	verifyMessageChaining_RocksDB(t, store, EnqueueRocksTestFC, EnqueueRocksTestCFS, queue2.ID, 2, []string{"msg2_queue2"}, now)
 }
