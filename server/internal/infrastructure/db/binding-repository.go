@@ -62,3 +62,19 @@ func (r *BindingRepository) GetBindingsByQueue(queueID string, now time.Time) (*
 func (r *BindingRepository) DeleteBinding(id string, now time.Time) (bool, error) {
 	return r.Delete(id, now)
 }
+
+func (r *BindingRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Binding], error) {
+	if q == "" {
+		if vNamespace == "" {
+			return r.Find("ID != 0", pageSize, cursor, now) // ID != 0 Workaround
+		} else {
+			return r.Find("VNamespace = "+vNamespace, pageSize, cursor, now)
+		}
+	} else {
+		if vNamespace == "" {
+			return r.Find("RoutingKey LIKE *"+q+"* | Pattern LIKE *"+q+"*", pageSize, cursor, now)
+		} else {
+			return r.Find("(RoutingKey LIKE *"+q+"* | Pattern LIKE *"+q+"*) & VNamespace = "+vNamespace, pageSize, cursor, now)
+		}
+	}
+}

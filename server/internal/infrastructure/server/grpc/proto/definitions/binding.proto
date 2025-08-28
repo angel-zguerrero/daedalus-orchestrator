@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package binding;
+
+option go_package = "pb/binding;binding";
+
+service BindingService {
+  rpc CreateBinding (CreateBindingRequest) returns (CreateBindingResponse);
+  rpc GetBinding (GetBindingRequest) returns (GetBindingResponse);
+  rpc GetBindings (GetBindingsRequest) returns (GetBindingsResponse);
+  rpc DeleteBinding (DeleteBindingRequest) returns (DeleteBindingResponse);
+}
+
+message CreateBindingRequest {
+  string tenantId = 1;
+  string exchangeCode = 2;
+  string queueCode = 3;
+  string vnamespace = 4;
+  string routingKey = 5;
+  string pattern = 6;
+  string xMatch = 7;
+  string bindingType = 8;
+}
+
+message CreateBindingResponse {
+  string message = 1;
+  Binding result = 2;
+}
+
+message GetBindingRequest {
+  string tenantId = 1;
+  string exchangeCode = 2;
+  string queueCode = 3;
+  string vnamespace = 4;
+}
+
+message GetBindingResponse {
+  string message = 1;
+  Binding result = 2;
+}
+
+message GetBindingsRequest {
+  string tenantId = 1;
+  string q = 2;
+  string cursor = 3;
+  int32 pageSize = 4;
+  string vnamespace = 5;
+}
+
+message Binding {
+  string id = 1;
+  string exchangeCode = 2;
+  string queueCode = 3;
+  string vnamespace = 4;
+  string routingKey = 5;
+  string pattern = 6;
+  string xMatch = 7;
+  string bindingType = 8;
+  string createdAt = 9;
+  string updatedAt = 10;
+}
+
+message BindingFindResult {
+  repeated Binding entities = 1;
+  string cursor = 2;
+}
+
+message GetBindingsResponse {
+  string message = 1;
+  BindingFindResult result = 2;
+}
+
+message DeleteBindingRequest {
+  string tenantId = 1;
+  string exchangeCode = 2;
+  string queueCode = 3;
+  string vnamespace = 4;
+}
+
+message DeleteBindingResponse {
+  string message = 1;
+}
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/binding.proto
