@@ -5,11 +5,10 @@ import "time"
 type ExchangeType string
 
 const (
-	Direct     ExchangeType = "direct"
-	Fanout     ExchangeType = "fanout"
-	Topic      ExchangeType = "topic"
-	Headers    ExchangeType = "headers"
-	DeadLetter ExchangeType = "dead-letter"
+	Direct  ExchangeType = "direct"
+	Fanout  ExchangeType = "fanout"
+	Topic   ExchangeType = "topic"
+	Headers ExchangeType = "headers"
 )
 
 // Exchange represents a message exchange with both unique code and compound uniqueness constraint.

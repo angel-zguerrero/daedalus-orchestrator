@@ -70,6 +70,7 @@ func (r *TenantSummaryRepository) IncreaseMessageCount(tenantId string, amount i
 			MessagesCount:  amount,
 			ExchangesCount: 0,
 			QueuesCount:    0,
+			BindingsCount:  0,
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
@@ -96,6 +97,7 @@ func (r *TenantSummaryRepository) DecreaseMessageCount(tenantId string, amount i
 			MessagesCount:  0,
 			ExchangesCount: 0,
 			QueuesCount:    0,
+			BindingsCount:  0,
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
@@ -125,6 +127,7 @@ func (r *TenantSummaryRepository) IncreaseExchangeCount(tenantId string, amount 
 			MessagesCount:  0,
 			ExchangesCount: amount,
 			QueuesCount:    0,
+			BindingsCount:  0,
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
@@ -151,6 +154,7 @@ func (r *TenantSummaryRepository) DecreaseExchangeCount(tenantId string, amount 
 			MessagesCount:  0,
 			ExchangesCount: 0,
 			QueuesCount:    0,
+			BindingsCount:  0,
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
@@ -180,6 +184,7 @@ func (r *TenantSummaryRepository) IncreaseQueueCount(tenantId string, amount int
 			MessagesCount:  0,
 			ExchangesCount: 0,
 			QueuesCount:    amount,
+			BindingsCount:  0,
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
@@ -206,6 +211,7 @@ func (r *TenantSummaryRepository) DecreaseQueueCount(tenantId string, amount int
 			MessagesCount:  0,
 			ExchangesCount: 0,
 			QueuesCount:    0,
+			BindingsCount:  0,
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
@@ -215,6 +221,63 @@ func (r *TenantSummaryRepository) DecreaseQueueCount(tenantId string, amount int
 	summary.QueuesCount -= amount
 	if summary.QueuesCount < 0 {
 		summary.QueuesCount = 0
+	}
+	_, err = r.UpdateTenantSummary(summary, now)
+	return err
+}
+
+// IncreaseBindingCount increases the BindingCount for a tenant by the specified amount
+// If the tenant doesn't exist, creates a new record with BindingCount = amount
+func (r *TenantSummaryRepository) IncreaseBindingCount(tenantId string, amount int, now time.Time) error {
+	summary, err := r.GetTenantSummaryById(tenantId, now)
+	if err != nil {
+		return err
+	}
+
+	if summary == nil {
+		// If tenant doesn't exist, create new record
+		newSummary := &models.TenantSummary{
+			ID:             tenantId,
+			MessagesCount:  0,
+			ExchangesCount: 0,
+			QueuesCount:    0,
+			BindingsCount:  amount,
+		}
+		_, err = r.CreateTenantSummary(newSummary, now)
+		return err
+	}
+
+	// Increase existing count
+	summary.BindingsCount += amount
+	_, err = r.UpdateTenantSummary(summary, now)
+	return err
+}
+
+// DecreaseBindingCount decreases the BindingCount for a tenant by the specified amount
+// If the tenant doesn't exist, creates a new record with BindingCount = 0
+func (r *TenantSummaryRepository) DecreaseBindingCount(tenantId string, amount int, now time.Time) error {
+	summary, err := r.GetTenantSummaryById(tenantId, now)
+	if err != nil {
+		return err
+	}
+
+	if summary == nil {
+		// If tenant doesn't exist, create new record with 0
+		newSummary := &models.TenantSummary{
+			ID:             tenantId,
+			MessagesCount:  0,
+			ExchangesCount: 0,
+			QueuesCount:    0,
+			BindingsCount:  0,
+		}
+		_, err = r.CreateTenantSummary(newSummary, now)
+		return err
+	}
+
+	// Decrease existing count (ensure it doesn't go below 0)
+	summary.BindingsCount -= amount
+	if summary.BindingsCount < 0 {
+		summary.BindingsCount = 0
 	}
 	_, err = r.UpdateTenantSummary(summary, now)
 	return err

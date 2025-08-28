@@ -9,6 +9,7 @@ type TenantSummary struct {
 
 	ExchangesCount int
 	QueuesCount    int
+	BindingsCount  int
 	MessagesCount  int
 
 	CreatedAt time.Time
