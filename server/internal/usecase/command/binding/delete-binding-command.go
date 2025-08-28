@@ -23,7 +23,7 @@ func (cmd *DeleteBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DefaultIDGeneratorFactory{}
-	
+
 	// Get repositories
 	bindingRepo, err := db.NewBindingRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {

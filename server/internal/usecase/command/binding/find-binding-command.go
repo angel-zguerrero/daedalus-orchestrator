@@ -25,7 +25,7 @@ func (cmd *FindBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 	idFactory := &db.DefaultIDGeneratorFactory{}
 	fmt.Println("Executing FindBindingCommand for ExchangeCode:", cmd.ExchangeCode, "QueueCode:", cmd.QueueCode, "VNamespace:", cmd.VNamespace, "CF:", cmd.CF, "CFS:", cmd.CFS)
-	
+
 	// Get repositories
 	bindingRepo, err := db.NewBindingRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {

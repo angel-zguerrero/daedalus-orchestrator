@@ -149,7 +149,7 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 		binding := &pb.Binding{
 			Id:           e.ID,
 			ExchangeCode: "", // Will need to resolve from ExchangeID
-			QueueCode:    "", // Will need to resolve from QueueID  
+			QueueCode:    "", // Will need to resolve from QueueID
 			Vnamespace:   e.VNamespace,
 			RoutingKey:   e.RoutingKey,
 			Pattern:      e.Pattern,
