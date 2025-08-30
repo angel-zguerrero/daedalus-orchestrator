@@ -14,6 +14,7 @@ import {
 import { IconDirective } from '@coreui/icons-angular';
 import { ExchangesComponent } from './exchanges/exchanges.component';
 import { QueuesComponent } from './queues/queues.component';
+import { BindingsComponent } from './bindings/bindings.component';
 import { TenantsService } from '../services/tenants.service';
 
 @Component({
@@ -33,7 +34,8 @@ import { TenantsService } from '../services/tenants.service';
     TabsListComponent,
     IconDirective,
     ExchangesComponent,
-    QueuesComponent
+    QueuesComponent,
+    BindingsComponent
   ]
 })
 export class TenantManagementComponent implements OnInit {

@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
@@ -46,6 +47,16 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	paginateQueuesCommand, ok := cmd.(queue_command.PaginateQueuesCommand)
 	if ok {
 		return paginateQueuesCommand.Execute(uow, now)
+	}
+
+	findBindingCommand, ok := cmd.(binding_command.FindBindingCommand)
+	if ok {
+		return findBindingCommand.Execute(uow, now)
+	}
+
+	paginateBindingsCommand, ok := cmd.(binding_command.PaginateBindingsCommand)
+	if ok {
+		return paginateBindingsCommand.Execute(uow, now)
 	}
 
 	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
@@ -108,6 +119,16 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	deleteQueueCommand, ok := cmd.(queue_command.DeleteQueueCommand)
 	if ok {
 		return deleteQueueCommand.Execute(uow, now)
+	}
+
+	assertBindingCommand, ok := cmd.(binding_command.AssertBindingCommand)
+	if ok {
+		return assertBindingCommand.Execute(uow, now)
+	}
+
+	deleteBindingCommand, ok := cmd.(binding_command.DeleteBindingCommand)
+	if ok {
+		return deleteBindingCommand.Execute(uow, now)
 	}
 
 	refreshLastUpdateAtFromCommand, ok := cmd.(tenant_summary_command.RefreshLastUpdateAtFromCommand)

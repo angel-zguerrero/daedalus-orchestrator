@@ -1,0 +1,426 @@
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-link" class="me-2"></svg>
+      Bindings Management
+    </h5>
+  </c-card-header>
+  <c-card-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    
+    <!-- Search and Actions Row -->
+    <c-row class="mb-3">
+      <c-col [md]="3">
+        <div class="input-group">
+          <input 
+            type="text" 
+            cFormControl 
+            placeholder="Search bindings" 
+            [(ngModel)]="searchQuery" 
+            (keydown.enter)="searchBindings()"/>
+          <button 
+            cButton 
+            type="button" 
+            color="secondary" 
+            variant="outline" 
+            (click)="searchBindings()">
+            <svg cIcon name="cil-search"></svg>
+          </button>
+        </div>
+      </c-col>
+      <c-col [md]="3">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by VNamespace</mat-label>
+          <input 
+            type="text"
+            matInput
+            [formControl]="vnamespaceFilterCtrl"
+            [matAutocomplete]="autoFilter"
+            (ngModelChange)="onVNamespaceFilterChange($event)">
+          <mat-autocomplete #autoFilter="matAutocomplete">
+            <mat-option *ngFor="let vns of filteredFilterVNamespaces | async" [value]="vns.Name">
+              {{vns.Name}}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+      <c-col [md]="6" class="d-flex justify-content-end align-items-end">
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create Binding
+        </button>
+      </c-col>
+    </c-row>
+
+    <!-- Bindings Table -->
+    <div class="table-responsive">
+      <table cTable class="mt-4" [hover]="true">
+        <thead>
+          <tr>
+            <th>Exchange</th>
+            <th>Queue</th>
+            <th>VNamespace</th>
+            <th>Routing Key</th>
+            <th>Pattern</th>
+            <th>X-Match</th>
+            <th>Type</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let binding of bindings" class="align-middle">
+            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.ExchangeCode || binding.exchangeCode }}">
+              <code>{{ binding.ExchangeCode || binding.exchangeCode }}</code>
+            </td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.QueueCode || binding.queueCode }}">
+              <code>{{ binding.QueueCode || binding.queueCode }}</code>
+            </td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.VNamespace || binding.vnamespace || '-' }}">
+              {{ binding.VNamespace || binding.vnamespace || '-' }}
+            </td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ binding.RoutingKey || binding.routingKey || '-' }}">
+              <span *ngIf="binding.RoutingKey || binding.routingKey; else emptyRoutingKey">
+                <code>{{ binding.RoutingKey || binding.routingKey }}</code>
+              </span>
+              <ng-template #emptyRoutingKey>-</ng-template>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ binding.Pattern || binding.pattern || '-' }}">
+              <span *ngIf="binding.Pattern || binding.pattern; else emptyPattern">
+                <code>{{ binding.Pattern || binding.pattern }}</code>
+              </span>
+              <ng-template #emptyPattern>-</ng-template>
+            </td>
+            <td>
+              <c-badge [color]="getXMatchColor(binding.XMatch || binding.xMatch)" shape="rounded-pill">
+                {{ binding.XMatch || binding.xMatch || 'all' }}
+              </c-badge>
+            </td>
+            <td>
+              <c-badge [color]="getBindingTypeColor(binding.BindingType || binding.bindingType)" shape="rounded-pill">
+                {{ binding.BindingType || binding.bindingType || 'classic' }}
+              </c-badge>
+            </td>
+            <td>
+              <div class="btn-group" role="group">
+                <button 
+                  cButton 
+                  color="info" 
+                  size="sm" 
+                  (click)="openDetailsModal(binding)"
+                  title="View Details">
+                  <svg cIcon name="cil-info"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="danger" 
+                  size="sm" 
+                  (click)="openDeleteModal(binding)"
+                  title="Delete">
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="bindings.length === 0">
+            <td colspan="8" class="text-center py-4">
+              <div class="text-muted">
+                <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                <h6>No bindings found</h6>
+                <p class="mb-0">Create your first binding to connect exchanges and queues.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex justify-content-end mt-3" *ngIf="bindings.length > 0">
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="cursors.length === 1" 
+        (click)="previousPage()">
+        <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+        Previous
+      </button>
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="!cursor" 
+        (click)="nextPage()" 
+        class="ms-2">
+        Next
+        <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create Binding Modal -->
+<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-plus" class="me-2"></svg>
+      Create Binding
+    </h5>
+    <button (click)="createModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <form [formGroup]="bindingForm" (ngSubmit)="createBinding()" (keydown.enter)="createBinding()">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <mat-form-field class="w-100">
+            <mat-label>Virtual Namespace *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="vnamespaceCtrl"
+              [matAutocomplete]="autoVNamespace">
+            <mat-autocomplete #autoVNamespace="matAutocomplete">
+              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+                {{vns.Name}}
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Required: Select the virtual namespace first</div>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <mat-form-field class="w-100">
+            <mat-label>Exchange *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="exchangeCtrl"
+              [matAutocomplete]="autoExchange">
+            <mat-autocomplete #autoExchange="matAutocomplete">
+              <mat-option *ngFor="let exchange of filteredExchanges | async" [value]="exchange.Code">
+                {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Required: Select the source exchange</div>
+          <div *ngIf="selectedExchange" class="mt-2">
+            <small class="text-info">
+              <svg cIcon name="cil-info" class="me-1"></svg>
+              Exchange Type: <strong>{{getExchangeTypeDisplayName()}}</strong>
+            </small>
+          </div>
+        </c-col>
+        <c-col [md]="6">
+          <mat-form-field class="w-100">
+            <mat-label>Queue *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="queueCtrl"
+              [matAutocomplete]="autoQueue">
+            <mat-autocomplete #autoQueue="matAutocomplete">
+              <mat-option *ngFor="let queue of filteredQueues | async" [value]="queue.Code">
+                {{queue.Code}} - {{queue.Name}} ({{queue.Type}})
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Required: Select the destination queue</div>
+        </c-col>
+      </c-row>
+      
+      <!-- Conditional fields based on exchange type -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="selectedExchange">
+        <c-col [md]="6" *ngIf="isFieldVisible('routingKey')">
+          <label cLabel for="routingKey">
+            Routing Key 
+            <span *ngIf="isFieldRequired('routingKey')" class="text-danger">*</span>
+          </label>
+          <input 
+            cFormControl 
+            id="routingKey" 
+            formControlName="routingKey" 
+            placeholder="Enter routing key" />
+          <small class="form-text text-muted">Used for direct exchanges to route messages</small>
+        </c-col>
+        <c-col [md]="6" *ngIf="isFieldVisible('pattern')">
+          <label cLabel for="pattern">
+            Pattern 
+            <span *ngIf="isFieldRequired('pattern')" class="text-danger">*</span>
+          </label>
+          <input 
+            cFormControl 
+            id="pattern" 
+            formControlName="pattern" 
+            placeholder="Enter pattern (e.g., user.*.created)" />
+          <small class="form-text text-muted">Used for topic exchanges pattern matching</small>
+        </c-col>
+        <c-col [md]="6" *ngIf="isFieldVisible('xMatch')">
+          <label cLabel for="xMatch">X-Match Type</label>
+          <select cSelect id="xMatch" formControlName="xMatch">
+            <option *ngFor="let xMatchType of xMatchTypes" [value]="xMatchType.value">
+              {{ xMatchType.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted">Used for headers exchanges matching</small>
+        </c-col>
+      </c-row>
+      
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="bindingType">Binding Type *</label>
+          <select cSelect id="bindingType" formControlName="bindingType">
+            <option *ngFor="let bindingType of bindingTypes" [value]="bindingType.value">
+              {{ bindingType.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted">Type of binding behavior</small>
+        </c-col>
+        <c-col [md]="6" *ngIf="!selectedExchange">
+          <div class="alert alert-info mt-3">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            Select an exchange to see type-specific fields
+          </div>
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="createModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="createBinding()" [disabled]="!bindingForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Create Binding
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Delete Binding Modal -->
+<c-modal id="deleteModal" [visible]="deleteModalVisible" (visibleChange)="deleteModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-trash" class="me-2"></svg>
+      Delete Binding
+    </h5>
+    <button (click)="deleteModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center">
+      <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
+      <h6>Are you sure you want to delete this binding?</h6>
+      <p class="text-muted mb-0">
+        <strong>{{ selectedBinding?.ExchangeCode || selectedBinding?.exchangeCode }}</strong> →
+        <strong>{{ selectedBinding?.QueueCode || selectedBinding?.queueCode }}</strong>
+        <br>This action cannot be undone.
+      </p>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="deleteModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="danger" (click)="deleteBinding()">
+      <svg cIcon name="cil-trash" class="me-1"></svg>
+      Delete Binding
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Binding Details Modal -->
+<c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-info" class="me-2"></svg>
+      Binding Details
+    </h5>
+    <button (click)="detailsModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedBinding">
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">ID</label>
+          <div class="p-2 bg-dark rounded">{{ selectedBinding?.ID || selectedBinding?.id || 'N/A' }}</div>
+          <div class="form-text">Unique system identifier</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Exchange Code</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedBinding?.ExchangeCode || selectedBinding?.exchangeCode || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Source exchange for message routing</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Queue Code</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedBinding?.QueueCode || selectedBinding?.queueCode || 'N/A' }}</code>
+          </div>
+          <div class="form-text">Destination queue for messages</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Virtual Namespace</label>
+          <div class="p-2 bg-dark rounded">{{ selectedBinding?.VNamespace || selectedBinding?.vnamespace || '-' }}</div>
+          <div class="form-text">Virtual namespace for logical grouping</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Routing Key</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedBinding?.RoutingKey || selectedBinding?.routingKey || '-' }}</code>
+          </div>
+          <div class="form-text">Used for direct exchange routing</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Pattern</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedBinding?.Pattern || selectedBinding?.pattern || '-' }}</code>
+          </div>
+          <div class="form-text">Used for topic exchange pattern matching</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">X-Match Type</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="getXMatchColor(selectedBinding?.XMatch || selectedBinding?.xMatch)" shape="rounded-pill">
+              {{ selectedBinding?.XMatch || selectedBinding?.xMatch || 'all' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Headers exchange matching strategy</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Binding Type</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="getBindingTypeColor(selectedBinding?.BindingType || selectedBinding?.bindingType)" shape="rounded-pill">
+              {{ selectedBinding?.BindingType || selectedBinding?.bindingType || 'classic' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Type of binding behavior</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row mt-3">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Created At</label>
+          <div class="p-2 bg-dark rounded">{{ (selectedBinding?.CreatedAt || selectedBinding?.createdAt) | date:'full' }}</div>
+          <div class="form-text">Binding creation timestamp</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Updated At</label>
+          <div class="p-2 bg-dark rounded">{{ (selectedBinding?.UpdatedAt || selectedBinding?.updatedAt) | date:'full' }}</div>
+          <div class="form-text">Last modification timestamp</div>
+        </div>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="detailsModalVisible = false" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>

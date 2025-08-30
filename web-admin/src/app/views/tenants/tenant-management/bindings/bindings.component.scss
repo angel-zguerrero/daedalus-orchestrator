@@ -1,0 +1,198 @@
+// Bindings component specific styles
+.table-responsive {
+  .table {
+    th {
+      white-space: nowrap;
+    }
+    
+    td {
+      vertical-align: middle;
+      
+      &.text-truncate {
+        max-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+  }
+}
+
+.btn-group {
+  .btn {
+    border-radius: 0.25rem !important;
+    margin-right: 0.125rem;
+    
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+}
+
+// Modal form styling
+.modal-body {
+  .form-text {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+  }
+  
+  .bg-dark {
+    background-color: var(--cui-dark) !important;
+    border-radius: 0.25rem;
+    color: var(--cui-light);
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+  }
+  
+  mat-form-field {
+    .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+    
+    // Better Material form field integration with CoreUI
+    .mat-mdc-text-field-wrapper {
+      background-color: var(--cui-input-bg);
+      border: 1px solid var(--cui-input-border-color);
+      border-radius: var(--cui-border-radius);
+      
+      &:hover {
+        border-color: var(--cui-input-focus-border-color);
+      }
+      
+      &.mdc-text-field--focused {
+        border-color: var(--cui-primary);
+        box-shadow: 0 0 0 0.2rem rgba(var(--cui-primary-rgb), 0.25);
+      }
+    }
+    
+    .mat-mdc-form-field-label {
+      color: var(--cui-body-color);
+    }
+    
+    .mat-mdc-input-element {
+      color: var(--cui-body-color);
+      background-color: transparent;
+      
+      &::placeholder {
+        color: var(--cui-input-placeholder-color);
+      }
+    }
+  }
+  
+  // Exchange type info styling
+  .text-info {
+    color: var(--cui-info) !important;
+    
+    strong {
+      font-weight: 600;
+    }
+  }
+  
+  // Form field visibility and validation styling
+  label {
+    .text-danger {
+      color: var(--cui-danger) !important;
+    }
+  }
+  
+  .alert {
+    &.alert-info {
+      background-color: rgba(var(--cui-info-rgb), 0.1);
+      border-color: var(--cui-info);
+      color: var(--cui-info);
+      
+      svg {
+        color: var(--cui-info);
+      }
+    }
+  }
+}
+
+// Autocomplete panel styling
+::ng-deep .mat-mdc-autocomplete-panel {
+  background-color: var(--cui-dropdown-bg);
+  border: 1px solid var(--cui-dropdown-border-color);
+  border-radius: var(--cui-border-radius);
+  box-shadow: var(--cui-dropdown-box-shadow);
+  
+  .mat-mdc-option {
+    color: var(--cui-dropdown-color);
+    
+    &:hover {
+      background-color: var(--cui-dropdown-link-hover-bg);
+    }
+    
+    &.mat-mdc-option-active {
+      background-color: var(--cui-dropdown-link-active-bg);
+      color: var(--cui-dropdown-link-active-color);
+    }
+  }
+}
+
+// Empty state styling
+.text-center {
+  .text-muted {
+    color: var(--cui-secondary) !important;
+    
+    h6 {
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    p {
+      color: var(--cui-body-color);
+      opacity: 0.7;
+    }
+  }
+}
+
+// Badge styling
+c-badge {
+  font-size: 0.75rem;
+  
+  &.shape-rounded-pill {
+    --cui-badge-border-radius: 10rem;
+  }
+}
+
+// Search and filter section
+.input-group {
+  .btn {
+    border-left: 0;
+    
+    &.btn-outline-secondary {
+      border-color: var(--cui-border-color);
+      
+      &:hover {
+        background-color: var(--cui-secondary);
+        border-color: var(--cui-secondary);
+      }
+    }
+  }
+  
+  input {
+    border-right: 0;
+    
+    &:focus {
+      box-shadow: none;
+      border-color: var(--cui-primary);
+    }
+  }
+}
+
+// Pagination
+.btn {
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Code styling
+code {
+  color: var(--cui-primary);
+  background-color: rgba(var(--cui-primary-rgb), 0.1);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}

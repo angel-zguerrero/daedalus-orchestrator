@@ -32,6 +32,10 @@
               <svg cIcon name="cil-list" class="me-2"></svg>
               Queues
             </button>
+            <button cTab itemKey="bindings">
+              <svg cIcon name="cil-link" class="me-2"></svg>
+              Bindings
+            </button>
           </c-tabs-list>
           
           <c-tabs-content>
@@ -121,6 +125,13 @@
             <c-tab-panel itemKey="queues" class="p-3">
               <ng-container *ngIf="activeTab === 'queues'">
                 <app-queues [tenantId]="tenantId"></app-queues>
+              </ng-container>
+            </c-tab-panel>
+
+            <!-- Bindings Tab -->
+            <c-tab-panel itemKey="bindings" class="p-3">
+              <ng-container *ngIf="activeTab === 'bindings'">
+                <app-bindings [tenantId]="tenantId"></app-bindings>
               </ng-container>
             </c-tab-panel>
           </c-tabs-content>
