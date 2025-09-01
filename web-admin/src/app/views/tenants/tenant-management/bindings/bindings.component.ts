@@ -213,21 +213,18 @@ export class BindingsComponent implements OnInit {
   private setupModelWatchers(): void {
     // Watch VNamespace changes
     this.vnamespaceCtrl.valueChanges.subscribe(vnamespace => {
-      console.log('VNamespace FormControl value changed:', vnamespace);
       this.selectedVNamespace = vnamespace;
       this.onVNamespaceChange();
     });
 
     // Watch Exchange changes
     this.exchangeCtrl.valueChanges.subscribe(exchange => {
-      console.log('Exchange FormControl value changed:', exchange);
       this.selectedExchange = exchange;
       this.onExchangeChange();
     });
 
     // Watch Queue changes
     this.queueCtrl.valueChanges.subscribe(queue => {
-      console.log('Queue FormControl value changed:', queue);
       this.selectedQueue = queue;
       this.onQueueChange();
     });
@@ -252,12 +249,8 @@ export class BindingsComponent implements OnInit {
     return this.vNamespacesService.getVNamespaces(this.tenantId, '', 50, value).pipe(
       map(response => {
         this.loadingVNamespaces = false;
-        console.log('Raw vnamespaces response:', response);
-        console.log('Response data:', response.data);
         
         return (response.data || []).map((item: any) => {
-          console.log('Mapping vnamespace item:', item);
-          
           // Intentar diferentes propiedades que podrían contener el código
           const mappedItem = {
             Code: item.Code || item.code || item.VirtualNamespaceCode || item.virtualNamespaceCode || item.Name || item.name,
@@ -265,7 +258,6 @@ export class BindingsComponent implements OnInit {
             Description: item.Description || item.description
           } as VNamespace;
           
-          console.log('Mapped vnamespace item:', mappedItem);
           return mappedItem;
         });
       }),
@@ -328,8 +320,6 @@ export class BindingsComponent implements OnInit {
 
   // Model change handlers
   private onVNamespaceChange(): void {
-    console.log('VNamespace changed:', this.selectedVNamespace);
-    
     // Reset dependent selections
     this.selectedExchange = null;
     this.selectedQueue = null;
@@ -350,13 +340,12 @@ export class BindingsComponent implements OnInit {
   }
 
   private onExchangeChange(): void {
-    console.log('Exchange changed:', this.selectedExchange);
     this.updateFormValidation();
     this.cdr.detectChanges();
   }
 
   private onQueueChange(): void {
-    console.log('Queue changed:', this.selectedQueue);
+    // Queue change logic if needed
   }
 
   // Display functions for autocompletes
@@ -465,14 +454,6 @@ export class BindingsComponent implements OnInit {
       exchangeValue?.Code && 
       queueValue?.Code
     );
-
-    console.log('Alternative validation:', {
-      vnamespaceValue,
-      exchangeValue,
-      queueValue,
-      hasValidValues,
-      vnamespaceCodeOrName: vnamespaceValue?.Code || vnamespaceValue?.Name
-    });
     
     if (this.bindingForm.valid && (isValidData || hasValidValues)) {
       const vnamespace = this.selectedVNamespace || this.vnamespaceCtrl.value;
@@ -489,8 +470,6 @@ export class BindingsComponent implements OnInit {
         bindingType: this.bindingForm.get('bindingType')?.value || 'classic'
       };
 
-      console.log('Creating binding with data:', bindingData);
-
       this.bindingsService.createBinding(this.tenantId, bindingData).subscribe({
         next: () => {
           this.createModalVisible = false;
@@ -503,18 +482,6 @@ export class BindingsComponent implements OnInit {
         }
       });
     } else {
-      console.log('Form validation failed:', {
-        formValid: this.bindingForm.valid,
-        isValidData,
-        hasValidValues,
-        selectedVNamespace: this.selectedVNamespace,
-        selectedExchange: this.selectedExchange,
-        selectedQueue: this.selectedQueue,
-        vnamespaceCtrlValue: this.vnamespaceCtrl.value,
-        exchangeCtrlValue: this.exchangeCtrl.value,
-        queueCtrlValue: this.queueCtrl.value,
-        formErrors: this.bindingForm.errors
-      });
       this.bindingForm.markAllAsTouched();
       
       if (!isValidData && !hasValidValues) {
@@ -525,36 +492,13 @@ export class BindingsComponent implements OnInit {
   }
 
   private validateSelectedModels(): boolean {
-    console.log('=== DETAILED MODEL VALIDATION ===');
-    console.log('selectedVNamespace:', this.selectedVNamespace);
-    console.log('selectedVNamespace?.Code:', this.selectedVNamespace?.Code);
-    console.log('selectedVNamespace?.Name:', this.selectedVNamespace?.Name);
-    console.log('selectedExchange:', this.selectedExchange);
-    console.log('selectedExchange?.Code:', this.selectedExchange?.Code);
-    console.log('selectedQueue:', this.selectedQueue);
-    console.log('selectedQueue?.Code:', this.selectedQueue?.Code);
-    
-    // También verifiquemos los valores de los FormControls
-    console.log('vnamespaceCtrl.value:', this.vnamespaceCtrl.value);
-    console.log('exchangeCtrl.value:', this.exchangeCtrl.value);
-    console.log('queueCtrl.value:', this.queueCtrl.value);
-
     // Para VNamespace, usar Code o Name como fallback
     const hasVNamespace = !!(this.selectedVNamespace && (this.selectedVNamespace.Code || this.selectedVNamespace.Name));
     const hasExchange = !!(this.selectedExchange && this.selectedExchange.Code);
     const hasQueue = !!(this.selectedQueue && this.selectedQueue.Code);
     
-    console.log('Validation checks:', {
-      hasVNamespace,
-      hasExchange,
-      hasQueue
-    });
-
     const isValid = hasVNamespace && hasExchange && hasQueue;
     
-    console.log('Final validation result:', isValid);
-    console.log('=== END MODEL VALIDATION ===');
-
     return isValid;
   }
 
@@ -606,7 +550,6 @@ export class BindingsComponent implements OnInit {
   }
 
   openDetailsModal(binding: any): void {
-    console.log('Selected binding from table:', binding);
     this.selectedBinding = binding;
     this.detailsModalVisible = true;
     this.showAlert = false;
@@ -665,25 +608,19 @@ export class BindingsComponent implements OnInit {
 
   // Method for vnamespace selection event
   onVNamespaceSelected(event: MatAutocompleteSelectedEvent): void {
-    console.log('VNamespace selected from autocomplete:', event.option.value);
     this.selectedVNamespace = event.option.value;
-    console.log('selectedVNamespace after assignment:', this.selectedVNamespace);
     this.onVNamespaceChange();
   }
 
   // Method for queue selection event
   onQueueSelected(event: MatAutocompleteSelectedEvent): void {
-    console.log('Queue selected from autocomplete:', event.option.value);
     this.selectedQueue = event.option.value;
-    console.log('selectedQueue after assignment:', this.selectedQueue);
     this.onQueueChange();
   }
 
   // Method for exchange selection event
   onExchangeSelected(event: MatAutocompleteSelectedEvent): void {
-    console.log('Exchange selected from autocomplete:', event.option.value);
     this.selectedExchange = event.option.value;
-    console.log('selectedExchange after assignment:', this.selectedExchange);
     this.onExchangeChange();
   }
 
