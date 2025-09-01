@@ -38,7 +38,7 @@
             [matAutocomplete]="autoFilter"
             (ngModelChange)="onVNamespaceFilterChange($event)">
           <mat-autocomplete #autoFilter="matAutocomplete">
-            <mat-option *ngFor="let vns of filteredFilterVNamespaces | async" [value]="vns.Name">
+            <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
               {{vns.Name}}
             </mat-option>
           </mat-autocomplete>
@@ -178,9 +178,9 @@
               matInput
               [formControl]="vnamespaceCtrl"
               [matAutocomplete]="autoVNamespace">
-            <mat-autocomplete #autoVNamespace="matAutocomplete">
-              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
-                {{vns.Name}}
+            <mat-autocomplete #autoVNamespace="matAutocomplete" [displayWith]="displayVNamespace" (optionSelected)="onVNamespaceSelected($event)">
+              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns">
+                {{vns.Code}} - {{vns.Name}}
               </mat-option>
             </mat-autocomplete>
           </mat-form-field>
@@ -195,9 +195,11 @@
               type="text"
               matInput
               [formControl]="exchangeCtrl"
-              [matAutocomplete]="autoExchange">
-            <mat-autocomplete #autoExchange="matAutocomplete">
-              <mat-option *ngFor="let exchange of filteredExchanges | async" [value]="exchange.Code">
+              [matAutocomplete]="autoExchange"
+              [disabled]="exchangeDisabled"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoExchange="matAutocomplete" (optionSelected)="onExchangeSelected($event)" [displayWith]="displayExchangeFn">
+              <mat-option *ngFor="let exchange of filteredExchanges | async" [value]="exchange">
                 {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
               </mat-option>
             </mat-autocomplete>
@@ -217,9 +219,11 @@
               type="text"
               matInput
               [formControl]="queueCtrl"
-              [matAutocomplete]="autoQueue">
-            <mat-autocomplete #autoQueue="matAutocomplete">
-              <mat-option *ngFor="let queue of filteredQueues | async" [value]="queue.Code">
+              [matAutocomplete]="autoQueue"
+              [disabled]="queueDisabled"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoQueue="matAutocomplete" [displayWith]="displayQueue" (optionSelected)="onQueueSelected($event)">
+              <mat-option *ngFor="let queue of filteredQueues | async" [value]="queue">
                 {{queue.Code}} - {{queue.Name}} ({{queue.Type}})
               </mat-option>
             </mat-autocomplete>
@@ -230,7 +234,7 @@
       
       <!-- Conditional fields based on exchange type -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="selectedExchange">
-        <c-col [md]="6" *ngIf="isFieldVisible('routingKey')">
+        <c-col [md]="6" *ngIf="showRoutingKey">
           <label cLabel for="routingKey">
             Routing Key 
             <span *ngIf="isFieldRequired('routingKey')" class="text-danger">*</span>
@@ -242,7 +246,7 @@
             placeholder="Enter routing key" />
           <small class="form-text text-muted">Used for direct exchanges to route messages</small>
         </c-col>
-        <c-col [md]="6" *ngIf="isFieldVisible('pattern')">
+        <c-col [md]="6" *ngIf="showPattern">
           <label cLabel for="pattern">
             Pattern 
             <span *ngIf="isFieldRequired('pattern')" class="text-danger">*</span>
@@ -254,7 +258,7 @@
             placeholder="Enter pattern (e.g., user.*.created)" />
           <small class="form-text text-muted">Used for topic exchanges pattern matching</small>
         </c-col>
-        <c-col [md]="6" *ngIf="isFieldVisible('xMatch')">
+        <c-col [md]="6" *ngIf="showXMatch">
           <label cLabel for="xMatch">X-Match Type</label>
           <select cSelect id="xMatch" formControlName="xMatch">
             <option *ngFor="let xMatchType of xMatchTypes" [value]="xMatchType.value">
