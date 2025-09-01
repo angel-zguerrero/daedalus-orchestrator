@@ -181,22 +181,25 @@ func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 		page = 1000
 	}
 
+	// Parse includeObjects parameter
+	includeObjects := false
+	if includeObjectsParam := c.Query("includeObjects"); includeObjectsParam != "" {
+		includeObjects, _ = strconv.ParseBool(includeObjectsParam)
+	}
+
 	findResult, err := ctrl.BindingBO.GetBindings(
 		c.Request.Context(),
 		c.Query("q"),
 		c.Query("cursor"),
 		page,
 		c.Query("vnamespace"),
+		includeObjects,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-
-	if findResult.Entities == nil {
-		findResult.Entities = []models.Binding{}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

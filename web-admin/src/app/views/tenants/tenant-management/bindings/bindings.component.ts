@@ -59,6 +59,9 @@ interface Binding {
   ID?: string;
   CreatedAt?: string;
   UpdatedAt?: string;
+  // Objetos completos cuando includeObjects=true
+  Exchange?: Exchange;
+  Queue?: Queue;
   // Compatibilidad con propiedades en camelCase
   exchangeCode?: string;
   queueCode?: string;
@@ -70,6 +73,8 @@ interface Binding {
   id?: string;
   createdAt?: string;
   updatedAt?: string;
+  exchange?: Exchange;
+  queue?: Queue;
 }
 
 @Component({
@@ -509,7 +514,7 @@ export class BindingsComponent implements OnInit {
     
     const vnamespaceFilter = this.selectedVNamespaceFilter?.Code || '';
     
-    this.bindingsService.getBindings(this.tenantId, cursor, this.pageSize, this.searchQuery, vnamespaceFilter).subscribe({
+    this.bindingsService.getBindings(this.tenantId, cursor, this.pageSize, this.searchQuery, vnamespaceFilter, true).subscribe({
       next: (response) => {
         this.bindings = response.result.Entities || [];
         this.cursor = response.result.Cursor;

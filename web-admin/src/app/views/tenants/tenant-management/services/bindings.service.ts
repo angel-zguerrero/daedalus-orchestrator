@@ -10,8 +10,8 @@ export class BindingsService {
 
   constructor(private http: HttpClient) { }
 
-  getBindings(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = ''): Observable<any> {
-    let params = `cursor=${cursor}&pageSize=${pageSize}&q=${q}`;
+  getBindings(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = '', includeObjects: boolean = false): Observable<any> {
+    let params = `cursor=${cursor}&pageSize=${pageSize}&q=${q}&includeObjects=${includeObjects}`;
     if (vnamespace) {
       params += `&vnamespace=${vnamespace}`;
     }

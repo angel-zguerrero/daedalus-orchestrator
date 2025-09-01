@@ -35,6 +35,31 @@ type Binding struct {
 	UpdatedAt time.Time
 }
 
+// BindingWithObjects representa un binding con los objetos Exchange y Queue incluidos
+type BindingWithObjects struct {
+	ID string `json:"id"`
+
+	VNamespace string `json:"vnamespace"`
+
+	ExchangeID   string    `json:"exchangeId"`
+	ExchangeCode string    `json:"exchangeCode"`
+	Exchange     *Exchange `json:"exchange,omitempty"`
+
+	QueueID   string `json:"queueId"`
+	QueueCode string `json:"queueCode"`
+	Queue     *Queue `json:"queue,omitempty"`
+
+	RoutingKey string `json:"routingKey"` //used only for direct exchanges
+	Pattern    string `json:"pattern"`    //used only for topic exchanges
+
+	XMatch XMatchType `json:"xMatch"` //used for headers exchanges
+
+	BindingType BindingType `json:"bindingType"`
+
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 func (Binding) TableName() string {
 	return "bindings"
 }

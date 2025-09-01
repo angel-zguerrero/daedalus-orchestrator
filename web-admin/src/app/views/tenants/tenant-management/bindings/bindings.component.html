@@ -69,11 +69,39 @@
         </thead>
         <tbody>
           <tr *ngFor="let binding of bindings" class="align-middle">
-            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.ExchangeCode || binding.exchangeCode }}">
-              <code>{{ binding.ExchangeCode || binding.exchangeCode }}</code>
+            <td class="text-truncate" style="max-width: 150px;">
+              <div *ngIf="binding.Exchange || binding.exchange; else simpleExchangeCode">
+                <div class="fw-bold" title="{{ (binding.Exchange || binding.exchange)?.Code }}">
+                  <code>{{ (binding.Exchange || binding.exchange)?.Code }}</code>
+                </div>
+                <small class="text-muted" title="{{ (binding.Exchange || binding.exchange)?.Name }}">
+                  {{ (binding.Exchange || binding.exchange)?.Name }}
+                </small>
+                <br>
+                <small class="text-info">
+                  {{ (binding.Exchange || binding.exchange)?.Type }}
+                </small>
+              </div>
+              <ng-template #simpleExchangeCode>
+                <code title="{{ binding.ExchangeCode || binding.exchangeCode }}">
+                  {{ binding.ExchangeCode || binding.exchangeCode }}
+                </code>
+              </ng-template>
             </td>
-            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.QueueCode || binding.queueCode }}">
-              <code>{{ binding.QueueCode || binding.queueCode }}</code>
+            <td class="text-truncate" style="max-width: 150px;">
+              <div *ngIf="binding.Queue || binding.queue; else simpleQueueCode">
+                <div class="fw-bold" title="{{ (binding.Queue || binding.queue)?.Code }}">
+                  <code>{{ (binding.Queue || binding.queue)?.Code }}</code>
+                </div>
+                <small class="text-muted" title="{{ (binding.Queue || binding.queue)?.Name }}">
+                  {{ (binding.Queue || binding.queue)?.Name }}
+                </small>
+              </div>
+              <ng-template #simpleQueueCode>
+                <code title="{{ binding.QueueCode || binding.queueCode }}">
+                  {{ binding.QueueCode || binding.queueCode }}
+                </code>
+              </ng-template>
             </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ binding.VNamespace || binding.vnamespace || '-' }}">
               {{ binding.VNamespace || binding.vnamespace || '-' }}

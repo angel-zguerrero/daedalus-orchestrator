@@ -45,6 +45,29 @@ message GetBindingsRequest {
   string cursor = 3;
   int32 pageSize = 4;
   string vnamespace = 5;
+  bool includeObjects = 6;
+}
+
+message Exchange {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string type = 4;
+  string vnamespace = 5;
+  string createdAt = 6;
+  string updatedAt = 7;
+}
+
+message Queue {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string vnamespace = 4;
+  string state = 5;
+  string type = 6;
+  int32 messagesCount = 7;
+  string createdAt = 8;
+  string updatedAt = 9;
 }
 
 message Binding {
@@ -58,6 +81,8 @@ message Binding {
   string bindingType = 8;
   string createdAt = 9;
   string updatedAt = 10;
+  Exchange exchange = 11;
+  Queue queue = 12;
 }
 
 message BindingFindResult {

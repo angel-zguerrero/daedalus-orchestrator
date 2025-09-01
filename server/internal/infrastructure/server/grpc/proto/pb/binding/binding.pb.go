@@ -294,14 +294,15 @@ func (x *GetBindingResponse) GetResult() *Binding {
 }
 
 type GetBindingsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	Q             string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
-	Cursor        string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	PageSize      int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TenantId       string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	Q              string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
+	Cursor         string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	PageSize       int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
+	Vnamespace     string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	IncludeObjects bool                   `protobuf:"varint,6,opt,name=includeObjects,proto3" json:"includeObjects,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetBindingsRequest) Reset() {
@@ -369,6 +370,213 @@ func (x *GetBindingsRequest) GetVnamespace() string {
 	return ""
 }
 
+func (x *GetBindingsRequest) GetIncludeObjects() bool {
+	if x != nil {
+		return x.IncludeObjects
+	}
+	return false
+}
+
+type Exchange struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,6,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,7,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Exchange) Reset() {
+	*x = Exchange{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Exchange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Exchange) ProtoMessage() {}
+
+func (x *Exchange) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Exchange.ProtoReflect.Descriptor instead.
+func (*Exchange) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Exchange) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Exchange) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *Exchange) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Exchange) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Exchange) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
+	}
+	return ""
+}
+
+func (x *Exchange) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *Exchange) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type Queue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,4,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	State         string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Type          string                 `protobuf:"bytes,6,opt,name=type,proto3" json:"type,omitempty"`
+	MessagesCount int32                  `protobuf:"varint,7,opt,name=messagesCount,proto3" json:"messagesCount,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,8,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Queue) Reset() {
+	*x = Queue{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Queue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Queue) ProtoMessage() {}
+
+func (x *Queue) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Queue.ProtoReflect.Descriptor instead.
+func (*Queue) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Queue) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Queue) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *Queue) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Queue) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
+	}
+	return ""
+}
+
+func (x *Queue) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *Queue) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Queue) GetMessagesCount() int32 {
+	if x != nil {
+		return x.MessagesCount
+	}
+	return 0
+}
+
+func (x *Queue) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *Queue) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
 type Binding struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -381,13 +589,15 @@ type Binding struct {
 	BindingType   string                 `protobuf:"bytes,8,opt,name=bindingType,proto3" json:"bindingType,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,9,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,10,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	Exchange      *Exchange              `protobuf:"bytes,11,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Queue         *Queue                 `protobuf:"bytes,12,opt,name=queue,proto3" json:"queue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Binding) Reset() {
 	*x = Binding{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[5]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -399,7 +609,7 @@ func (x *Binding) String() string {
 func (*Binding) ProtoMessage() {}
 
 func (x *Binding) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[5]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -412,7 +622,7 @@ func (x *Binding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Binding.ProtoReflect.Descriptor instead.
 func (*Binding) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{5}
+	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Binding) GetId() string {
@@ -485,6 +695,20 @@ func (x *Binding) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *Binding) GetExchange() *Exchange {
+	if x != nil {
+		return x.Exchange
+	}
+	return nil
+}
+
+func (x *Binding) GetQueue() *Queue {
+	if x != nil {
+		return x.Queue
+	}
+	return nil
+}
+
 type BindingFindResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Entities      []*Binding             `protobuf:"bytes,1,rep,name=entities,proto3" json:"entities,omitempty"`
@@ -495,7 +719,7 @@ type BindingFindResult struct {
 
 func (x *BindingFindResult) Reset() {
 	*x = BindingFindResult{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[6]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -507,7 +731,7 @@ func (x *BindingFindResult) String() string {
 func (*BindingFindResult) ProtoMessage() {}
 
 func (x *BindingFindResult) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[6]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -520,7 +744,7 @@ func (x *BindingFindResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BindingFindResult.ProtoReflect.Descriptor instead.
 func (*BindingFindResult) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{6}
+	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BindingFindResult) GetEntities() []*Binding {
@@ -547,7 +771,7 @@ type GetBindingsResponse struct {
 
 func (x *GetBindingsResponse) Reset() {
 	*x = GetBindingsResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[7]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +783,7 @@ func (x *GetBindingsResponse) String() string {
 func (*GetBindingsResponse) ProtoMessage() {}
 
 func (x *GetBindingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[7]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,7 +796,7 @@ func (x *GetBindingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBindingsResponse.ProtoReflect.Descriptor instead.
 func (*GetBindingsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{7}
+	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetBindingsResponse) GetMessage() string {
@@ -601,7 +825,7 @@ type DeleteBindingRequest struct {
 
 func (x *DeleteBindingRequest) Reset() {
 	*x = DeleteBindingRequest{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[8]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -613,7 +837,7 @@ func (x *DeleteBindingRequest) String() string {
 func (*DeleteBindingRequest) ProtoMessage() {}
 
 func (x *DeleteBindingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[8]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -626,7 +850,7 @@ func (x *DeleteBindingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBindingRequest.ProtoReflect.Descriptor instead.
 func (*DeleteBindingRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{8}
+	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteBindingRequest) GetTenantId() string {
@@ -666,7 +890,7 @@ type DeleteBindingResponse struct {
 
 func (x *DeleteBindingResponse) Reset() {
 	*x = DeleteBindingResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[9]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -678,7 +902,7 @@ func (x *DeleteBindingResponse) String() string {
 func (*DeleteBindingResponse) ProtoMessage() {}
 
 func (x *DeleteBindingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[9]
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +915,7 @@ func (x *DeleteBindingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBindingResponse.ProtoReflect.Descriptor instead.
 func (*DeleteBindingResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{9}
+	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DeleteBindingResponse) GetMessage() string {
@@ -731,7 +955,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"vnamespace\"X\n" +
 	"\x12GetBindingResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12(\n" +
-	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\x92\x01\n" +
+	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\xba\x01\n" +
 	"\x12GetBindingsRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\f\n" +
 	"\x01q\x18\x02 \x01(\tR\x01q\x12\x16\n" +
@@ -739,7 +963,30 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"\xab\x02\n" +
+	"vnamespace\x12&\n" +
+	"\x0eincludeObjects\x18\x06 \x01(\bR\x0eincludeObjects\"\xb2\x01\n" +
+	"\bExchange\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x05 \x01(\tR\n" +
+	"vnamespace\x12\x1c\n" +
+	"\tcreatedAt\x18\x06 \x01(\tR\tcreatedAt\x12\x1c\n" +
+	"\tupdatedAt\x18\a \x01(\tR\tupdatedAt\"\xeb\x01\n" +
+	"\x05Queue\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x04 \x01(\tR\n" +
+	"vnamespace\x12\x14\n" +
+	"\x05state\x18\x05 \x01(\tR\x05state\x12\x12\n" +
+	"\x04type\x18\x06 \x01(\tR\x04type\x12$\n" +
+	"\rmessagesCount\x18\a \x01(\x05R\rmessagesCount\x12\x1c\n" +
+	"\tcreatedAt\x18\b \x01(\tR\tcreatedAt\x12\x1c\n" +
+	"\tupdatedAt\x18\t \x01(\tR\tupdatedAt\"\x80\x03\n" +
 	"\aBinding\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
 	"\fexchangeCode\x18\x02 \x01(\tR\fexchangeCode\x12\x1c\n" +
@@ -755,7 +1002,9 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"\vbindingType\x18\b \x01(\tR\vbindingType\x12\x1c\n" +
 	"\tcreatedAt\x18\t \x01(\tR\tcreatedAt\x12\x1c\n" +
 	"\tupdatedAt\x18\n" +
-	" \x01(\tR\tupdatedAt\"Y\n" +
+	" \x01(\tR\tupdatedAt\x12-\n" +
+	"\bexchange\x18\v \x01(\v2\x11.binding.ExchangeR\bexchange\x12$\n" +
+	"\x05queue\x18\f \x01(\v2\x0e.binding.QueueR\x05queue\"Y\n" +
 	"\x11BindingFindResult\x12,\n" +
 	"\bentities\x18\x01 \x03(\v2\x10.binding.BindingR\bentities\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"c\n" +
@@ -790,37 +1039,41 @@ func file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_ra
 	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_goTypes = []any{
 	(*CreateBindingRequest)(nil),  // 0: binding.CreateBindingRequest
 	(*CreateBindingResponse)(nil), // 1: binding.CreateBindingResponse
 	(*GetBindingRequest)(nil),     // 2: binding.GetBindingRequest
 	(*GetBindingResponse)(nil),    // 3: binding.GetBindingResponse
 	(*GetBindingsRequest)(nil),    // 4: binding.GetBindingsRequest
-	(*Binding)(nil),               // 5: binding.Binding
-	(*BindingFindResult)(nil),     // 6: binding.BindingFindResult
-	(*GetBindingsResponse)(nil),   // 7: binding.GetBindingsResponse
-	(*DeleteBindingRequest)(nil),  // 8: binding.DeleteBindingRequest
-	(*DeleteBindingResponse)(nil), // 9: binding.DeleteBindingResponse
+	(*Exchange)(nil),              // 5: binding.Exchange
+	(*Queue)(nil),                 // 6: binding.Queue
+	(*Binding)(nil),               // 7: binding.Binding
+	(*BindingFindResult)(nil),     // 8: binding.BindingFindResult
+	(*GetBindingsResponse)(nil),   // 9: binding.GetBindingsResponse
+	(*DeleteBindingRequest)(nil),  // 10: binding.DeleteBindingRequest
+	(*DeleteBindingResponse)(nil), // 11: binding.DeleteBindingResponse
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_depIdxs = []int32{
-	5, // 0: binding.CreateBindingResponse.result:type_name -> binding.Binding
-	5, // 1: binding.GetBindingResponse.result:type_name -> binding.Binding
-	5, // 2: binding.BindingFindResult.entities:type_name -> binding.Binding
-	6, // 3: binding.GetBindingsResponse.result:type_name -> binding.BindingFindResult
-	0, // 4: binding.BindingService.CreateBinding:input_type -> binding.CreateBindingRequest
-	2, // 5: binding.BindingService.GetBinding:input_type -> binding.GetBindingRequest
-	4, // 6: binding.BindingService.GetBindings:input_type -> binding.GetBindingsRequest
-	8, // 7: binding.BindingService.DeleteBinding:input_type -> binding.DeleteBindingRequest
-	1, // 8: binding.BindingService.CreateBinding:output_type -> binding.CreateBindingResponse
-	3, // 9: binding.BindingService.GetBinding:output_type -> binding.GetBindingResponse
-	7, // 10: binding.BindingService.GetBindings:output_type -> binding.GetBindingsResponse
-	9, // 11: binding.BindingService.DeleteBinding:output_type -> binding.DeleteBindingResponse
-	8, // [8:12] is the sub-list for method output_type
-	4, // [4:8] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	7,  // 0: binding.CreateBindingResponse.result:type_name -> binding.Binding
+	7,  // 1: binding.GetBindingResponse.result:type_name -> binding.Binding
+	5,  // 2: binding.Binding.exchange:type_name -> binding.Exchange
+	6,  // 3: binding.Binding.queue:type_name -> binding.Queue
+	7,  // 4: binding.BindingFindResult.entities:type_name -> binding.Binding
+	8,  // 5: binding.GetBindingsResponse.result:type_name -> binding.BindingFindResult
+	0,  // 6: binding.BindingService.CreateBinding:input_type -> binding.CreateBindingRequest
+	2,  // 7: binding.BindingService.GetBinding:input_type -> binding.GetBindingRequest
+	4,  // 8: binding.BindingService.GetBindings:input_type -> binding.GetBindingsRequest
+	10, // 9: binding.BindingService.DeleteBinding:input_type -> binding.DeleteBindingRequest
+	1,  // 10: binding.BindingService.CreateBinding:output_type -> binding.CreateBindingResponse
+	3,  // 11: binding.BindingService.GetBinding:output_type -> binding.GetBindingResponse
+	9,  // 12: binding.BindingService.GetBindings:output_type -> binding.GetBindingsResponse
+	11, // 13: binding.BindingService.DeleteBinding:output_type -> binding.DeleteBindingResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_init() }
@@ -834,7 +1087,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_in
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
