@@ -208,7 +208,7 @@
               [matAutocomplete]="autoVNamespace">
             <mat-autocomplete #autoVNamespace="matAutocomplete" [displayWith]="displayVNamespace" (optionSelected)="onVNamespaceSelected($event)">
               <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns">
-                {{vns.Code}} - {{vns.Name}}
+                {{vns.Name}}
               </mat-option>
             </mat-autocomplete>
           </mat-form-field>
