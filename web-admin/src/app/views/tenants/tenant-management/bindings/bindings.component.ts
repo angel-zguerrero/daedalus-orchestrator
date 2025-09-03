@@ -319,7 +319,8 @@ export class BindingsComponent implements OnInit {
           Code: item.Code,
           Name: item.Name,
           VNamespace: item.VNamespace,
-          Description: item.Description
+          Description: item.Description,
+          Type: item.Type || item.type || 'standard' // Agregar el Type
         } as Queue));
       }),
       catchError(error => {
@@ -362,7 +363,7 @@ export class BindingsComponent implements OnInit {
 
   // Display functions for autocompletes
   displayVNamespace = (vnamespace: VNamespace): string => {
-    return vnamespace ? `${vnamespace.Code} - ${vnamespace.Name}` : '';
+    return vnamespace ? `${vnamespace.Code}` : '';
   }
 
   displayExchange = (exchange: Exchange): string => {
