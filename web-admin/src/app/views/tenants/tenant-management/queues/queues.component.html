@@ -271,50 +271,44 @@
       </c-row>
 
       <!-- Fair Priority Thresholds Configuration -->
-                                          <!-- Fair Priority Thresholds Section -->
-                  <div class="mb-3 priority-fair-section" [style.display]="queueFormUpdate.value.priorityType === 'fair' ? 'block' : 'none'">
-                    <label class="form-label fw-bold">Desired Priority Thresholds</label>
-                    <div class="mb-3">
-                      <div class="d-flex align-items-center gap-3 mb-3">
-                        <label class="form-label mb-0">Number of Priority Levels:</label>
-                        <div class="btn-group" role="group">
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 2" (click)="setEditPriorityLevels(2)">2</button>
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 3" (click)="setEditPriorityLevels(3)">3</button>
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 4" (click)="setEditPriorityLevels(4)">4</button>
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 5" (click)="setEditPriorityLevels(5)">5</button>
-                        </div>
-                      </div>
-                      
-                      <!-- Priority Threshold Inputs -->
-                      <div class="row g-3">
-                        <div class="col-6 col-md-4 col-lg-3" *ngFor="let level of getEditPriorityLevelsArray(); let i = index">
-                          <div class="form-group">
-                            <label class="form-label small fw-bold">Priority {{i + 1}}</label>
-                            <input 
-                              type="number" 
-                              class="form-control form-control-sm" 
-                              [ngModel]="editDesiredPriorityThresholds[i] || 0"
-                              (ngModelChange)="updateEditDesiredPriorityThresholds(i, $event)"
-                              [ngModelOptions]="{standalone: true}"
-                              [name]="'editPriorityThreshold_' + i"
-                              min="0"
-                              placeholder="0 = All tasks"
-                            >
-                            <div class="form-text small">
-                              {{editDesiredPriorityThresholds[i] === 0 ? 'Process all tasks' : 'tasks limit'}}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div class="mt-3 p-2 bg-info bg-opacity-10 border border-info rounded">
-                        <small class="text-info">
-                          <svg cIcon name="cil-info" class="me-1"></svg>
-                          <strong>Note:</strong> These are your desired values. The system will transition to these values when appropriate, considering current queue usage.
-                        </small>
-                      </div>
-                    </div>
-                  </div>
+      <div *ngIf="priorityType === 'fair'" class="mb-3">
+        <c-row class="mb-2">
+          <c-col [md]="12">
+            <label class="form-label fw-bold">Desired Priority Thresholds</label>
+            <p class="text-muted small">
+              Set the desired number of tasks to process for each priority before moving to the next priority level.
+              Use 0 to process all tasks of a priority before moving to the next one.
+            </p>
+          </c-col>
+        </c-row>
+        <c-row [gutter]="{gy: 2, gx: 3}">
+          <c-col [md]="6" [lg]="4" *ngFor="let priority of getPriorityArray(); let i = index">
+            <div class="border rounded p-3 mb-2">
+              <label class="form-label">Priority {{i + 1}}</label>
+              <input 
+                cFormControl 
+                type="number" 
+                min="0" 
+                max="10000"
+                placeholder="0"
+                [(ngModel)]="desiredPriorityThresholds[i]" 
+                [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="updateDesiredPriorityThresholds(i, $event)"
+                class="form-control" />
+              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this priority first)</small>
+            </div>
+          </c-col>
+        </c-row>
+        <div *ngIf="priorityType === 'fair' && maxPriority > 0" class="mt-2">
+          <c-alert color="info" class="mb-0">
+            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
+            Higher priorities (higher numbers) will be processed first, but after processing the specified number 
+            of tasks, the system will move to the next priority level.
+            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
+            before moving to the next priority level.
+          </c-alert>
+        </div>
+      </div>
 
       <!-- Normal Priority Information -->
       <div *ngIf="priorityType === 'normal'" class="mb-3">

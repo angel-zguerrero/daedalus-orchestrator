@@ -229,7 +229,7 @@ export class QueuesComponent implements OnInit {
     });
     this.priorityType = 'normal';
     this.maxPriority = 1;
-    this.desiredPriorityThresholds = [];
+    this.desiredPriorityThresholds = [0]; // Initialize with one element for maxPriority = 1
     this.showAlert = false;
   }
 
@@ -299,9 +299,9 @@ export class QueuesComponent implements OnInit {
           desiredPriorityThresholds[i] = 0;
         }
       } else if (formValue.priorityType === 'fair') {
-        // For fair priority, create object with 1-indexed keys: {1: value, 2: value, etc}
+        // For fair priority, create object with 0-indexed keys: {0: value, 1: value, etc}
         for (let i = 0; i < this.maxPriority; i++) {
-          desiredPriorityThresholds[i + 1] = this.desiredPriorityThresholds[i] || 0;
+          desiredPriorityThresholds[i] = this.desiredPriorityThresholds[i] || 0;
         }
       }
 
@@ -340,9 +340,9 @@ export class QueuesComponent implements OnInit {
           desiredPriorityThresholds[i] = 0;
         }
       } else if (formValue.priorityType === 'fair') {
-        // For fair priority, create object with 1-indexed keys: {1: value, 2: value, etc}
+        // For fair priority, create object with 0-indexed keys: {0: value, 1: value, etc}
         for (let i = 0; i < this.updateMaxPriority; i++) {
-          desiredPriorityThresholds[i + 1] = this.editDesiredPriorityThresholds[i] || 0;
+          desiredPriorityThresholds[i] = this.editDesiredPriorityThresholds[i] || 0;
         }
       }
 
@@ -568,15 +568,10 @@ export class QueuesComponent implements OnInit {
     const formValue = this.queueForm.get('priorityType')?.value;
     this.priorityType = formValue || 'normal';
     
-    if (this.priorityType === 'normal') {
-      // For normal priority, auto-generate priorityThresholds based on maxPriority
-      // with all values set to 0 (0-indexed array)
-      this.desiredPriorityThresholds = [];
-      for (let i = 0; i < this.maxPriority; i++) {
-        this.desiredPriorityThresholds.push(0);
-      }
-    } else if (this.priorityType === 'fair') {
-      this.updateFairThresholds();
+    // Ensure the thresholds array is properly sized for the current maxPriority
+    this.desiredPriorityThresholds = [];
+    for (let i = 0; i < this.maxPriority; i++) {
+      this.desiredPriorityThresholds.push(0);
     }
   }
 
@@ -584,14 +579,18 @@ export class QueuesComponent implements OnInit {
     const formValue = this.queueForm.get('maxPriority')?.value;
     this.maxPriority = Number(formValue) || 1;
     
-    if (this.priorityType === 'normal') {
-      // For normal priority, regenerate desiredPriorityThresholds array based on new maxPriority
-      this.desiredPriorityThresholds = [];
-      for (let i = 0; i < this.maxPriority; i++) {
+    // Resize the thresholds array to match the new maxPriority
+    const currentLength = this.desiredPriorityThresholds.length;
+    const targetLength = this.maxPriority;
+    
+    if (targetLength > currentLength) {
+      // Add new thresholds with default value of 0
+      for (let i = currentLength; i < targetLength; i++) {
         this.desiredPriorityThresholds.push(0);
       }
-    } else if (this.priorityType === 'fair') {
-      this.updateFairThresholds();
+    } else if (targetLength < currentLength) {
+      // Remove excess thresholds
+      this.desiredPriorityThresholds = this.desiredPriorityThresholds.slice(0, targetLength);
     }
   }
 
