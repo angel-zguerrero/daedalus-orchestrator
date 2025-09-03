@@ -341,8 +341,8 @@
       <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
       <h6>Are you sure you want to delete this binding?</h6>
       <p class="text-muted mb-0">
-        <strong>{{ selectedBinding?.ExchangeCode || selectedBinding?.exchangeCode }}</strong> →
-        <strong>{{ selectedBinding?.QueueCode || selectedBinding?.queueCode }}</strong>
+        <strong>{{ selectedBinding?.exchangeCode }}</strong> →
+        <strong>{{ selectedBinding?.queueCode }}</strong>
         <br>This action cannot be undone.
       </p>
     </div>
@@ -380,20 +380,20 @@
         <div class="mb-3">
           <label class="form-label fw-bold">Exchange Code</label>
           <div class="p-2 bg-dark rounded">
-            <code>{{ selectedBinding?.ExchangeCode || selectedBinding?.exchangeCode || 'N/A' }}</code>
+            <code>{{ selectedBinding?.exchangeCode || 'N/A' }}</code>
           </div>
           <div class="form-text">Source exchange for message routing</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Queue Code</label>
           <div class="p-2 bg-dark rounded">
-            <code>{{ selectedBinding?.QueueCode || selectedBinding?.queueCode || 'N/A' }}</code>
+            <code>{{ selectedBinding?.queueCode || 'N/A' }}</code>
           </div>
           <div class="form-text">Destination queue for messages</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Virtual Namespace</label>
-          <div class="p-2 bg-dark rounded">{{ selectedBinding?.VNamespace || selectedBinding?.vnamespace || '-' }}</div>
+          <div class="p-2 bg-dark rounded">{{ selectedBinding?.vnamespace || '-' }}</div>
           <div class="form-text">Virtual namespace for logical grouping</div>
         </div>
       </div>

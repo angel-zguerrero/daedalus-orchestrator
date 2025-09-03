@@ -49,9 +49,6 @@ interface Queue {
 }
 
 interface Binding {
-  ExchangeCode: string;
-  QueueCode: string;
-  VNamespace: string;
   RoutingKey?: string;
   Pattern?: string;
   XMatch?: string;
@@ -63,9 +60,9 @@ interface Binding {
   Exchange?: Exchange;
   Queue?: Queue;
   // Compatibilidad con propiedades en camelCase
-  exchangeCode?: string;
-  queueCode?: string;
-  vnamespace?: string;
+  exchangeCode: string;
+  queueCode: string;
+  vnamespace: string;
   routingKey?: string;
   pattern?: string;
   xMatch?: string;
@@ -236,7 +233,17 @@ export class BindingsComponent implements OnInit {
 
     // Watch VNamespace filter changes
     this.vnamespaceFilterCtrl.valueChanges.subscribe(vnamespace => {
-      this.selectedVNamespaceFilter = vnamespace;
+      // Si vnamespace es un string (solo el Code), crear un objeto VNamespace básico
+      if (typeof vnamespace === 'string') {
+        this.selectedVNamespaceFilter = {
+          Code: vnamespace,
+          Name: vnamespace, // Usar el mismo valor para Name si no tenemos el objeto completo
+          Description: undefined
+        };
+      } else {
+        this.selectedVNamespaceFilter = vnamespace;
+      }
+      
       this.onVNamespaceFilterChange();
     });
   }
@@ -512,8 +519,8 @@ export class BindingsComponent implements OnInit {
       this.cursors.push(cursor);
     }
     
-    const vnamespaceFilter = this.selectedVNamespaceFilter?.Code || '';
-    
+    const vnamespaceFilter = this.selectedVNamespaceFilter?.Code || this.selectedVNamespaceFilter?.Name || '';
+
     this.bindingsService.getBindings(this.tenantId, cursor, this.pageSize, this.searchQuery, vnamespaceFilter, true).subscribe({
       next: (response) => {
         this.bindings = response.result.Entities || [];
@@ -561,12 +568,13 @@ export class BindingsComponent implements OnInit {
   }
 
   deleteBinding(): void {
+    console.log('Deleting binding:::', this.selectedBinding);
     if (this.selectedBinding) {
       this.bindingsService.deleteBinding(
         this.tenantId, 
-        this.selectedBinding.ExchangeCode,
-        this.selectedBinding.QueueCode,
-        this.selectedBinding.VNamespace
+        this.selectedBinding.exchangeCode,
+        this.selectedBinding.queueCode,
+        this.selectedBinding.vnamespace
       ).subscribe({
         next: () => {
           this.deleteModalVisible = false;
