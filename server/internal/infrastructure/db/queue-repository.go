@@ -107,7 +107,7 @@ func (r *QueueRepository) Paginate(q string, pageSize int, cursor string, vNames
 		if len(conditions) == 0 {
 			query = "ID != 0"
 		} else {
-			query = strings.Join(conditions, " AND ")
+			query = strings.Join(conditions, " & ")
 		}
 	}
 

@@ -72,10 +72,9 @@ func (r *ExchangeRepository) Paginate(q string, pageSize int, cursor string, vNa
 		if len(conditions) == 0 {
 			query = "ID != 0"
 		} else {
-			query = strings.Join(conditions, " AND ")
+			query = strings.Join(conditions, " & ")
 		}
 	}
-
 	return r.Find(query, pageSize, cursor, now)
 }
 
