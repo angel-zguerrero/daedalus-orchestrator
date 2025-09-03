@@ -58,8 +58,11 @@ type Config struct {
 	NodeSchedulerHeartbeatTimeout time.Duration
 	// NodeSchedulerTTL is the Time-To-Live (in minutes) for node scheduler entries.
 	NodeSchedulerTTL int64
-	// TenantSummaryWorkerInterval is the interval in seconds for tenant summary updates.
+	// TenantSummaryWorkerInterval specifies the interval for tenant summary worker in seconds. Minimum 10. Default 30.
 	TenantSummaryWorkerInterval int64
+
+	// MaxHeaders specifies the maximum number of headers allowed. Minimum 5, maximum 1000. Default 100.
+	MaxHeaders int
 
 	Env string
 }
@@ -93,6 +96,7 @@ type ConfigFromMap struct {
 	node_scheduler_heartbeat_timeout int64 // Timeout in seconds
 	node_scheduler_ttl               int64 // TTL in minutes
 	tenant_summary_worker_interval   int64 // Interval in seconds
+	max_headers                      int   // Maximum number of headers
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -130,6 +134,7 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		NodeSchedulerHeartbeatTimeout: time.Duration(configFromMapInstance.node_scheduler_heartbeat_timeout) * time.Second,
 		NodeSchedulerTTL:              configFromMapInstance.node_scheduler_ttl,
 		TenantSummaryWorkerInterval:   configFromMapInstance.tenant_summary_worker_interval,
+		MaxHeaders:                    configFromMapInstance.max_headers,
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
 		// after considering flags and env vars. We need to pass the raw string from the config file if present.
 		// However, the Config struct doesn't store the raw string.
