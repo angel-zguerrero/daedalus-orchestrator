@@ -69,7 +69,7 @@
 
                   <!-- Summary data -->
                   <div *ngIf="tenantSummary && !tenantSummaryLoading" class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                       <div class="card border-success mb-3">
                         <div class="card-body text-center">
                           <svg cIcon name="cil-share" size="3xl" class="text-success mb-2"></svg>
@@ -78,7 +78,7 @@
                         </div>
                       </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                       <div class="card border-warning mb-3">
                         <div class="card-body text-center">
                           <svg cIcon name="cil-list" size="3xl" class="text-warning mb-2"></svg>
@@ -87,7 +87,16 @@
                         </div>
                       </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                      <div class="card border-primary mb-3">
+                        <div class="card-body text-center">
+                          <svg cIcon name="cil-link" size="3xl" class="text-primary mb-2"></svg>
+                          <h3 class="card-title text-primary">{{ tenantSummary.BindingsCount || 0 }}</h3>
+                          <p class="card-text">Bindings</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
                       <div class="card border-info mb-3">
                         <div class="card-body text-center">
                           <svg cIcon name="cil-envelope-letter" size="3xl" class="text-info mb-2"></svg>
