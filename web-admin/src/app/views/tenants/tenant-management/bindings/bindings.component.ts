@@ -671,4 +671,38 @@ export class BindingsComponent implements OnInit {
         return type || '';
     }
   }
+
+  // Methods for binding details modal
+  getSelectedBindingExchangeType(): string {
+    const exchange = this.selectedBinding?.Exchange || this.selectedBinding?.exchange;
+    return exchange?.Type?.toLowerCase() || '';
+  }
+
+  shouldShowRoutingKeyInDetails(): boolean {
+    return this.getSelectedBindingExchangeType() === 'direct';
+  }
+
+  shouldShowPatternInDetails(): boolean {
+    return this.getSelectedBindingExchangeType() === 'topic';
+  }
+
+  shouldShowXMatchInDetails(): boolean {
+    return this.getSelectedBindingExchangeType() === 'headers';
+  }
+
+  getSelectedBindingExchangeTypeDisplayName(): string {
+    const type = this.getSelectedBindingExchangeType();
+    switch (type) {
+      case 'direct':
+        return 'Direct (point-to-point routing)';
+      case 'topic':
+        return 'Topic (pattern-based routing)';
+      case 'fanout':
+        return 'Fanout (broadcast to all queues)';
+      case 'headers':
+        return 'Headers (attribute-based routing)';
+      default:
+        return type || 'Unknown';
+    }
+  }
 }

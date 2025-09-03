@@ -103,8 +103,8 @@
                 </code>
               </ng-template>
             </td>
-            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.VNamespace || binding.vnamespace || '-' }}">
-              {{ binding.VNamespace || binding.vnamespace || '-' }}
+            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.vnamespace || '-' }}">
+              {{ binding.vnamespace || '-' }}
             </td>
             <td class="text-truncate" style="max-width: 150px;" title="{{ binding.RoutingKey || binding.routingKey || '-' }}">
               <span *ngIf="binding.RoutingKey || binding.routingKey; else emptyRoutingKey">
@@ -370,82 +370,186 @@
   <c-modal-body *ngIf="selectedBinding">
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     
-    <div class="row">
-      <div class="col-md-6">
-        <div class="mb-3">
-          <label class="form-label fw-bold">ID</label>
-          <div class="p-2 bg-dark rounded">{{ selectedBinding?.ID || selectedBinding?.id || 'N/A' }}</div>
-          <div class="form-text">Unique system identifier</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Exchange Code</label>
-          <div class="p-2 bg-dark rounded">
-            <code>{{ selectedBinding?.exchangeCode || 'N/A' }}</code>
+    <!-- Binding Configuration Section -->
+    <div class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-link" class="me-2"></svg>
+        Binding Configuration
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">ID</label>
+            <div class="p-2 bg-dark rounded">{{ selectedBinding?.ID || selectedBinding?.id || 'N/A' }}</div>
+            <div class="form-text">Unique system identifier</div>
           </div>
-          <div class="form-text">Source exchange for message routing</div>
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Queue Code</label>
-          <div class="p-2 bg-dark rounded">
-            <code>{{ selectedBinding?.queueCode || 'N/A' }}</code>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Virtual Namespace</label>
+            <div class="p-2 bg-dark rounded">{{ selectedBinding?.vnamespace || '-' }}</div>
+            <div class="form-text">Virtual namespace for logical grouping</div>
           </div>
-          <div class="form-text">Destination queue for messages</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Virtual Namespace</label>
-          <div class="p-2 bg-dark rounded">{{ selectedBinding?.vnamespace || '-' }}</div>
-          <div class="form-text">Virtual namespace for logical grouping</div>
         </div>
       </div>
-      <div class="col-md-6">
-        <div class="mb-3">
-          <label class="form-label fw-bold">Routing Key</label>
-          <div class="p-2 bg-dark rounded">
-            <code>{{ selectedBinding?.RoutingKey || selectedBinding?.routingKey || '-' }}</code>
+
+      <!-- Routing Configuration based on Exchange Type -->
+      <div class="row">
+        <!-- Routing Key - shown for Direct exchanges -->
+        <div class="col-md-6" *ngIf="shouldShowRoutingKeyInDetails()">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Routing Key</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ selectedBinding?.RoutingKey || selectedBinding?.routingKey || '-' }}</code>
+            </div>
+            <div class="form-text">Used for direct exchange routing</div>
           </div>
-          <div class="form-text">Used for direct exchange routing</div>
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Pattern</label>
-          <div class="p-2 bg-dark rounded">
-            <code>{{ selectedBinding?.Pattern || selectedBinding?.pattern || '-' }}</code>
+
+        <!-- Pattern - shown for Topic exchanges -->
+        <div class="col-md-6" *ngIf="shouldShowPatternInDetails()">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Pattern</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ selectedBinding?.Pattern || selectedBinding?.pattern || '-' }}</code>
+            </div>
+            <div class="form-text">Used for topic exchange pattern matching</div>
           </div>
-          <div class="form-text">Used for topic exchange pattern matching</div>
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">X-Match Type</label>
-          <div class="p-2 bg-dark rounded">
-            <c-badge [color]="getXMatchColor(selectedBinding?.XMatch || selectedBinding?.xMatch)" shape="rounded-pill">
-              {{ selectedBinding?.XMatch || selectedBinding?.xMatch || 'all' }}
-            </c-badge>
+
+        <!-- X-Match Type - shown for Headers exchanges -->
+        <div class="col-md-6" *ngIf="shouldShowXMatchInDetails()">
+          <div class="mb-3">
+            <label class="form-label fw-bold">X-Match Type</label>
+            <div class="p-2 bg-dark rounded">
+              <c-badge [color]="getXMatchColor(selectedBinding?.XMatch || selectedBinding?.xMatch)" shape="rounded-pill">
+                {{ selectedBinding?.XMatch || selectedBinding?.xMatch || 'all' }}
+              </c-badge>
+            </div>
+            <div class="form-text">Headers exchange matching strategy</div>
           </div>
-          <div class="form-text">Headers exchange matching strategy</div>
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Binding Type</label>
-          <div class="p-2 bg-dark rounded">
-            <c-badge [color]="getBindingTypeColor(selectedBinding?.BindingType || selectedBinding?.bindingType)" shape="rounded-pill">
-              {{ selectedBinding?.BindingType || selectedBinding?.bindingType || 'classic' }}
-            </c-badge>
+
+        <!-- Binding Type - always shown -->
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Binding Type</label>
+            <div class="p-2 bg-dark rounded">
+              <c-badge [color]="getBindingTypeColor(selectedBinding?.BindingType || selectedBinding?.bindingType)" shape="rounded-pill">
+                {{ selectedBinding?.BindingType || selectedBinding?.bindingType || 'classic' }}
+              </c-badge>
+            </div>
+            <div class="form-text">Type of binding behavior</div>
           </div>
-          <div class="form-text">Type of binding behavior</div>
+        </div>
+      </div>
+
+      <!-- Information note based on exchange type -->
+      <div class="mb-3">
+        <c-alert color="info" class="mb-0" *ngIf="getSelectedBindingExchangeType()">
+          <strong>{{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Type }} Exchange:</strong>
+          <span *ngIf="getSelectedBindingExchangeType() === 'direct'">
+            Messages are routed to queues whose routing key exactly matches the message's routing key.
+          </span>
+          <span *ngIf="getSelectedBindingExchangeType() === 'topic'">
+            Messages are routed to queues based on pattern matching between the routing key and the binding pattern.
+          </span>
+          <span *ngIf="getSelectedBindingExchangeType() === 'fanout'">
+            Messages are routed to all bound queues, ignoring routing keys.
+          </span>
+          <span *ngIf="getSelectedBindingExchangeType() === 'headers'">
+            Messages are routed based on header attributes matching using the X-Match strategy.
+          </span>
+        </c-alert>
+      </div>
+    </div>
+
+    <!-- Exchange Information Section -->
+    <div *ngIf="selectedBinding?.Exchange || selectedBinding?.exchange" class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-share" class="me-2"></svg>
+        Exchange Information
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Exchange Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Code || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Exchange identifier</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Exchange Name</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Name || 'N/A' }}</div>
+            <div class="form-text">Exchange display name</div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Exchange Type</label>
+            <div class="p-2 bg-dark rounded">
+              <c-badge color="info" shape="rounded-pill" class="me-2">
+                {{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Type || 'N/A' }}
+              </c-badge>
+              <span class="text-muted">{{ getSelectedBindingExchangeTypeDisplayName() }}</span>
+            </div>
+            <div class="form-text">Exchange type determines routing behavior</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue Information Section -->
+    <div *ngIf="selectedBinding?.Queue || selectedBinding?.queue" class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-list" class="me-2"></svg>
+        Queue Information
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Queue Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ (selectedBinding?.Queue || selectedBinding?.queue)?.Code || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Queue identifier</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Queue Name</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.Queue || selectedBinding?.queue)?.Name || 'N/A' }}</div>
+            <div class="form-text">Queue display name</div>
+          </div>
         </div>
       </div>
     </div>
     
-    <div class="row mt-3">
-      <div class="col-md-6">
-        <div class="mb-3">
-          <label class="form-label fw-bold">Created At</label>
-          <div class="p-2 bg-dark rounded">{{ (selectedBinding?.CreatedAt || selectedBinding?.createdAt) | date:'full' }}</div>
-          <div class="form-text">Binding creation timestamp</div>
+    <!-- Timestamps Section -->
+    <div class="mb-3">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-clock" class="me-2"></svg>
+        Timestamps
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Created At</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.CreatedAt || selectedBinding?.createdAt) | date:'full' }}</div>
+            <div class="form-text">Binding creation timestamp</div>
+          </div>
         </div>
-      </div>
-      <div class="col-md-6">
-        <div class="mb-3">
-          <label class="form-label fw-bold">Updated At</label>
-          <div class="p-2 bg-dark rounded">{{ (selectedBinding?.UpdatedAt || selectedBinding?.updatedAt) | date:'full' }}</div>
-          <div class="form-text">Last modification timestamp</div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Updated At</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.UpdatedAt || selectedBinding?.updatedAt) | date:'full' }}</div>
+            <div class="form-text">Last modification timestamp</div>
+          </div>
         </div>
       </div>
     </div>
