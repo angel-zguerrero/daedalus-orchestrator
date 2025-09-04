@@ -20,6 +20,7 @@ message CreateBindingRequest {
   string pattern = 6;
   string xMatch = 7;
   string bindingType = 8;
+  map<string, string> headers = 9;
 }
 
 message CreateBindingResponse {
@@ -83,6 +84,7 @@ message Binding {
   string updatedAt = 10;
   Exchange exchange = 11;
   Queue queue = 12;
+  map<string, string> headers = 13;
 }
 
 message BindingFindResult {

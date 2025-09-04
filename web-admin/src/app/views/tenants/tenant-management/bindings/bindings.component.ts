@@ -56,6 +56,7 @@ interface Binding {
   ID?: string;
   CreatedAt?: string;
   UpdatedAt?: string;
+  Headers?: { [key: string]: string }; // Added headers support
   // Objetos completos cuando includeObjects=true
   Exchange?: Exchange;
   Queue?: Queue;
@@ -70,6 +71,7 @@ interface Binding {
   id?: string;
   createdAt?: string;
   updatedAt?: string;
+  headers?: { [key: string]: string }; // Added headers support in camelCase
   exchange?: Exchange;
   queue?: Queue;
 }
@@ -153,6 +155,11 @@ export class BindingsComponent implements OnInit {
   loadingVNamespaces = false;
   loadingExchanges = false;
   loadingQueues = false;
+
+  // Headers management for Headers exchange type
+  headers: { key: string; value: string }[] = [];
+  newHeaderKey = '';
+  newHeaderValue = '';
 
   constructor(
     private bindingsService: BindingsService,
@@ -395,6 +402,10 @@ export class BindingsComponent implements OnInit {
     return this.selectedExchange?.Type?.toLowerCase() === 'headers';
   }
 
+  get showHeaders(): boolean {
+    return this.selectedExchange?.Type?.toLowerCase() === 'headers';
+  }
+
   get isRoutingKeyRequired(): boolean {
     return this.showRoutingKey;
   }
@@ -448,6 +459,11 @@ export class BindingsComponent implements OnInit {
       xMatch: 'all'
     });
     
+    // Reset headers
+    this.headers = [];
+    this.newHeaderKey = '';
+    this.newHeaderValue = '';
+    
     // Disable dependent controls
     this.exchangeCtrl.disable();
     this.queueCtrl.disable();
@@ -480,7 +496,8 @@ export class BindingsComponent implements OnInit {
         routingKey: this.bindingForm.get('routingKey')?.value || '',
         pattern: this.bindingForm.get('pattern')?.value || '',
         xMatch: this.bindingForm.get('xMatch')?.value || 'all',
-        bindingType: this.bindingForm.get('bindingType')?.value || 'classic'
+        bindingType: this.bindingForm.get('bindingType')?.value || 'classic',
+        headers: this.showHeaders ? this.getHeadersAsMap() : {}
       };
 
       this.bindingsService.createBinding(this.tenantId, bindingData).subscribe({
@@ -690,6 +707,17 @@ export class BindingsComponent implements OnInit {
     return this.getSelectedBindingExchangeType() === 'headers';
   }
 
+  shouldShowHeadersInDetails(): boolean {
+    return this.getSelectedBindingExchangeType() === 'headers';
+  }
+
+  getSelectedBindingHeaders(): { key: string; value: string }[] {
+    const headers = this.selectedBinding?.Headers || this.selectedBinding?.headers;
+    if (!headers) return [];
+    
+    return Object.entries(headers).map(([key, value]) => ({ key, value }));
+  }
+
   getSelectedBindingExchangeTypeDisplayName(): string {
     const type = this.getSelectedBindingExchangeType();
     switch (type) {
@@ -704,5 +732,55 @@ export class BindingsComponent implements OnInit {
       default:
         return type || 'Unknown';
     }
+  }
+
+  // Headers management methods
+  addHeader(): void {
+    if (this.newHeaderKey.trim() && this.newHeaderValue.trim()) {
+      // Check if header key already exists
+      const existingIndex = this.headers.findIndex(h => h.key === this.newHeaderKey.trim());
+      if (existingIndex >= 0) {
+        // Update existing header
+        this.headers[existingIndex].value = this.newHeaderValue.trim();
+      } else {
+        // Add new header
+        this.headers.push({
+          key: this.newHeaderKey.trim(),
+          value: this.newHeaderValue.trim()
+        });
+      }
+      
+      // Clear input fields
+      this.newHeaderKey = '';
+      this.newHeaderValue = '';
+    }
+  }
+
+  removeHeader(index: number): void {
+    if (index >= 0 && index < this.headers.length) {
+      this.headers.splice(index, 1);
+    }
+  }
+
+  onHeaderKeyInput(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.newHeaderKey = target.value;
+  }
+
+  onHeaderValueInput(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.newHeaderValue = target.value;
+  }
+
+  isHeaderKeyDuplicate(): boolean {
+    return this.headers.some(h => h.key === this.newHeaderKey.trim());
+  }
+
+  private getHeadersAsMap(): { [key: string]: string } {
+    const headersMap: { [key: string]: string } = {};
+    this.headers.forEach(header => {
+      headersMap[header.key] = header.value;
+    });
+    return headersMap;
   }
 }

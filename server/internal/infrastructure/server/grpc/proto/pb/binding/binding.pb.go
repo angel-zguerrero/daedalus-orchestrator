@@ -31,6 +31,7 @@ type CreateBindingRequest struct {
 	Pattern       string                 `protobuf:"bytes,6,opt,name=pattern,proto3" json:"pattern,omitempty"`
 	XMatch        string                 `protobuf:"bytes,7,opt,name=xMatch,proto3" json:"xMatch,omitempty"`
 	BindingType   string                 `protobuf:"bytes,8,opt,name=bindingType,proto3" json:"bindingType,omitempty"`
+	Headers       map[string]string      `protobuf:"bytes,9,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -119,6 +120,13 @@ func (x *CreateBindingRequest) GetBindingType() string {
 		return x.BindingType
 	}
 	return ""
+}
+
+func (x *CreateBindingRequest) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
 }
 
 type CreateBindingResponse struct {
@@ -591,6 +599,7 @@ type Binding struct {
 	UpdatedAt     string                 `protobuf:"bytes,10,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
 	Exchange      *Exchange              `protobuf:"bytes,11,opt,name=exchange,proto3" json:"exchange,omitempty"`
 	Queue         *Queue                 `protobuf:"bytes,12,opt,name=queue,proto3" json:"queue,omitempty"`
+	Headers       map[string]string      `protobuf:"bytes,13,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -705,6 +714,13 @@ func (x *Binding) GetExchange() *Exchange {
 func (x *Binding) GetQueue() *Queue {
 	if x != nil {
 		return x.Queue
+	}
+	return nil
+}
+
+func (x *Binding) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
 	}
 	return nil
 }
@@ -929,7 +945,7 @@ var File_internal_infrastructure_server_grpc_proto_definitions_binding_proto pro
 
 const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDesc = "" +
 	"\n" +
-	"Cinternal/infrastructure/server/grpc/proto/definitions/binding.proto\x12\abinding\"\x88\x02\n" +
+	"Cinternal/infrastructure/server/grpc/proto/definitions/binding.proto\x12\abinding\"\x8a\x03\n" +
 	"\x14CreateBindingRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\"\n" +
 	"\fexchangeCode\x18\x02 \x01(\tR\fexchangeCode\x12\x1c\n" +
@@ -942,7 +958,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"routingKey\x12\x18\n" +
 	"\apattern\x18\x06 \x01(\tR\apattern\x12\x16\n" +
 	"\x06xMatch\x18\a \x01(\tR\x06xMatch\x12 \n" +
-	"\vbindingType\x18\b \x01(\tR\vbindingType\"[\n" +
+	"\vbindingType\x18\b \x01(\tR\vbindingType\x12D\n" +
+	"\aheaders\x18\t \x03(\v2*.binding.CreateBindingRequest.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"[\n" +
 	"\x15CreateBindingResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12(\n" +
 	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\x91\x01\n" +
@@ -986,7 +1006,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"\x04type\x18\x06 \x01(\tR\x04type\x12$\n" +
 	"\rmessagesCount\x18\a \x01(\x05R\rmessagesCount\x12\x1c\n" +
 	"\tcreatedAt\x18\b \x01(\tR\tcreatedAt\x12\x1c\n" +
-	"\tupdatedAt\x18\t \x01(\tR\tupdatedAt\"\x80\x03\n" +
+	"\tupdatedAt\x18\t \x01(\tR\tupdatedAt\"\xf5\x03\n" +
 	"\aBinding\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
 	"\fexchangeCode\x18\x02 \x01(\tR\fexchangeCode\x12\x1c\n" +
@@ -1004,7 +1024,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"\tupdatedAt\x18\n" +
 	" \x01(\tR\tupdatedAt\x12-\n" +
 	"\bexchange\x18\v \x01(\v2\x11.binding.ExchangeR\bexchange\x12$\n" +
-	"\x05queue\x18\f \x01(\v2\x0e.binding.QueueR\x05queue\"Y\n" +
+	"\x05queue\x18\f \x01(\v2\x0e.binding.QueueR\x05queue\x127\n" +
+	"\aheaders\x18\r \x03(\v2\x1d.binding.Binding.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Y\n" +
 	"\x11BindingFindResult\x12,\n" +
 	"\bentities\x18\x01 \x03(\v2\x10.binding.BindingR\bentities\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"c\n" +
@@ -1039,7 +1063,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_ra
 	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_goTypes = []any{
 	(*CreateBindingRequest)(nil),  // 0: binding.CreateBindingRequest
 	(*CreateBindingResponse)(nil), // 1: binding.CreateBindingResponse
@@ -1053,27 +1077,31 @@ var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_goT
 	(*GetBindingsResponse)(nil),   // 9: binding.GetBindingsResponse
 	(*DeleteBindingRequest)(nil),  // 10: binding.DeleteBindingRequest
 	(*DeleteBindingResponse)(nil), // 11: binding.DeleteBindingResponse
+	nil,                           // 12: binding.CreateBindingRequest.HeadersEntry
+	nil,                           // 13: binding.Binding.HeadersEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_depIdxs = []int32{
-	7,  // 0: binding.CreateBindingResponse.result:type_name -> binding.Binding
-	7,  // 1: binding.GetBindingResponse.result:type_name -> binding.Binding
-	5,  // 2: binding.Binding.exchange:type_name -> binding.Exchange
-	6,  // 3: binding.Binding.queue:type_name -> binding.Queue
-	7,  // 4: binding.BindingFindResult.entities:type_name -> binding.Binding
-	8,  // 5: binding.GetBindingsResponse.result:type_name -> binding.BindingFindResult
-	0,  // 6: binding.BindingService.CreateBinding:input_type -> binding.CreateBindingRequest
-	2,  // 7: binding.BindingService.GetBinding:input_type -> binding.GetBindingRequest
-	4,  // 8: binding.BindingService.GetBindings:input_type -> binding.GetBindingsRequest
-	10, // 9: binding.BindingService.DeleteBinding:input_type -> binding.DeleteBindingRequest
-	1,  // 10: binding.BindingService.CreateBinding:output_type -> binding.CreateBindingResponse
-	3,  // 11: binding.BindingService.GetBinding:output_type -> binding.GetBindingResponse
-	9,  // 12: binding.BindingService.GetBindings:output_type -> binding.GetBindingsResponse
-	11, // 13: binding.BindingService.DeleteBinding:output_type -> binding.DeleteBindingResponse
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	12, // 0: binding.CreateBindingRequest.headers:type_name -> binding.CreateBindingRequest.HeadersEntry
+	7,  // 1: binding.CreateBindingResponse.result:type_name -> binding.Binding
+	7,  // 2: binding.GetBindingResponse.result:type_name -> binding.Binding
+	5,  // 3: binding.Binding.exchange:type_name -> binding.Exchange
+	6,  // 4: binding.Binding.queue:type_name -> binding.Queue
+	13, // 5: binding.Binding.headers:type_name -> binding.Binding.HeadersEntry
+	7,  // 6: binding.BindingFindResult.entities:type_name -> binding.Binding
+	8,  // 7: binding.GetBindingsResponse.result:type_name -> binding.BindingFindResult
+	0,  // 8: binding.BindingService.CreateBinding:input_type -> binding.CreateBindingRequest
+	2,  // 9: binding.BindingService.GetBinding:input_type -> binding.GetBindingRequest
+	4,  // 10: binding.BindingService.GetBindings:input_type -> binding.GetBindingsRequest
+	10, // 11: binding.BindingService.DeleteBinding:input_type -> binding.DeleteBindingRequest
+	1,  // 12: binding.BindingService.CreateBinding:output_type -> binding.CreateBindingResponse
+	3,  // 13: binding.BindingService.GetBinding:output_type -> binding.GetBindingResponse
+	9,  // 14: binding.BindingService.GetBindings:output_type -> binding.GetBindingsResponse
+	11, // 15: binding.BindingService.DeleteBinding:output_type -> binding.DeleteBindingResponse
+	12, // [12:16] is the sub-list for method output_type
+	8,  // [8:12] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_init() }
@@ -1087,7 +1115,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_in
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

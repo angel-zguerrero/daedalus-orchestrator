@@ -12,9 +12,12 @@ import (
 func init() {
 	gob.Register(AssertBindingCommand{})
 	gob.Register(models.Binding{})
+	gob.Register(models.RoutingHeader{})
+	gob.Register(map[string]string{})
 }
 
 type AssertBindingCommand struct {
+	NewBindingID string
 	QueueCode    string
 	ExchangeCode string
 	VNamespace   string
@@ -24,6 +27,7 @@ type AssertBindingCommand struct {
 	BindingType  models.BindingType
 	CF           string
 	CFS          string
+	Headers      map[string]string // Headers for routing, used only for Headers exchange type
 }
 
 func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -50,7 +54,7 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		cmd.BindingType = models.BindingTypeClassic
 	}
 
-	idFactory := &db.DefaultIDGeneratorFactory{}
+	idFactory := &db.DeterministicIDGeneratorFactory{}
 	bindingRepo, err := db.NewBindingRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -77,6 +81,13 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	}
 
 	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	// Initialize routing headers repository for headers management
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -137,7 +148,7 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	} else {
 		// Create new binding
 		binding = models.Binding{
-			ID:          idFactory.GenerateID(),
+			ID:          cmd.NewBindingID,
 			VNamespace:  cmd.VNamespace,
 			ExchangeID:  exchange.ID,
 			QueueID:     queue.ID,
@@ -186,6 +197,15 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	// Update tenant summary if a new binding was created
 	if newBindingCreated {
 		err = tenantSummaryRepo.IncreaseBindingCount(cmd.CFS, 1, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+	}
+
+	// Handle routing headers for Headers exchange type
+	if exchange.Type == models.Headers && cmd.Headers != nil && len(cmd.Headers) > 0 {
+		err = cmd.upsertRoutingHeaders(routingHeadersRepo, binding.ID, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
@@ -254,6 +274,73 @@ func (cmd *AssertBindingCommand) validateBindingParams(exchangeType models.Excha
 
 	default:
 		return errors.New("unsupported Exchange Type: " + string(exchangeType))
+	}
+
+	return nil
+}
+
+// upsertRoutingHeaders creates or updates routing headers for a binding
+func (cmd *AssertBindingCommand) upsertRoutingHeaders(routingHeadersRepo *db.RoutingHeadersRepository, bindingID string, now time.Time) error {
+	// Get existing headers for this binding
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByBinding(bindingID, now)
+	if err != nil {
+		return err
+	}
+
+	// Create a map of existing headers by key for fast lookup
+	existingByKey := make(map[string]*models.RoutingHeader)
+	if existingHeaders != nil {
+		for i := range existingHeaders.Entities {
+			header := &existingHeaders.Entities[i]
+			existingByKey[header.Key] = header
+		}
+	}
+
+	// Track which keys we're processing to identify headers to delete
+	processedKeys := make(map[string]bool)
+
+	// Create or update headers from the map
+	for key, value := range cmd.Headers {
+		// Generate unique ID by combining binding ID and header key
+		headerID := bindingID + "_" + key
+		processedKeys[key] = true
+
+		if existingHeader, exists := existingByKey[key]; exists {
+			// Update existing header
+			existingHeader.Value = value
+			existingHeader.UpdatedAt = now
+
+			_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Create new header
+			routingHeader := &models.RoutingHeader{
+				ID:         headerID,
+				VNamespace: cmd.VNamespace,
+				BindingID:  bindingID,
+				Key:        key,
+				Value:      value,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			}
+
+			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Delete headers that are no longer present in the new map
+	for key, header := range existingByKey {
+		if !processedKeys[key] {
+			_, err := routingHeadersRepo.DeleteRoutingHeader(header.ID, now)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

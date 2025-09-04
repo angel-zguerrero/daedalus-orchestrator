@@ -17,6 +17,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type BindingBO struct {
@@ -29,8 +31,9 @@ func NewBindingBO(Config *common.ServerConfing) *BindingBO {
 	}
 }
 
-func (bo *BindingBO) CreateBinding(ctx context.Context, queueCode, exchangeCode, vnamespace, routingKey, pattern string, xMatch models.XMatchType, bindingType models.BindingType, cf, cfs string) (models.Binding, error) {
+func (bo *BindingBO) CreateBinding(ctx context.Context, queueCode, exchangeCode, vnamespace, routingKey, pattern string, xMatch models.XMatchType, bindingType models.BindingType, headers map[string]string, cf, cfs string) (models.Binding, error) {
 	assertBindingCommand := &binding_command.AssertBindingCommand{
+		NewBindingID: strings.ReplaceAll(uuid.New().String(), "-", ""),
 		QueueCode:    queueCode,
 		ExchangeCode: exchangeCode,
 		VNamespace:   vnamespace,
@@ -38,6 +41,7 @@ func (bo *BindingBO) CreateBinding(ctx context.Context, queueCode, exchangeCode,
 		Pattern:      pattern,
 		XMatch:       xMatch,
 		BindingType:  bindingType,
+		Headers:      headers,
 		CF:           cf,
 		CFS:          cfs,
 	}

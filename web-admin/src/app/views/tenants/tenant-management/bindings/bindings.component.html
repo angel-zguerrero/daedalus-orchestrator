@@ -296,6 +296,87 @@
           <small class="form-text text-muted">Used for headers exchanges matching</small>
         </c-col>
       </c-row>
+
+      <!-- Headers Section - only for Headers exchanges -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="showHeaders">
+        <c-col [md]="12">
+          <label cLabel class="fw-bold">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Headers
+          </label>
+          <small class="form-text text-muted mb-3">Add key-value pairs for headers exchange routing</small>
+          
+          <!-- Add Header Form -->
+          <div class="border rounded p-3 mb-3 bg-light">
+            <c-row [gutter]="{gy: 2, gx: 2}">
+              <c-col [md]="4">
+                <input 
+                  cFormControl 
+                  placeholder="Header key" 
+                  [value]="newHeaderKey"
+                  (input)="onHeaderKeyInput($event)"
+                  (keydown.enter)="addHeader()"
+                  [class.is-invalid]="newHeaderKey.trim() && isHeaderKeyDuplicate()" />
+                <div *ngIf="newHeaderKey.trim() && isHeaderKeyDuplicate()" class="invalid-feedback">
+                  Key already exists - will update existing header
+                </div>
+              </c-col>
+              <c-col [md]="6">
+                <input 
+                  cFormControl 
+                  placeholder="Header value" 
+                  [value]="newHeaderValue"
+                  (input)="onHeaderValueInput($event)"
+                  (keydown.enter)="addHeader()" />
+              </c-col>
+              <c-col [md]="2">
+                <button 
+                  cButton 
+                  [color]="isHeaderKeyDuplicate() && newHeaderKey.trim() ? 'warning' : 'success'"
+                  size="sm" 
+                  (click)="addHeader()"
+                  [disabled]="!newHeaderKey.trim() || !newHeaderValue.trim()">
+                  <svg cIcon [name]="isHeaderKeyDuplicate() && newHeaderKey.trim() ? 'cil-pencil' : 'cil-plus'"></svg>
+                  {{ isHeaderKeyDuplicate() && newHeaderKey.trim() ? 'Update' : 'Add' }}
+                </button>
+              </c-col>
+            </c-row>
+          </div>
+
+          <!-- Headers List -->
+          <div *ngIf="headers.length > 0" class="border rounded p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Current Headers ({{ headers.length }})</h6>
+              <small class="text-muted">X-Match: {{ bindingForm.get('xMatch')?.value || 'all' }}</small>
+            </div>
+            <div class="row">
+              <div *ngFor="let header of headers; let i = index" class="col-12 mb-2">
+                <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
+                  <div class="d-flex flex-grow-1">
+                    <code class="me-3 text-info">{{ header.key }}</code>
+                    <code class="text-light">{{ header.value }}</code>
+                  </div>
+                  <button 
+                    cButton 
+                    color="danger" 
+                    size="sm" 
+                    variant="ghost"
+                    (click)="removeHeader(i)"
+                    title="Remove header">
+                    <svg cIcon name="cil-trash"></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- No Headers Message -->
+          <div *ngIf="headers.length === 0" class="text-center p-3 text-muted">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            No headers added yet. Add headers above for routing configuration.
+          </div>
+        </c-col>
+      </c-row>
       
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
@@ -442,6 +523,42 @@
             <div class="form-text">Type of binding behavior</div>
           </div>
         </div>
+      </div>
+
+      <!-- Headers Section - shown for Headers exchanges -->
+      <div *ngIf="shouldShowHeadersInDetails()" class="mb-3">
+        <label class="form-label fw-bold">
+          <svg cIcon name="cil-tags" class="me-2"></svg>
+          Headers
+        </label>
+        <div class="form-text mb-2">Headers used for routing in this Headers exchange</div>
+        
+        <div *ngIf="getSelectedBindingHeaders().length > 0; else noHeaders" class="border rounded p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Routing Headers ({{ getSelectedBindingHeaders().length }})</h6>
+            <c-badge [color]="getXMatchColor(selectedBinding?.XMatch || selectedBinding?.xMatch)" shape="rounded-pill">
+              X-Match: {{ selectedBinding?.XMatch || selectedBinding?.xMatch || 'all' }}
+            </c-badge>
+          </div>
+          
+          <div class="row">
+            <div *ngFor="let header of getSelectedBindingHeaders()" class="col-md-6 mb-2">
+              <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
+                <div class="d-flex flex-column flex-grow-1">
+                  <code class="text-info mb-1">{{ header.key }}</code>
+                  <code class="text-light">{{ header.value }}</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <ng-template #noHeaders>
+          <div class="border rounded p-3 text-center text-muted">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            No headers configured for this binding
+          </div>
+        </ng-template>
       </div>
 
       <!-- Information note based on exchange type -->

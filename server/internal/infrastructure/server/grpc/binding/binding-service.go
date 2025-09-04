@@ -66,6 +66,7 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 		r.Pattern,
 		xMatch,
 		bindingType,
+		r.Headers,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
 	)

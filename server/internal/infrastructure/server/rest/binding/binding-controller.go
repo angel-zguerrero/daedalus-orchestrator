@@ -28,13 +28,14 @@ func NewBindingController(Config *common.ServerConfing) *BindingController {
 }
 
 type createBindingRequest struct {
-	ExchangeCode string `json:"exchangeCode" binding:"required"`
-	QueueCode    string `json:"queueCode" binding:"required"`
-	VNamespace   string `json:"vnamespace" binding:"required"`
-	RoutingKey   string `json:"routingKey"`
-	Pattern      string `json:"pattern"`
-	XMatch       string `json:"xMatch"`
-	BindingType  string `json:"bindingType"`
+	ExchangeCode string            `json:"exchangeCode" binding:"required"`
+	QueueCode    string            `json:"queueCode" binding:"required"`
+	VNamespace   string            `json:"vnamespace" binding:"required"`
+	RoutingKey   string            `json:"routingKey"`
+	Pattern      string            `json:"pattern"`
+	XMatch       string            `json:"xMatch"`
+	BindingType  string            `json:"bindingType"`
+	Headers      map[string]string `json:"headers"`
 }
 
 // CreateBindingHandler handles POST /rest-api/tenants/:id/binding
@@ -86,6 +87,7 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		req.Pattern,
 		xMatch,
 		bindingType,
+		req.Headers,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
 	)
