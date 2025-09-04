@@ -56,6 +56,8 @@ type BindingWithObjects struct {
 
 	BindingType BindingType `json:"bindingType"`
 
+	Headers map[string]string `json:"headers,omitempty"` // Headers for routing, used only for Headers exchange type
+
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

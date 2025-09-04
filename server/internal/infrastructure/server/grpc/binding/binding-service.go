@@ -193,6 +193,11 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 					}
 				}
 
+				// Add headers if available
+				if e.Headers != nil {
+					binding.Headers = e.Headers
+				}
+
 				rBindings = append(rBindings, binding)
 			}
 

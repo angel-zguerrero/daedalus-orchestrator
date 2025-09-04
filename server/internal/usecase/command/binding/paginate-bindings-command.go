@@ -61,6 +61,13 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 			return *commandResult
 		}
 
+		// Obtener repositorio para routing headers
+		routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+
 		// Convertir cada binding y añadir los objetos
 		for _, binding := range findResult.Entities {
 			bindingWithObjects := models.BindingWithObjects{
@@ -80,6 +87,18 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 			if exchange, err := exchangeRepo.GetExchangeById(binding.ExchangeID, now); err == nil && exchange != nil {
 				bindingWithObjects.Exchange = exchange
 				bindingWithObjects.ExchangeCode = exchange.Code
+
+				// Si el exchange es del tipo Headers, obtener los headers del binding
+				if exchange.Type == models.Headers {
+					if headersResult, err := routingHeadersRepo.GetRoutingHeadersByBinding(binding.ID, now); err == nil && headersResult != nil {
+						// Convertir los headers a map[string]string
+						headers := make(map[string]string)
+						for _, header := range headersResult.Entities {
+							headers[header.Key] = header.Value
+						}
+						bindingWithObjects.Headers = headers
+					}
+				}
 			}
 
 			// Obtener la queue
