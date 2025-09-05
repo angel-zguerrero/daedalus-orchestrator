@@ -18,6 +18,7 @@ func init() {
 
 type AssertBindingCommand struct {
 	NewBindingID string
+	Code         string
 	QueueCode    string
 	ExchangeCode string
 	VNamespace   string
@@ -149,6 +150,7 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		// Create new binding
 		binding = models.Binding{
 			ID:          cmd.NewBindingID,
+			Code:        cmd.Code,
 			VNamespace:  cmd.VNamespace,
 			ExchangeID:  exchange.ID,
 			QueueID:     queue.ID,

@@ -19,7 +19,8 @@ const (
 type Binding struct {
 	ID string `orm:"primary-key"`
 
-	VNamespace string
+	VNamespace string `orm:"unique-compound:1"`
+	Code       string `orm:"unique-compound:1"`
 
 	ExchangeID string `orm:"unique-compound:0"`
 	QueueID    string `orm:"unique-compound:0"`
@@ -37,29 +38,28 @@ type Binding struct {
 
 // BindingWithObjects representa un binding con los objetos Exchange y Queue incluidos
 type BindingWithObjects struct {
-	ID string `json:"id"`
+	ID string
 
-	VNamespace string `json:"vnamespace"`
+	VNamespace string
 
-	ExchangeID   string    `json:"exchangeId"`
-	ExchangeCode string    `json:"exchangeCode"`
-	Exchange     *Exchange `json:"exchange,omitempty"`
+	ExchangeID   string
+	ExchangeCode string
+	Exchange     *Exchange
 
-	QueueID   string `json:"queueId"`
-	QueueCode string `json:"queueCode"`
-	Queue     *Queue `json:"queue,omitempty"`
+	QueueID   string
+	QueueCode string
+	Queue     *Queue
 
-	RoutingKey string `json:"routingKey"` //used only for direct exchanges
-	Pattern    string `json:"pattern"`    //used only for topic exchanges
+	RoutingKey string //used only for direct exchanges
+	Pattern    string //used only for topic exchanges
 
-	XMatch XMatchType `json:"xMatch"` //used for headers exchanges
+	XMatch XMatchType
 
-	BindingType BindingType `json:"bindingType"`
+	BindingType BindingType
 
-	Headers map[string]string `json:"headers,omitempty"` // Headers for routing, used only for Headers exchange type
-
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Headers   map[string]string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (Binding) TableName() string {

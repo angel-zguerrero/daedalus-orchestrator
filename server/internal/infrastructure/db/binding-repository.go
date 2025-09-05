@@ -33,6 +33,18 @@ func (r *BindingRepository) UpdateBinding(input *models.Binding, now time.Time) 
 	return r.Update(input, now)
 }
 
+func (r *BindingRepository) GetBindingByCode(code string, vnamespace string, now time.Time) (*models.Binding, error) {
+	query := "Code = " + code + " & VNamespace = " + vnamespace
+	result, err := r.Find(query, 1, "", now)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Entities) == 0 {
+		return nil, nil
+	}
+	return &result.Entities[0], nil
+}
+
 func (r *BindingRepository) GetBindingByExchangeAndQueue(exchangeID string, queueID string, now time.Time) (*models.Binding, error) {
 	query := "ExchangeID = " + exchangeID + " & QueueID = " + queueID
 	result, err := r.Find(query, 1, "", now)
