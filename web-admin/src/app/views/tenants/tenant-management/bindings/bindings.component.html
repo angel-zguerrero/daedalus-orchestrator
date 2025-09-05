@@ -617,24 +617,6 @@
         </ng-template>
       </div>
 
-      <!-- Information note based on exchange type -->
-      <div class="mb-3">
-        <c-alert color="info" class="mb-0" *ngIf="getSelectedBindingExchangeType()">
-          <strong>{{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Type }} Exchange:</strong>
-          <span *ngIf="getSelectedBindingExchangeType() === 'direct'">
-            Messages are routed to queues whose routing key exactly matches the message's routing key.
-          </span>
-          <span *ngIf="getSelectedBindingExchangeType() === 'topic'">
-            Messages are routed to queues based on pattern matching between the routing key and the binding pattern.
-          </span>
-          <span *ngIf="getSelectedBindingExchangeType() === 'fanout'">
-            Messages are routed to all bound queues, ignoring routing keys.
-          </span>
-          <span *ngIf="getSelectedBindingExchangeType() === 'headers'">
-            Messages are routed based on header attributes matching using the X-Match strategy.
-          </span>
-        </c-alert>
-      </div>
     </div>
 
     <!-- Exchange Information Section -->
