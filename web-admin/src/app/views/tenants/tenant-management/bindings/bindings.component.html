@@ -561,6 +561,26 @@
         </div>
       </div>
 
+      <!-- Dynamic Binding Explanation - shown for dynamic bindings -->
+      <div *ngIf="(selectedBinding?.BindingType || selectedBinding?.bindingType) === 'dynamic'" class="mb-3">
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'direct'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>Dynamic Direct Binding:</strong> Queue is determined automatically by the queue code.
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'topic'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>Dynamic Topic Binding:</strong> Queues are determined where the code matches the pattern.
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'headers'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>Dynamic Headers Binding:</strong> Queues are determined by queue headers, message headers, and X-Match type.
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'fanout'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>Dynamic Fanout Binding:</strong> Queue is determined automatically by the queue code.
+        </div>
+      </div>
+
       <!-- Headers Section - shown for Headers exchanges -->
       <div *ngIf="shouldShowHeadersInDetails()" class="mb-3">
         <label class="form-label fw-bold">
