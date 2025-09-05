@@ -35,14 +35,28 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	commandResult := &command.CommandResult{}
 
 	// Validate required fields
+	if cmd.Code == "" {
+		commandResult.Error = "Code is required"
+		return *commandResult
+	}
+
 	if cmd.ExchangeCode == "" {
 		commandResult.Error = "ExchangeCode is required"
 		return *commandResult
 	}
 
-	if cmd.QueueCode == "" {
-		commandResult.Error = "QueueCode is required"
-		return *commandResult
+	// Validate BindingType specific requirements
+	if cmd.BindingType == models.BindingTypeClassic {
+		if cmd.QueueCode == "" {
+			commandResult.Error = "QueueCode is required for classic bindings"
+			return *commandResult
+		}
+	} else if cmd.BindingType == models.BindingTypeDynamic {
+		// For dynamic bindings, QueueCode should be empty
+		if cmd.QueueCode != "" {
+			commandResult.Error = "QueueCode should not be specified for dynamic bindings"
+			return *commandResult
+		}
 	}
 
 	// Set default VNamespace if not provided
@@ -105,15 +119,24 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
-	// Find Queue by Code and VNamespace
-	queue, err := queueRepo.GetQueueByCode(cmd.QueueCode, cmd.VNamespace, now)
-	if err != nil {
-		commandResult.Error = err.Error()
+	// Validate that dynamic bindings cannot use Fanout exchanges
+	if cmd.BindingType == models.BindingTypeDynamic && exchange.Type == models.Fanout {
+		commandResult.Error = "Dynamic bindings cannot use Fanout exchanges as they don't support routing"
 		return *commandResult
 	}
-	if queue == nil {
-		commandResult.Error = "Queue with Code '" + cmd.QueueCode + "' in VNamespace '" + cmd.VNamespace + "' does not exist"
-		return *commandResult
+
+	// Find Queue by Code and VNamespace (only for classic bindings)
+	var queue *models.Queue
+	if cmd.BindingType == models.BindingTypeClassic {
+		queue, err = queueRepo.GetQueueByCode(cmd.QueueCode, cmd.VNamespace, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		if queue == nil {
+			commandResult.Error = "Queue with Code '" + cmd.QueueCode + "' in VNamespace '" + cmd.VNamespace + "' does not exist"
+			return *commandResult
+		}
 	}
 
 	// Validate binding parameters according to Exchange Type
@@ -123,8 +146,8 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
-	// Look for existing binding by ExchangeID and QueueID
-	existing, err := bindingRepo.GetBindingByExchangeAndQueue(exchange.ID, queue.ID, now)
+	// Look for existing binding by Code and VNamespace
+	existing, err := bindingRepo.GetBindingByCode(cmd.Code, cmd.VNamespace, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -140,6 +163,13 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		binding.Pattern = cmd.Pattern
 		binding.XMatch = cmd.XMatch
 		binding.BindingType = cmd.BindingType
+		// Update ExchangeID and QueueID in case they changed
+		binding.ExchangeID = exchange.ID
+		if queue != nil {
+			binding.QueueID = queue.ID
+		} else {
+			binding.QueueID = "" // For dynamic bindings
+		}
 
 		_, err = bindingRepo.UpdateBinding(&binding, now)
 		if err != nil {
@@ -148,12 +178,17 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		}
 	} else {
 		// Create new binding
+		queueID := ""
+		if queue != nil {
+			queueID = queue.ID
+		}
+
 		binding = models.Binding{
 			ID:          cmd.NewBindingID,
 			Code:        cmd.Code,
 			VNamespace:  cmd.VNamespace,
 			ExchangeID:  exchange.ID,
-			QueueID:     queue.ID,
+			QueueID:     queueID,
 			RoutingKey:  cmd.RoutingKey,
 			Pattern:     cmd.Pattern,
 			XMatch:      cmd.XMatch,
@@ -205,8 +240,8 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		}
 	}
 
-	// Handle routing headers for Headers exchange type
-	if exchange.Type == models.Headers && cmd.Headers != nil && len(cmd.Headers) > 0 {
+	// Handle routing headers for Headers exchange type in classic bindings only
+	if exchange.Type == models.Headers && cmd.BindingType == models.BindingTypeClassic && cmd.Headers != nil && len(cmd.Headers) > 0 {
 		err = cmd.upsertRoutingHeaders(routingHeadersRepo, binding.ID, now)
 		if err != nil {
 			commandResult.Error = err.Error()
@@ -218,13 +253,14 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	return *commandResult
 }
 
-// validateBindingParams validates binding parameters according to Exchange Type
+// validateBindingParams validates binding parameters according to Exchange Type and BindingType
 func (cmd *AssertBindingCommand) validateBindingParams(exchangeType models.ExchangeType) error {
 	switch exchangeType {
 	case models.Direct:
-		// Direct exchanges require RoutingKey
-		if cmd.RoutingKey == "" {
-			return errors.New("RoutingKey is required for Direct exchanges")
+		// Direct exchanges require RoutingKey only for classic bindings
+		// For dynamic bindings, RoutingKey is ignored as queue is found by code
+		if cmd.BindingType == models.BindingTypeClassic && cmd.RoutingKey == "" {
+			return errors.New("RoutingKey is required for Direct exchanges in classic bindings")
 		}
 		// Pattern and XMatch should be empty for direct exchanges
 		if cmd.Pattern != "" {
@@ -235,7 +271,9 @@ func (cmd *AssertBindingCommand) validateBindingParams(exchangeType models.Excha
 		}
 
 	case models.Topic:
-		// Topic exchanges require Pattern
+		// Topic exchanges require Pattern for all binding types
+		// For classic bindings, Pattern is used for message routing
+		// For dynamic bindings, Pattern is used for automatic queue discovery
 		if cmd.Pattern == "" {
 			return errors.New("Pattern is required for Topic exchanges")
 		}
@@ -251,6 +289,12 @@ func (cmd *AssertBindingCommand) validateBindingParams(exchangeType models.Excha
 		// Headers exchanges require XMatch
 		if cmd.XMatch == "" {
 			cmd.XMatch = models.XMatchTypeAll // Set default
+		}
+		// For dynamic bindings, queues are determined automatically based on message headers
+		// and queue header conditions, so only XMatch is needed
+		// For classic bindings, routing headers are required
+		if cmd.BindingType == models.BindingTypeClassic {
+			// Headers are validated separately in the main command handler
 		}
 		// RoutingKey and Pattern should be empty for headers exchanges
 		if cmd.RoutingKey != "" {

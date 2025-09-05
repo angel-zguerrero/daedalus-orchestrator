@@ -13,14 +13,15 @@ service BindingService {
 
 message CreateBindingRequest {
   string tenantId = 1;
-  string exchangeCode = 2;
-  string queueCode = 3;
-  string vnamespace = 4;
-  string routingKey = 5;
-  string pattern = 6;
-  string xMatch = 7;
-  string bindingType = 8;
-  map<string, string> headers = 9;
+  string code = 2;
+  string exchangeCode = 3;
+  string queueCode = 4;
+  string vnamespace = 5;
+  string routingKey = 6;
+  string pattern = 7;
+  string xMatch = 8;
+  string bindingType = 9;
+  map<string, string> headers = 10;
 }
 
 message CreateBindingResponse {
@@ -73,18 +74,19 @@ message Queue {
 
 message Binding {
   string id = 1;
-  string exchangeCode = 2;
-  string queueCode = 3;
-  string vnamespace = 4;
-  string routingKey = 5;
-  string pattern = 6;
-  string xMatch = 7;
-  string bindingType = 8;
-  string createdAt = 9;
-  string updatedAt = 10;
-  Exchange exchange = 11;
-  Queue queue = 12;
-  map<string, string> headers = 13;
+  string code = 2;
+  string exchangeCode = 3;
+  string queueCode = 4;
+  string vnamespace = 5;
+  string routingKey = 6;
+  string pattern = 7;
+  string xMatch = 8;
+  string bindingType = 9;
+  string createdAt = 10;
+  string updatedAt = 11;
+  Exchange exchange = 12;
+  Queue queue = 13;
+  map<string, string> headers = 14;
 }
 
 message BindingFindResult {

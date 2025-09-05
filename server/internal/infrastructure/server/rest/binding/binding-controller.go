@@ -28,8 +28,9 @@ func NewBindingController(Config *common.ServerConfing) *BindingController {
 }
 
 type createBindingRequest struct {
+	Code         string            `json:"code" binding:"required"`
 	ExchangeCode string            `json:"exchangeCode" binding:"required"`
-	QueueCode    string            `json:"queueCode" binding:"required"`
+	QueueCode    string            `json:"queueCode"`
 	VNamespace   string            `json:"vnamespace" binding:"required"`
 	RoutingKey   string            `json:"routingKey"`
 	Pattern      string            `json:"pattern"`
@@ -44,6 +45,16 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ctrl.Config.Logger.Warn().Err(err).Msg("create binding attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	// Validate binding type specific requirements
+	if req.BindingType == "classic" && req.QueueCode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required for classic bindings"})
+		return
+	}
+	if req.BindingType == "dynamic" && req.QueueCode != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode should not be specified for dynamic bindings"})
 		return
 	}
 
@@ -80,6 +91,7 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 
 	binding, err := ctrl.BindingBO.CreateBinding(
 		c.Request.Context(),
+		req.Code,
 		req.QueueCode,
 		req.ExchangeCode,
 		req.VNamespace,

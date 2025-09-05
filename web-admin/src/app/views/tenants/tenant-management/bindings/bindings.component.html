@@ -198,6 +198,26 @@
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <form [formGroup]="bindingForm" (ngSubmit)="createBinding()" (keydown.enter)="createBinding()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="bindingType">Binding Type *</label>
+          <select cSelect id="bindingType" formControlName="bindingType" (change)="onBindingTypeChange($event)">
+            <option *ngFor="let bindingType of bindingTypes" [value]="bindingType.value">
+              {{ bindingType.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted">Type of binding behavior</small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="code">Code *</label>
+          <input 
+            cFormControl 
+            id="code" 
+            formControlName="code" 
+            placeholder="Enter binding code" />
+          <small class="form-text text-muted">Unique identifier for this binding</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
           <mat-form-field class="w-100">
             <mat-label>Virtual Namespace *</mat-label>
@@ -216,7 +236,7 @@
         </c-col>
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="6">
+        <c-col [md]="showQueue ? 6 : 12">
           <mat-form-field class="w-100">
             <mat-label>Exchange *</mat-label>
             <input 
@@ -233,6 +253,12 @@
             </mat-autocomplete>
           </mat-form-field>
           <div class="form-text">Required: Select the source exchange</div>
+          <div *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'" class="mt-2">
+            <small class="text-warning">
+              <svg cIcon name="cil-warning" class="me-1"></svg>
+              <strong>Dynamic Mode:</strong> Fanout exchanges are filtered out as they don't support routing
+            </small>
+          </div>
           <div *ngIf="selectedExchange" class="mt-2">
             <small class="text-info">
               <svg cIcon name="cil-info" class="me-1"></svg>
@@ -240,7 +266,7 @@
             </small>
           </div>
         </c-col>
-        <c-col [md]="6">
+        <c-col [md]="6" *ngIf="showQueue">
           <mat-form-field class="w-100">
             <mat-label>Queue *</mat-label>
             <input 
@@ -257,6 +283,16 @@
             </mat-autocomplete>
           </mat-form-field>
           <div class="form-text">Required: Select the destination queue</div>
+        </c-col>
+        <c-col [md]="6" *ngIf="!showQueue">
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'topic'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>Dynamic Topic Binding:</strong> Queue will be determined automatically using the pattern to match queues. Routing key is ignored.
+          </div>
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() !== 'topic'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>Dynamic Binding:</strong> Queue will be determined automatically by code. Routing key and pattern fields are hidden as they are ignored.
+          </div>
         </c-col>
       </c-row>
       
@@ -284,7 +320,12 @@
             id="pattern" 
             formControlName="pattern" 
             placeholder="Enter pattern (e.g., user.*.created)" />
-          <small class="form-text text-muted">Used for topic exchanges pattern matching</small>
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'">
+            Used for topic exchanges to automatically find and bind matching queues
+          </small>
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value !== 'dynamic'">
+            Used for topic exchanges pattern matching
+          </small>
         </c-col>
         <c-col [md]="6" *ngIf="showXMatch">
           <label cLabel for="xMatch">X-Match Type</label>
@@ -293,7 +334,12 @@
               {{ xMatchType.label }}
             </option>
           </select>
-          <small class="form-text text-muted">Used for headers exchanges matching</small>
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value === 'classic'">
+            Used for headers exchanges matching
+          </small>
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'">
+            Queues will be determined automatically based on message headers and queue header conditions
+          </small>
         </c-col>
       </c-row>
 
@@ -374,24 +420,6 @@
           <div *ngIf="headers.length === 0" class="text-center p-3 text-muted">
             <svg cIcon name="cil-info" class="me-2"></svg>
             No headers added yet. Add headers above for routing configuration.
-          </div>
-        </c-col>
-      </c-row>
-      
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="6">
-          <label cLabel for="bindingType">Binding Type *</label>
-          <select cSelect id="bindingType" formControlName="bindingType">
-            <option *ngFor="let bindingType of bindingTypes" [value]="bindingType.value">
-              {{ bindingType.label }}
-            </option>
-          </select>
-          <small class="form-text text-muted">Type of binding behavior</small>
-        </c-col>
-        <c-col [md]="6" *ngIf="!selectedExchange">
-          <div class="alert alert-info mt-3">
-            <svg cIcon name="cil-info" class="me-2"></svg>
-            Select an exchange to see type-specific fields
           </div>
         </c-col>
       </c-row>

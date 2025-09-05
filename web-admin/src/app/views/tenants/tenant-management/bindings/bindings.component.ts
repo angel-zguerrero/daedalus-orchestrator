@@ -49,6 +49,7 @@ interface Queue {
 }
 
 interface Binding {
+  Code?: string;
   RoutingKey?: string;
   Pattern?: string;
   XMatch?: string;
@@ -61,6 +62,7 @@ interface Binding {
   Exchange?: Exchange;
   Queue?: Queue;
   // Compatibilidad con propiedades en camelCase
+  code?: string;
   exchangeCode: string;
   queueCode: string;
   vnamespace: string;
@@ -170,6 +172,7 @@ export class BindingsComponent implements OnInit {
     private cdr: ChangeDetectorRef
   ) {
     this.bindingForm = this.fb.group({
+      code: ['', Validators.required],
       vnamespace: this.vnamespaceCtrl,
       exchange: this.exchangeCtrl,
       queue: this.queueCtrl,
@@ -238,6 +241,11 @@ export class BindingsComponent implements OnInit {
       this.onQueueChange();
     });
 
+    // Watch BindingType changes
+    this.bindingForm.get('bindingType')?.valueChanges.subscribe(bindingType => {
+      this.onBindingTypeChange(bindingType);
+    });
+
     // Watch VNamespace filter changes
     this.vnamespaceFilterCtrl.valueChanges.subscribe(vnamespace => {
       // Si vnamespace es un string (solo el Code), crear un objeto VNamespace básico
@@ -297,13 +305,21 @@ export class BindingsComponent implements OnInit {
     return this.exchangesService.getExchanges(this.tenantId, '', 50, value, this.selectedVNamespace.Code).pipe(
       map(response => {
         this.loadingExchanges = false;
-        return (response.result?.Entities || []).map((item: any) => ({
+        let exchanges = (response.result?.Entities || []).map((item: any) => ({
           Code: item.Code,
           Name: item.Name,
           Type: item.Type,
           VNamespace: item.VNamespace,
           Description: item.Description
         } as Exchange));
+
+        // Filter out Fanout exchanges for dynamic bindings
+        const bindingType = this.bindingForm.get('bindingType')?.value;
+        if (bindingType === 'dynamic') {
+          exchanges = exchanges.filter((exchange: Exchange) => exchange.Type !== 'fanout');
+        }
+
+        return exchanges;
       }),
       catchError(error => {
         this.loadingExchanges = false;
@@ -368,6 +384,32 @@ export class BindingsComponent implements OnInit {
     // Queue change logic if needed
   }
 
+  onBindingTypeChange(event: any): void {
+    const bindingType = event.target?.value || event;
+    // Clear queue selection when switching to dynamic binding
+    if (bindingType === 'dynamic') {
+      this.selectedQueue = null;
+      this.queueCtrl.setValue(null);
+      this.queueCtrl.disable();
+      
+      // Clear exchange selection if it's a Fanout exchange (not allowed for dynamic bindings)
+      if (this.selectedExchange && this.selectedExchange.Type === 'fanout') {
+        this.selectedExchange = null;
+        this.exchangeCtrl.setValue(null);
+      }
+    } else if (bindingType === 'classic') {
+      this.queueCtrl.enable();
+    }
+    
+    // Trigger exchange list refresh to apply filtering
+    if (this.selectedVNamespace) {
+      this.exchangeCtrl.updateValueAndValidity();
+    }
+    
+    this.updateFormValidation();
+    this.cdr.detectChanges();
+  }
+
   // Display functions for autocompletes
   displayVNamespace = (vnamespace: VNamespace): string => {
     return vnamespace ? `${vnamespace.Code}` : '';
@@ -390,12 +432,24 @@ export class BindingsComponent implements OnInit {
     return this.selectedVNamespace !== null;
   }
 
+  get showQueue(): boolean {
+    const bindingType = this.bindingForm.get('bindingType')?.value;
+    return bindingType === 'classic';
+  }
+
   get showRoutingKey(): boolean {
-    return this.selectedExchange?.Type?.toLowerCase() === 'direct';
+    const bindingType = this.bindingForm.get('bindingType')?.value;
+    // Don't show routing key for dynamic bindings as it's ignored
+    return this.selectedExchange?.Type?.toLowerCase() === 'direct' && bindingType !== 'dynamic';
   }
 
   get showPattern(): boolean {
-    return this.selectedExchange?.Type?.toLowerCase() === 'topic';
+    const bindingType = this.bindingForm.get('bindingType')?.value;
+    const isTopicExchange = this.selectedExchange?.Type?.toLowerCase() === 'topic';
+    
+    // Show pattern for topic exchanges regardless of binding type
+    // For dynamic bindings with topic exchanges, pattern is used to find queues automatically
+    return isTopicExchange;
   }
 
   get showXMatch(): boolean {
@@ -403,7 +457,10 @@ export class BindingsComponent implements OnInit {
   }
 
   get showHeaders(): boolean {
-    return this.selectedExchange?.Type?.toLowerCase() === 'headers';
+    // Headers are only shown for Headers exchanges with classic binding type
+    // For dynamic bindings, queues are determined automatically based on message headers
+    return this.selectedExchange?.Type?.toLowerCase() === 'headers' && 
+           this.bindingForm.get('bindingType')?.value === 'classic';
   }
 
   get isRoutingKeyRequired(): boolean {
@@ -414,27 +471,45 @@ export class BindingsComponent implements OnInit {
     return this.showPattern;
   }
 
+  get isQueueRequired(): boolean {
+    return this.showQueue;
+  }
+
   private updateFormValidation(): void {
     const routingKeyControl = this.bindingForm.get('routingKey');
     const patternControl = this.bindingForm.get('pattern');
+    const queueControl = this.bindingForm.get('queue');
 
     // Clear existing validators
     routingKeyControl?.clearValidators();
     patternControl?.clearValidators();
+    queueControl?.clearValidators();
 
-    // Set validators based on exchange type
+    // Set validators based on binding type
+    const bindingType = this.bindingForm.get('bindingType')?.value;
+    if (bindingType === 'classic') {
+      queueControl?.setValidators([Validators.required]);
+    }
+
+    // Set validators based on exchange type and binding type
     if (this.selectedExchange) {
       const exchangeType = this.selectedExchange.Type?.toLowerCase();
       
       if (exchangeType === 'direct') {
-        routingKeyControl?.setValidators([Validators.required]);
+        // For dynamic bindings, routing key is not required as queue is found by code
+        if (bindingType === 'classic') {
+          routingKeyControl?.setValidators([Validators.required]);
+        }
       } else if (exchangeType === 'topic') {
+        // Pattern is always required for topic exchanges, regardless of binding type
+        // For dynamic bindings, pattern is used to find queues automatically
         patternControl?.setValidators([Validators.required]);
       }
     }
 
     routingKeyControl?.updateValueAndValidity();
     patternControl?.updateValueAndValidity();
+    queueControl?.updateValueAndValidity();
   }
 
   // Modal and CRUD operations
@@ -477,11 +552,12 @@ export class BindingsComponent implements OnInit {
     const vnamespaceValue = this.selectedVNamespace || this.vnamespaceCtrl.value;
     const exchangeValue = this.selectedExchange || this.exchangeCtrl.value;
     const queueValue = this.selectedQueue || this.queueCtrl.value;
+    const bindingType = this.bindingForm.get('bindingType')?.value || 'classic';
     
     const hasValidValues = !!(
       (vnamespaceValue?.Code || vnamespaceValue?.Name) && 
       exchangeValue?.Code && 
-      queueValue?.Code
+      (bindingType === 'dynamic' || queueValue?.Code) // For dynamic, queue is not required
     );
     
     if (this.bindingForm.valid && (isValidData || hasValidValues)) {
@@ -490,13 +566,14 @@ export class BindingsComponent implements OnInit {
       const queue = this.selectedQueue || this.queueCtrl.value;
       
       const bindingData = {
+        code: this.bindingForm.get('code')?.value,
         exchangeCode: exchange?.Code,
-        queueCode: queue?.Code,
+        queueCode: queue?.Code || '', // Can be empty for dynamic bindings
         vnamespace: vnamespace?.Code || vnamespace?.Name, // Usar Name como fallback si Code no existe
         routingKey: this.bindingForm.get('routingKey')?.value || '',
         pattern: this.bindingForm.get('pattern')?.value || '',
         xMatch: this.bindingForm.get('xMatch')?.value || 'all',
-        bindingType: this.bindingForm.get('bindingType')?.value || 'classic',
+        bindingType: bindingType,
         headers: this.showHeaders ? this.getHeadersAsMap() : {}
       };
 
@@ -516,7 +593,11 @@ export class BindingsComponent implements OnInit {
       
       if (!isValidData && !hasValidValues) {
         this.showAlert = true;
-        this.errorMessage = 'Por favor selecciona un VNamespace, Exchange y Queue válidos antes de crear el binding.';
+        if (bindingType === 'classic') {
+          this.errorMessage = 'Por favor selecciona un VNamespace, Exchange y Queue válidos antes de crear el binding.';
+        } else {
+          this.errorMessage = 'Por favor selecciona un VNamespace y Exchange válidos antes de crear el binding dinámico.';
+        }
       }
     }
   }
@@ -525,11 +606,16 @@ export class BindingsComponent implements OnInit {
     // Para VNamespace, usar Code o Name como fallback
     const hasVNamespace = !!(this.selectedVNamespace && (this.selectedVNamespace.Code || this.selectedVNamespace.Name));
     const hasExchange = !!(this.selectedExchange && this.selectedExchange.Code);
-    const hasQueue = !!(this.selectedQueue && this.selectedQueue.Code);
+    const bindingType = this.bindingForm.get('bindingType')?.value;
     
-    const isValid = hasVNamespace && hasExchange && hasQueue;
-    
-    return isValid;
+    // For classic bindings, queue is required. For dynamic bindings, queue should not be specified
+    if (bindingType === 'classic') {
+      const hasQueue = !!(this.selectedQueue && this.selectedQueue.Code);
+      return hasVNamespace && hasExchange && hasQueue;
+    } else {
+      // For dynamic bindings, queue is not required
+      return hasVNamespace && hasExchange;
+    }
   }
 
   loadBindings(cursor: string = '', isPrevious: boolean = false): void {

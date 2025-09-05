@@ -35,6 +35,19 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 		return nil, err
 	}
 
+	// Validate that Code is provided
+	if r.Code == "" {
+		return nil, fmt.Errorf("code is required")
+	}
+
+	// Validate binding type specific requirements
+	if r.BindingType == "classic" && r.QueueCode == "" {
+		return nil, fmt.Errorf("queueCode is required for classic bindings")
+	}
+	if r.BindingType == "dynamic" && r.QueueCode != "" {
+		return nil, fmt.Errorf("queueCode should not be specified for dynamic bindings")
+	}
+
 	// Validate binding type
 	if r.BindingType != "" && !isValidBindingType(r.BindingType) {
 		return nil, fmt.Errorf("invalid binding type: %s. Valid types are: classic, dynamic", r.BindingType)
@@ -59,6 +72,7 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 
 	binding, err := s.BindingBO.CreateBinding(
 		ctx,
+		r.Code,
 		r.QueueCode,
 		r.ExchangeCode,
 		r.Vnamespace,
@@ -78,6 +92,7 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 		Message: "Binding was created",
 		Result: &pb.Binding{
 			Id:           binding.ID,
+			Code:         binding.Code,
 			ExchangeCode: r.ExchangeCode,
 			QueueCode:    r.QueueCode,
 			Vnamespace:   binding.VNamespace,
@@ -154,6 +169,7 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 			for _, e := range bindingsWithObjects.Entities {
 				binding := &pb.Binding{
 					Id:           e.ID,
+					Code:         e.Code,
 					ExchangeCode: e.ExchangeCode,
 					QueueCode:    e.QueueCode,
 					Vnamespace:   e.VNamespace,

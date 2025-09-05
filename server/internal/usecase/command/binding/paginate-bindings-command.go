@@ -72,6 +72,7 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 		for _, binding := range findResult.Entities {
 			bindingWithObjects := models.BindingWithObjects{
 				ID:          binding.ID,
+				Code:        binding.Code,
 				VNamespace:  binding.VNamespace,
 				ExchangeID:  binding.ExchangeID,
 				QueueID:     binding.QueueID,
@@ -101,10 +102,12 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 				}
 			}
 
-			// Obtener la queue
-			if queue, err := queueRepo.GetQueueById(binding.QueueID, now); err == nil && queue != nil {
-				bindingWithObjects.Queue = queue
-				bindingWithObjects.QueueCode = queue.Code
+			// Obtener la queue (solo para bindings classic)
+			if binding.QueueID != "" {
+				if queue, err := queueRepo.GetQueueById(binding.QueueID, now); err == nil && queue != nil {
+					bindingWithObjects.Queue = queue
+					bindingWithObjects.QueueCode = queue.Code
+				}
 			}
 
 			resultWithObjects.Entities = append(resultWithObjects.Entities, bindingWithObjects)
