@@ -284,14 +284,22 @@
           </mat-form-field>
           <div class="form-text">Required: Select the destination queue</div>
         </c-col>
-        <c-col [md]="6" *ngIf="!showQueue">
+        <c-col [md]="6" *ngIf="!showQueue && selectedExchange">
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'direct'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>Dynamic Direct Binding:</strong> Queue will be determined automatically by the queue code.
+          </div>
           <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'topic'">
             <svg cIcon name="cil-info" class="me-2"></svg>
-            <strong>Dynamic Topic Binding:</strong> Queue will be determined automatically using the pattern to match queues. Routing key is ignored.
+            <strong>Dynamic Topic Binding:</strong> Queues will be determined where the code matches the pattern.
           </div>
-          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() !== 'topic'">
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'headers'">
             <svg cIcon name="cil-info" class="me-2"></svg>
-            <strong>Dynamic Binding:</strong> Queue will be determined automatically by code. Routing key and pattern fields are hidden as they are ignored.
+            <strong>Dynamic Headers Binding:</strong> Queues will be determined by queue headers, message headers, and X-Match type.
+          </div>
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'fanout'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>Dynamic Fanout Binding:</strong> Queue will be determined automatically by the queue code.
           </div>
         </c-col>
       </c-row>
