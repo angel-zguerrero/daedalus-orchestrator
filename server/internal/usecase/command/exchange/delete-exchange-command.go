@@ -58,15 +58,21 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
-	// Find and delete all bindings associated with this exchange
-	bindingsResult, err := bindingRepo.GetBindingsByExchange(exchange.ID, now)
-	if err != nil {
-		commandResult.Error = "error retrieving exchange bindings: " + err.Error()
-		return *commandResult
-	}
-
+	// Find and delete all bindings associated with this exchange (with pagination)
 	bindingCount := 0
-	if bindingsResult != nil && len(bindingsResult.Entities) > 0 {
+	cursor := ""
+
+	for {
+		bindingsResult, err := bindingRepo.Find("ExchangeID = "+exchange.ID, 100, cursor, now)
+		if err != nil {
+			commandResult.Error = "error retrieving exchange bindings: " + err.Error()
+			return *commandResult
+		}
+
+		if bindingsResult == nil || len(bindingsResult.Entities) == 0 {
+			break
+		}
+
 		for _, binding := range bindingsResult.Entities {
 			// Delete all routing headers associated with this binding
 			headersResult, err := routingHeadersRepo.GetRoutingHeadersByBinding(binding.ID, now)
@@ -92,6 +98,12 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 				return *commandResult
 			}
 			bindingCount++
+		}
+
+		// Update cursor for next page
+		cursor = bindingsResult.Cursor
+		if cursor == "" {
+			break
 		}
 	}
 

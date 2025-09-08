@@ -60,15 +60,21 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
-	// Find and delete all bindings associated with this queue
-	bindingsResult, err := bindingRepo.GetBindingsByQueue(queue.ID, now)
-	if err != nil {
-		commandResult.Error = "error retrieving queue bindings: " + err.Error()
-		return *commandResult
-	}
-
+	// Find and delete all bindings associated with this queue (with pagination)
 	bindingCount := 0
-	if bindingsResult != nil && len(bindingsResult.Entities) > 0 {
+	cursor := ""
+
+	for {
+		bindingsResult, err := bindingRepo.Find("QueueID = "+queue.ID, 100, cursor, now)
+		if err != nil {
+			commandResult.Error = "error retrieving queue bindings: " + err.Error()
+			return *commandResult
+		}
+
+		if bindingsResult == nil || len(bindingsResult.Entities) == 0 {
+			break
+		}
+
 		for _, binding := range bindingsResult.Entities {
 			// Delete all routing headers associated with this binding
 			headersResult, err := routingHeadersRepo.GetRoutingHeadersByBinding(binding.ID, now)
@@ -94,6 +100,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 				return *commandResult
 			}
 			bindingCount++
+		}
+
+		// Update cursor for next page
+		cursor = bindingsResult.Cursor
+		if cursor == "" {
+			break
 		}
 	}
 
