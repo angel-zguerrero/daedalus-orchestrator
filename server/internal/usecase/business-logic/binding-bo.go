@@ -167,7 +167,7 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, exchangeCode, queueCode,
 	return nil
 }
 
-func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeObjects bool, cf, cfs string) (interface{}, error) {
+func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeObjects bool, cf, cfs string) (db.FindResult[models.Binding], error) {
 	paginateBindingsCommand := &binding_command.PaginateBindingsCommand{
 		Query:          q,
 		Cursor:         cursor,
@@ -190,9 +190,6 @@ func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, p
 	result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Msg("Paginate bindings command failed")
-		if includeObjects {
-			return db.FindResult[models.BindingWithObjects]{}, errors.New("Paginate bindings failed: " + err.Error())
-		}
 		return db.FindResult[models.Binding]{}, errors.New("Paginate bindings failed: " + err.Error())
 	}
 
@@ -201,31 +198,18 @@ func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, p
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
 		bo.Config.Logger.Error().Err(err).Msg("Paginate bindings command failed")
-		if includeObjects {
-			return db.FindResult[models.BindingWithObjects]{}, errors.New("Paginate bindings command failed")
-		}
 		return db.FindResult[models.Binding]{}, errors.New("Paginate bindings command failed")
 	}
 
 	if parsedResult.Error != "" {
 		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate bindings command failed")
-		if includeObjects {
-			return db.FindResult[models.BindingWithObjects]{}, errors.New("Paginate bindings command failed")
-		}
 		return db.FindResult[models.Binding]{}, errors.New("Paginate bindings command failed")
 	}
 
-	if includeObjects {
-		findResult := parsedResult.Result.(db.FindResult[models.BindingWithObjects])
-		if findResult.Entities == nil {
-			findResult.Entities = []models.BindingWithObjects{}
-		}
-		return findResult, nil
-	} else {
-		findResult := parsedResult.Result.(db.FindResult[models.Binding])
-		if findResult.Entities == nil {
-			findResult.Entities = []models.Binding{}
-		}
-		return findResult, nil
+	findResult := parsedResult.Result.(db.FindResult[models.Binding])
+	if findResult.Entities == nil {
+		findResult.Entities = []models.Binding{}
 	}
+
+	return findResult, nil
 }

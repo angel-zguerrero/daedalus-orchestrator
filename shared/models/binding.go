@@ -32,36 +32,15 @@ type Binding struct {
 
 	BindingType BindingType
 
+	// Virtual fields - not stored in database
+	ExchangeCode string            `orm:"virtual"`
+	Exchange     *Exchange         `orm:"virtual"`
+	QueueCode    string            `orm:"virtual"`
+	Queue        *Queue            `orm:"virtual"`
+	Headers      map[string]string `orm:"virtual"` // Headers for routing, used only for Headers exchange type
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
-}
-
-// BindingWithObjects representa un binding con los objetos Exchange y Queue incluidos
-type BindingWithObjects struct {
-	ID string `json:"id"`
-
-	VNamespace string `json:"vnamespace"`
-	Code       string `json:"code"`
-
-	ExchangeID   string    `json:"exchangeId"`
-	ExchangeCode string    `json:"exchangeCode"`
-	Exchange     *Exchange `json:"exchange,omitempty"`
-
-	QueueID   string `json:"queueId"`
-	QueueCode string `json:"queueCode"`
-	Queue     *Queue `json:"queue,omitempty"`
-
-	RoutingKey string `json:"routingKey"` //used only for direct exchanges
-	Pattern    string `json:"pattern"`    //used only for topic exchanges
-
-	XMatch XMatchType `json:"xMatch"` //used for headers exchanges
-
-	BindingType BindingType `json:"bindingType"`
-
-	Headers map[string]string `json:"headers,omitempty"` // Headers for routing, used only for Headers exchange type
-
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 func (Binding) TableName() string {

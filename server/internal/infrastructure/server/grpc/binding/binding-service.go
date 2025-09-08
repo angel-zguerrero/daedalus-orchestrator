@@ -163,98 +163,65 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 
 	rBindings := []*pb.Binding{}
 
-	if r.IncludeObjects {
-		// Cast to BindingWithObjects result
-		if bindingsWithObjects, ok := findResult.(db.FindResult[models.BindingWithObjects]); ok {
-			for _, e := range bindingsWithObjects.Entities {
-				binding := &pb.Binding{
-					Id:           e.ID,
-					Code:         e.Code,
-					ExchangeCode: e.ExchangeCode,
-					QueueCode:    e.QueueCode,
-					Vnamespace:   e.VNamespace,
-					RoutingKey:   e.RoutingKey,
-					Pattern:      e.Pattern,
-					XMatch:       string(e.XMatch),
-					BindingType:  string(e.BindingType),
-					CreatedAt:    e.CreatedAt.Format(time.RFC3339),
-					UpdatedAt:    e.UpdatedAt.Format(time.RFC3339),
-				}
-
-				// Add exchange if available
-				if e.Exchange != nil {
-					binding.Exchange = &pb.Exchange{
-						Id:         e.Exchange.ID,
-						Code:       e.Exchange.Code,
-						Name:       e.Exchange.Name,
-						Type:       string(e.Exchange.Type),
-						Vnamespace: e.Exchange.VNamespace,
-						CreatedAt:  e.Exchange.CreatedAt.Format(time.RFC3339),
-						UpdatedAt:  e.Exchange.UpdatedAt.Format(time.RFC3339),
-					}
-				}
-
-				// Add queue if available
-				if e.Queue != nil {
-					binding.Queue = &pb.Queue{
-						Id:            e.Queue.ID,
-						Code:          e.Queue.Code,
-						Name:          e.Queue.Name,
-						Vnamespace:    e.Queue.VNamespace,
-						State:         string(e.Queue.State),
-						Type:          string(e.Queue.Type),
-						MessagesCount: int32(e.Queue.MessagesCount),
-						CreatedAt:     e.Queue.CreatedAt.Format(time.RFC3339),
-						UpdatedAt:     e.Queue.UpdatedAt.Format(time.RFC3339),
-					}
-				}
-
-				// Add headers if available
-				if e.Headers != nil {
-					binding.Headers = e.Headers
-				}
-
-				rBindings = append(rBindings, binding)
-			}
-
-			return &pb.GetBindingsResponse{
-				Message: "Binding list",
-				Result: &pb.BindingFindResult{
-					Entities: rBindings,
-					Cursor:   bindingsWithObjects.Cursor,
-				},
-			}, nil
+	// Use the simplified Binding model with virtual fields
+	for _, e := range findResult.Entities {
+		binding := &pb.Binding{
+			Id:           e.ID,
+			Code:         e.Code,
+			ExchangeCode: e.ExchangeCode,
+			QueueCode:    e.QueueCode,
+			Vnamespace:   e.VNamespace,
+			RoutingKey:   e.RoutingKey,
+			Pattern:      e.Pattern,
+			XMatch:       string(e.XMatch),
+			BindingType:  string(e.BindingType),
+			CreatedAt:    e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    e.UpdatedAt.Format(time.RFC3339),
 		}
-	} else {
-		// Cast to regular Binding result
-		if bindings, ok := findResult.(db.FindResult[models.Binding]); ok {
-			for _, e := range bindings.Entities {
-				binding := &pb.Binding{
-					Id:           e.ID,
-					ExchangeCode: "", // Will need to resolve from ExchangeID if needed
-					QueueCode:    "", // Will need to resolve from QueueID if needed
-					Vnamespace:   e.VNamespace,
-					RoutingKey:   e.RoutingKey,
-					Pattern:      e.Pattern,
-					XMatch:       string(e.XMatch),
-					BindingType:  string(e.BindingType),
-					CreatedAt:    e.CreatedAt.Format(time.RFC3339),
-					UpdatedAt:    e.UpdatedAt.Format(time.RFC3339),
-				}
-				rBindings = append(rBindings, binding)
-			}
 
-			return &pb.GetBindingsResponse{
-				Message: "Binding list",
-				Result: &pb.BindingFindResult{
-					Entities: rBindings,
-					Cursor:   bindings.Cursor,
-				},
-			}, nil
+		// Add exchange if available and included
+		if r.IncludeObjects && e.Exchange != nil {
+			binding.Exchange = &pb.Exchange{
+				Id:         e.Exchange.ID,
+				Code:       e.Exchange.Code,
+				Name:       e.Exchange.Name,
+				Type:       string(e.Exchange.Type),
+				Vnamespace: e.Exchange.VNamespace,
+				CreatedAt:  e.Exchange.CreatedAt.Format(time.RFC3339),
+				UpdatedAt:  e.Exchange.UpdatedAt.Format(time.RFC3339),
+			}
 		}
+
+		// Add queue if available and included
+		if r.IncludeObjects && e.Queue != nil {
+			binding.Queue = &pb.Queue{
+				Id:            e.Queue.ID,
+				Code:          e.Queue.Code,
+				Name:          e.Queue.Name,
+				Vnamespace:    e.Queue.VNamespace,
+				State:         string(e.Queue.State),
+				Type:          string(e.Queue.Type),
+				MessagesCount: int32(e.Queue.MessagesCount),
+				CreatedAt:     e.Queue.CreatedAt.Format(time.RFC3339),
+				UpdatedAt:     e.Queue.UpdatedAt.Format(time.RFC3339),
+			}
+		}
+
+		// Add headers if available and included
+		if r.IncludeObjects && e.Headers != nil {
+			binding.Headers = e.Headers
+		}
+
+		rBindings = append(rBindings, binding)
 	}
 
-	return nil, fmt.Errorf("unexpected result type")
+	return &pb.GetBindingsResponse{
+		Message: "Binding list",
+		Result: &pb.BindingFindResult{
+			Entities: rBindings,
+			Cursor:   findResult.Cursor,
+		},
+	}, nil
 }
 
 func (s *BindingService) DeleteBinding(ctx context.Context, r *pb.DeleteBindingRequest) (*pb.DeleteBindingResponse, error) {

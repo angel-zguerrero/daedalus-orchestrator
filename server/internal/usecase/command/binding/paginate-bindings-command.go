@@ -11,7 +11,6 @@ import (
 func init() {
 	gob.Register(PaginateBindingsCommand{})
 	gob.Register(db.FindResult[models.Binding]{})
-	gob.Register(db.FindResult[models.BindingWithObjects]{})
 }
 
 type PaginateBindingsCommand struct {
@@ -42,12 +41,6 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 	}
 
 	if cmd.IncludeObjects {
-		// Convertir a BindingWithObjects y agregar los objetos Exchange y Queue
-		resultWithObjects := &db.FindResult[models.BindingWithObjects]{
-			Cursor:   findResult.Cursor,
-			Entities: make([]models.BindingWithObjects, 0, len(findResult.Entities)),
-		}
-
 		// Obtener repositorios para exchanges y queues
 		exchangeRepo, err := db.NewExchangeRepository(uow, idFactory, cmd.CF, cmd.CFS)
 		if err != nil {
@@ -68,26 +61,14 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 			return *commandResult
 		}
 
-		// Convertir cada binding y añadir los objetos
-		for _, binding := range findResult.Entities {
-			bindingWithObjects := models.BindingWithObjects{
-				ID:          binding.ID,
-				Code:        binding.Code,
-				VNamespace:  binding.VNamespace,
-				ExchangeID:  binding.ExchangeID,
-				QueueID:     binding.QueueID,
-				RoutingKey:  binding.RoutingKey,
-				Pattern:     binding.Pattern,
-				XMatch:      binding.XMatch,
-				BindingType: binding.BindingType,
-				CreatedAt:   binding.CreatedAt,
-				UpdatedAt:   binding.UpdatedAt,
-			}
+		// Poblar los campos virtuales de cada binding
+		for i := range findResult.Entities {
+			binding := &findResult.Entities[i]
 
 			// Obtener el exchange
 			if exchange, err := exchangeRepo.GetExchangeById(binding.ExchangeID, now); err == nil && exchange != nil {
-				bindingWithObjects.Exchange = exchange
-				bindingWithObjects.ExchangeCode = exchange.Code
+				binding.Exchange = exchange
+				binding.ExchangeCode = exchange.Code
 
 				// Si el exchange es del tipo Headers, obtener los headers del binding
 				if exchange.Type == models.Headers {
@@ -97,7 +78,7 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 						for _, header := range headersResult.Entities {
 							headers[header.Key] = header.Value
 						}
-						bindingWithObjects.Headers = headers
+						binding.Headers = headers
 					}
 				}
 			}
@@ -105,18 +86,13 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 			// Obtener la queue (solo para bindings classic)
 			if binding.QueueID != "" {
 				if queue, err := queueRepo.GetQueueById(binding.QueueID, now); err == nil && queue != nil {
-					bindingWithObjects.Queue = queue
-					bindingWithObjects.QueueCode = queue.Code
+					binding.Queue = queue
+					binding.QueueCode = queue.Code
 				}
 			}
-
-			resultWithObjects.Entities = append(resultWithObjects.Entities, bindingWithObjects)
 		}
-
-		commandResult.Result = *resultWithObjects
-	} else {
-		commandResult.Result = *findResult
 	}
 
+	commandResult.Result = *findResult
 	return *commandResult
 }
