@@ -827,42 +827,37 @@
         </div>
 
         <!-- Headers Section -->
-        <div class="mb-3" *ngIf="selectedQueue?.Headers && getHeadersArray(selectedQueue.Headers).length > 0">
+        <div class="mb-3">
           <label class="form-label fw-bold">
             <svg cIcon name="cil-tags" class="me-2"></svg>
             Queue Headers
           </label>
-          <div class="p-3 bg-dark rounded">
-            <div class="table-responsive">
-              <table cTable class="table-sm mb-0">
-                <thead>
-                  <tr>
-                    <th>Key</th>
-                    <th>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let header of getHeadersArray(selectedQueue.Headers)">
-                    <td><code>{{ header.key }}</code></td>
-                    <td>{{ header.value }}</td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="form-text mb-2">Headers associated with this queue for routing and metadata</div>
+          
+          <div *ngIf="selectedQueue?.Headers && getHeadersArray(selectedQueue.Headers).length > 0; else noQueueHeaders" class="border rounded p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="mb-0">Queue Headers ({{ getHeadersArray(selectedQueue.Headers).length }})</h6>
+            </div>
+            
+            <div class="row">
+              <div *ngFor="let header of getHeadersArray(selectedQueue.Headers)" class="col-md-6 mb-2">
+                <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
+                  <div class="d-flex flex-column flex-grow-1">
+                    <code class="text-info mb-1">{{ header.key }}</code>
+                    <code class="text-light">{{ header.value }}</code>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="form-text">Custom headers associated with this queue</div>
-        </div>
-        
-        <div class="mb-3" *ngIf="!selectedQueue?.Headers || getHeadersArray(selectedQueue.Headers || {}).length === 0">
-          <label class="form-label fw-bold">
-            <svg cIcon name="cil-tags" class="me-2"></svg>
-            Queue Headers
-          </label>
-          <div class="p-3 bg-dark rounded text-muted text-center">
-            <svg cIcon name="cil-tags" size="2xl" class="mb-2 opacity-50"></svg>
-            <div>No headers configured for this queue</div>
-          </div>
-          <div class="form-text">Custom headers can be configured when creating or editing the queue</div>
+          
+          <ng-template #noQueueHeaders>
+            <div class="border rounded p-3 text-center text-muted">
+              <svg cIcon name="cil-tags" size="2xl" class="mb-2 opacity-50"></svg>
+              <div>No headers configured for this queue</div>
+              <small class="mt-1 d-block">Custom headers can be configured when creating or editing the queue</small>
+            </div>
+          </ng-template>
         </div>
       </div>
     </div>
