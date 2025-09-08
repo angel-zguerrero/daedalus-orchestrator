@@ -146,6 +146,19 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
+	// For classic bindings, check if there's already a binding between this exchange and queue
+	if cmd.BindingType == models.BindingTypeClassic && queue != nil {
+		existingClassicBinding, err := bindingRepo.GetBindingByExchangeAndQueue(exchange.ID, queue.ID, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		if existingClassicBinding != nil && existingClassicBinding.Code != cmd.Code {
+			commandResult.Error = "A classic binding between exchange '" + cmd.ExchangeCode + "' and queue '" + cmd.QueueCode + "' already exists with Code '" + existingClassicBinding.Code + "'"
+			return *commandResult
+		}
+	}
+
 	// Look for existing binding by Code and VNamespace
 	existing, err := bindingRepo.GetBindingByCode(cmd.Code, cmd.VNamespace, now)
 	if err != nil {

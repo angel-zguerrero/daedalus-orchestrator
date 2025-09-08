@@ -22,8 +22,8 @@ type Binding struct {
 	VNamespace string `orm:"unique-compound:1"`
 	Code       string `orm:"unique-compound:1"`
 
-	ExchangeID string `orm:"unique-compound:0"`
-	QueueID    string `orm:"unique-compound:0"`
+	ExchangeID string
+	QueueID    string
 
 	RoutingKey string //used only for direct exchanges
 	Pattern    string //used only for topic exchanges
