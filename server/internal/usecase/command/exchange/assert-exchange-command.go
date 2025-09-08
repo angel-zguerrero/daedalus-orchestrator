@@ -121,7 +121,7 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 	// Update tenant summary with the total count of new exchanges created
 	if newExchangesCount > 0 {
-		err = tenantSummaryRepo.IncreaseExchangeCount(cmd.CFS, newExchangesCount, now)
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, newExchangesCount, 0, 0, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

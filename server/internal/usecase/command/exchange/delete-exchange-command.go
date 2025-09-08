@@ -107,20 +107,12 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
-	// Update tenant summary
-	err = tenantSummaryRepo.DecreaseExchangeCount(cmd.CFS, 1, now)
+	// Update tenant summary with a single operation
+	// Decrease exchange count by 1 and binding count by bindingCount
+	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, -1, 0, -bindingCount, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
-	}
-
-	// Decrease binding count if we deleted any bindings
-	if bindingCount > 0 {
-		err = tenantSummaryRepo.DecreaseBindingCount(cmd.CFS, bindingCount, now)
-		if err != nil {
-			commandResult.Error = err.Error()
-			return *commandResult
-		}
 	}
 
 	commandResult.Result = true

@@ -55,9 +55,9 @@ func (r *TenantSummaryRepository) PaginateTenantUpdatedAtFrom(lastUpdatedAt time
 	return r.Find(filter, pageSize, cursor, now)
 }
 
-// IncreaseMessageCount increases the MessageCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with MessageCount = amount
-func (r *TenantSummaryRepository) IncreaseMessageCount(tenantId string, amount int, now time.Time) error {
+// UpdateCounters allows updating multiple counters in a single operation
+// Positive values increase counters, negative values decrease them
+func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange, exchangesChange, queuesChange, bindingsChange int, now time.Time) error {
 	summary, err := r.GetTenantSummaryById(tenantId, now)
 	if err != nil {
 		return err
@@ -67,218 +67,29 @@ func (r *TenantSummaryRepository) IncreaseMessageCount(tenantId string, amount i
 		// If tenant doesn't exist, create new record
 		newSummary := &models.TenantSummary{
 			ID:             tenantId,
-			MessagesCount:  amount,
-			ExchangesCount: 0,
-			QueuesCount:    0,
-			BindingsCount:  0,
+			MessagesCount:  max(0, messagesChange),
+			ExchangesCount: max(0, exchangesChange),
+			QueuesCount:    max(0, queuesChange),
+			BindingsCount:  max(0, bindingsChange),
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
 	}
 
-	// Increase existing count
-	summary.MessagesCount += amount
+	// Update existing counts (ensure they don't go below 0)
+	summary.MessagesCount = max(0, summary.MessagesCount+messagesChange)
+	summary.ExchangesCount = max(0, summary.ExchangesCount+exchangesChange)
+	summary.QueuesCount = max(0, summary.QueuesCount+queuesChange)
+	summary.BindingsCount = max(0, summary.BindingsCount+bindingsChange)
+
 	_, err = r.UpdateTenantSummary(summary, now)
 	return err
 }
 
-// DecreaseMessageCount decreases the MessageCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with MessageCount = 0
-func (r *TenantSummaryRepository) DecreaseMessageCount(tenantId string, amount int, now time.Time) error {
-	summary, err := r.GetTenantSummaryById(tenantId, now)
-	if err != nil {
-		return err
+// Helper function to get the maximum of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
 	}
-
-	if summary == nil {
-		// If tenant doesn't exist, create new record with 0
-		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  0,
-			ExchangesCount: 0,
-			QueuesCount:    0,
-			BindingsCount:  0,
-		}
-		_, err = r.CreateTenantSummary(newSummary, now)
-		return err
-	}
-
-	// Decrease existing count (ensure it doesn't go below 0)
-	summary.MessagesCount -= amount
-	if summary.MessagesCount < 0 {
-		summary.MessagesCount = 0
-	}
-	_, err = r.UpdateTenantSummary(summary, now)
-	return err
-}
-
-// IncreaseExchangeCount increases the ExchangeCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with ExchangeCount = amount
-func (r *TenantSummaryRepository) IncreaseExchangeCount(tenantId string, amount int, now time.Time) error {
-	summary, err := r.GetTenantSummaryById(tenantId, now)
-	if err != nil {
-		return err
-	}
-
-	if summary == nil {
-		// If tenant doesn't exist, create new record
-		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  0,
-			ExchangesCount: amount,
-			QueuesCount:    0,
-			BindingsCount:  0,
-		}
-		_, err = r.CreateTenantSummary(newSummary, now)
-		return err
-	}
-
-	// Increase existing count
-	summary.ExchangesCount += amount
-	_, err = r.UpdateTenantSummary(summary, now)
-	return err
-}
-
-// DecreaseExchangeCount decreases the ExchangeCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with ExchangeCount = 0
-func (r *TenantSummaryRepository) DecreaseExchangeCount(tenantId string, amount int, now time.Time) error {
-	summary, err := r.GetTenantSummaryById(tenantId, now)
-	if err != nil {
-		return err
-	}
-
-	if summary == nil {
-		// If tenant doesn't exist, create new record with 0
-		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  0,
-			ExchangesCount: 0,
-			QueuesCount:    0,
-			BindingsCount:  0,
-		}
-		_, err = r.CreateTenantSummary(newSummary, now)
-		return err
-	}
-
-	// Decrease existing count (ensure it doesn't go below 0)
-	summary.ExchangesCount -= amount
-	if summary.ExchangesCount < 0 {
-		summary.ExchangesCount = 0
-	}
-	_, err = r.UpdateTenantSummary(summary, now)
-	return err
-}
-
-// IncreaseQueueCount increases the QueueCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with QueueCount = amount
-func (r *TenantSummaryRepository) IncreaseQueueCount(tenantId string, amount int, now time.Time) error {
-	summary, err := r.GetTenantSummaryById(tenantId, now)
-	if err != nil {
-		return err
-	}
-
-	if summary == nil {
-		// If tenant doesn't exist, create new record
-		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  0,
-			ExchangesCount: 0,
-			QueuesCount:    amount,
-			BindingsCount:  0,
-		}
-		_, err = r.CreateTenantSummary(newSummary, now)
-		return err
-	}
-
-	// Increase existing count
-	summary.QueuesCount += amount
-	_, err = r.UpdateTenantSummary(summary, now)
-	return err
-}
-
-// DecreaseQueueCount decreases the QueueCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with QueueCount = 0
-func (r *TenantSummaryRepository) DecreaseQueueCount(tenantId string, amount int, now time.Time) error {
-	summary, err := r.GetTenantSummaryById(tenantId, now)
-	if err != nil {
-		return err
-	}
-
-	if summary == nil {
-		// If tenant doesn't exist, create new record with 0
-		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  0,
-			ExchangesCount: 0,
-			QueuesCount:    0,
-			BindingsCount:  0,
-		}
-		_, err = r.CreateTenantSummary(newSummary, now)
-		return err
-	}
-
-	// Decrease existing count (ensure it doesn't go below 0)
-	summary.QueuesCount -= amount
-	if summary.QueuesCount < 0 {
-		summary.QueuesCount = 0
-	}
-	_, err = r.UpdateTenantSummary(summary, now)
-	return err
-}
-
-// IncreaseBindingCount increases the BindingCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with BindingCount = amount
-func (r *TenantSummaryRepository) IncreaseBindingCount(tenantId string, amount int, now time.Time) error {
-	summary, err := r.GetTenantSummaryById(tenantId, now)
-	if err != nil {
-		return err
-	}
-
-	if summary == nil {
-		// If tenant doesn't exist, create new record
-		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  0,
-			ExchangesCount: 0,
-			QueuesCount:    0,
-			BindingsCount:  amount,
-		}
-		_, err = r.CreateTenantSummary(newSummary, now)
-		return err
-	}
-
-	// Increase existing count
-	summary.BindingsCount += amount
-	_, err = r.UpdateTenantSummary(summary, now)
-	return err
-}
-
-// DecreaseBindingCount decreases the BindingCount for a tenant by the specified amount
-// If the tenant doesn't exist, creates a new record with BindingCount = 0
-func (r *TenantSummaryRepository) DecreaseBindingCount(tenantId string, amount int, now time.Time) error {
-	summary, err := r.GetTenantSummaryById(tenantId, now)
-	if err != nil {
-		return err
-	}
-
-	if summary == nil {
-		// If tenant doesn't exist, create new record with 0
-		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  0,
-			ExchangesCount: 0,
-			QueuesCount:    0,
-			BindingsCount:  0,
-		}
-		_, err = r.CreateTenantSummary(newSummary, now)
-		return err
-	}
-
-	// Decrease existing count (ensure it doesn't go below 0)
-	summary.BindingsCount -= amount
-	if summary.BindingsCount < 0 {
-		summary.BindingsCount = 0
-	}
-	_, err = r.UpdateTenantSummary(summary, now)
-	return err
+	return b
 }

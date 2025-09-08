@@ -138,7 +138,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 	// Update tenant summary with the total count of new queues created
 	if newQueuesCount > 0 {
-		err = tenantSummaryRepo.IncreaseQueueCount(cmd.CFS, newQueuesCount, now)
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, 0, newQueuesCount, 0, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

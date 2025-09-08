@@ -126,20 +126,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
-	// Update tenant summary
-	err = tenantSummaryRepo.DecreaseQueueCount(cmd.CFS, 1, now)
+	// Update tenant summary with a single operation
+	// Decrease queue count by 1 and binding count by bindingCount
+	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, 0, -1, -bindingCount, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
-	}
-
-	// Decrease binding count if we deleted any bindings
-	if bindingCount > 0 {
-		err = tenantSummaryRepo.DecreaseBindingCount(cmd.CFS, bindingCount, now)
-		if err != nil {
-			commandResult.Error = err.Error()
-			return *commandResult
-		}
 	}
 
 	commandResult.Result = true

@@ -83,7 +83,7 @@ func (cmd *DeleteBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	}
 
 	// Update tenant summary
-	err = tenantSummaryRepo.DecreaseBindingCount(cmd.CFS, 1, now)
+	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, 0, 0, -1, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
