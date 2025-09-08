@@ -57,6 +57,7 @@
       <table cTable class="mt-4" [hover]="true">
         <thead>
           <tr>
+            <th>Code</th>
             <th>Exchange</th>
             <th>Queue</th>
             <th>VNamespace</th>
@@ -69,6 +70,9 @@
         </thead>
         <tbody>
           <tr *ngFor="let binding of bindings" class="align-middle">
+            <td class="text-truncate" style="max-width: 200px;" title="{{ binding.Code || binding.code || '-' }}">
+              <code>{{ binding.Code || binding.code || '-' }}</code>
+            </td>
             <td class="text-truncate" style="max-width: 150px;">
               <div *ngIf="binding.Exchange || binding.exchange; else simpleExchangeCode">
                 <div class="fw-bold" title="{{ (binding.Exchange || binding.exchange)?.Code }}">
@@ -128,6 +132,7 @@
                 {{ binding.BindingType || binding.bindingType || 'classic' }}
               </c-badge>
             </td>
+            
             <td>
               <div class="btn-group" role="group">
                 <button 
@@ -150,7 +155,7 @@
             </td>
           </tr>
           <tr *ngIf="bindings.length === 0">
-            <td colspan="8" class="text-center py-4">
+            <td colspan="9" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No bindings found</h6>
@@ -467,6 +472,9 @@
             <svg cIcon name="cil-arrow-right" class="mx-2"></svg>
             <strong>{{ selectedBinding.queueCode }}</strong>
           </p>
+          <p class="mb-2">
+            <strong>Code:</strong> <code>{{ selectedBinding.Code || selectedBinding.code }}</code>
+          </p>
           <p class="small mb-2">
             <span class="badge" [style.background-color]="getExchangeTypeColor(selectedBinding.virtualExchange?.exchangeType)">
               {{ selectedBinding.virtualExchange?.exchangeType | titlecase }} Exchange
@@ -557,9 +565,32 @@
         </div>
         <div class="col-md-6">
           <div class="mb-3">
+            <label class="form-label fw-bold">Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code class="text-white">{{ selectedBinding.Code || selectedBinding.code || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Binding unique code identifier</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
             <label class="form-label fw-bold">Virtual Namespace</label>
             <div class="p-2 bg-dark rounded">{{ getVNamespace(selectedBinding) || '-' }}</div>
             <div class="form-text">Virtual namespace for logical grouping</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Binding Type</label>
+            <div class="p-2 rounded">
+              <c-badge [color]="getBindingTypeColor(selectedBinding.BindingType || selectedBinding.bindingType)" shape="rounded-pill">
+                {{ getBindingTypeDisplayName(selectedBinding.BindingType || selectedBinding.bindingType) }}
+              </c-badge>
+            </div>
+            <div class="form-text">Type of binding (classic or dynamic)</div>
           </div>
         </div>
       </div>
