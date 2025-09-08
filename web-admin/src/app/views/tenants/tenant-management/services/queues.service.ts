@@ -10,10 +10,13 @@ export class QueuesService {
 
   constructor(private http: HttpClient) { }
 
-  getQueues(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = ''): Observable<any> {
+  getQueues(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = '', includeHeaders: boolean = false): Observable<any> {
     let params = `cursor=${cursor}&pageSize=${pageSize}&q=${q}`;
     if (vnamespace) {
       params += `&vnamespace=${vnamespace}`;
+    }
+    if (includeHeaders) {
+      params += `&includeHeaders=true`;
     }
     return this.http.get(`${this.apiUrl}/${tenantId}/queue?${params}`);
   }

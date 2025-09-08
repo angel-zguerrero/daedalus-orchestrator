@@ -497,14 +497,14 @@
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">ID</label>
-            <div class="p-2 bg-dark rounded">{{ selectedBinding?.ID || selectedBinding?.id || 'N/A' }}</div>
+            <div class="p-2 bg-dark rounded">{{ selectedBinding.ID || selectedBinding.id || 'N/A' }}</div>
             <div class="form-text">Unique system identifier</div>
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">Virtual Namespace</label>
-            <div class="p-2 bg-dark rounded">{{ selectedBinding?.vnamespace || '-' }}</div>
+            <div class="p-2 bg-dark rounded">{{ selectedBinding.vnamespace || '-' }}</div>
             <div class="form-text">Virtual namespace for logical grouping</div>
           </div>
         </div>
@@ -517,7 +517,7 @@
           <div class="mb-3">
             <label class="form-label fw-bold">Routing Key</label>
             <div class="p-2 bg-dark rounded">
-              <code>{{ selectedBinding?.RoutingKey || selectedBinding?.routingKey || '-' }}</code>
+              <code>{{ selectedBinding.RoutingKey || selectedBinding.routingKey || '-' }}</code>
             </div>
             <div class="form-text">Used for direct exchange routing</div>
           </div>
@@ -528,7 +528,7 @@
           <div class="mb-3">
             <label class="form-label fw-bold">Pattern</label>
             <div class="p-2 bg-dark rounded">
-              <code>{{ selectedBinding?.Pattern || selectedBinding?.pattern || '-' }}</code>
+              <code>{{ selectedBinding.Pattern || selectedBinding.pattern || '-' }}</code>
             </div>
             <div class="form-text">Used for topic exchange pattern matching</div>
           </div>
@@ -539,8 +539,8 @@
           <div class="mb-3">
             <label class="form-label fw-bold">X-Match Type</label>
             <div class="p-2 bg-dark rounded">
-              <c-badge [color]="getXMatchColor(selectedBinding?.XMatch || selectedBinding?.xMatch)" shape="rounded-pill">
-                {{ selectedBinding?.XMatch || selectedBinding?.xMatch || 'all' }}
+              <c-badge [color]="getXMatchColor(selectedBinding.XMatch || selectedBinding.xMatch)" shape="rounded-pill">
+                {{ selectedBinding.XMatch || selectedBinding.xMatch || 'all' }}
               </c-badge>
             </div>
             <div class="form-text">Headers exchange matching strategy</div>
@@ -552,8 +552,8 @@
           <div class="mb-3">
             <label class="form-label fw-bold">Binding Type</label>
             <div class="p-2 bg-dark rounded">
-              <c-badge [color]="getBindingTypeColor(selectedBinding?.BindingType || selectedBinding?.bindingType)" shape="rounded-pill">
-                {{ selectedBinding?.BindingType || selectedBinding?.bindingType || 'classic' }}
+              <c-badge [color]="getBindingTypeColor(selectedBinding.BindingType || selectedBinding.bindingType)" shape="rounded-pill">
+                {{ selectedBinding.BindingType || selectedBinding.bindingType || 'classic' }}
               </c-badge>
             </div>
             <div class="form-text">Type of binding behavior</div>
@@ -562,7 +562,7 @@
       </div>
 
       <!-- Dynamic Binding Explanation - shown for dynamic bindings -->
-      <div *ngIf="(selectedBinding?.BindingType || selectedBinding?.bindingType) === 'dynamic'" class="mb-3">
+      <div *ngIf="(selectedBinding.BindingType || selectedBinding.bindingType) === 'dynamic'" class="mb-3">
         <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'direct'">
           <svg cIcon name="cil-info" class="me-2"></svg>
           <strong>Dynamic Direct Binding:</strong> Queue is determined automatically by the queue code.
@@ -592,8 +592,8 @@
         <div *ngIf="getSelectedBindingHeaders().length > 0; else noHeaders" class="border rounded p-3">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h6 class="mb-0">Routing Headers ({{ getSelectedBindingHeaders().length }})</h6>
-            <c-badge [color]="getXMatchColor(selectedBinding?.XMatch || selectedBinding?.xMatch)" shape="rounded-pill">
-              X-Match: {{ selectedBinding?.XMatch || selectedBinding?.xMatch || 'all' }}
+            <c-badge [color]="getXMatchColor(selectedBinding.XMatch || selectedBinding.xMatch)" shape="rounded-pill">
+              X-Match: {{ selectedBinding.XMatch || selectedBinding.xMatch || 'all' }}
             </c-badge>
           </div>
           
@@ -620,7 +620,7 @@
     </div>
 
     <!-- Exchange Information Section -->
-    <div *ngIf="selectedBinding?.Exchange || selectedBinding?.exchange" class="mb-4">
+    <div *ngIf="selectedBinding.Exchange || selectedBinding.exchange" class="mb-4">
       <h6 class="mb-3">
         <svg cIcon name="cil-share" class="me-2"></svg>
         Exchange Information
@@ -630,7 +630,7 @@
           <div class="mb-3">
             <label class="form-label fw-bold">Exchange Code</label>
             <div class="p-2 bg-dark rounded">
-              <code>{{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Code || 'N/A' }}</code>
+              <code>{{ (selectedBinding.Exchange || selectedBinding.exchange)?.Code || 'N/A' }}</code>
             </div>
             <div class="form-text">Exchange identifier</div>
           </div>
@@ -638,7 +638,7 @@
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">Exchange Name</label>
-            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Name || 'N/A' }}</div>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.Exchange || selectedBinding.exchange)?.Name || 'N/A' }}</div>
             <div class="form-text">Exchange display name</div>
           </div>
         </div>
@@ -649,7 +649,7 @@
             <label class="form-label fw-bold">Exchange Type</label>
             <div class="p-2 bg-dark rounded">
               <c-badge color="info" shape="rounded-pill" class="me-2">
-                {{ (selectedBinding?.Exchange || selectedBinding?.exchange)?.Type || 'N/A' }}
+                {{ (selectedBinding.Exchange || selectedBinding.exchange)?.Type || 'N/A' }}
               </c-badge>
               <span class="text-muted">{{ getSelectedBindingExchangeTypeDisplayName() }}</span>
             </div>
@@ -660,7 +660,7 @@
     </div>
 
     <!-- Queue Information Section -->
-    <div *ngIf="selectedBinding?.Queue || selectedBinding?.queue" class="mb-4">
+    <div *ngIf="selectedBinding.Queue || selectedBinding.queue" class="mb-4">
       <h6 class="mb-3">
         <svg cIcon name="cil-list" class="me-2"></svg>
         Queue Information
@@ -670,7 +670,7 @@
           <div class="mb-3">
             <label class="form-label fw-bold">Queue Code</label>
             <div class="p-2 bg-dark rounded">
-              <code>{{ (selectedBinding?.Queue || selectedBinding?.queue)?.Code || 'N/A' }}</code>
+              <code>{{ (selectedBinding.Queue || selectedBinding.queue)?.Code || 'N/A' }}</code>
             </div>
             <div class="form-text">Queue identifier</div>
           </div>
@@ -678,7 +678,7 @@
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">Queue Name</label>
-            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.Queue || selectedBinding?.queue)?.Name || 'N/A' }}</div>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.Queue || selectedBinding.queue)?.Name || 'N/A' }}</div>
             <div class="form-text">Queue display name</div>
           </div>
         </div>
@@ -695,14 +695,14 @@
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">Created At</label>
-            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.CreatedAt || selectedBinding?.createdAt) | date:'full' }}</div>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.CreatedAt || selectedBinding.createdAt) | date:'full' }}</div>
             <div class="form-text">Binding creation timestamp</div>
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">Updated At</label>
-            <div class="p-2 bg-dark rounded">{{ (selectedBinding?.UpdatedAt || selectedBinding?.updatedAt) | date:'full' }}</div>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.UpdatedAt || selectedBinding.updatedAt) | date:'full' }}</div>
             <div class="form-text">Last modification timestamp</div>
           </div>
         </div>

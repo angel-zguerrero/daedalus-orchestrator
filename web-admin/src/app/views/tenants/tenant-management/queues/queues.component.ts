@@ -24,6 +24,22 @@ import { Observable, of } from 'rxjs';
 import { startWith, map, debounceTime, switchMap } from 'rxjs/operators';
 import { ErrorUtil } from '../../../../shared/utils/error.util';
 
+interface Queue {
+  ID: string;
+  Name: string;
+  Code: string;
+  Type: string;
+  VNamespace: string;
+  TTLQueue: number;
+  AllowDuplicated: boolean;
+  MaxAttempts: number;
+  DesiredPriorityThresholds: { [key: number]: number };
+  PriorityThresholds: { [key: number]: number };
+  Headers?: { [key: string]: string };
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
 @Component({
   selector: 'app-queues',
   templateUrl: './queues.component.html',
@@ -53,7 +69,7 @@ import { ErrorUtil } from '../../../../shared/utils/error.util';
 export class QueuesComponent implements OnInit {
   @Input() tenantId: string = '';
   
-  queues: any[] = [];
+  queues: Queue[] = [];
   cursor = '';
   cursors: string[] = [];
   pageSize = 20;
@@ -106,6 +122,11 @@ export class QueuesComponent implements OnInit {
   // Priority levels management
   priorityLevels: number = 3;
   editPriorityLevels: number = 3;
+
+  // Headers management properties
+  queueHeaders: { key: string, value: string }[] = [];
+  queueHeaderKey: string = '';
+  queueHeaderValue: string = '';
 
   // Valid queue types
   private validQueueTypes = ['standard', 'delayed', 'dead-letter'];
@@ -176,7 +197,7 @@ export class QueuesComponent implements OnInit {
       this.cursors.push(cursor);
     }
     
-    this.queuesService.getQueues(this.tenantId, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter).subscribe({
+    this.queuesService.getQueues(this.tenantId, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter, true).subscribe({
       next: (response) => {
         this.queues = response.result.Entities || [];
         this.cursor = response.result.Cursor;
@@ -230,6 +251,9 @@ export class QueuesComponent implements OnInit {
     this.priorityType = 'normal';
     this.maxPriority = 1;
     this.desiredPriorityThresholds = [0]; // Initialize with one element for maxPriority = 1
+    this.queueHeaders = []; // Clear headers
+    this.queueHeaderKey = '';
+    this.queueHeaderValue = '';
     this.showAlert = false;
   }
 
@@ -270,6 +294,19 @@ export class QueuesComponent implements OnInit {
       this.editDesiredPriorityThresholds = [];
     }
     
+    // Load existing headers
+    this.queueHeaders = [];
+    if (queue.Headers) {
+      Object.keys(queue.Headers).forEach(key => {
+        this.queueHeaders.push({
+          key: key,
+          value: queue.Headers[key]
+        });
+      });
+    }
+    this.queueHeaderKey = '';
+    this.queueHeaderValue = '';
+    
     this.editModalVisible = true;
     this.showAlert = false;
   }
@@ -305,10 +342,17 @@ export class QueuesComponent implements OnInit {
         }
       }
 
+      // Convert headers array to object
+      const headersObj: { [key: string]: string } = {};
+      this.queueHeaders.forEach(header => {
+        headersObj[header.key] = header.value;
+      });
+
       const queueData = {
         ...formValue,
         desiredPriorityThresholds,
-        maxPriority: this.maxPriority
+        maxPriority: this.maxPriority,
+        headers: headersObj
       };
 
       this.queuesService.createQueue(this.tenantId, queueData).subscribe({
@@ -346,6 +390,12 @@ export class QueuesComponent implements OnInit {
         }
       }
 
+      // Convert headers array to object
+      const headersObj: { [key: string]: string } = {};
+      this.queueHeaders.forEach(header => {
+        headersObj[header.key] = header.value;
+      });
+
       const queueData = {
         name: formValue.name,
         code: this.selectedQueue.Code, // Preserve existing code (frontend cannot edit)
@@ -357,7 +407,8 @@ export class QueuesComponent implements OnInit {
         maxAttempts: formValue.maxAttempts,
         priorityType: formValue.priorityType,
         maxPriority: this.updateMaxPriority,
-        desiredPriorityThresholds
+        desiredPriorityThresholds,
+        headers: headersObj
       };
       
       this.queuesService.createQueue(this.tenantId, queueData).subscribe({
@@ -393,6 +444,36 @@ export class QueuesComponent implements OnInit {
   openBulkUploadModal(): void {
     this.bulkUploadModalVisible = true;
     this.showAlert = false;
+  }
+
+  // Headers management methods
+  addQueueHeader(): void {
+    if (this.queueHeaderKey.trim() && this.queueHeaderValue.trim()) {
+      // Check if header key already exists
+      const existingIndex = this.queueHeaders.findIndex(h => h.key === this.queueHeaderKey.trim());
+      if (existingIndex >= 0) {
+        // Update existing header
+        this.queueHeaders[existingIndex].value = this.queueHeaderValue.trim();
+      } else {
+        // Add new header
+        this.queueHeaders.push({
+          key: this.queueHeaderKey.trim(),
+          value: this.queueHeaderValue.trim()
+        });
+      }
+      this.queueHeaderKey = '';
+      this.queueHeaderValue = '';
+    }
+  }
+
+  removeQueueHeader(index: number): void {
+    this.queueHeaders.splice(index, 1);
+  }
+
+  // Helper method to convert headers object to array for display
+  getHeadersArray(headers: { [key: string]: string }): { key: string, value: string }[] {
+    if (!headers) return [];
+    return Object.keys(headers).map(key => ({ key, value: headers[key] }));
   }
 
   onFileChange(event: any): void {

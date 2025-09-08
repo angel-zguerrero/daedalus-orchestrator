@@ -317,6 +317,62 @@
           Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
+
+      <!-- Headers Configuration Section -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Queue Headers (Optional)
+          </h6>
+        </c-col>
+      </c-row>
+
+      <!-- Headers Management -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="5">
+          <label cLabel for="headerKey">Header Key</label>
+          <input cFormControl id="headerKey" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}" placeholder="e.g., content-type" />
+        </c-col>
+        <c-col [md]="5">
+          <label cLabel for="headerValue">Header Value</label>
+          <input cFormControl id="headerValue" [(ngModel)]="queueHeaderValue" [ngModelOptions]="{standalone: true}" placeholder="e.g., application/json" />
+        </c-col>
+        <c-col [md]="2" class="d-flex align-items-end">
+          <button cButton color="success" variant="outline" (click)="addQueueHeader()" [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </c-col>
+      </c-row>
+
+      <!-- Headers List -->
+      <c-row class="mb-3" *ngIf="queueHeaders.length > 0" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <div class="table-responsive">
+            <table cTable class="table-sm">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="80">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let header of queueHeaders; let i = index">
+                  <td><code>{{ header.key }}</code></td>
+                  <td>{{ header.value }}</td>
+                  <td>
+                    <button cButton color="danger" variant="outline" size="sm" (click)="removeQueueHeader(i)">
+                      <svg cIcon name="cil-trash"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </c-col>
+      </c-row>
     </form>
   </c-modal-body>
   <c-modal-footer>
@@ -475,6 +531,62 @@
           Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
+
+      <!-- Headers Configuration Section -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Queue Headers (Optional)
+          </h6>
+        </c-col>
+      </c-row>
+
+      <!-- Headers Management -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="5">
+          <label cLabel for="headerKey-update">Header Key</label>
+          <input cFormControl id="headerKey-update" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}" placeholder="e.g., content-type" />
+        </c-col>
+        <c-col [md]="5">
+          <label cLabel for="headerValue-update">Header Value</label>
+          <input cFormControl id="headerValue-update" [(ngModel)]="queueHeaderValue" [ngModelOptions]="{standalone: true}" placeholder="e.g., application/json" />
+        </c-col>
+        <c-col [md]="2" class="d-flex align-items-end">
+          <button cButton color="success" variant="outline" (click)="addQueueHeader()" [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </c-col>
+      </c-row>
+
+      <!-- Headers List -->
+      <c-row class="mb-3" *ngIf="queueHeaders.length > 0" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <div class="table-responsive">
+            <table cTable class="table-sm">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="80">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let header of queueHeaders; let i = index">
+                  <td><code>{{ header.key }}</code></td>
+                  <td>{{ header.value }}</td>
+                  <td>
+                    <button cButton color="danger" variant="outline" size="sm" (click)="removeQueueHeader(i)">
+                      <svg cIcon name="cil-trash"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </c-col>
+      </c-row>
     </form>
   </c-modal-body>
   <c-modal-footer>
@@ -712,6 +824,45 @@
           <div class="form-text mt-2">
             Currently active priority configuration - tasks with higher priority values are processed first
           </div>
+        </div>
+
+        <!-- Headers Section -->
+        <div class="mb-3" *ngIf="selectedQueue?.Headers && getHeadersArray(selectedQueue.Headers).length > 0">
+          <label class="form-label fw-bold">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Queue Headers
+          </label>
+          <div class="p-3 bg-dark rounded">
+            <div class="table-responsive">
+              <table cTable class="table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let header of getHeadersArray(selectedQueue.Headers)">
+                    <td><code>{{ header.key }}</code></td>
+                    <td>{{ header.value }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="form-text">Custom headers associated with this queue</div>
+        </div>
+        
+        <div class="mb-3" *ngIf="!selectedQueue?.Headers || getHeadersArray(selectedQueue.Headers || {}).length === 0">
+          <label class="form-label fw-bold">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Queue Headers
+          </label>
+          <div class="p-3 bg-dark rounded text-muted text-center">
+            <svg cIcon name="cil-tags" size="2xl" class="mb-2 opacity-50"></svg>
+            <div>No headers configured for this queue</div>
+          </div>
+          <div class="form-text">Custom headers can be configured when creating or editing the queue</div>
         </div>
       </div>
     </div>

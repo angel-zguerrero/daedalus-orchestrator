@@ -178,9 +178,11 @@ func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.Routing
 				}
 			}
 		} else {
+
+			headerID := queueID + "_" + key
 			// Create new header
 			routingHeader := &models.RoutingHeader{
-				ID:      cmd.generateHeaderID(),
+				ID:      headerID,
 				QueueID: queueID,
 				Key:     key,
 				Value:   value,
@@ -205,10 +207,4 @@ func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.Routing
 	}
 
 	return nil
-}
-
-// generateHeaderID generates a unique ID for routing headers
-func (cmd *AssertQueueCommand) generateHeaderID() string {
-	factory := &db.DeterministicIDGeneratorFactory{}
-	return factory.GenerateID()
 }
