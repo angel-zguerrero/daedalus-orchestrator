@@ -35,6 +35,11 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	commandResult := &command.CommandResult{}
 
 	// Validate required fields
+	if cmd.NewBindingID == "" {
+		commandResult.Error = "NewBindingID is required"
+		return *commandResult
+	}
+
 	if cmd.Code == "" {
 		commandResult.Error = "Code is required"
 		return *commandResult
