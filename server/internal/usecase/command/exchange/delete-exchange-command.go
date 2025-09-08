@@ -28,6 +28,18 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
+	bindingRepo, err := db.NewBindingRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -46,7 +58,44 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
-	// Now delete by ID
+	// Find and delete all bindings associated with this exchange
+	bindingsResult, err := bindingRepo.GetBindingsByExchange(exchange.ID, now)
+	if err != nil {
+		commandResult.Error = "error retrieving exchange bindings: " + err.Error()
+		return *commandResult
+	}
+
+	bindingCount := 0
+	if bindingsResult != nil && len(bindingsResult.Entities) > 0 {
+		for _, binding := range bindingsResult.Entities {
+			// Delete all routing headers associated with this binding
+			headersResult, err := routingHeadersRepo.GetRoutingHeadersByBinding(binding.ID, now)
+			if err != nil {
+				commandResult.Error = "error retrieving binding headers: " + err.Error()
+				return *commandResult
+			}
+
+			if headersResult != nil && len(headersResult.Entities) > 0 {
+				for _, header := range headersResult.Entities {
+					_, err := routingHeadersRepo.DeleteRoutingHeader(header.ID, now)
+					if err != nil {
+						commandResult.Error = "error deleting binding header: " + err.Error()
+						return *commandResult
+					}
+				}
+			}
+
+			// Delete the binding
+			_, err = bindingRepo.DeleteBinding(binding.ID, now)
+			if err != nil {
+				commandResult.Error = "error deleting binding: " + err.Error()
+				return *commandResult
+			}
+			bindingCount++
+		}
+	}
+
+	// Now delete the exchange by ID
 	deleted, err := exchangeRepo.DeleteExchangeById(exchange.ID, now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -58,10 +107,20 @@ func (cmd *DeleteExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
+	// Update tenant summary
 	err = tenantSummaryRepo.DecreaseExchangeCount(cmd.CFS, 1, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
+	}
+
+	// Decrease binding count if we deleted any bindings
+	if bindingCount > 0 {
+		err = tenantSummaryRepo.DecreaseBindingCount(cmd.CFS, bindingCount, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
 	}
 
 	commandResult.Result = true

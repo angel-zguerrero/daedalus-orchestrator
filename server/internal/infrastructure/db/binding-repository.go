@@ -63,12 +63,12 @@ func (r *BindingRepository) GetBindingById(id string, now time.Time) (*models.Bi
 
 func (r *BindingRepository) GetBindingsByExchange(exchangeID string, now time.Time) (*FindResult[models.Binding], error) {
 	query := "ExchangeID = " + exchangeID
-	return r.Find(query, 0, "", now)
+	return r.Find(query, 100000, "", now)
 }
 
 func (r *BindingRepository) GetBindingsByQueue(queueID string, now time.Time) (*FindResult[models.Binding], error) {
 	query := "QueueID = " + queueID
-	return r.Find(query, 0, "", now)
+	return r.Find(query, 100000, "", now)
 }
 
 func (r *BindingRepository) DeleteBinding(id string, now time.Time) (bool, error) {
