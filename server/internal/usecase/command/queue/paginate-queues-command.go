@@ -11,15 +11,17 @@ import (
 func init() {
 	gob.Register(PaginateQueuesCommand{})
 	gob.Register(db.FindResult[models.Queue]{})
+	gob.Register(models.RoutingHeader{})
 }
 
 type PaginateQueuesCommand struct {
-	Query      string
-	Cursor     string
-	PageSize   int
-	VNamespace string
-	CF         string
-	CFS        string
+	Query          string
+	Cursor         string
+	PageSize       int
+	VNamespace     string
+	IncludeHeaders bool
+	CF             string
+	CFS            string
 }
 
 func (cmd *PaginateQueuesCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -36,6 +38,29 @@ func (cmd *PaginateQueuesCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
+	}
+
+	// If headers are requested, populate them using RoutingHeader
+	if cmd.IncludeHeaders && findResult.Entities != nil {
+		routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+
+		// Populate headers for each queue
+		for i := range findResult.Entities {
+			queue := &findResult.Entities[i]
+
+			// Get headers for this queue using QueueID
+			if headersResult, err := routingHeadersRepo.GetRoutingHeadersByQueue(queue.ID, now); err == nil && headersResult != nil {
+				headers := make(map[string]string)
+				for _, header := range headersResult.Entities {
+					headers[header.Key] = header.Value
+				}
+				queue.Headers = headers
+			}
+		}
 	}
 
 	commandResult.Result = *findResult

@@ -12,6 +12,7 @@ func init() {
 	gob.Register(AssertQueueCommand{})
 	gob.Register(models.Queue{})
 	gob.Register([]models.Queue{})
+	gob.Register(models.RoutingHeader{})
 }
 
 type AssertQueueCommand struct {
@@ -36,6 +37,12 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 	}
 
 	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -116,6 +123,16 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
+
+		// Update headers if provided
+		if queue.Headers != nil && len(queue.Headers) > 0 {
+			err = cmd.upsertQueueHeaders(routingHeadersRepo, queue.ID, queue.Headers, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+		}
+
 		resultQueues = append(resultQueues, queue)
 	}
 
@@ -130,4 +147,68 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 	commandResult.Result = resultQueues
 	return *commandResult
+}
+
+// upsertQueueHeaders creates or updates routing headers for a queue
+func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.RoutingHeadersRepository, queueID string, headers map[string]string, now time.Time) error {
+	// Get existing headers for this queue
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByQueue(queueID, now)
+	if err != nil {
+		return err
+	}
+
+	// Create a map for quick lookup of existing headers
+	existingByKey := make(map[string]*models.RoutingHeader)
+	if existingHeaders != nil {
+		for i := range existingHeaders.Entities {
+			header := &existingHeaders.Entities[i]
+			existingByKey[header.Key] = header
+		}
+	}
+
+	// Process each header from input
+	for key, value := range headers {
+		if existingHeader, exists := existingByKey[key]; exists {
+			// Update existing header if value changed
+			if existingHeader.Value != value {
+				existingHeader.Value = value
+				_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			// Create new header
+			routingHeader := &models.RoutingHeader{
+				ID:      cmd.generateHeaderID(),
+				QueueID: queueID,
+				Key:     key,
+				Value:   value,
+			}
+			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Remove headers that are no longer in the input
+	if existingHeaders != nil {
+		for _, existingHeader := range existingHeaders.Entities {
+			if _, stillExists := headers[existingHeader.Key]; !stillExists {
+				_, err := routingHeadersRepo.DeleteRoutingHeader(existingHeader.ID, now)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// generateHeaderID generates a unique ID for routing headers
+func (cmd *AssertQueueCommand) generateHeaderID() string {
+	factory := &db.DeterministicIDGeneratorFactory{}
+	return factory.GenerateID()
 }

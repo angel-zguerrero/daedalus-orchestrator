@@ -28,15 +28,16 @@ func NewQueueController(Config *common.ServerConfing) *QueueController {
 }
 
 type createQueueRequest struct {
-	Code                      string      `json:"code" binding:"required"`
-	Name                      string      `json:"name" binding:"required"`
-	Type                      string      `json:"type" binding:"required"`
-	State                     string      `json:"state"`
-	VNamespace                string      `json:"vnamespace" binding:"required"`
-	TTLQueue                  int         `json:"ttlQueue"`
-	AllowDuplicated           bool        `json:"allowDuplicated"`
-	MaxAttempts               int         `json:"maxAttempts"`
-	DesiredPriorityThresholds map[int]int `json:"desiredPriorityThresholds"`
+	Code                      string            `json:"code" binding:"required"`
+	Name                      string            `json:"name" binding:"required"`
+	Type                      string            `json:"type" binding:"required"`
+	State                     string            `json:"state"`
+	VNamespace                string            `json:"vnamespace" binding:"required"`
+	TTLQueue                  int               `json:"ttlQueue"`
+	AllowDuplicated           bool              `json:"allowDuplicated"`
+	MaxAttempts               int               `json:"maxAttempts"`
+	DesiredPriorityThresholds map[int]int       `json:"desiredPriorityThresholds"`
+	Headers                   map[string]string `json:"headers"`
 }
 
 type createBulkQueueRequest struct {
@@ -86,6 +87,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		AllowDuplicated:           req.AllowDuplicated,
 		MaxAttempts:               req.MaxAttempts,
 		DesiredPriorityThresholds: req.DesiredPriorityThresholds,
+		Headers:                   req.Headers, // Add headers support
 	}
 
 	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), []*models.Queue{queue}, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
@@ -146,6 +148,7 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			AllowDuplicated:           t.AllowDuplicated,
 			MaxAttempts:               t.MaxAttempts,
 			DesiredPriorityThresholds: t.DesiredPriorityThresholds,
+			Headers:                   t.Headers, // Add headers support
 		}
 		queues = append(queues, queue)
 	}
@@ -173,7 +176,7 @@ func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueCode, vnamespace, false, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -224,7 +227,10 @@ func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 		page = 1000
 	}
 
-	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	// Check if headers should be included from query parameter
+	includeHeaders := c.Query("includeHeaders") == "true"
+
+	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), includeHeaders, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

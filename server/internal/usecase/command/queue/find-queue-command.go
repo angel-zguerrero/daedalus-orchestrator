@@ -3,6 +3,7 @@ package queue
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/usecase/command"
+	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"fmt"
 	"time"
@@ -10,13 +11,15 @@ import (
 
 func init() {
 	gob.Register(FindQueueCommand{})
+	gob.Register(models.RoutingHeader{})
 }
 
 type FindQueueCommand struct {
-	Code       string
-	VNamespace string
-	CF         string
-	CFS        string
+	Code           string
+	VNamespace     string
+	IncludeHeaders bool
+	CF             string
+	CFS            string
 }
 
 func (cmd *FindQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -39,6 +42,24 @@ func (cmd *FindQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.
 	if queue == nil {
 		commandResult.Error = "queue not found"
 		return *commandResult
+	}
+
+	// If headers are requested, populate them using RoutingHeader
+	if cmd.IncludeHeaders {
+		routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+
+		// Get headers for this queue using QueueID
+		if headersResult, err := routingHeadersRepo.GetRoutingHeadersByQueue(queue.ID, now); err == nil && headersResult != nil {
+			headers := make(map[string]string)
+			for _, header := range headersResult.Entities {
+				headers[header.Key] = header.Value
+			}
+			queue.Headers = headers
+		}
 	}
 
 	commandResult.Result = *queue

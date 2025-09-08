@@ -74,6 +74,7 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 		AllowDuplicated:           r.AllowDuplicated,
 		MaxAttempts:               int(r.MaxAttempts),
 		DesiredPriorityThresholds: convertDesiredPriorityThresholds(r.DesiredPriorityThresholds),
+		Headers:                   r.Headers, // Add headers support
 	}
 
 	// Set defaults if not provided
@@ -104,6 +105,7 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 			MaxAttempts:               int32(result.MaxAttempts),
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(result.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(result.PriorityThresholds),
+			Headers:                   result.Headers, // Include headers in response
 		},
 	}, nil
 }
@@ -131,6 +133,7 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 			AllowDuplicated:           t.AllowDuplicated,
 			MaxAttempts:               int(t.MaxAttempts),
 			DesiredPriorityThresholds: convertDesiredPriorityThresholds(t.DesiredPriorityThresholds),
+			Headers:                   t.Headers, // Add headers support
 		}
 		// Set defaults if not provided
 		if queue.MaxAttempts == 0 {
@@ -160,6 +163,7 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 			MaxAttempts:               int32(e.MaxAttempts),
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(e.PriorityThresholds),
+			Headers:                   e.Headers, // Include headers in response
 		}
 		rQueues = append(rQueues, ex)
 	}
@@ -176,7 +180,7 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 		return nil, err
 	}
 
-	queue, err := s.QueueBO.GetQueue(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queue, err := s.QueueBO.GetQueue(ctx, r.Code, r.Vnamespace, false, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +201,7 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 			MaxAttempts:               int32(queue.MaxAttempts),
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(queue.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(queue.PriorityThresholds),
+			Headers:                   queue.Headers, // Include headers in response
 		},
 	}, nil
 }
@@ -207,7 +212,7 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 		return nil, err
 	}
 
-	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, r.IncludeHeaders, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -229,6 +234,12 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(e.PriorityThresholds),
 		}
+
+		// Add headers if requested and available
+		if r.IncludeHeaders && e.Headers != nil {
+			ex.Headers = e.Headers
+		}
+
 		rQueues = append(rQueues, ex)
 	}
 

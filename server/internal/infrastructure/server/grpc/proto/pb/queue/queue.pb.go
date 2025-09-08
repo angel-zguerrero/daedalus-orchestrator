@@ -82,6 +82,7 @@ type CreateQueueRequest struct {
 	AllowDuplicated           bool                   `protobuf:"varint,8,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
 	MaxAttempts               int32                  `protobuf:"varint,9,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
 	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,10,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                   map[string]string      `protobuf:"bytes,11,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -182,6 +183,13 @@ func (x *CreateQueueRequest) GetMaxAttempts() int32 {
 func (x *CreateQueueRequest) GetDesiredPriorityThresholds() map[int32]int32 {
 	if x != nil {
 		return x.DesiredPriorityThresholds
+	}
+	return nil
+}
+
+func (x *CreateQueueRequest) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
 	}
 	return nil
 }
@@ -301,6 +309,7 @@ type CreateQueueItem struct {
 	AllowDuplicated           bool                   `protobuf:"varint,7,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
 	MaxAttempts               int32                  `protobuf:"varint,8,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
 	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,9,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                   map[string]string      `protobuf:"bytes,10,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -394,6 +403,13 @@ func (x *CreateQueueItem) GetMaxAttempts() int32 {
 func (x *CreateQueueItem) GetDesiredPriorityThresholds() map[int32]int32 {
 	if x != nil {
 		return x.DesiredPriorityThresholds
+	}
+	return nil
+}
+
+func (x *CreateQueueItem) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
 	}
 	return nil
 }
@@ -563,14 +579,15 @@ func (x *GetQueueResponse) GetResult() *Queue {
 }
 
 type GetQueuesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	Q             string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
-	Cursor        string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	PageSize      int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TenantId       string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	Q              string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
+	Cursor         string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	PageSize       int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
+	Vnamespace     string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	IncludeHeaders bool                   `protobuf:"varint,6,opt,name=includeHeaders,proto3" json:"includeHeaders,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetQueuesRequest) Reset() {
@@ -638,6 +655,13 @@ func (x *GetQueuesRequest) GetVnamespace() string {
 	return ""
 }
 
+func (x *GetQueuesRequest) GetIncludeHeaders() bool {
+	if x != nil {
+		return x.IncludeHeaders
+	}
+	return false
+}
+
 type Queue struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
 	Id                        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -653,6 +677,7 @@ type Queue struct {
 	MaxAttempts               int32                  `protobuf:"varint,11,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
 	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,12,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 	PriorityThresholds        map[int32]int32        `protobuf:"bytes,13,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                   map[string]string      `protobuf:"bytes,14,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -774,6 +799,13 @@ func (x *Queue) GetDesiredPriorityThresholds() map[int32]int32 {
 func (x *Queue) GetPriorityThresholds() map[int32]int32 {
 	if x != nil {
 		return x.PriorityThresholds
+	}
+	return nil
+}
+
+func (x *Queue) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
 	}
 	return nil
 }
@@ -990,7 +1022,7 @@ var File_internal_infrastructure_server_grpc_proto_definitions_queue_proto proto
 
 const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc = "" +
 	"\n" +
-	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xd0\x03\n" +
+	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xce\x04\n" +
 	"\x12CreateQueueRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -1004,16 +1036,20 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x0fallowDuplicated\x18\b \x01(\bR\x0fallowDuplicated\x12 \n" +
 	"\vmaxAttempts\x18\t \x01(\x05R\vmaxAttempts\x12v\n" +
 	"\x19desiredPriorityThresholds\x18\n" +
-	" \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x1aL\n" +
+	" \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12@\n" +
+	"\aheaders\x18\v \x03(\v2&.queue.CreateQueueRequest.HeadersEntryR\aheaders\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"U\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"U\n" +
 	"\x13CreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
 	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"d\n" +
 	"\x16BulkCreateQueueRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xae\x03\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xa9\x04\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1025,10 +1061,15 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\bttlQueue\x18\x06 \x01(\x05R\bttlQueue\x12(\n" +
 	"\x0fallowDuplicated\x18\a \x01(\bR\x0fallowDuplicated\x12 \n" +
 	"\vmaxAttempts\x18\b \x01(\x05R\vmaxAttempts\x12s\n" +
-	"\x19desiredPriorityThresholds\x18\t \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x1aL\n" +
+	"\x19desiredPriorityThresholds\x18\t \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12=\n" +
+	"\aheaders\x18\n" +
+	" \x03(\v2#.queue.CreateQueueItem.HeadersEntryR\aheaders\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"Y\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Y\n" +
 	"\x17BulkCreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
 	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"a\n" +
@@ -1040,7 +1081,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"vnamespace\"R\n" +
 	"\x10GetQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"\x90\x01\n" +
+	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"\xb8\x01\n" +
 	"\x10GetQueuesRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\f\n" +
 	"\x01q\x18\x02 \x01(\tR\x01q\x12\x16\n" +
@@ -1048,7 +1089,8 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"\x83\x05\n" +
+	"vnamespace\x12&\n" +
+	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\xf4\x05\n" +
 	"\x05Queue\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -1065,13 +1107,17 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	" \x01(\bR\x0fallowDuplicated\x12 \n" +
 	"\vmaxAttempts\x18\v \x01(\x05R\vmaxAttempts\x12i\n" +
 	"\x19desiredPriorityThresholds\x18\f \x03(\v2+.queue.Queue.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12T\n" +
-	"\x12priorityThresholds\x18\r \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x1aL\n" +
+	"\x12priorityThresholds\x18\r \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x123\n" +
+	"\aheaders\x18\x0e \x03(\v2\x19.queue.Queue.HeadersEntryR\aheaders\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aE\n" +
 	"\x17PriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"S\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"S\n" +
 	"\x0fQueueFindResult\x12(\n" +
 	"\bentities\x18\x01 \x03(\v2\f.queue.QueueR\bentities\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"]\n" +
@@ -1110,7 +1156,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawD
 }
 
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_goTypes = []any{
 	(QueueType)(0),                  // 0: queue.QueueType
 	(*CreateQueueRequest)(nil),      // 1: queue.CreateQueueRequest
@@ -1127,36 +1173,42 @@ var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_goTyp
 	(*DeleteQueueRequest)(nil),      // 12: queue.DeleteQueueRequest
 	(*DeleteQueueResponse)(nil),     // 13: queue.DeleteQueueResponse
 	nil,                             // 14: queue.CreateQueueRequest.DesiredPriorityThresholdsEntry
-	nil,                             // 15: queue.CreateQueueItem.DesiredPriorityThresholdsEntry
-	nil,                             // 16: queue.Queue.DesiredPriorityThresholdsEntry
-	nil,                             // 17: queue.Queue.PriorityThresholdsEntry
+	nil,                             // 15: queue.CreateQueueRequest.HeadersEntry
+	nil,                             // 16: queue.CreateQueueItem.DesiredPriorityThresholdsEntry
+	nil,                             // 17: queue.CreateQueueItem.HeadersEntry
+	nil,                             // 18: queue.Queue.DesiredPriorityThresholdsEntry
+	nil,                             // 19: queue.Queue.PriorityThresholdsEntry
+	nil,                             // 20: queue.Queue.HeadersEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_depIdxs = []int32{
 	14, // 0: queue.CreateQueueRequest.desiredPriorityThresholds:type_name -> queue.CreateQueueRequest.DesiredPriorityThresholdsEntry
-	9,  // 1: queue.CreateQueueResponse.result:type_name -> queue.Queue
-	4,  // 2: queue.BulkCreateQueueRequest.queues:type_name -> queue.CreateQueueItem
-	15, // 3: queue.CreateQueueItem.desiredPriorityThresholds:type_name -> queue.CreateQueueItem.DesiredPriorityThresholdsEntry
-	9,  // 4: queue.BulkCreateQueueResponse.result:type_name -> queue.Queue
-	9,  // 5: queue.GetQueueResponse.result:type_name -> queue.Queue
-	16, // 6: queue.Queue.desiredPriorityThresholds:type_name -> queue.Queue.DesiredPriorityThresholdsEntry
-	17, // 7: queue.Queue.priorityThresholds:type_name -> queue.Queue.PriorityThresholdsEntry
-	9,  // 8: queue.QueueFindResult.entities:type_name -> queue.Queue
-	10, // 9: queue.GetQueuesResponse.result:type_name -> queue.QueueFindResult
-	1,  // 10: queue.QueueService.CreateQueue:input_type -> queue.CreateQueueRequest
-	3,  // 11: queue.QueueService.BulkCreateQueue:input_type -> queue.BulkCreateQueueRequest
-	6,  // 12: queue.QueueService.GetQueue:input_type -> queue.GetQueueRequest
-	8,  // 13: queue.QueueService.GetQueues:input_type -> queue.GetQueuesRequest
-	12, // 14: queue.QueueService.DeleteQueue:input_type -> queue.DeleteQueueRequest
-	2,  // 15: queue.QueueService.CreateQueue:output_type -> queue.CreateQueueResponse
-	5,  // 16: queue.QueueService.BulkCreateQueue:output_type -> queue.BulkCreateQueueResponse
-	7,  // 17: queue.QueueService.GetQueue:output_type -> queue.GetQueueResponse
-	11, // 18: queue.QueueService.GetQueues:output_type -> queue.GetQueuesResponse
-	13, // 19: queue.QueueService.DeleteQueue:output_type -> queue.DeleteQueueResponse
-	15, // [15:20] is the sub-list for method output_type
-	10, // [10:15] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	15, // 1: queue.CreateQueueRequest.headers:type_name -> queue.CreateQueueRequest.HeadersEntry
+	9,  // 2: queue.CreateQueueResponse.result:type_name -> queue.Queue
+	4,  // 3: queue.BulkCreateQueueRequest.queues:type_name -> queue.CreateQueueItem
+	16, // 4: queue.CreateQueueItem.desiredPriorityThresholds:type_name -> queue.CreateQueueItem.DesiredPriorityThresholdsEntry
+	17, // 5: queue.CreateQueueItem.headers:type_name -> queue.CreateQueueItem.HeadersEntry
+	9,  // 6: queue.BulkCreateQueueResponse.result:type_name -> queue.Queue
+	9,  // 7: queue.GetQueueResponse.result:type_name -> queue.Queue
+	18, // 8: queue.Queue.desiredPriorityThresholds:type_name -> queue.Queue.DesiredPriorityThresholdsEntry
+	19, // 9: queue.Queue.priorityThresholds:type_name -> queue.Queue.PriorityThresholdsEntry
+	20, // 10: queue.Queue.headers:type_name -> queue.Queue.HeadersEntry
+	9,  // 11: queue.QueueFindResult.entities:type_name -> queue.Queue
+	10, // 12: queue.GetQueuesResponse.result:type_name -> queue.QueueFindResult
+	1,  // 13: queue.QueueService.CreateQueue:input_type -> queue.CreateQueueRequest
+	3,  // 14: queue.QueueService.BulkCreateQueue:input_type -> queue.BulkCreateQueueRequest
+	6,  // 15: queue.QueueService.GetQueue:input_type -> queue.GetQueueRequest
+	8,  // 16: queue.QueueService.GetQueues:input_type -> queue.GetQueuesRequest
+	12, // 17: queue.QueueService.DeleteQueue:input_type -> queue.DeleteQueueRequest
+	2,  // 18: queue.QueueService.CreateQueue:output_type -> queue.CreateQueueResponse
+	5,  // 19: queue.QueueService.BulkCreateQueue:output_type -> queue.BulkCreateQueueResponse
+	7,  // 20: queue.QueueService.GetQueue:output_type -> queue.GetQueueResponse
+	11, // 21: queue.QueueService.GetQueues:output_type -> queue.GetQueuesResponse
+	13, // 22: queue.QueueService.DeleteQueue:output_type -> queue.DeleteQueueResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_init() }
@@ -1170,7 +1222,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_init
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
