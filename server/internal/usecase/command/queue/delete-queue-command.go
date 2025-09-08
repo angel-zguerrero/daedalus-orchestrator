@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
+	"fmt"
 	"time"
 )
 
@@ -34,6 +35,13 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	fmt.Println("Attempting to delete queue with code:", cmd.Code, "in vNamespace:", cmd.VNamespace)
 	// First find the queue by code
 	queue, err := queueRepo.GetQueueByCode(cmd.Code, cmd.VNamespace, now)
 	if err != nil {
@@ -46,7 +54,24 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
-	// Now delete by ID
+	// Delete all routing headers associated with this queue
+	headersResult, err := routingHeadersRepo.GetRoutingHeadersByQueue(queue.ID, now)
+	if err != nil {
+		commandResult.Error = "error retrieving queue headers: " + err.Error()
+		return *commandResult
+	}
+
+	if headersResult != nil && len(headersResult.Entities) > 0 {
+		for _, header := range headersResult.Entities {
+			_, err := routingHeadersRepo.DeleteRoutingHeader(header.ID, now)
+			if err != nil {
+				commandResult.Error = "error deleting queue header: " + err.Error()
+				return *commandResult
+			}
+		}
+	}
+
+	// Now delete the queue by ID
 	deleted, err := queueRepo.DeleteQueueById(queue.ID, now)
 	if err != nil {
 		commandResult.Error = err.Error()

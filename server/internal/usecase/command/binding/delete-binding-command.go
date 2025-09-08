@@ -49,6 +49,12 @@ func (cmd *DeleteBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// Find Exchange by Code and VNamespace
 	exchange, err := exchangeRepo.GetExchangeByCode(cmd.ExchangeCode, cmd.VNamespace, now)
 	if err != nil {
@@ -80,6 +86,23 @@ func (cmd *DeleteBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	if binding == nil {
 		commandResult.Error = "binding not found"
 		return *commandResult
+	}
+
+	// Delete all routing headers associated with this binding
+	headersResult, err := routingHeadersRepo.GetRoutingHeadersByBinding(binding.ID, now)
+	if err != nil {
+		commandResult.Error = "error retrieving binding headers: " + err.Error()
+		return *commandResult
+	}
+
+	if headersResult != nil && len(headersResult.Entities) > 0 {
+		for _, header := range headersResult.Entities {
+			_, err := routingHeadersRepo.DeleteRoutingHeader(header.ID, now)
+			if err != nil {
+				commandResult.Error = "error deleting binding header: " + err.Error()
+				return *commandResult
+			}
+		}
 	}
 
 	// Delete the binding by ID
