@@ -57,6 +57,8 @@ type FieldDefinition struct {
 	IsUniqueCompound bool
 	// DataOnly indicates whether this field is for data storage only and should not be indexed or searchable.
 	DataOnly bool
+	// Virtual indicates whether this field should be completely excluded from storage and queries.
+	Virtual bool
 }
 
 // TableDefinition describes the schema of a table in the key-value store.
@@ -229,6 +231,9 @@ func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) 
 	}
 	if def.DataOnly {
 		return nil, fmt.Errorf("Field '%s' is marked as data-only and cannot be used in queries", field)
+	}
+	if def.Virtual {
+		return nil, fmt.Errorf("Field '%s' is marked as virtual and cannot be used in queries", field)
 	}
 	operator := strings.ToUpper(strings.TrimSpace(parts[2]))
 	value := strings.TrimSpace(strings.Trim(parts[3], "'"))
@@ -735,7 +740,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 
 		for _, def := range r.definition.Fields {
-			if def.DataOnly { // Skip data-only fields from all indexing operations
+			if def.DataOnly || def.Virtual { // Skip data-only and virtual fields from all indexing operations
 				continue
 			}
 			if def.Unique { // This handles non-primary unique fields
@@ -862,7 +867,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 
 		for _, def := range r.definition.Fields {
-			if def.TTL || def.DataOnly { // TTL field and data-only fields are not indexed like other fields.
+			if def.TTL || def.DataOnly || def.Virtual { // TTL field, data-only and virtual fields are not indexed like other fields.
 				continue
 			}
 			// Pass entityPtrVal (which is *T) to getNestedFieldValue
@@ -945,7 +950,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
-		dataBytes, err := json.Marshal(entity)
+		dataBytes, err := r.marshalWithoutVirtual(entity)
 		if err != nil {
 			return nil, err
 		}
@@ -1212,7 +1217,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		currentEntityDataVal := currentEntityReflectVal.Elem() // For setting fields if changed
 
 		for _, def := range r.definition.Fields {
-			if def.Primary || def.TTL || def.DataOnly { // Primary key, TTL and data-only fields managed separately
+			if def.Primary || def.TTL || def.DataOnly || def.Virtual { // Primary key, TTL, data-only and virtual fields managed separately
 				continue
 			}
 
@@ -1334,7 +1339,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		if changed {
 			dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 			// Marshal the modified currentEntityStored, which now contains the merged changes
-			dataBytes, err := json.Marshal(entity)
+			dataBytes, err := r.marshalWithoutVirtual(entity)
 			if err != nil {
 				return nil, err
 			}
@@ -1627,6 +1632,25 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySecto
 				return nil, fmt.Errorf("field '%s' cannot be both data-only and primary key in struct %s", def.Name, t.Name())
 			}
 		}
+
+		// Validate virtual field constraints
+		if def.Virtual {
+			if def.Unique {
+				return nil, fmt.Errorf("field '%s' cannot be both virtual and unique in struct %s", def.Name, t.Name())
+			}
+			if def.IsUniqueCompound {
+				return nil, fmt.Errorf("field '%s' cannot be both virtual and part of compound uniqueness in struct %s", def.Name, t.Name())
+			}
+			if def.Primary {
+				return nil, fmt.Errorf("field '%s' cannot be both virtual and primary key in struct %s", def.Name, t.Name())
+			}
+			if def.DataOnly {
+				return nil, fmt.Errorf("field '%s' cannot be both virtual and data-only in struct %s", def.Name, t.Name())
+			}
+			if def.TTL {
+				return nil, fmt.Errorf("field '%s' cannot be both virtual and TTL in struct %s", def.Name, t.Name())
+			}
+		}
 	}
 
 	if !hasPrimaryKey {
@@ -1803,6 +1827,8 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 			def.MaxLength = &max
 		case rule == "data-only":
 			def.DataOnly = true
+		case rule == "virtual":
+			def.Virtual = true
 		case rule == "":
 			// ignore empty rule
 		default:
@@ -1826,4 +1852,47 @@ func NewRepositoryWithBatch[T ORMEntity](kvStore KVStore, ColumnFamily, columnFa
 		batch: batch,
 	}
 	return repo, nil
+}
+
+// filterVirtualFields creates a copy of the entity excluding virtual fields for storage
+func (r *Repository[T]) filterVirtualFields(entity *T) (map[string]interface{}, error) {
+	entityVal := reflect.ValueOf(entity).Elem()
+	entityType := entityVal.Type()
+
+	filtered := make(map[string]interface{})
+
+	for i := 0; i < entityVal.NumField(); i++ {
+		field := entityType.Field(i)
+		fieldVal := entityVal.Field(i)
+
+		// Find field definition
+		var fieldDef *FieldDefinition
+		for _, def := range r.definition.Fields {
+			if def.Name == field.Name {
+				fieldDef = &def
+				break
+			}
+		}
+
+		// Skip virtual fields
+		if fieldDef != nil && fieldDef.Virtual {
+			continue
+		}
+
+		// Include non-virtual fields
+		if fieldVal.CanInterface() {
+			filtered[field.Name] = fieldVal.Interface()
+		}
+	}
+
+	return filtered, nil
+}
+
+// marshalWithoutVirtual marshals entity excluding virtual fields
+func (r *Repository[T]) marshalWithoutVirtual(entity *T) ([]byte, error) {
+	filtered, err := r.filterVirtualFields(entity)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(filtered)
 }

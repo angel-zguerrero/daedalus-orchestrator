@@ -2741,3 +2741,81 @@ func TestDataOnlyFields_RocksDBUpdate(t *testing.T) {
 	assert.Len(t, result.Entities, 1)
 	assert.Equal(t, id, result.Entities[0].ID)
 }
+
+func TestVirtualFields_RocksDBCreateAndRead(t *testing.T) {
+	store := newRocksdbStore(t)
+
+	repo, err := db.NewRepository[VirtualFieldEntity](store, TestFC, testColumnFamilySector, "test_virtual", &db.DefaultIDGeneratorFactory{})
+	require.NoError(t, err)
+
+	now := time.Now()
+	entity := &VirtualFieldEntity{
+		Name:        "test-entity",
+		SearchField: "searchable-value",
+		VirtualData: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+		TempCache:   []string{"cache1", "cache2"},
+		RuntimeInfo: map[string]interface{}{"count": 42, "rate": 3.14},
+		CreatedAt:   now,
+	}
+
+	// Create entity
+	id, err := repo.Create(entity, now)
+	require.NoError(t, err)
+	assert.NotEmpty(t, id)
+	assert.Equal(t, id, entity.ID)
+
+	// Read entity back using FindByField with ID
+	readEntity, err := repo.FindByField("ID", id, now)
+	require.NoError(t, err)
+	assert.Equal(t, entity.ID, readEntity.ID)
+	assert.Equal(t, entity.Name, readEntity.Name)
+	assert.Equal(t, entity.SearchField, readEntity.SearchField)
+	assert.Equal(t, entity.CreatedAt.Unix(), readEntity.CreatedAt.Unix())
+
+	// Virtual fields should NOT be persisted - they should be empty/nil when read back
+	assert.Nil(t, readEntity.VirtualData, "VirtualData should not be persisted")
+	assert.Nil(t, readEntity.TempCache, "TempCache should not be persisted")
+	assert.Nil(t, readEntity.RuntimeInfo, "RuntimeInfo should not be persisted")
+
+	// Verify we can search by normal fields
+	result, err := repo.Find("Name='test-entity'", 10, "", now)
+	require.NoError(t, err)
+	assert.Len(t, result.Entities, 1)
+	assert.Equal(t, entity.ID, result.Entities[0].ID)
+
+	// Verify we can search by SearchField
+	result2, err := repo.Find("SearchField='searchable-value'", 10, "", now)
+	require.NoError(t, err)
+	assert.Len(t, result2.Entities, 1)
+	assert.Equal(t, entity.ID, result2.Entities[0].ID)
+
+	// Verify we CANNOT search by virtual fields - should return error
+	_, err = repo.Find("VirtualData='anything'", 10, "", now)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "virtual")
+
+	_, err = repo.Find("TempCache='anything'", 10, "", now)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "virtual")
+
+	_, err = repo.Find("RuntimeInfo='anything'", 10, "", now)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "virtual")
+}
+
+func TestVirtualFields_ValidationErrors_RocksDB(t *testing.T) {
+	store := newRocksdbStore(t)
+
+	// Test virtual field cannot be unique
+	_, err := db.NewRepository[InvalidVirtualUniqueEntity](store, TestFC, testColumnFamilySector, "test_virtual_unique", &db.DefaultIDGeneratorFactory{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be both virtual and unique")
+
+	// Test virtual field cannot be data-only
+	_, err = db.NewRepository[InvalidVirtualDataOnlyEntity](store, TestFC, testColumnFamilySector, "test_virtual_data_only", &db.DefaultIDGeneratorFactory{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be both virtual and data-only")
+}
