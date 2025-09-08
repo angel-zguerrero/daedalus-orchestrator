@@ -58,6 +58,21 @@ interface Binding {
   CreatedAt?: string;
   UpdatedAt?: string;
   Headers?: { [key: string]: string }; // Added headers support
+  // Virtual objects for dynamic binding resolution
+  virtualExchange?: {
+    exchangeType?: string;
+    code?: string;
+    name?: string;
+  };
+  virtualQueue?: {
+    queueType?: string;
+    code?: string;
+    name?: string;
+  };
+  routingHeaders?: Array<{
+    key: string;
+    value: string;
+  }>;
   // Objetos completos cuando includeObjects=true
   Exchange?: Exchange;
   Queue?: Queue;
@@ -66,6 +81,8 @@ interface Binding {
   exchangeCode: string;
   queueCode: string;
   vnamespace: string;
+  VNamespace?: string; // Possible variation
+  Vnamespace?: string; // Possible variation
   routingKey?: string;
   pattern?: string;
   xMatch?: string;
@@ -629,6 +646,11 @@ export class BindingsComponent implements OnInit {
       next: (response) => {
         this.bindings = response.result.Entities || [];
         this.cursor = response.result.Cursor;
+        
+        // Debug: Log the first binding to see the structure
+        if (this.bindings.length > 0) {
+          console.log('Sample binding data:', this.bindings[0]);
+        }
       },
       error: (error) => {
         this.showAlert = true;
@@ -671,14 +693,35 @@ export class BindingsComponent implements OnInit {
     this.showAlert = false;
   }
 
+  private getVNamespaceFromBinding(binding: any): string {
+    return binding.vnamespace || 
+           binding.VNamespace || 
+           binding.Vnamespace || 
+           '';
+  }
+
+  // Public method for template use
+  getVNamespace(binding: any): string {
+    return this.getVNamespaceFromBinding(binding);
+  }
+
   deleteBinding(): void {
     console.log('Deleting binding:::', this.selectedBinding);
-    if (this.selectedBinding) {
+    if (this.selectedBinding && this.selectedBinding.Code) {
+      const vnamespace = this.getVNamespaceFromBinding(this.selectedBinding);
+      
+      console.log('Using vnamespace:', vnamespace);
+      
+      if (!vnamespace) {
+        this.showAlert = true;
+        this.errorMessage = 'Virtual namespace is required but not found in binding data';
+        return;
+      }
+
       this.bindingsService.deleteBinding(
         this.tenantId, 
-        this.selectedBinding.exchangeCode,
-        this.selectedBinding.queueCode,
-        this.selectedBinding.vnamespace
+        this.selectedBinding.Code,
+        vnamespace
       ).subscribe({
         next: () => {
           this.deleteModalVisible = false;
@@ -868,5 +911,23 @@ export class BindingsComponent implements OnInit {
       headersMap[header.key] = header.value;
     });
     return headersMap;
+  }
+
+  getBindingTypeDisplayName(type?: string): string {
+    const typeNames: { [key: string]: string } = {
+      'classic': 'Classic',
+      'dynamic': 'Dynamic'
+    };
+    return typeNames[type || 'classic'] || 'Classic';
+  }
+
+  getExchangeTypeColor(type?: string): string {
+    const typeColors: { [key: string]: string } = {
+      'direct': '#007bff',    // Blue
+      'topic': '#28a745',     // Green
+      'headers': '#dc3545',   // Red
+      'fanout': '#ffc107'     // Yellow
+    };
+    return typeColors[type || 'direct'] || '#6c757d'; // Gray as default
   }
 }

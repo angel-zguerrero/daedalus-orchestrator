@@ -101,9 +101,8 @@ message GetBindingsResponse {
 
 message DeleteBindingRequest {
   string tenantId = 1;
-  string exchangeCode = 2;
-  string queueCode = 3;
-  string vnamespace = 4;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message DeleteBindingResponse {

@@ -232,8 +232,7 @@ func (s *BindingService) DeleteBinding(ctx context.Context, r *pb.DeleteBindingR
 
 	err = s.BindingBO.DeleteBinding(
 		ctx,
-		r.ExchangeCode,
-		r.QueueCode,
+		r.Code,
 		r.Vnamespace,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
@@ -243,7 +242,7 @@ func (s *BindingService) DeleteBinding(ctx context.Context, r *pb.DeleteBindingR
 	}
 
 	return &pb.DeleteBindingResponse{
-		Message: fmt.Sprintf("Binding between exchange %s and queue %s in namespace %s was deleted", r.ExchangeCode, r.QueueCode, r.Vnamespace),
+		Message: fmt.Sprintf("Binding with code %s in namespace %s was deleted", r.Code, r.Vnamespace),
 	}, nil
 }
 

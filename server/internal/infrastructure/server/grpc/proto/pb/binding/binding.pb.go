@@ -848,9 +848,8 @@ func (x *GetBindingsResponse) GetResult() *BindingFindResult {
 type DeleteBindingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	ExchangeCode  string                 `protobuf:"bytes,2,opt,name=exchangeCode,proto3" json:"exchangeCode,omitempty"`
-	QueueCode     string                 `protobuf:"bytes,3,opt,name=queueCode,proto3" json:"queueCode,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,4,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -892,16 +891,9 @@ func (x *DeleteBindingRequest) GetTenantId() string {
 	return ""
 }
 
-func (x *DeleteBindingRequest) GetExchangeCode() string {
+func (x *DeleteBindingRequest) GetCode() string {
 	if x != nil {
-		return x.ExchangeCode
-	}
-	return ""
-}
-
-func (x *DeleteBindingRequest) GetQueueCode() string {
-	if x != nil {
-		return x.QueueCode
+		return x.Code
 	}
 	return ""
 }
@@ -1053,13 +1045,12 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"c\n" +
 	"\x13GetBindingsResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x122\n" +
-	"\x06result\x18\x02 \x01(\v2\x1a.binding.BindingFindResultR\x06result\"\x94\x01\n" +
+	"\x06result\x18\x02 \x01(\v2\x1a.binding.BindingFindResultR\x06result\"f\n" +
 	"\x14DeleteBindingRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\"\n" +
-	"\fexchangeCode\x18\x02 \x01(\tR\fexchangeCode\x12\x1c\n" +
-	"\tqueueCode\x18\x03 \x01(\tR\tqueueCode\x12\x1e\n" +
+	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
 	"\n" +
-	"vnamespace\x18\x04 \x01(\tR\n" +
+	"vnamespace\x18\x03 \x01(\tR\n" +
 	"vnamespace\"1\n" +
 	"\x15DeleteBindingResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage2\xc1\x02\n" +

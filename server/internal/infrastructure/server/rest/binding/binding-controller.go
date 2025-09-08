@@ -146,10 +146,9 @@ func (ctrl *BindingController) GetBindingHandler(c *gin.Context) {
 	})
 }
 
-// DeleteBindingHandler handles DELETE /rest-api/tenants/:id/binding/:exchangeCode/:queueCode/:vnamespace
+// DeleteBindingHandler handles DELETE /rest-api/tenants/:id/binding/:code/:vnamespace
 func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
-	exchangeCode := c.Param("exchangeCode")
-	queueCode := c.Param("queueCode")
+	code := c.Param("code")
 	vnamespace := c.Param("vnamespace")
 	tenantID := c.Param("id")
 
@@ -161,8 +160,7 @@ func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 
 	err = ctrl.BindingBO.DeleteBinding(
 		c.Request.Context(),
-		exchangeCode,
-		queueCode,
+		code,
 		vnamespace,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
@@ -173,7 +171,7 @@ func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("Binding between exchange %s and queue %s in namespace %s was deleted", exchangeCode, queueCode, vnamespace),
+		"message": fmt.Sprintf("Binding with code %s in namespace %s was deleted", code, vnamespace),
 	})
 }
 

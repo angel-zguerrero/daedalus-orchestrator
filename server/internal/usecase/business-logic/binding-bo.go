@@ -127,16 +127,15 @@ func (bo *BindingBO) GetBinding(ctx context.Context, exchangeCode, queueCode, vn
 	return binding, nil
 }
 
-func (bo *BindingBO) DeleteBinding(ctx context.Context, exchangeCode, queueCode, vnamespace, cf, cfs string) error {
+func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cfs string) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
 	defer writeCancel()
 
 	deleteBindingCommand := &binding_command.DeleteBindingCommand{
-		ExchangeCode: exchangeCode,
-		QueueCode:    queueCode,
-		VNamespace:   vnamespace,
-		CF:           cf,
-		CFS:          cfs,
+		Code:       code,
+		VNamespace: vnamespace,
+		CF:         cf,
+		CFS:        cfs,
 	}
 
 	fsmCmd := general_command.FSM_Command{
@@ -147,7 +146,7 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, exchangeCode, queueCode,
 
 	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Failed to delete binding")
+		bo.Config.Logger.Error().Err(err).Str("Code", code).Str("VNamespace", vnamespace).Msg("Failed to delete binding")
 		return errors.New("Failed to delete binding: " + err.Error())
 	}
 
@@ -155,7 +154,7 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, exchangeCode, queueCode,
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Binding deletion command returned unexpected result type")
+		bo.Config.Logger.Error().Err(err).Str("Code", code).Str("VNamespace", vnamespace).Msg("Binding deletion command returned unexpected result type")
 		return errors.New("Binding deletion command returned unexpected error")
 	}
 
@@ -163,7 +162,6 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, exchangeCode, queueCode,
 		return errors.New("Failed to delete binding error: " + parsedResult.Error)
 	}
 
-	bo.Config.Logger.Info().Str("ExchangeCode", exchangeCode).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("binding deleted successfully")
 	return nil
 }
 

@@ -59,8 +59,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 				tenantsGroup.POST("/:id/binding", bindingController.CreateBindingHandler)
 				tenantsGroup.GET("/:id/bindings", bindingController.GetBindingsHandler)
-				tenantsGroup.GET("/:id/binding/:exchangeCode/:queueCode/:vnamespace", bindingController.GetBindingHandler)
-				tenantsGroup.DELETE("/:id/binding/:exchangeCode/:queueCode/:vnamespace", bindingController.DeleteBindingHandler)
+				tenantsGroup.GET("/:id/binding/:code/:vnamespace", bindingController.GetBindingHandler)
+				tenantsGroup.DELETE("/:id/binding/:code/:vnamespace", bindingController.DeleteBindingHandler)
 
 				tenantsGroup.GET("/:id/vnamespaces", vnamespaceController.GetVNamespacesHandler)
 			}
