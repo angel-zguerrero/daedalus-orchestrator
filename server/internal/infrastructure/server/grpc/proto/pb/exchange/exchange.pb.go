@@ -28,6 +28,7 @@ type CreateExchangeRequest struct {
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Headers       map[string]string      `protobuf:"bytes,6,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -95,6 +96,13 @@ func (x *CreateExchangeRequest) GetVnamespace() string {
 		return x.Vnamespace
 	}
 	return ""
+}
+
+func (x *CreateExchangeRequest) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
 }
 
 type CreateExchangeResponse struct {
@@ -207,6 +215,7 @@ type CreateExchangeItem struct {
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,4,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Headers       map[string]string      `protobuf:"bytes,5,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -267,6 +276,13 @@ func (x *CreateExchangeItem) GetVnamespace() string {
 		return x.Vnamespace
 	}
 	return ""
+}
+
+func (x *CreateExchangeItem) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
 }
 
 type BulkCreateExchangeResponse struct {
@@ -518,6 +534,7 @@ type Exchange struct {
 	VNamespace    string                 `protobuf:"bytes,5,opt,name=VNamespace,proto3" json:"VNamespace,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	Headers       map[string]string      `protobuf:"bytes,8,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -599,6 +616,13 @@ func (x *Exchange) GetUpdatedAt() string {
 		return x.UpdatedAt
 	}
 	return ""
+}
+
+func (x *Exchange) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
 }
 
 type ExchangeFindResult struct {
@@ -813,7 +837,7 @@ var File_internal_infrastructure_server_grpc_proto_definitions_exchange_proto pr
 
 const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc = "" +
 	"\n" +
-	"Dinternal/infrastructure/server/grpc/proto/definitions/exchange.proto\x12\bexchange\"\x8f\x01\n" +
+	"Dinternal/infrastructure/server/grpc/proto/definitions/exchange.proto\x12\bexchange\"\x93\x02\n" +
 	"\x15CreateExchangeRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -821,20 +845,28 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"^\n" +
+	"vnamespace\x12F\n" +
+	"\aheaders\x18\x06 \x03(\v2,.exchange.CreateExchangeRequest.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"^\n" +
 	"\x16CreateExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
 	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"s\n" +
 	"\x19BulkCreateExchangeRequest\x12\x1a\n" +
 	"\btenantId\x18\x01 \x01(\tR\btenantId\x12:\n" +
-	"\texchanges\x18\x02 \x03(\v2\x1c.exchange.CreateExchangeItemR\texchanges\"p\n" +
+	"\texchanges\x18\x02 \x03(\v2\x1c.exchange.CreateExchangeItemR\texchanges\"\xf1\x01\n" +
 	"\x12CreateExchangeItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x04 \x01(\tR\n" +
-	"vnamespace\"b\n" +
+	"vnamespace\x12C\n" +
+	"\aheaders\x18\x05 \x03(\v2).exchange.CreateExchangeItem.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"b\n" +
 	"\x1aBulkCreateExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
 	"\x06result\x18\x02 \x03(\v2\x12.exchange.ExchangeR\x06result\"d\n" +
@@ -854,7 +886,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"\xb2\x01\n" +
+	"vnamespace\"\xa9\x02\n" +
 	"\bExchange\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
 	"\x04Code\x18\x02 \x01(\tR\x04Code\x12\x12\n" +
@@ -864,7 +896,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"VNamespace\x18\x05 \x01(\tR\n" +
 	"VNamespace\x12\x1c\n" +
 	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\"\\\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\x129\n" +
+	"\aheaders\x18\b \x03(\v2\x1f.exchange.Exchange.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\\\n" +
 	"\x12ExchangeFindResult\x12.\n" +
 	"\bEntities\x18\x01 \x03(\v2\x12.exchange.ExchangeR\bEntities\x12\x16\n" +
 	"\x06Cursor\x18\x02 \x01(\tR\x06Cursor\"f\n" +
@@ -898,7 +934,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_r
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_goTypes = []any{
 	(*CreateExchangeRequest)(nil),      // 0: exchange.CreateExchangeRequest
 	(*CreateExchangeResponse)(nil),     // 1: exchange.CreateExchangeResponse
@@ -913,29 +949,35 @@ var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_go
 	(*GetExchangesResponse)(nil),       // 10: exchange.GetExchangesResponse
 	(*DeleteExchangeRequest)(nil),      // 11: exchange.DeleteExchangeRequest
 	(*DeleteExchangeResponse)(nil),     // 12: exchange.DeleteExchangeResponse
+	nil,                                // 13: exchange.CreateExchangeRequest.HeadersEntry
+	nil,                                // 14: exchange.CreateExchangeItem.HeadersEntry
+	nil,                                // 15: exchange.Exchange.HeadersEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_depIdxs = []int32{
-	8,  // 0: exchange.CreateExchangeResponse.result:type_name -> exchange.Exchange
-	3,  // 1: exchange.BulkCreateExchangeRequest.exchanges:type_name -> exchange.CreateExchangeItem
-	8,  // 2: exchange.BulkCreateExchangeResponse.result:type_name -> exchange.Exchange
-	8,  // 3: exchange.GetExchangeResponse.result:type_name -> exchange.Exchange
-	8,  // 4: exchange.ExchangeFindResult.Entities:type_name -> exchange.Exchange
-	9,  // 5: exchange.GetExchangesResponse.result:type_name -> exchange.ExchangeFindResult
-	0,  // 6: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
-	2,  // 7: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
-	5,  // 8: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
-	7,  // 9: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
-	11, // 10: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
-	1,  // 11: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
-	4,  // 12: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
-	6,  // 13: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
-	10, // 14: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
-	12, // 15: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	13, // 0: exchange.CreateExchangeRequest.headers:type_name -> exchange.CreateExchangeRequest.HeadersEntry
+	8,  // 1: exchange.CreateExchangeResponse.result:type_name -> exchange.Exchange
+	3,  // 2: exchange.BulkCreateExchangeRequest.exchanges:type_name -> exchange.CreateExchangeItem
+	14, // 3: exchange.CreateExchangeItem.headers:type_name -> exchange.CreateExchangeItem.HeadersEntry
+	8,  // 4: exchange.BulkCreateExchangeResponse.result:type_name -> exchange.Exchange
+	8,  // 5: exchange.GetExchangeResponse.result:type_name -> exchange.Exchange
+	15, // 6: exchange.Exchange.headers:type_name -> exchange.Exchange.HeadersEntry
+	8,  // 7: exchange.ExchangeFindResult.Entities:type_name -> exchange.Exchange
+	9,  // 8: exchange.GetExchangesResponse.result:type_name -> exchange.ExchangeFindResult
+	0,  // 9: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
+	2,  // 10: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
+	5,  // 11: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
+	7,  // 12: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
+	11, // 13: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
+	1,  // 14: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
+	4,  // 15: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
+	6,  // 16: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
+	10, // 17: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
+	12, // 18: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_init() }
@@ -949,7 +991,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_i
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

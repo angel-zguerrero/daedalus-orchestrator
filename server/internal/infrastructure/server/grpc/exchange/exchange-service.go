@@ -35,7 +35,7 @@ func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchan
 		return nil, err
 	}
 
-	exchange, err := s.ExchangeBO.CreateExchange(ctx, r.Code, r.Vnamespace, r.Name, models.ExchangeType(r.Type), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := s.ExchangeBO.CreateExchange(ctx, r.Code, r.Vnamespace, r.Name, models.ExchangeType(r.Type), r.Headers, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -50,6 +50,7 @@ func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchan
 			VNamespace: exchange.VNamespace,
 			CreatedAt:  exchange.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:  exchange.UpdatedAt.Format(time.RFC3339),
+			Headers:    exchange.Headers,
 		},
 	}, nil
 }
@@ -67,6 +68,7 @@ func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCrea
 			VNamespace: t.Vnamespace,
 			Name:       t.Name,
 			Type:       models.ExchangeType(t.Type),
+			Headers:    t.Headers,
 		}
 		exchanges = append(exchanges, exchange)
 	}
@@ -86,6 +88,7 @@ func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCrea
 			VNamespace: e.VNamespace,
 			CreatedAt:  e.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:  e.UpdatedAt.Format(time.RFC3339),
+			Headers:    e.Headers,
 		}
 		rExchanges = append(rExchanges, ex)
 	}
@@ -117,6 +120,7 @@ func (s *ExchangeService) GetExchange(ctx context.Context, r *pb.GetExchangeRequ
 			VNamespace: exchange.VNamespace,
 			CreatedAt:  exchange.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:  exchange.UpdatedAt.Format(time.RFC3339),
+			Headers:    exchange.Headers,
 		},
 	}, nil
 }
@@ -149,6 +153,7 @@ func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRe
 			VNamespace: e.VNamespace,
 			CreatedAt:  e.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:  e.UpdatedAt.Format(time.RFC3339),
+			Headers:    e.Headers,
 		}
 	}
 

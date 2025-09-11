@@ -29,6 +29,12 @@ func (cmd *FindExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 		return *commandResult
 	}
 
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	exchange, err := exchangeRepo.GetExchangeByCode(cmd.Code, cmd.VNamespace, now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -39,6 +45,16 @@ func (cmd *FindExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 		commandResult.Error = "exchange not found"
 		return *commandResult
 	}
+
+	// Load headers for the exchange
+	headers := make(map[string]string)
+	headersResult, err := routingHeadersRepo.GetRoutingHeadersByExchange(exchange.ID, now)
+	if err == nil && headersResult != nil {
+		for _, header := range headersResult.Entities {
+			headers[header.Key] = header.Value
+		}
+	}
+	exchange.Headers = headers
 
 	commandResult.Result = *exchange
 	return *commandResult

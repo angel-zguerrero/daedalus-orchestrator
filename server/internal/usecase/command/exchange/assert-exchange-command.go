@@ -41,6 +41,12 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	var resultExchanges []models.Exchange
 	newExchangesCount := 0
 
@@ -116,6 +122,16 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
+
+		// Update headers if provided
+		if exchange.Headers != nil && len(exchange.Headers) > 0 {
+			err = cmd.upsertExchangeHeaders(routingHeadersRepo, exchange.ID, exchange.Headers, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+		}
+
 		resultExchanges = append(resultExchanges, exchange)
 	}
 
@@ -130,4 +146,63 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 	commandResult.Result = resultExchanges
 	return *commandResult
+}
+
+// upsertExchangeHeaders creates or updates routing headers for an exchange
+func (cmd *AssertExchangeCommand) upsertExchangeHeaders(routingHeadersRepo *db.RoutingHeadersRepository, exchangeID string, headers map[string]string, now time.Time) error {
+	// Get existing headers for this exchange
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByExchange(exchangeID, now)
+	if err != nil {
+		return err
+	}
+
+	// Create a map for quick lookup of existing headers
+	existingByKey := make(map[string]*models.RoutingHeader)
+	if existingHeaders != nil {
+		for i := range existingHeaders.Entities {
+			header := &existingHeaders.Entities[i]
+			existingByKey[header.Key] = header
+		}
+	}
+
+	// Process each header from input
+	for key, value := range headers {
+		if existingHeader, exists := existingByKey[key]; exists {
+			// Update existing header if value changed
+			if existingHeader.Value != value {
+				existingHeader.Value = value
+				_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			headerID := exchangeID + "_" + key
+			// Create new header
+			routingHeader := &models.RoutingHeader{
+				ID:         headerID,
+				ExchangeID: exchangeID,
+				Key:        key,
+				Value:      value,
+			}
+			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Remove headers that are no longer in the input
+	if existingHeaders != nil {
+		for _, existingHeader := range existingHeaders.Entities {
+			if _, stillExists := headers[existingHeader.Key]; !stillExists {
+				_, err := routingHeadersRepo.DeleteRoutingHeader(existingHeader.ID, now)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }

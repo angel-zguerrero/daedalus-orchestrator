@@ -93,6 +93,12 @@ export class ExchangesComponent implements OnInit {
   loadingFilterVNamespaces = false;
   selectedVNamespaceFilter = '';
 
+    // Header management variables
+  exchangeHeaderKey: string = '';
+  exchangeHeaderValue: string = '';
+  exchangeHeaders: { key: string, value: string }[] = [];
+  exchangeUpdateHeaders: { key: string, value: string }[] = [];
+
   public file: File | null = null;
 
   constructor(
@@ -189,6 +195,9 @@ export class ExchangesComponent implements OnInit {
     this.createModalVisible = true;
     this.exchangeForm.reset();
     this.exchangeForm.patchValue({ type: 'direct' });
+    this.exchangeHeaders = [];
+    this.exchangeHeaderKey = '';
+    this.exchangeHeaderValue = '';
     this.showAlert = false;
   }
 
@@ -198,6 +207,9 @@ export class ExchangesComponent implements OnInit {
     this.exchangeFormUpdate.patchValue({
       name: exchange.Name
     });
+    this.exchangeUpdateHeaders = this.getHeadersArray(exchange.headers || {});
+    this.exchangeHeaderKey = '';
+    this.exchangeHeaderValue = '';
     this.editModalVisible = true;
     this.showAlert = false;
   }
@@ -217,7 +229,14 @@ export class ExchangesComponent implements OnInit {
 
   createExchange(): void {
     if (this.exchangeForm.valid) {
-      this.exchangesService.createExchange(this.tenantId, this.exchangeForm.value).subscribe({
+      // Convert headers array to object
+      const headersObj = this.getHeadersAsMap();
+      const exchangeData = {
+        ...this.exchangeForm.value,
+        headers: headersObj
+      };
+      
+      this.exchangesService.createExchange(this.tenantId, exchangeData).subscribe({
         next: () => {
           this.createModalVisible = false;
           this.loadExchanges();
@@ -236,12 +255,15 @@ export class ExchangesComponent implements OnInit {
 
   updateExchange(): void {
     if (this.exchangeFormUpdate.valid) {
+      // Convert headers array to object
+      const headersObj = this.getUpdateHeadersAsMap();
       const exchangeData = {
         name: this.exchangeFormUpdate.value.name,
         code: this.selectedExchange.Code, // Preserve existing code (frontend cannot edit)
         type: this.selectedExchange.Type, // Preserve original type
         vnamespace: this.selectedExchange.VNamespace, // Preserve original vnamespace
-        id: this.selectedExchange.ID
+        id: this.selectedExchange.ID,
+        headers: headersObj
       };
       this.exchangesService.createExchange(this.tenantId, exchangeData).subscribe({
         next: () => {
@@ -322,6 +344,63 @@ export class ExchangesComponent implements OnInit {
       });
     };
     fileReader.readAsArrayBuffer(this.file);
+  }
+
+  // Headers management methods
+  addExchangeHeader(): void {
+    if (this.exchangeHeaderKey.trim() && this.exchangeHeaderValue.trim()) {
+      // Check if we're in create mode or edit mode
+      const targetArray = this.editModalVisible ? this.exchangeUpdateHeaders : this.exchangeHeaders;
+      const existingIndex = targetArray.findIndex(h => h.key === this.exchangeHeaderKey.trim());
+      
+      if (existingIndex >= 0) {
+        // Update existing header
+        targetArray[existingIndex].value = this.exchangeHeaderValue.trim();
+      } else {
+        // Add new header
+        targetArray.push({
+          key: this.exchangeHeaderKey.trim(),
+          value: this.exchangeHeaderValue.trim()
+        });
+      }
+      this.exchangeHeaderKey = '';
+      this.exchangeHeaderValue = '';
+    }
+  }
+
+  removeExchangeHeader(index: number): void {
+    // Check if we're in create mode or edit mode
+    if (this.editModalVisible) {
+      this.exchangeUpdateHeaders.splice(index, 1);
+    } else {
+      this.exchangeHeaders.splice(index, 1);
+    }
+  }
+
+  private getHeadersAsMap(): { [key: string]: string } {
+    const headersMap: { [key: string]: string } = {};
+    this.exchangeHeaders.forEach(header => {
+      if (header.key && header.value) {
+        headersMap[header.key] = header.value;
+      }
+    });
+    return headersMap;
+  }
+
+  private getUpdateHeadersAsMap(): { [key: string]: string } {
+    const headersMap: { [key: string]: string } = {};
+    this.exchangeUpdateHeaders.forEach(header => {
+      if (header.key && header.value) {
+        headersMap[header.key] = header.value;
+      }
+    });
+    return headersMap;
+  }
+
+  // Helper method to convert headers object to array for display
+  getHeadersArray(headers: { [key: string]: string }): { key: string, value: string }[] {
+    if (!headers) return [];
+    return Object.keys(headers).map(key => ({ key, value: headers[key] }));
   }
 
   getExchangeTypeColor(type: string): string {

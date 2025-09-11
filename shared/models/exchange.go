@@ -29,6 +29,8 @@ type Exchange struct {
 	// Together with Name, they form a unique constraint: (Name, VNamespace)
 	VNamespace string `orm:"unique-compound:0"`
 
+	Headers map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

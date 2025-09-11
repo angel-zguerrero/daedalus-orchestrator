@@ -18,6 +18,7 @@ message CreateExchangeRequest {
   string name = 3;
   string type = 4;
   string vnamespace = 5;
+  map<string, string> headers = 6;
 }
 
 message CreateExchangeResponse {
@@ -35,6 +36,7 @@ message CreateExchangeItem {
   string name = 2;
   string type = 3;
   string vnamespace = 4;
+  map<string, string> headers = 5;
 }
 
 message BulkCreateExchangeResponse {
@@ -69,6 +71,7 @@ message Exchange {
   string VNamespace = 5;
   string CreatedAt = 6;
   string UpdatedAt = 7;
+  map<string, string> headers = 8;
 }
 
 message ExchangeFindResult {
