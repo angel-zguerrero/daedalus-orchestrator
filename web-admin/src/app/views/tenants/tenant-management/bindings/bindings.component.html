@@ -356,83 +356,58 @@
         </c-col>
       </c-row>
 
-      <!-- Headers Section - only for Headers exchanges -->
+      <!-- Headers Configuration Section - only for Headers exchanges -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="showHeaders">
         <c-col [md]="12">
-          <label cLabel class="fw-bold">
+          <hr>
+          <h6 class="mb-3">
             <svg cIcon name="cil-tags" class="me-2"></svg>
-            Headers
-          </label>
-          <small class="form-text text-muted mb-3">Add key-value pairs for headers exchange routing</small>
-          
-          <!-- Add Header Form -->
-          <div class="border rounded p-3 mb-3 bg-light">
-            <c-row [gutter]="{gy: 2, gx: 2}">
-              <c-col [md]="4">
-                <input 
-                  cFormControl 
-                  placeholder="Header key" 
-                  [value]="newHeaderKey"
-                  (input)="onHeaderKeyInput($event)"
-                  (keydown.enter)="addHeader()"
-                  [class.is-invalid]="newHeaderKey.trim() && isHeaderKeyDuplicate()" />
-                <div *ngIf="newHeaderKey.trim() && isHeaderKeyDuplicate()" class="invalid-feedback">
-                  Key already exists - will update existing header
-                </div>
-              </c-col>
-              <c-col [md]="6">
-                <input 
-                  cFormControl 
-                  placeholder="Header value" 
-                  [value]="newHeaderValue"
-                  (input)="onHeaderValueInput($event)"
-                  (keydown.enter)="addHeader()" />
-              </c-col>
-              <c-col [md]="2">
-                <button 
-                  cButton 
-                  [color]="isHeaderKeyDuplicate() && newHeaderKey.trim() ? 'warning' : 'success'"
-                  size="sm" 
-                  (click)="addHeader()"
-                  [disabled]="!newHeaderKey.trim() || !newHeaderValue.trim()">
-                  <svg cIcon [name]="isHeaderKeyDuplicate() && newHeaderKey.trim() ? 'cil-pencil' : 'cil-plus'"></svg>
-                  {{ isHeaderKeyDuplicate() && newHeaderKey.trim() ? 'Update' : 'Add' }}
-                </button>
-              </c-col>
-            </c-row>
-          </div>
+            Binding Headers (Optional)
+          </h6>
+        </c-col>
+      </c-row>
 
-          <!-- Headers List -->
-          <div *ngIf="headers.length > 0" class="border rounded p-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <h6 class="mb-0">Current Headers ({{ headers.length }})</h6>
-              <small class="text-muted">X-Match: {{ bindingForm.get('xMatch')?.value || 'all' }}</small>
-            </div>
-            <div class="row">
-              <div *ngFor="let header of headers; let i = index" class="col-12 mb-2">
-                <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
-                  <div class="d-flex flex-grow-1">
-                    <code class="me-3 text-info">{{ header.key }}</code>
-                    <code class="text-light">{{ header.value }}</code>
-                  </div>
-                  <button 
-                    cButton 
-                    color="danger" 
-                    size="sm" 
-                    variant="ghost"
-                    (click)="removeHeader(i)"
-                    title="Remove header">
-                    <svg cIcon name="cil-trash"></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- No Headers Message -->
-          <div *ngIf="headers.length === 0" class="text-center p-3 text-muted">
-            <svg cIcon name="cil-info" class="me-2"></svg>
-            No headers added yet. Add headers above for routing configuration.
+      <!-- Headers Management -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="showHeaders">
+        <c-col [md]="5">
+          <label cLabel for="headerKey">Header Key</label>
+          <input cFormControl id="headerKey" [value]="newHeaderKey" (input)="onHeaderKeyInput($event)" placeholder="e.g., content-type" />
+        </c-col>
+        <c-col [md]="5">
+          <label cLabel for="headerValue">Header Value</label>
+          <input cFormControl id="headerValue" [value]="newHeaderValue" (input)="onHeaderValueInput($event)" placeholder="e.g., application/json" />
+        </c-col>
+        <c-col [md]="2" class="d-flex align-items-end">
+          <button cButton color="success" variant="outline" (click)="addHeader()" [disabled]="!newHeaderKey.trim() || !newHeaderValue.trim()">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </c-col>
+      </c-row>
+
+      <!-- Headers List -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="showHeaders && headers.length > 0">
+        <c-col [md]="12">
+          <div class="table-responsive">
+            <table cTable class="table-sm">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="80">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let header of headers; let i = index">
+                  <td><code>{{ header.key }}</code></td>
+                  <td>{{ header.value }}</td>
+                  <td>
+                    <button cButton color="danger" variant="outline" size="sm" (click)="removeHeader(i)">
+                      <svg cIcon name="cil-trash"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </c-col>
       </c-row>
