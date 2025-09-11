@@ -154,6 +154,7 @@ export class ExchangesComponent implements OnInit {
     this.exchangesService.getExchanges(this.tenantId, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter).subscribe({
       next: (response) => {
         this.exchanges = response.result.Entities || [];
+        console.log('Loaded exchanges with headers:', this.exchanges.map(e => ({ id: e.ID, headers: e.Headers || e.headers })));
         this.cursor = response.result.Cursor;
       },
       error: (error) => {
@@ -233,10 +234,18 @@ export class ExchangesComponent implements OnInit {
 
   openDetailsModal(exchange: any): void {
     console.log('Selected exchange from table:', exchange);
+    console.log('Headers in exchange:', exchange?.Headers || exchange?.headers);
     // Use the exchange data directly from the table instead of making an API call
     this.selectedExchange = exchange;
     this.detailsModalVisible = true;
     this.showAlert = false; // Clear any previous alerts
+  }
+
+  // Helper method to get headers for display in details modal
+  getExchangeHeadersForDisplay(exchange: any): { key: string, value: string }[] {
+    if (!exchange) return [];
+    const headers = exchange.Headers || exchange.headers || {};
+    return this.getHeadersArray(headers);
   }
 
   createExchange(): void {
