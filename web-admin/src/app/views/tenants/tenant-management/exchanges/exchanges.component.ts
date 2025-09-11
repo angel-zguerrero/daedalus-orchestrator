@@ -207,7 +207,19 @@ export class ExchangesComponent implements OnInit {
     this.exchangeFormUpdate.patchValue({
       name: exchange.Name
     });
-    this.exchangeUpdateHeaders = this.getHeadersArray(exchange.headers || {});
+    
+    // Load existing headers - try both Headers (backend) and headers (frontend)
+    this.exchangeUpdateHeaders = [];
+    const headersData = exchange.Headers || exchange.headers || {};
+    if (headersData && typeof headersData === 'object') {
+      Object.keys(headersData).forEach(key => {
+        this.exchangeUpdateHeaders.push({
+          key: key,
+          value: headersData[key]
+        });
+      });
+    }
+    
     this.exchangeHeaderKey = '';
     this.exchangeHeaderValue = '';
     this.editModalVisible = true;
