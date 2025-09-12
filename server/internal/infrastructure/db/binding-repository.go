@@ -57,6 +57,18 @@ func (r *BindingRepository) GetBindingByExchangeAndQueue(exchangeID string, queu
 	return &result.Entities[0], nil
 }
 
+func (r *BindingRepository) GetBindingByExchangeAndTargetExchange(exchangeID string, targetExchangeID string, now time.Time) (*models.Binding, error) {
+	query := "ExchangeID = " + exchangeID + " & TargetExchangeID = " + targetExchangeID
+	result, err := r.Find(query, 1, "", now)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Entities) == 0 {
+		return nil, nil
+	}
+	return &result.Entities[0], nil
+}
+
 func (r *BindingRepository) GetBindingById(id string, now time.Time) (*models.Binding, error) {
 	return r.FindByField("ID", id, now)
 }

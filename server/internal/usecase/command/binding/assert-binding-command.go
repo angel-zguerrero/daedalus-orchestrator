@@ -236,8 +236,15 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 
 	// For classic bindings with exchange targets, check if there's already a binding between this exchange and target exchange
 	if cmd.BindingType == models.BindingTypeClassic && cmd.TargetExchangeType == models.TargetExchangeTypeExchange && targetExchange != nil {
-		// Note: We need to implement GetBindingByExchangeAndTargetExchange in the repository
-		// For now, we'll check during the unique constraint validation at the database level
+		existingExchangeBinding, err := bindingRepo.GetBindingByExchangeAndTargetExchange(exchange.ID, targetExchange.ID, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		if existingExchangeBinding != nil && existingExchangeBinding.Code != cmd.Code {
+			commandResult.Error = "A classic binding between exchange '" + cmd.ExchangeCode + "' and target exchange '" + cmd.TargetExchangeCode + "' already exists with Code '" + existingExchangeBinding.Code + "'"
+			return *commandResult
+		}
 	}
 
 	// Look for existing binding by Code and VNamespace
