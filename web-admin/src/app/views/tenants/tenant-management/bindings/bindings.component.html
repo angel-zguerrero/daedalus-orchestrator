@@ -279,6 +279,7 @@
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
+          <label cLabel for="xMatch">Exchange</label>
           <mat-form-field class="w-100">
             <mat-label>Exchange *</mat-label>
             <input 
@@ -310,6 +311,7 @@
         </c-col>
         <c-col [md]="6" *ngIf="showQueue || showTargetExchange">
           <!-- Queue field when target type is 'queue' -->
+          <label cLabel for="Queue"  *ngIf="showQueue">Queue</label>
           <mat-form-field class="w-100" *ngIf="showQueue">
             <mat-label>Queue *</mat-label>
             <input 
@@ -328,6 +330,7 @@
           <div class="form-text" *ngIf="showQueue">Required: Select the destination queue</div>
           
           <!-- Target Exchange field when target type is 'exchange' -->
+          <label cLabel for="Target-Exchange" *ngIf="showTargetExchange">Target Exchange</label>
           <mat-form-field class="w-100" *ngIf="showTargetExchange">
             <mat-label>Target Exchange *</mat-label>
             <input 
@@ -347,19 +350,19 @@
         <c-col [md]="6" *ngIf="!showQueue && selectedExchange">
           <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'direct'">
             <svg cIcon name="cil-info" class="me-2"></svg>
-            <strong>Dynamic Direct Binding:</strong> Queue will be determined automatically by the queue code.
+            <strong>{{ getDynamicBindingMessage('direct') }}</strong>
           </div>
           <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'topic'">
             <svg cIcon name="cil-info" class="me-2"></svg>
-            <strong>Dynamic Topic Binding:</strong> Queues will be determined where the code matches the pattern.
+            <strong>{{ getDynamicBindingMessage('topic') }}</strong>
           </div>
           <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'headers'">
             <svg cIcon name="cil-info" class="me-2"></svg>
-            <strong>Dynamic Headers Binding:</strong> Queues will be determined by queue headers, message headers, and X-Match type.
+            <strong>{{ getDynamicBindingMessage('headers') }}</strong>
           </div>
           <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'fanout'">
             <svg cIcon name="cil-info" class="me-2"></svg>
-            <strong>Dynamic Fanout Binding:</strong> Queue will be determined automatically by the queue code.
+            <strong>{{ getDynamicBindingMessage('fanout') }}</strong>
           </div>
         </c-col>
       </c-row>
@@ -416,6 +419,7 @@
           </div>
         </c-col>
         <c-col [md]="6" *ngIf="showXMatch && showAlternateExchange">
+          <label cLabel for="xMatch">Alternate Exchange (Optional)</label>
           <mat-form-field class="w-100">
             <mat-label>Alternate Exchange (Optional)</mat-label>
             <input 
@@ -687,15 +691,7 @@
 
         <!-- Binding Type - always shown -->
         <div class="col-md-6">
-          <div class="mb-3">
-            <label class="form-label fw-bold">Binding Type</label>
-            <div class="p-2 bg-dark rounded">
-              <c-badge [color]="getBindingTypeColor(selectedBinding.BindingType || selectedBinding.bindingType)" shape="rounded-pill">
-                {{ selectedBinding.BindingType || selectedBinding.bindingType || 'classic' }}
-              </c-badge>
-            </div>
-            <div class="form-text">Type of binding behavior</div>
-          </div>
+
         </div>
       </div>
 
@@ -703,19 +699,19 @@
       <div *ngIf="(selectedBinding.BindingType || selectedBinding.bindingType) === 'dynamic'" class="mb-3">
         <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'direct'">
           <svg cIcon name="cil-info" class="me-2"></svg>
-          <strong>Dynamic Direct Binding:</strong> Queue is determined automatically by the queue code.
+          <strong>{{ getDynamicBindingDetailsMessage('direct') }}</strong>
         </div>
         <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'topic'">
           <svg cIcon name="cil-info" class="me-2"></svg>
-          <strong>Dynamic Topic Binding:</strong> Queues are determined where the code matches the pattern.
+          <strong>{{ getDynamicBindingDetailsMessage('topic') }}</strong>
         </div>
         <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'headers'">
           <svg cIcon name="cil-info" class="me-2"></svg>
-          <strong>Dynamic Headers Binding:</strong> Queues are determined by queue headers, message headers, and X-Match type.
+          <strong>{{ getDynamicBindingDetailsMessage('headers') }}</strong>
         </div>
         <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'fanout'">
           <svg cIcon name="cil-info" class="me-2"></svg>
-          <strong>Dynamic Fanout Binding:</strong> Queue is determined automatically by the queue code.
+          <strong>{{ getDynamicBindingDetailsMessage('fanout') }}</strong>
         </div>
       </div>
 

@@ -84,6 +84,8 @@ interface Binding {
   queueCode: string;
   targetExchangeCode?: string;
   alternateExchangeCode?: string;
+  TargetExchangeType?: string; // Added TargetExchangeType
+  targetExchangeType?: string; // Added targetExchangeType in camelCase
   vnamespace: string;
   VNamespace?: string; // Possible variation
   Vnamespace?: string; // Possible variation
@@ -1074,5 +1076,44 @@ export class BindingsComponent implements OnInit {
       'fanout': '#ffc107'     // Yellow
     };
     return typeColors[type || 'direct'] || '#6c757d'; // Gray as default
+  }
+
+  // Dynamic message methods based on TargetExchangeType
+  getDynamicBindingMessage(exchangeType: string): string {
+    const targetType = this.bindingForm.get('targetExchangeType')?.value;
+    const entityType = targetType === 'queue' ? 'Queue' : 'Exchange';
+    const entityTypePlural = targetType === 'queue' ? 'Queues' : 'Exchanges';
+    
+    switch (exchangeType?.toLowerCase()) {
+      case 'direct':
+        return `Dynamic Direct Binding: ${entityType} will be determined automatically by the ${targetType} code.`;
+      case 'topic':
+        return `Dynamic Topic Binding: ${entityTypePlural} will be determined where the code matches the pattern.`;
+      case 'headers':
+        return `Dynamic Headers Binding: ${entityTypePlural} will be determined by ${targetType} headers, message headers, and X-Match type.`;
+      case 'fanout':
+        return `Dynamic Fanout Binding: ${entityType} will be determined automatically by the ${targetType} code.`;
+      default:
+        return `Dynamic Binding: ${entityTypePlural} will be determined automatically.`;
+    }
+  }
+
+  getDynamicBindingDetailsMessage(exchangeType: string): string {
+    const targetType = this.selectedBinding?.TargetExchangeType || this.selectedBinding?.targetExchangeType || 'queue';
+    const entityType = targetType === 'queue' ? 'Queue' : 'Exchange';
+    const entityTypePlural = targetType === 'queue' ? 'Queues' : 'Exchanges';
+    
+    switch (exchangeType?.toLowerCase()) {
+      case 'direct':
+        return `Dynamic Direct Binding: ${entityType} is determined automatically by the ${targetType} code.`;
+      case 'topic':
+        return `Dynamic Topic Binding: ${entityTypePlural} are determined where the code matches the pattern.`;
+      case 'headers':
+        return `Dynamic Headers Binding: ${entityTypePlural} are determined by ${targetType} headers, message headers, and X-Match type.`;
+      case 'fanout':
+        return `Dynamic Fanout Binding: ${entityType} is determined automatically by the ${targetType} code.`;
+      default:
+        return `Dynamic Binding: ${entityTypePlural} are determined automatically.`;
+    }
   }
 }
