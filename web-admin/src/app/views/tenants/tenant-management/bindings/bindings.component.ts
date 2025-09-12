@@ -739,9 +739,9 @@ export class BindingsComponent implements OnInit {
       if (!isValidData && !hasValidValues) {
         this.showAlert = true;
         if (bindingType === 'classic') {
-          this.errorMessage = 'Por favor selecciona un VNamespace, Exchange y Queue válidos antes de crear el binding.';
+            this.errorMessage = 'Please select a valid VNamespace, Exchange, and Queue before creating the binding.';
         } else {
-          this.errorMessage = 'Por favor selecciona un VNamespace y Exchange válidos antes de crear el binding dinámico.';
+            this.errorMessage = 'Please select a valid VNamespace and Exchange before creating the dynamic binding.';
         }
       }
     }
