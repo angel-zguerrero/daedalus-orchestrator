@@ -607,16 +607,24 @@ export class BindingsComponent implements OnInit {
     const routingKeyControl = this.bindingForm.get('routingKey');
     const patternControl = this.bindingForm.get('pattern');
     const queueControl = this.bindingForm.get('queue');
+    const targetExchangeControl = this.bindingForm.get('targetExchange');
 
     // Clear existing validators
     routingKeyControl?.clearValidators();
     patternControl?.clearValidators();
     queueControl?.clearValidators();
+    targetExchangeControl?.clearValidators();
 
-    // Set validators based on binding type
+    // Set validators based on binding type and target exchange type
     const bindingType = this.bindingForm.get('bindingType')?.value;
+    const targetExchangeType = this.bindingForm.get('targetExchangeType')?.value;
+    
     if (bindingType === 'classic') {
-      queueControl?.setValidators([Validators.required]);
+      if (targetExchangeType === 'queue') {
+        queueControl?.setValidators([Validators.required]);
+      } else if (targetExchangeType === 'exchange') {
+        targetExchangeControl?.setValidators([Validators.required]);
+      }
     }
 
     // Set validators based on exchange type and binding type
@@ -638,6 +646,7 @@ export class BindingsComponent implements OnInit {
     routingKeyControl?.updateValueAndValidity();
     patternControl?.updateValueAndValidity();
     queueControl?.updateValueAndValidity();
+    targetExchangeControl?.updateValueAndValidity();
   }
 
   // Modal and CRUD operations
