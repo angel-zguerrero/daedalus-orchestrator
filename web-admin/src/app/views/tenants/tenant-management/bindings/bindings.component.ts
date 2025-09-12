@@ -261,14 +261,14 @@ export class BindingsComponent implements OnInit {
     this.filteredTargetExchanges = this.targetExchangeCtrl.valueChanges.pipe(
       startWith(null),
       debounceTime(300),
-      switchMap(value => this._filterExchanges(this.getSearchTerm(value)))
+      switchMap(value => this._filterTargetExchanges(this.getSearchTerm(value)))
     );
 
     // Alternate Exchange autocomplete
     this.filteredAlternateExchanges = this.alternateExchangeCtrl.valueChanges.pipe(
       startWith(null),
       debounceTime(300),
-      switchMap(value => this._filterExchanges(this.getSearchTerm(value)))
+      switchMap(value => this._filterAlternateExchanges(this.getSearchTerm(value)))
     );
 
     // Queue autocomplete
@@ -290,6 +290,9 @@ export class BindingsComponent implements OnInit {
     this.exchangeCtrl.valueChanges.subscribe(exchange => {
       this.selectedExchange = exchange;
       this.onExchangeChange();
+      // Refresh filters when main exchange changes
+      this.refreshTargetExchangeFilter();
+      this.refreshAlternateExchangeFilter();
     });
 
     // Watch Queue changes
@@ -301,11 +304,15 @@ export class BindingsComponent implements OnInit {
     // Watch Target Exchange changes
     this.targetExchangeCtrl.valueChanges.subscribe(targetExchange => {
       this.selectedTargetExchange = targetExchange;
+      // Refresh alternate exchange filter when target exchange changes
+      this.refreshAlternateExchangeFilter();
     });
 
     // Watch Alternate Exchange changes
     this.alternateExchangeCtrl.valueChanges.subscribe(alternateExchange => {
       this.selectedAlternateExchange = alternateExchange;
+      // Refresh target exchange filter when alternate exchange changes
+      this.refreshTargetExchangeFilter();
     });
 
     // Watch BindingType changes
@@ -396,6 +403,86 @@ export class BindingsComponent implements OnInit {
       catchError(error => {
         this.loadingExchanges = false;
         console.error('Error filtering exchanges:', error);
+        return of([]);
+      })
+    );
+  }
+
+  private _filterTargetExchanges(value: string): Observable<Exchange[]> {
+    if (!this.selectedVNamespace) {
+      return of([]);
+    }
+
+    this.loadingExchanges = true;
+    return this.exchangesService.getExchanges(this.tenantId, '', 50, value, this.selectedVNamespace.Code).pipe(
+      map(response => {
+        this.loadingExchanges = false;
+        let exchanges = (response.result?.Entities || []).map((item: any) => ({
+          Code: item.Code,
+          Name: item.Name,
+          Type: item.Type,
+          VNamespace: item.VNamespace,
+          Description: item.Description
+        } as Exchange));
+
+        // Filter out Fanout exchanges for dynamic bindings
+        const bindingType = this.bindingForm.get('bindingType')?.value;
+        if (bindingType === 'dynamic') {
+          exchanges = exchanges.filter((exchange: Exchange) => exchange.Type !== 'fanout');
+        }
+
+        // Filter out the selected main exchange and alternate exchange
+        exchanges = exchanges.filter((exchange: Exchange) => {
+          const isMainExchange = this.selectedExchange && exchange.Code === this.selectedExchange.Code;
+          const isAlternateExchange = this.selectedAlternateExchange && exchange.Code === this.selectedAlternateExchange.Code;
+          return !isMainExchange && !isAlternateExchange;
+        });
+
+        return exchanges;
+      }),
+      catchError(error => {
+        this.loadingExchanges = false;
+        console.error('Error filtering target exchanges:', error);
+        return of([]);
+      })
+    );
+  }
+
+  private _filterAlternateExchanges(value: string): Observable<Exchange[]> {
+    if (!this.selectedVNamespace) {
+      return of([]);
+    }
+
+    this.loadingExchanges = true;
+    return this.exchangesService.getExchanges(this.tenantId, '', 50, value, this.selectedVNamespace.Code).pipe(
+      map(response => {
+        this.loadingExchanges = false;
+        let exchanges = (response.result?.Entities || []).map((item: any) => ({
+          Code: item.Code,
+          Name: item.Name,
+          Type: item.Type,
+          VNamespace: item.VNamespace,
+          Description: item.Description
+        } as Exchange));
+
+        // Filter out Fanout exchanges for dynamic bindings
+        const bindingType = this.bindingForm.get('bindingType')?.value;
+        if (bindingType === 'dynamic') {
+          exchanges = exchanges.filter((exchange: Exchange) => exchange.Type !== 'fanout');
+        }
+
+        // Filter out the selected main exchange and target exchange
+        exchanges = exchanges.filter((exchange: Exchange) => {
+          const isMainExchange = this.selectedExchange && exchange.Code === this.selectedExchange.Code;
+          const isTargetExchange = this.selectedTargetExchange && exchange.Code === this.selectedTargetExchange.Code;
+          return !isMainExchange && !isTargetExchange;
+        });
+
+        return exchanges;
+      }),
+      catchError(error => {
+        this.loadingExchanges = false;
+        console.error('Error filtering alternate exchanges:', error);
         return of([]);
       })
     );
@@ -708,6 +795,10 @@ export class BindingsComponent implements OnInit {
     
     // Ensure code field is enabled
     this.bindingForm.get('code')?.enable();
+    
+    // Refresh filters after reset
+    this.refreshTargetExchangeFilter();
+    this.refreshAlternateExchangeFilter();
   }
 
   private populateFormWithBinding(binding: Binding): void {
@@ -759,6 +850,10 @@ export class BindingsComponent implements OnInit {
     
     // Update form validation
     this.updateFormValidation();
+    
+    // Refresh filters to exclude selected exchanges
+    this.refreshTargetExchangeFilter();
+    this.refreshAlternateExchangeFilter();
   }
 
   createBinding(): void {
@@ -1003,16 +1098,41 @@ export class BindingsComponent implements OnInit {
   onExchangeSelected(event: MatAutocompleteSelectedEvent): void {
     this.selectedExchange = event.option.value;
     this.onExchangeChange();
+    // Refresh target and alternate exchange filters to exclude this exchange
+    this.refreshTargetExchangeFilter();
+    this.refreshAlternateExchangeFilter();
   }
 
   // Method for target exchange selection event
   onTargetExchangeSelected(event: MatAutocompleteSelectedEvent): void {
     this.selectedTargetExchange = event.option.value;
+    // Refresh alternate exchange filter to exclude this exchange
+    this.refreshAlternateExchangeFilter();
   }
 
   // Method for alternate exchange selection event
   onAlternateExchangeSelected(event: MatAutocompleteSelectedEvent): void {
     this.selectedAlternateExchange = event.option.value;
+    // Refresh target exchange filter to exclude this exchange
+    this.refreshTargetExchangeFilter();
+  }
+
+  // Refresh target exchange filter to exclude selected exchanges
+  private refreshTargetExchangeFilter(): void {
+    this.filteredTargetExchanges = this.targetExchangeCtrl.valueChanges.pipe(
+      startWith(this.targetExchangeCtrl.value),
+      debounceTime(300),
+      switchMap(value => this._filterTargetExchanges(this.getSearchTerm(value)))
+    );
+  }
+
+  // Refresh alternate exchange filter to exclude selected exchanges
+  private refreshAlternateExchangeFilter(): void {
+    this.filteredAlternateExchanges = this.alternateExchangeCtrl.valueChanges.pipe(
+      startWith(this.alternateExchangeCtrl.value),
+      debounceTime(300),
+      switchMap(value => this._filterAlternateExchanges(this.getSearchTerm(value)))
+    );
   }
 
   // Display function for exchanges used in template
