@@ -146,6 +146,10 @@ export class BindingsComponent implements OnInit {
   public errorMessage = '';
   public loading = false;
 
+  // Edit state
+  public isEditMode = false;
+  public editBinding: Binding | null = null;
+
   // Form and selected models
   bindingForm: FormGroup;
   selectedBinding: Binding | null = null;
@@ -656,7 +660,24 @@ export class BindingsComponent implements OnInit {
     this.showAlert = false;
   }
 
+  openEditModal(binding: Binding): void {
+    this.isEditMode = true;
+    this.editBinding = binding;
+    this.createModalVisible = true;
+    this.showAlert = false;
+    
+    // Populate form with binding data
+    this.populateFormWithBinding(binding);
+    
+    // Disable the code field since it's not editable
+    this.bindingForm.get('code')?.disable();
+  }
+
   private resetForm(): void {
+    // Reset edit state
+    this.isEditMode = false;
+    this.editBinding = null;
+    
     // Reset all models
     this.selectedVNamespace = null;
     this.selectedExchange = null;
@@ -684,6 +705,60 @@ export class BindingsComponent implements OnInit {
     this.queueCtrl.disable();
     this.targetExchangeCtrl.disable();
     this.alternateExchangeCtrl.disable();
+    
+    // Ensure code field is enabled
+    this.bindingForm.get('code')?.enable();
+  }
+
+  private populateFormWithBinding(binding: Binding): void {
+    // Set selected models
+    this.selectedVNamespace = binding.VNamespace ? { Code: binding.VNamespace, Name: binding.VNamespace } as VNamespace : null;
+    this.selectedExchange = binding.Exchange || null;
+    this.selectedQueue = binding.Queue || null;
+    this.selectedTargetExchange = binding.TargetExchange || null;
+    this.selectedAlternateExchange = binding.AlternateExchange || null;
+    
+    // Populate form
+    this.bindingForm.patchValue({
+      code: binding.Code || binding.code || '',
+      bindingType: binding.BindingType || binding.bindingType || 'classic',
+      targetExchangeType: binding.TargetExchangeType || binding.targetExchangeType || 'queue',
+      routingKey: binding.RoutingKey || binding.routingKey || '',
+      pattern: binding.Pattern || binding.pattern || '',
+      xMatch: binding.XMatch || binding.xMatch || 'all'
+    });
+    
+    // Set form controls
+    this.vnamespaceCtrl.setValue(this.selectedVNamespace);
+    this.exchangeCtrl.setValue(this.selectedExchange);
+    this.queueCtrl.setValue(this.selectedQueue);
+    this.targetExchangeCtrl.setValue(this.selectedTargetExchange);
+    this.alternateExchangeCtrl.setValue(this.selectedAlternateExchange);
+    
+    // Enable controls based on selections
+    if (this.selectedVNamespace) {
+      this.exchangeCtrl.enable();
+      if (this.selectedExchange) {
+        const targetType = binding.TargetExchangeType || binding.targetExchangeType || 'queue';
+        if (targetType === 'queue') {
+          this.queueCtrl.enable();
+        } else {
+          this.targetExchangeCtrl.enable();
+        }
+      }
+    }
+    
+    // Populate headers if any
+    this.headers = [];
+    if (binding.Headers || binding.headers) {
+      const headersMap = binding.Headers || binding.headers || {};
+      for (const [key, value] of Object.entries(headersMap)) {
+        this.headers.push({ key, value });
+      }
+    }
+    
+    // Update form validation
+    this.updateFormValidation();
   }
 
   createBinding(): void {

@@ -168,6 +168,14 @@
                 </button>
                 <button 
                   cButton 
+                  color="warning" 
+                  size="sm" 
+                  (click)="openEditModal(binding)"
+                  title="Edit">
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button 
+                  cButton 
                   color="danger" 
                   size="sm" 
                   (click)="openDeleteModal(binding)"
@@ -218,7 +226,7 @@
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-plus" class="me-2"></svg>
-      Create Binding
+      {{ isEditMode ? 'Edit Binding' : 'Create Binding' }}
     </h5>
     <button (click)="createModalVisible = false" cButtonClose></button>
   </c-modal-header>
@@ -241,8 +249,11 @@
             cFormControl 
             id="code" 
             formControlName="code" 
-            placeholder="Enter binding code" />
-          <small class="form-text text-muted">Unique identifier for this binding</small>
+            placeholder="Enter binding code"
+            [readonly]="isEditMode" />
+          <small class="form-text text-muted">
+            {{ isEditMode ? 'Binding code cannot be changed' : 'Unique identifier for this binding' }}
+          </small>
         </c-col>
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
@@ -501,7 +512,7 @@
     </button>
     <button cButton color="primary" (click)="createBinding()" [disabled]="!bindingForm.valid">
       <svg cIcon name="cil-check" class="me-1"></svg>
-      Create Binding
+      {{ isEditMode ? 'Save Changes' : 'Create Binding' }}
     </button>
   </c-modal-footer>
 </c-modal>
