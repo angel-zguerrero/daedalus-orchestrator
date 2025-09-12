@@ -60,6 +60,7 @@
             <th>Code</th>
             <th>Exchange</th>
             <th>Queue</th>
+            <th>Target Exchange</th>
             <th>VNamespace</th>
             <th>Routing Key</th>
             <th>Pattern</th>
@@ -105,6 +106,28 @@
                 <code title="{{ binding.QueueCode || binding.queueCode }}">
                   {{ binding.QueueCode || binding.queueCode }}
                 </code>
+              </ng-template>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;">
+              <div *ngIf="binding.TargetExchange || binding.targetExchange; else simpleTargetExchangeCode">
+                <div class="fw-bold" title="{{ (binding.TargetExchange || binding.targetExchange)?.Code }}">
+                  <code>{{ (binding.TargetExchange || binding.targetExchange)?.Code }}</code>
+                </div>
+                <small class="text-muted" title="{{ (binding.TargetExchange || binding.targetExchange)?.Name }}">
+                  {{ (binding.TargetExchange || binding.targetExchange)?.Name }}
+                </small>
+                <br>
+                <small class="text-info">
+                  {{ (binding.TargetExchange || binding.targetExchange)?.Type }}
+                </small>
+              </div>
+              <ng-template #simpleTargetExchangeCode>
+                <span *ngIf="binding.targetExchangeCode; else noTargetExchange">
+                  <code title="{{ binding.targetExchangeCode }}">
+                    {{ binding.targetExchangeCode }}
+                  </code>
+                </span>
+                <ng-template #noTargetExchange>-</ng-template>
               </ng-template>
             </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ getVNamespace(binding) || '-' }}">
@@ -155,7 +178,7 @@
             </td>
           </tr>
           <tr *ngIf="bindings.length === 0">
-            <td colspan="9" class="text-center py-4">
+            <td colspan="10" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No bindings found</h6>
@@ -241,7 +264,21 @@
         </c-col>
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="showQueue ? 6 : 12">
+        <c-col [md]="6">
+          <label cLabel for="targetExchangeType">Target Type *</label>
+          <select cSelect id="targetExchangeType" formControlName="targetExchangeType">
+            <option *ngFor="let targetType of targetExchangeTypes" [value]="targetType.value">
+              {{ targetType.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted">Whether this binding targets a queue or another exchange</small>
+        </c-col>
+        <c-col [md]="6">
+          <!-- Placeholder for future fields or spacing -->
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
           <mat-form-field class="w-100">
             <mat-label>Exchange *</mat-label>
             <input 
@@ -271,8 +308,9 @@
             </small>
           </div>
         </c-col>
-        <c-col [md]="6" *ngIf="showQueue">
-          <mat-form-field class="w-100">
+        <c-col [md]="6" *ngIf="showQueue || showTargetExchange">
+          <!-- Queue field when target type is 'queue' -->
+          <mat-form-field class="w-100" *ngIf="showQueue">
             <mat-label>Queue *</mat-label>
             <input 
               type="text"
@@ -287,7 +325,24 @@
               </mat-option>
             </mat-autocomplete>
           </mat-form-field>
-          <div class="form-text">Required: Select the destination queue</div>
+          <div class="form-text" *ngIf="showQueue">Required: Select the destination queue</div>
+          
+          <!-- Target Exchange field when target type is 'exchange' -->
+          <mat-form-field class="w-100" *ngIf="showTargetExchange">
+            <mat-label>Target Exchange *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="targetExchangeCtrl"
+              [matAutocomplete]="autoTargetExchange"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoTargetExchange="matAutocomplete" [displayWith]="displayTargetExchange" (optionSelected)="onTargetExchangeSelected($event)">
+              <mat-option *ngFor="let exchange of filteredTargetExchanges | async" [value]="exchange">
+                {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text" *ngIf="showTargetExchange">Required when target type is Exchange: Select the target exchange</div>
         </c-col>
         <c-col [md]="6" *ngIf="!showQueue && selectedExchange">
           <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'direct'">
@@ -353,6 +408,29 @@
           <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'">
             Queues will be determined automatically based on message headers and queue header conditions
           </small>
+          <div *ngIf="selectedExchange?.Type?.toLowerCase() === 'headers'" class="mt-2">
+            <small class="text-info">
+              <svg cIcon name="cil-info" class="me-1"></svg>
+              Exchange Type: <strong>Headers</strong> (attribute-based routing)
+            </small>
+          </div>
+        </c-col>
+        <c-col [md]="6" *ngIf="showXMatch && showAlternateExchange">
+          <mat-form-field class="w-100">
+            <mat-label>Alternate Exchange (Optional)</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="alternateExchangeCtrl"
+              [matAutocomplete]="autoAlternateExchange"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoAlternateExchange="matAutocomplete" [displayWith]="displayAlternateExchange" (optionSelected)="onAlternateExchangeSelected($event)">
+              <mat-option *ngFor="let exchange of filteredAlternateExchanges | async" [value]="exchange">
+                {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Optional: Exchange to use when message routing fails</div>
         </c-col>
       </c-row>
 
@@ -740,6 +818,46 @@
             <label class="form-label fw-bold">Queue Name</label>
             <div class="p-2 bg-dark rounded">{{ (selectedBinding.Queue || selectedBinding.queue)?.Name || 'N/A' }}</div>
             <div class="form-text">Queue display name</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Target Exchange Information Section -->
+    <div *ngIf="selectedBinding.TargetExchange || selectedBinding.targetExchange || selectedBinding.targetExchangeCode" class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-share" class="me-2"></svg>
+        Target Exchange Information
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Exchange Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ (selectedBinding.TargetExchange || selectedBinding.targetExchange)?.Code || selectedBinding.targetExchangeCode || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Target exchange identifier</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Exchange Name</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.TargetExchange || selectedBinding.targetExchange)?.Name || 'N/A' }}</div>
+            <div class="form-text">Target exchange display name</div>
+          </div>
+        </div>
+      </div>
+      <div class="row" *ngIf="selectedBinding.TargetExchange || selectedBinding.targetExchange">
+        <div class="col-md-12">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Exchange Type</label>
+            <div class="p-2 bg-dark rounded">
+              <c-badge color="success" shape="rounded-pill" class="me-2">
+                {{ (selectedBinding.TargetExchange || selectedBinding.targetExchange)?.Type || 'N/A' }}
+              </c-badge>
+              <span class="text-muted">Destination exchange for message routing</span>
+            </div>
+            <div class="form-text">Target exchange type determines routing behavior</div>
           </div>
         </div>
       </div>

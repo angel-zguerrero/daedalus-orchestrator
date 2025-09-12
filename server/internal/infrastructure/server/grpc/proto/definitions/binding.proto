@@ -16,12 +16,15 @@ message CreateBindingRequest {
   string code = 2;
   string exchangeCode = 3;
   string queueCode = 4;
-  string vnamespace = 5;
-  string routingKey = 6;
-  string pattern = 7;
-  string xMatch = 8;
-  string bindingType = 9;
-  map<string, string> headers = 10;
+  string targetExchangeCode = 5;
+  string alternateExchangeCode = 6;
+  string vnamespace = 7;
+  string routingKey = 8;
+  string pattern = 9;
+  string xMatch = 10;
+  string bindingType = 11;
+  string targetExchangeType = 12;
+  map<string, string> headers = 13;
 }
 
 message CreateBindingResponse {
@@ -77,16 +80,21 @@ message Binding {
   string code = 2;
   string exchangeCode = 3;
   string queueCode = 4;
-  string vnamespace = 5;
-  string routingKey = 6;
-  string pattern = 7;
-  string xMatch = 8;
-  string bindingType = 9;
-  string createdAt = 10;
-  string updatedAt = 11;
-  Exchange exchange = 12;
-  Queue queue = 13;
-  map<string, string> headers = 14;
+  string targetExchangeCode = 5;
+  string alternateExchangeCode = 6;
+  string vnamespace = 7;
+  string routingKey = 8;
+  string pattern = 9;
+  string xMatch = 10;
+  string bindingType = 11;
+  string targetExchangeType = 12;
+  string createdAt = 13;
+  string updatedAt = 14;
+  Exchange exchange = 15;
+  Queue queue = 16;
+  Exchange targetExchange = 17;
+  Exchange alternateExchange = 18;
+  map<string, string> headers = 19;
 }
 
 message BindingFindResult {

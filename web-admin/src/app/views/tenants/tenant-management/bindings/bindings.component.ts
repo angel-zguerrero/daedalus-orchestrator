@@ -76,10 +76,14 @@ interface Binding {
   // Objetos completos cuando includeObjects=true
   Exchange?: Exchange;
   Queue?: Queue;
+  TargetExchange?: Exchange;
+  AlternateExchange?: Exchange;
   // Compatibilidad con propiedades en camelCase
   code?: string;
   exchangeCode: string;
   queueCode: string;
+  targetExchangeCode?: string;
+  alternateExchangeCode?: string;
   vnamespace: string;
   VNamespace?: string; // Possible variation
   Vnamespace?: string; // Possible variation
@@ -93,6 +97,8 @@ interface Binding {
   headers?: { [key: string]: string }; // Added headers support in camelCase
   exchange?: Exchange;
   queue?: Queue;
+  targetExchange?: Exchange;
+  alternateExchange?: Exchange;
 }
 
 @Component({
@@ -144,6 +150,8 @@ export class BindingsComponent implements OnInit {
   selectedVNamespace: VNamespace | null = null;
   selectedExchange: Exchange | null = null;
   selectedQueue: Queue | null = null;
+  selectedTargetExchange: Exchange | null = null;
+  selectedAlternateExchange: Exchange | null = null;
 
   // Filter model for list
   selectedVNamespaceFilter: VNamespace | null = null;
@@ -151,6 +159,11 @@ export class BindingsComponent implements OnInit {
   bindingTypes = [
     { value: 'classic', label: 'Classic' },
     { value: 'dynamic', label: 'Dynamic' }
+  ];
+
+  targetExchangeTypes = [
+    { value: 'queue', label: 'Queue' },
+    { value: 'exchange', label: 'Exchange' }
   ];
 
   xMatchTypes = [
@@ -162,12 +175,16 @@ export class BindingsComponent implements OnInit {
   vnamespaceCtrl = new FormControl<VNamespace | null>(null, Validators.required);
   exchangeCtrl = new FormControl<Exchange | null>({ value: null, disabled: true }, Validators.required);
   queueCtrl = new FormControl<Queue | null>({ value: null, disabled: true }, Validators.required);
+  targetExchangeCtrl = new FormControl<Exchange | null>({ value: null, disabled: true });
+  alternateExchangeCtrl = new FormControl<Exchange | null>({ value: null, disabled: true });
   vnamespaceFilterCtrl = new FormControl<VNamespace | null>(null);
 
   // Observables for autocompletes
   filteredVNamespaces!: Observable<VNamespace[]>;
   filteredExchanges!: Observable<Exchange[]>;
   filteredQueues!: Observable<Queue[]>;
+  filteredTargetExchanges!: Observable<Exchange[]>;
+  filteredAlternateExchanges!: Observable<Exchange[]>;
   filteredFilterVNamespaces!: Observable<VNamespace[]>;
 
   // Loading states
@@ -193,6 +210,9 @@ export class BindingsComponent implements OnInit {
       vnamespace: this.vnamespaceCtrl,
       exchange: this.exchangeCtrl,
       queue: this.queueCtrl,
+      targetExchange: this.targetExchangeCtrl,
+      alternateExchange: this.alternateExchangeCtrl,
+      targetExchangeType: ['queue', Validators.required],
       routingKey: [''],
       pattern: [''],
       xMatch: ['all'],
@@ -231,6 +251,20 @@ export class BindingsComponent implements OnInit {
       switchMap(value => this._filterExchanges(this.getSearchTerm(value)))
     );
 
+    // Target Exchange autocomplete
+    this.filteredTargetExchanges = this.targetExchangeCtrl.valueChanges.pipe(
+      startWith(null),
+      debounceTime(300),
+      switchMap(value => this._filterExchanges(this.getSearchTerm(value)))
+    );
+
+    // Alternate Exchange autocomplete
+    this.filteredAlternateExchanges = this.alternateExchangeCtrl.valueChanges.pipe(
+      startWith(null),
+      debounceTime(300),
+      switchMap(value => this._filterExchanges(this.getSearchTerm(value)))
+    );
+
     // Queue autocomplete
     this.filteredQueues = this.queueCtrl.valueChanges.pipe(
       startWith(null),
@@ -258,9 +292,24 @@ export class BindingsComponent implements OnInit {
       this.onQueueChange();
     });
 
+    // Watch Target Exchange changes
+    this.targetExchangeCtrl.valueChanges.subscribe(targetExchange => {
+      this.selectedTargetExchange = targetExchange;
+    });
+
+    // Watch Alternate Exchange changes
+    this.alternateExchangeCtrl.valueChanges.subscribe(alternateExchange => {
+      this.selectedAlternateExchange = alternateExchange;
+    });
+
     // Watch BindingType changes
     this.bindingForm.get('bindingType')?.valueChanges.subscribe(bindingType => {
       this.onBindingTypeChange(bindingType);
+    });
+
+    // Watch TargetExchangeType changes
+    this.bindingForm.get('targetExchangeType')?.valueChanges.subscribe(targetType => {
+      this.onTargetExchangeTypeChange(targetType);
     });
 
     // Watch VNamespace filter changes
@@ -376,16 +425,29 @@ export class BindingsComponent implements OnInit {
     // Reset dependent selections
     this.selectedExchange = null;
     this.selectedQueue = null;
+    this.selectedTargetExchange = null;
+    this.selectedAlternateExchange = null;
     this.exchangeCtrl.setValue(null);
     this.queueCtrl.setValue(null);
+    this.targetExchangeCtrl.setValue(null);
+    this.alternateExchangeCtrl.setValue(null);
     
     // Enable/disable controls based on vnamespace selection
     if (this.selectedVNamespace) {
       this.exchangeCtrl.enable();
       this.queueCtrl.enable();
+      this.alternateExchangeCtrl.enable();
+      
+      // Enable target exchange only if target type is exchange
+      const targetType = this.bindingForm.get('targetExchangeType')?.value;
+      if (targetType === 'exchange') {
+        this.targetExchangeCtrl.enable();
+      }
     } else {
       this.exchangeCtrl.disable();
       this.queueCtrl.disable();
+      this.targetExchangeCtrl.disable();
+      this.alternateExchangeCtrl.disable();
     }
     
     this.updateFormValidation();
@@ -402,6 +464,7 @@ export class BindingsComponent implements OnInit {
   }
 
   onBindingTypeChange(event: any): void {
+    if(!event){ return; }
     const bindingType = event.target?.value || event;
     // Clear queue selection when switching to dynamic binding
     if (bindingType === 'dynamic') {
@@ -427,6 +490,32 @@ export class BindingsComponent implements OnInit {
     this.cdr.detectChanges();
   }
 
+  onTargetExchangeTypeChange(targetType: string): void {
+    // When target type changes, clear current selections and update validation
+    if (targetType === 'queue') {
+      // Clear target exchange selection
+      this.selectedTargetExchange = null;
+      this.targetExchangeCtrl.setValue(null);
+      this.targetExchangeCtrl.disable();
+      
+      // Enable queue control if it was disabled
+      if (this.bindingForm.get('bindingType')?.value === 'classic') {
+        this.queueCtrl.enable();
+      }
+    } else if (targetType === 'exchange') {
+      // Clear queue selection
+      this.selectedQueue = null;
+      this.queueCtrl.setValue(null);
+      this.queueCtrl.disable();
+      
+      // Enable target exchange control
+      this.targetExchangeCtrl.enable();
+    }
+    
+    this.updateFormValidation();
+    this.cdr.detectChanges();
+  }
+
   // Display functions for autocompletes
   displayVNamespace = (vnamespace: VNamespace): string => {
     return vnamespace ? `${vnamespace.Code}` : '';
@@ -440,6 +529,14 @@ export class BindingsComponent implements OnInit {
     return queue ? `${queue.Code} - ${queue.Name}` : '';
   }
 
+  displayTargetExchange = (exchange: Exchange): string => {
+    return exchange ? `${exchange.Code} - ${exchange.Name} (${exchange.Type})` : '';
+  }
+
+  displayAlternateExchange = (exchange: Exchange): string => {
+    return exchange ? `${exchange.Code} - ${exchange.Name} (${exchange.Type})` : '';
+  }
+
   // Validation and visibility methods
   get canSelectExchange(): boolean {
     return this.selectedVNamespace !== null;
@@ -451,7 +548,8 @@ export class BindingsComponent implements OnInit {
 
   get showQueue(): boolean {
     const bindingType = this.bindingForm.get('bindingType')?.value;
-    return bindingType === 'classic';
+    const targetType = this.bindingForm.get('targetExchangeType')?.value;
+    return bindingType === 'classic' && targetType === 'queue';
   }
 
   get showRoutingKey(): boolean {
@@ -478,6 +576,17 @@ export class BindingsComponent implements OnInit {
     // For dynamic bindings, queues are determined automatically based on message headers
     return this.selectedExchange?.Type?.toLowerCase() === 'headers' && 
            this.bindingForm.get('bindingType')?.value === 'classic';
+  }
+
+  get showTargetExchange(): boolean {
+    const bindingType = this.bindingForm.get('bindingType')?.value;
+    const targetType = this.bindingForm.get('targetExchangeType')?.value;
+    return bindingType === 'classic' && targetType === 'exchange' && this.selectedVNamespace !== null;
+  }
+
+  get showAlternateExchange(): boolean {
+    // Always show alternate exchange if a VNamespace is selected
+    return this.selectedVNamespace !== null;
   }
 
   get isRoutingKeyRequired(): boolean {
@@ -541,6 +650,8 @@ export class BindingsComponent implements OnInit {
     this.selectedVNamespace = null;
     this.selectedExchange = null;
     this.selectedQueue = null;
+    this.selectedTargetExchange = null;
+    this.selectedAlternateExchange = null;
     
     // Reset form
     this.bindingForm.reset();
@@ -548,6 +659,7 @@ export class BindingsComponent implements OnInit {
     // Set default values
     this.bindingForm.patchValue({
       bindingType: 'classic',
+      targetExchangeType: 'queue',
       xMatch: 'all'
     });
     
@@ -559,6 +671,8 @@ export class BindingsComponent implements OnInit {
     // Disable dependent controls
     this.exchangeCtrl.disable();
     this.queueCtrl.disable();
+    this.targetExchangeCtrl.disable();
+    this.alternateExchangeCtrl.disable();
   }
 
   createBinding(): void {
@@ -569,28 +683,40 @@ export class BindingsComponent implements OnInit {
     const vnamespaceValue = this.selectedVNamespace || this.vnamespaceCtrl.value;
     const exchangeValue = this.selectedExchange || this.exchangeCtrl.value;
     const queueValue = this.selectedQueue || this.queueCtrl.value;
+    const targetExchangeValue = this.selectedTargetExchange || this.targetExchangeCtrl.value;
     const bindingType = this.bindingForm.get('bindingType')?.value || 'classic';
+    const targetExchangeType = this.bindingForm.get('targetExchangeType')?.value || 'queue';
     
     const hasValidValues = !!(
       (vnamespaceValue?.Code || vnamespaceValue?.Name) && 
       exchangeValue?.Code && 
-      (bindingType === 'dynamic' || queueValue?.Code) // For dynamic, queue is not required
+      (
+        bindingType === 'dynamic' || 
+        (targetExchangeType === 'queue' && queueValue?.Code) ||
+        (targetExchangeType === 'exchange' && targetExchangeValue?.Code)
+      )
     );
     
     if (this.bindingForm.valid && (isValidData || hasValidValues)) {
       const vnamespace = this.selectedVNamespace || this.vnamespaceCtrl.value;
       const exchange = this.selectedExchange || this.exchangeCtrl.value;
       const queue = this.selectedQueue || this.queueCtrl.value;
+      const targetExchange = this.selectedTargetExchange || this.targetExchangeCtrl.value;
+      const alternateExchange = this.selectedAlternateExchange || this.alternateExchangeCtrl.value;
+      const targetExchangeType = this.bindingForm.get('targetExchangeType')?.value || 'queue';
       
       const bindingData = {
         code: this.bindingForm.get('code')?.value,
         exchangeCode: exchange?.Code,
-        queueCode: queue?.Code || '', // Can be empty for dynamic bindings
+        queueCode: targetExchangeType === 'queue' ? (queue?.Code || '') : '', // Only use queue if target type is queue
+        targetExchangeCode: targetExchangeType === 'exchange' ? (targetExchange?.Code || '') : '', // Only use target exchange if target type is exchange
+        alternateExchangeCode: alternateExchange?.Code || '',
         vnamespace: vnamespace?.Code || vnamespace?.Name, // Usar Name como fallback si Code no existe
         routingKey: this.bindingForm.get('routingKey')?.value || '',
         pattern: this.bindingForm.get('pattern')?.value || '',
         xMatch: this.bindingForm.get('xMatch')?.value || 'all',
         bindingType: bindingType,
+        targetExchangeType: targetExchangeType,
         headers: this.showHeaders ? this.getHeadersAsMap() : {}
       };
 
@@ -624,13 +750,22 @@ export class BindingsComponent implements OnInit {
     const hasVNamespace = !!(this.selectedVNamespace && (this.selectedVNamespace.Code || this.selectedVNamespace.Name));
     const hasExchange = !!(this.selectedExchange && this.selectedExchange.Code);
     const bindingType = this.bindingForm.get('bindingType')?.value;
+    const targetExchangeType = this.bindingForm.get('targetExchangeType')?.value;
     
-    // For classic bindings, queue is required. For dynamic bindings, queue should not be specified
+    // For classic bindings, check target type
     if (bindingType === 'classic') {
-      const hasQueue = !!(this.selectedQueue && this.selectedQueue.Code);
-      return hasVNamespace && hasExchange && hasQueue;
+      if (targetExchangeType === 'queue') {
+        // If target is queue, queue is required
+        const hasQueue = !!(this.selectedQueue && this.selectedQueue.Code);
+        return hasVNamespace && hasExchange && hasQueue;
+      } else if (targetExchangeType === 'exchange') {
+        // If target is exchange, target exchange is required
+        const hasTargetExchange = !!(this.selectedTargetExchange && this.selectedTargetExchange.Code);
+        return hasVNamespace && hasExchange && hasTargetExchange;
+      }
+      return false;
     } else {
-      // For dynamic bindings, queue is not required
+      // For dynamic bindings, target type is not relevant
       return hasVNamespace && hasExchange;
     }
   }
@@ -782,6 +917,16 @@ export class BindingsComponent implements OnInit {
   onExchangeSelected(event: MatAutocompleteSelectedEvent): void {
     this.selectedExchange = event.option.value;
     this.onExchangeChange();
+  }
+
+  // Method for target exchange selection event
+  onTargetExchangeSelected(event: MatAutocompleteSelectedEvent): void {
+    this.selectedTargetExchange = event.option.value;
+  }
+
+  // Method for alternate exchange selection event
+  onAlternateExchangeSelected(event: MatAutocompleteSelectedEvent): void {
+    this.selectedAlternateExchange = event.option.value;
   }
 
   // Display function for exchanges used in template

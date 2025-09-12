@@ -28,15 +28,18 @@ func NewBindingController(Config *common.ServerConfing) *BindingController {
 }
 
 type createBindingRequest struct {
-	Code         string            `json:"code" binding:"required"`
-	ExchangeCode string            `json:"exchangeCode" binding:"required"`
-	QueueCode    string            `json:"queueCode"`
-	VNamespace   string            `json:"vnamespace" binding:"required"`
-	RoutingKey   string            `json:"routingKey"`
-	Pattern      string            `json:"pattern"`
-	XMatch       string            `json:"xMatch"`
-	BindingType  string            `json:"bindingType"`
-	Headers      map[string]string `json:"headers"`
+	Code                  string            `json:"code" binding:"required"`
+	ExchangeCode          string            `json:"exchangeCode" binding:"required"`
+	QueueCode             string            `json:"queueCode"`
+	TargetExchangeCode    string            `json:"targetExchangeCode"`
+	AlternateExchangeCode string            `json:"alternateExchangeCode"`
+	VNamespace            string            `json:"vnamespace" binding:"required"`
+	RoutingKey            string            `json:"routingKey"`
+	Pattern               string            `json:"pattern"`
+	XMatch                string            `json:"xMatch"`
+	BindingType           string            `json:"bindingType"`
+	TargetExchangeType    string            `json:"targetExchangeType"`
+	Headers               map[string]string `json:"headers"`
 }
 
 // CreateBindingHandler handles POST /rest-api/tenants/:id/binding
@@ -48,8 +51,43 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		return
 	}
 
-	// Validate binding type specific requirements
-	if req.BindingType == "classic" && req.QueueCode == "" {
+	// Set default target exchange type if not provided
+	targetExchangeType := models.TargetExchangeTypeQueue
+	if req.TargetExchangeType != "" {
+		if !isValidTargetExchangeType(req.TargetExchangeType) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid target exchange type: %s. Valid types are: queue, exchange", req.TargetExchangeType)})
+			return
+		}
+		targetExchangeType = models.TargetExchangeType(req.TargetExchangeType)
+	}
+
+	// Validate target exchange type specific requirements
+	if targetExchangeType == models.TargetExchangeTypeQueue {
+		if req.BindingType == "classic" && req.QueueCode == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required for classic bindings when targetExchangeType is queue"})
+			return
+		}
+		if req.TargetExchangeCode != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "targetExchangeCode should not be specified when targetExchangeType is queue"})
+			return
+		}
+	} else if targetExchangeType == models.TargetExchangeTypeExchange {
+		if req.TargetExchangeCode == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "targetExchangeCode is required when targetExchangeType is exchange"})
+			return
+		}
+		if req.QueueCode != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode should not be specified when targetExchangeType is exchange"})
+			return
+		}
+		if req.BindingType == "dynamic" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "exchange targets are not supported for dynamic bindings"})
+			return
+		}
+	}
+
+	// Legacy validation for backward compatibility
+	if req.BindingType == "classic" && targetExchangeType == models.TargetExchangeTypeQueue && req.QueueCode == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required for classic bindings"})
 		return
 	}
@@ -94,11 +132,14 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		req.Code,
 		req.QueueCode,
 		req.ExchangeCode,
+		req.TargetExchangeCode,
+		req.AlternateExchangeCode,
 		req.VNamespace,
 		req.RoutingKey,
 		req.Pattern,
 		xMatch,
 		bindingType,
+		targetExchangeType,
 		req.Headers,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
@@ -234,6 +275,16 @@ func isValidBindingType(bindingType string) bool {
 func isValidXMatchType(xMatch string) bool {
 	switch xMatch {
 	case "all", "any":
+		return true
+	default:
+		return false
+	}
+}
+
+// isValidTargetExchangeType validates if the target exchange type is one of the allowed types
+func isValidTargetExchangeType(targetExchangeType string) bool {
+	switch targetExchangeType {
+	case "queue", "exchange":
 		return true
 	default:
 		return false

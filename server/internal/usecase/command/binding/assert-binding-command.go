@@ -17,18 +17,21 @@ func init() {
 }
 
 type AssertBindingCommand struct {
-	NewBindingID string
-	Code         string
-	QueueCode    string
-	ExchangeCode string
-	VNamespace   string
-	RoutingKey   string
-	Pattern      string
-	XMatch       models.XMatchType
-	BindingType  models.BindingType
-	CF           string
-	CFS          string
-	Headers      map[string]string // Headers for routing, used only for Headers exchange type
+	NewBindingID          string
+	Code                  string
+	QueueCode             string
+	ExchangeCode          string
+	TargetExchangeCode    string
+	AlternateExchangeCode string
+	VNamespace            string
+	RoutingKey            string
+	Pattern               string
+	XMatch                models.XMatchType
+	BindingType           models.BindingType
+	TargetExchangeType    models.TargetExchangeType
+	CF                    string
+	CFS                   string
+	Headers               map[string]string // Headers for routing, used only for Headers exchange type
 }
 
 func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -50,16 +53,55 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
-	// Validate BindingType specific requirements
+	// Validate TargetExchangeType and its dependencies
+	if cmd.TargetExchangeType == "" {
+		cmd.TargetExchangeType = models.TargetExchangeTypeQueue // Default to queue
+	}
+
+	// Validate TargetExchangeType specific requirements
+	if cmd.TargetExchangeType == models.TargetExchangeTypeQueue {
+		// For queue target, QueueCode is required for classic bindings
+		if cmd.BindingType == models.BindingTypeClassic && cmd.QueueCode == "" {
+			commandResult.Error = "QueueCode is required for classic bindings when TargetExchangeType is queue"
+			return *commandResult
+		}
+		// TargetExchangeCode should not be specified when targeting a queue
+		if cmd.TargetExchangeCode != "" {
+			commandResult.Error = "TargetExchangeCode should not be specified when TargetExchangeType is queue"
+			return *commandResult
+		}
+	} else if cmd.TargetExchangeType == models.TargetExchangeTypeExchange {
+		// For exchange target, TargetExchangeCode is required
+		if cmd.TargetExchangeCode == "" {
+			commandResult.Error = "TargetExchangeCode is required when TargetExchangeType is exchange"
+			return *commandResult
+		}
+		// QueueCode should not be specified when targeting an exchange
+		if cmd.QueueCode != "" {
+			commandResult.Error = "QueueCode should not be specified when TargetExchangeType is exchange"
+			return *commandResult
+		}
+		// Exchange targets are only valid for classic bindings
+		if cmd.BindingType == models.BindingTypeDynamic {
+			commandResult.Error = "Exchange targets are not supported for dynamic bindings"
+			return *commandResult
+		}
+	}
+
+	// Validate legacy BindingType specific requirements (for backward compatibility)
 	if cmd.BindingType == models.BindingTypeClassic {
-		if cmd.QueueCode == "" {
-			commandResult.Error = "QueueCode is required for classic bindings"
+		if cmd.TargetExchangeType == models.TargetExchangeTypeQueue && cmd.QueueCode == "" {
+			commandResult.Error = "QueueCode is required for classic bindings when targeting a queue"
 			return *commandResult
 		}
 	} else if cmd.BindingType == models.BindingTypeDynamic {
-		// For dynamic bindings, QueueCode should be empty
+		// For dynamic bindings, QueueCode should be empty and only queue targets are allowed
 		if cmd.QueueCode != "" {
 			commandResult.Error = "QueueCode should not be specified for dynamic bindings"
+			return *commandResult
+		}
+		if cmd.TargetExchangeType != models.TargetExchangeTypeQueue {
+			commandResult.Error = "Dynamic bindings only support queue targets"
 			return *commandResult
 		}
 	}
@@ -130,9 +172,9 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
-	// Find Queue by Code and VNamespace (only for classic bindings)
+	// Find Queue by Code and VNamespace (only for queue targets in classic bindings)
 	var queue *models.Queue
-	if cmd.BindingType == models.BindingTypeClassic {
+	if cmd.TargetExchangeType == models.TargetExchangeTypeQueue && cmd.BindingType == models.BindingTypeClassic {
 		queue, err = queueRepo.GetQueueByCode(cmd.QueueCode, cmd.VNamespace, now)
 		if err != nil {
 			commandResult.Error = err.Error()
@@ -144,6 +186,34 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		}
 	}
 
+	// Find Target Exchange by Code and VNamespace (only for exchange targets)
+	var targetExchange *models.Exchange
+	if cmd.TargetExchangeType == models.TargetExchangeTypeExchange {
+		targetExchange, err = exchangeRepo.GetExchangeByCode(cmd.TargetExchangeCode, cmd.VNamespace, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		if targetExchange == nil {
+			commandResult.Error = "Target Exchange with Code '" + cmd.TargetExchangeCode + "' in VNamespace '" + cmd.VNamespace + "' does not exist"
+			return *commandResult
+		}
+	}
+
+	// Find Alternate Exchange by Code and VNamespace (optional)
+	var alternateExchange *models.Exchange
+	if cmd.AlternateExchangeCode != "" {
+		alternateExchange, err = exchangeRepo.GetExchangeByCode(cmd.AlternateExchangeCode, cmd.VNamespace, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		if alternateExchange == nil {
+			commandResult.Error = "Alternate Exchange with Code '" + cmd.AlternateExchangeCode + "' in VNamespace '" + cmd.VNamespace + "' does not exist"
+			return *commandResult
+		}
+	}
+
 	// Validate binding parameters according to Exchange Type
 	err = cmd.validateBindingParams(exchange.Type)
 	if err != nil {
@@ -151,8 +221,8 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
-	// For classic bindings, check if there's already a binding between this exchange and queue
-	if cmd.BindingType == models.BindingTypeClassic && queue != nil {
+	// For classic bindings with queue targets, check if there's already a binding between this exchange and queue
+	if cmd.BindingType == models.BindingTypeClassic && cmd.TargetExchangeType == models.TargetExchangeTypeQueue && queue != nil {
 		existingClassicBinding, err := bindingRepo.GetBindingByExchangeAndQueue(exchange.ID, queue.ID, now)
 		if err != nil {
 			commandResult.Error = err.Error()
@@ -162,6 +232,12 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 			commandResult.Error = "A classic binding between exchange '" + cmd.ExchangeCode + "' and queue '" + cmd.QueueCode + "' already exists with Code '" + existingClassicBinding.Code + "'"
 			return *commandResult
 		}
+	}
+
+	// For classic bindings with exchange targets, check if there's already a binding between this exchange and target exchange
+	if cmd.BindingType == models.BindingTypeClassic && cmd.TargetExchangeType == models.TargetExchangeTypeExchange && targetExchange != nil {
+		// Note: We need to implement GetBindingByExchangeAndTargetExchange in the repository
+		// For now, we'll check during the unique constraint validation at the database level
 	}
 
 	// Look for existing binding by Code and VNamespace
@@ -181,12 +257,30 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		binding.Pattern = cmd.Pattern
 		binding.XMatch = cmd.XMatch
 		binding.BindingType = cmd.BindingType
-		// Update ExchangeID and QueueID in case they changed
+		binding.TargetExchangeType = cmd.TargetExchangeType
+
+		// Update ExchangeID, QueueID, TargetExchangeID and AlternateExchangeID
 		binding.ExchangeID = exchange.ID
-		if queue != nil {
-			binding.QueueID = queue.ID
+
+		if cmd.TargetExchangeType == models.TargetExchangeTypeQueue {
+			if queue != nil {
+				binding.QueueID = queue.ID
+			} else {
+				binding.QueueID = "" // For dynamic bindings
+			}
+			binding.TargetExchangeID = "" // Clear target exchange when targeting queue
 		} else {
-			binding.QueueID = "" // For dynamic bindings
+			binding.QueueID = "" // Clear queue when targeting exchange
+			if targetExchange != nil {
+				binding.TargetExchangeID = targetExchange.ID
+			}
+		}
+
+		// Set alternate exchange (optional)
+		if alternateExchange != nil {
+			binding.AlternateExchangeID = alternateExchange.ID
+		} else {
+			binding.AlternateExchangeID = ""
 		}
 
 		_, err = bindingRepo.UpdateBinding(&binding, now)
@@ -197,22 +291,38 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	} else {
 		// Create new binding
 		queueID := ""
-		if queue != nil {
-			queueID = queue.ID
+		targetExchangeID := ""
+		alternateExchangeID := ""
+
+		if cmd.TargetExchangeType == models.TargetExchangeTypeQueue {
+			if queue != nil {
+				queueID = queue.ID
+			}
+		} else {
+			if targetExchange != nil {
+				targetExchangeID = targetExchange.ID
+			}
+		}
+
+		if alternateExchange != nil {
+			alternateExchangeID = alternateExchange.ID
 		}
 
 		binding = models.Binding{
-			ID:          cmd.NewBindingID,
-			Code:        cmd.Code,
-			VNamespace:  cmd.VNamespace,
-			ExchangeID:  exchange.ID,
-			QueueID:     queueID,
-			RoutingKey:  cmd.RoutingKey,
-			Pattern:     cmd.Pattern,
-			XMatch:      cmd.XMatch,
-			BindingType: cmd.BindingType,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:                  cmd.NewBindingID,
+			Code:                cmd.Code,
+			VNamespace:          cmd.VNamespace,
+			ExchangeID:          exchange.ID,
+			QueueID:             queueID,
+			TargetExchangeID:    targetExchangeID,
+			AlternateExchangeID: alternateExchangeID,
+			TargetExchangeType:  cmd.TargetExchangeType,
+			RoutingKey:          cmd.RoutingKey,
+			Pattern:             cmd.Pattern,
+			XMatch:              cmd.XMatch,
+			BindingType:         cmd.BindingType,
+			CreatedAt:           now,
+			UpdatedAt:           now,
 		}
 
 		// Set default XMatch if not specified for headers exchanges

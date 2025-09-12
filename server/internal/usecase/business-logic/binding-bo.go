@@ -31,20 +31,23 @@ func NewBindingBO(Config *common.ServerConfing) *BindingBO {
 	}
 }
 
-func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchangeCode, vnamespace, routingKey, pattern string, xMatch models.XMatchType, bindingType models.BindingType, headers map[string]string, cf, cfs string) (models.Binding, error) {
+func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchangeCode, targetExchangeCode, alternateExchangeCode, vnamespace, routingKey, pattern string, xMatch models.XMatchType, bindingType models.BindingType, targetExchangeType models.TargetExchangeType, headers map[string]string, cf, cfs string) (models.Binding, error) {
 	assertBindingCommand := &binding_command.AssertBindingCommand{
-		NewBindingID: strings.ReplaceAll(uuid.New().String(), "-", ""),
-		Code:         code,
-		QueueCode:    queueCode,
-		ExchangeCode: exchangeCode,
-		VNamespace:   vnamespace,
-		RoutingKey:   routingKey,
-		Pattern:      pattern,
-		XMatch:       xMatch,
-		BindingType:  bindingType,
-		Headers:      headers,
-		CF:           cf,
-		CFS:          cfs,
+		NewBindingID:          strings.ReplaceAll(uuid.New().String(), "-", ""),
+		Code:                  code,
+		QueueCode:             queueCode,
+		ExchangeCode:          exchangeCode,
+		TargetExchangeCode:    targetExchangeCode,
+		AlternateExchangeCode: alternateExchangeCode,
+		VNamespace:            vnamespace,
+		RoutingKey:            routingKey,
+		Pattern:               pattern,
+		XMatch:                xMatch,
+		BindingType:           bindingType,
+		TargetExchangeType:    targetExchangeType,
+		Headers:               headers,
+		CF:                    cf,
+		CFS:                   cfs,
 	}
 
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)

@@ -90,6 +90,22 @@ func (cmd *PaginateBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 					binding.QueueCode = queue.Code
 				}
 			}
+
+			// Obtener el target exchange
+			if binding.TargetExchangeID != "" {
+				if targetExchange, err := exchangeRepo.GetExchangeById(binding.TargetExchangeID, now); err == nil && targetExchange != nil {
+					binding.TargetExchange = targetExchange
+					binding.TargetExchangeCode = targetExchange.Code
+				}
+			}
+
+			// Obtener el alternate exchange
+			if binding.AlternateExchangeID != "" {
+				if alternateExchange, err := exchangeRepo.GetExchangeById(binding.AlternateExchangeID, now); err == nil && alternateExchange != nil {
+					binding.AlternateExchange = alternateExchange
+					binding.AlternateExchangeCode = alternateExchange.Code
+				}
+			}
 		}
 	}
 
