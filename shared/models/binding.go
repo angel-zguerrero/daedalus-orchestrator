@@ -16,6 +16,13 @@ const (
 	XMatchTypeAny XMatchType = "any"
 )
 
+type TargetExchangeType string
+
+const (
+	TargetExchangeTypeQueue    TargetExchangeType = "queue"
+	TargetExchangeTypeExchange TargetExchangeType = "exchange"
+)
+
 type Binding struct {
 	ID string `orm:"primary-key"`
 
@@ -25,6 +32,11 @@ type Binding struct {
 	ExchangeID string
 	QueueID    string
 
+	TargetExchangeID    string
+	AlternateExchangeID string
+
+	TargetExchangeType TargetExchangeType
+
 	RoutingKey string //used only for direct exchanges
 	Pattern    string //used only for topic exchanges
 
@@ -33,11 +45,15 @@ type Binding struct {
 	BindingType BindingType
 
 	// Virtual fields - not stored in database
-	ExchangeCode string            `orm:"virtual"`
-	Exchange     *Exchange         `orm:"virtual"`
-	QueueCode    string            `orm:"virtual"`
-	Queue        *Queue            `orm:"virtual"`
-	Headers      map[string]string `orm:"virtual"` // Headers for routing, used only for Headers exchange type
+	ExchangeCode          string            `orm:"virtual"`
+	Exchange              *Exchange         `orm:"virtual"`
+	QueueCode             string            `orm:"virtual"`
+	Queue                 *Queue            `orm:"virtual"`
+	TargetExchangeCode    string            `orm:"virtual"`
+	TargetExchange        *Exchange         `orm:"virtual"`
+	AlternateExchangeCode string            `orm:"virtual"`
+	AlternateExchange     *Exchange         `orm:"virtual"`
+	Headers               map[string]string `orm:"virtual"` // Headers for routing, used only for Headers exchange type
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
