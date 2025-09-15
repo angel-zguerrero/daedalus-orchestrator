@@ -12,7 +12,7 @@ service BindingService {
 }
 
 message CreateBindingRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string exchangeCode = 3;
   string queueCode = 4;
@@ -33,7 +33,7 @@ message CreateBindingResponse {
 }
 
 message GetBindingRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string exchangeCode = 2;
   string queueCode = 3;
   string vnamespace = 4;
@@ -45,7 +45,7 @@ message GetBindingResponse {
 }
 
 message GetBindingsRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string q = 2;
   string cursor = 3;
   int32 pageSize = 4;
@@ -108,7 +108,7 @@ message GetBindingsResponse {
 }
 
 message DeleteBindingRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string vnamespace = 3;
 }

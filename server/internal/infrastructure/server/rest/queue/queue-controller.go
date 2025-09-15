@@ -59,8 +59,8 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		return
 	}
 
-	tenantID := c.Param("id")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenantCode := c.Param("code")
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -118,9 +118,9 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 		}
 	}
 
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -165,13 +165,13 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 	})
 }
 
-// GetQueueHandler handles GET /rest-api/tenants/:id/queue/:code/:vnamespace
+// GetQueueHandler handles GET /rest-api/tenants/:code/queue/:queueCode/:vnamespace
 func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
-	queueCode := c.Param("code")
+	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -188,13 +188,13 @@ func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 	})
 }
 
-// DeleteQueueHandler handles DELETE /rest-api/tenants/:id/queue/:code/:vnamespace
+// DeleteQueueHandler handles DELETE /rest-api/tenants/:code/queue/:queueCode/:vnamespace
 func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
-	queueCode := c.Param("code")
+	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -213,9 +213,9 @@ func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
 
 func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

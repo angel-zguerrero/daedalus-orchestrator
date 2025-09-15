@@ -10,27 +10,27 @@ export class ExchangesService {
 
   constructor(private http: HttpClient) { }
 
-  getExchanges(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = ''): Observable<any> {
+  getExchanges(tenantCode: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = ''): Observable<any> {
     let params = `cursor=${cursor}&pageSize=${pageSize}&q=${q}`;
     if (vnamespace) {
       params += `&vnamespace=${vnamespace}`;
     }
-    return this.http.get(`${this.apiUrl}/${tenantId}/exchange?${params}`);
+    return this.http.get(`${this.apiUrl}/${tenantCode}/exchange?${params}`);
   }
 
-  getExchange(tenantId: string, code: string, vnamespace: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${tenantId}/exchange/${code}/${vnamespace}`);
+  getExchange(tenantCode: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${tenantCode}/exchange/${code}/${vnamespace}`);
   }
 
-  createExchange(tenantId: string, exchange: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/${tenantId}/exchange`, exchange);
+  createExchange(tenantCode: string, exchange: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${tenantCode}/exchange`, exchange);
   }
 
-  bulkCreateExchanges(tenantId: string, exchanges: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/${tenantId}/exchange/bulk`, exchanges);
+  bulkCreateExchanges(tenantCode: string, exchanges: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${tenantCode}/exchange/bulk`, exchanges);
   }
 
-  deleteExchange(tenantId: string, code: string, vnamespace: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${tenantId}/exchange/${code}/${vnamespace}`);
+  deleteExchange(tenantCode: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${tenantCode}/exchange/${code}/${vnamespace}`);
   }
 }

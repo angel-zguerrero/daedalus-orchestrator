@@ -30,7 +30,7 @@ func NewBindingService(config *common.ServerConfing) *BindingService {
 }
 
 func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingRequest) (*pb.CreateBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 }
 
 func (s *BindingService) GetBinding(ctx context.Context, r *pb.GetBindingRequest) (*pb.GetBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (s *BindingService) GetBinding(ctx context.Context, r *pb.GetBindingRequest
 }
 
 func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsRequest) (*pb.GetBindingsResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 }
 
 func (s *BindingService) DeleteBinding(ctx context.Context, r *pb.DeleteBindingRequest) (*pb.DeleteBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}

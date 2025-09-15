@@ -93,7 +93,7 @@ func (s *TenantService) AssertBulkTenant(ctx context.Context, r *pb.AssertBulkTe
 }
 
 func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoRequest) (*pb.TenantInfoResponse, error) {
-	tenantInMaster, node, _, err := s.TenantBO.GetTenant(ctx, r.ID)
+	tenantInMaster, node, _, err := s.TenantBO.GetTenant(ctx, r.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoReque
 
 func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummaryRequest) (*pb.TenantSummaryResponse, error) {
 	// Get tenant info first to extract CF and CFS
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.ID)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummar
 	cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
 	cfs := tenant.ID
 
-	tenantSummary, err := s.TenantSummaryBO.GetTenantSummary(ctx, r.ID, cf, cfs)
+	tenantSummary, err := s.TenantSummaryBO.GetTenantSummary(ctx, tenant.ID, cf, cfs)
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +149,6 @@ func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummar
 		Message: "Tenant Summary",
 		Result: &pb.TenantSummary{
 			ID:             tenantSummary.ID,
-			TenantId:       tenantSummary.TenantId,
-			Code:           tenantSummary.Code,
 			ExchangesCount: int32(tenantSummary.ExchangesCount),
 			QueuesCount:    int32(tenantSummary.QueuesCount),
 			MessagesCount:  int32(tenantSummary.MessagesCount),
@@ -163,12 +161,12 @@ func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummar
 }
 
 func (s *TenantService) DeleteTenant(ctx context.Context, r *pb.DeleteTenantRequest) (*pb.DeleteTenantResponse, error) {
-	err := s.TenantBO.DeleteTenant(ctx, r.ID)
+	err := s.TenantBO.DeleteTenant(ctx, r.Code)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.DeleteTenantResponse{Message: "Tenant " + r.ID + " was deleted"}, nil
+	return &pb.DeleteTenantResponse{Message: "Tenant " + r.Code + " was deleted"}, nil
 }
 
 func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest) (*pb.GetTenantsResponse, error) {

@@ -47,8 +47,8 @@ func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
 		return
 	}
 
-	tenantID := c.Param("id")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenantCode := c.Param("code")
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -73,9 +73,9 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -106,13 +106,13 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 	})
 }
 
-// GetExchangeHandler handles GET /rest-api/tenants/:id/exchange/:code/:vnamespace
+// GetExchangeHandler handles GET /rest-api/tenants/:code/exchange/:exchangeCode/:vnamespace
 func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
-	exchangeCode := c.Param("code")
+	exchangeCode := c.Param("exchangeCode")
 	vnamespace := c.Param("vnamespace")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -129,13 +129,13 @@ func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
 	})
 }
 
-// DeleteExchangeHandler handles DELETE /rest-api/tenants/:id/exchange/:code/:vnamespace
+// DeleteExchangeHandler handles DELETE /rest-api/tenants/:code/exchange/:exchangeCode/:vnamespace
 func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
-	exchangeCode := c.Param("code")
+	exchangeCode := c.Param("exchangeCode")
 	vnamespace := c.Param("vnamespace")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -154,9 +154,9 @@ func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
 
 func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

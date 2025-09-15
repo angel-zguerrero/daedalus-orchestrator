@@ -51,7 +51,7 @@ import { ErrorUtil } from '../../../../shared/utils/error.util';
   ]
 })
 export class ExchangesComponent implements OnInit {
-  @Input() tenantId: string = '';
+  @Input() tenantCode: string = '';
   
   exchanges: any[] = [];
   cursor = '';
@@ -130,7 +130,7 @@ export class ExchangesComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.tenantId) {
+    if (this.tenantCode) {
       this.cursors.push('');
       this.loadExchanges();
     }
@@ -138,7 +138,7 @@ export class ExchangesComponent implements OnInit {
 
   private _filterVNamespaces(value: string): Observable<any[]> {
     this.loadingVNamespaces = true;
-    return this.vNamespacesService.getVNamespaces(this.tenantId, '', 20, value).pipe(
+    return this.vNamespacesService.getVNamespaces(this.tenantCode, '', 20, value).pipe(
       map(response => {
         this.loadingVNamespaces = false;
         return response.data || [];
@@ -151,7 +151,7 @@ export class ExchangesComponent implements OnInit {
       this.cursors.push(cursor);
     }
     
-    this.exchangesService.getExchanges(this.tenantId, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter).subscribe({
+    this.exchangesService.getExchanges(this.tenantCode, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter).subscribe({
       next: (response) => {
         this.exchanges = response.result.Entities || [];
         console.log('Loaded exchanges with headers:', this.exchanges.map(e => ({ id: e.ID, headers: e.Headers || e.headers })));
@@ -257,7 +257,7 @@ export class ExchangesComponent implements OnInit {
         headers: headersObj
       };
       
-      this.exchangesService.createExchange(this.tenantId, exchangeData).subscribe({
+      this.exchangesService.createExchange(this.tenantCode, exchangeData).subscribe({
         next: () => {
           this.createModalVisible = false;
           this.loadExchanges();
@@ -286,7 +286,7 @@ export class ExchangesComponent implements OnInit {
         id: this.selectedExchange.ID,
         headers: headersObj
       };
-      this.exchangesService.createExchange(this.tenantId, exchangeData).subscribe({
+      this.exchangesService.createExchange(this.tenantCode, exchangeData).subscribe({
         next: () => {
           this.editModalVisible = false;
           this.loadExchanges();
@@ -304,7 +304,7 @@ export class ExchangesComponent implements OnInit {
   }
 
   deleteExchange(): void {
-    this.exchangesService.deleteExchange(this.tenantId, this.selectedExchange.Code, this.selectedExchange.VNamespace).subscribe({
+    this.exchangesService.deleteExchange(this.tenantCode, this.selectedExchange.Code, this.selectedExchange.VNamespace).subscribe({
       next: () => {
         this.deleteModalVisible = false;
         this.loadExchanges();
@@ -350,7 +350,7 @@ export class ExchangesComponent implements OnInit {
         return;
       }
 
-      this.exchangesService.bulkCreateExchanges(this.tenantId, { exchanges }).subscribe({
+      this.exchangesService.bulkCreateExchanges(this.tenantCode, { exchanges }).subscribe({
         next: () => {
           this.bulkUploadModalVisible = false;
           this.loadExchanges();

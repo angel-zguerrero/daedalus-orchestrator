@@ -23,7 +23,7 @@ const (
 
 type CreateBindingRequest struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
-	TenantId              string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode            string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code                  string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	ExchangeCode          string                 `protobuf:"bytes,3,opt,name=exchangeCode,proto3" json:"exchangeCode,omitempty"`
 	QueueCode             string                 `protobuf:"bytes,4,opt,name=queueCode,proto3" json:"queueCode,omitempty"`
@@ -70,9 +70,9 @@ func (*CreateBindingRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateBindingRequest) GetTenantId() string {
+func (x *CreateBindingRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -215,7 +215,7 @@ func (x *CreateBindingResponse) GetResult() *Binding {
 
 type GetBindingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	ExchangeCode  string                 `protobuf:"bytes,2,opt,name=exchangeCode,proto3" json:"exchangeCode,omitempty"`
 	QueueCode     string                 `protobuf:"bytes,3,opt,name=queueCode,proto3" json:"queueCode,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,4,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
@@ -253,9 +253,9 @@ func (*GetBindingRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *GetBindingRequest) GetTenantId() string {
+func (x *GetBindingRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -335,7 +335,7 @@ func (x *GetBindingResponse) GetResult() *Binding {
 
 type GetBindingsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	TenantId       string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode     string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Q              string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
 	Cursor         string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
 	PageSize       int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
@@ -375,9 +375,9 @@ func (*GetBindingsRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GetBindingsRequest) GetTenantId() string {
+func (x *GetBindingsRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -911,7 +911,7 @@ func (x *GetBindingsResponse) GetResult() *BindingFindResult {
 
 type DeleteBindingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -948,9 +948,9 @@ func (*DeleteBindingRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *DeleteBindingRequest) GetTenantId() string {
+func (x *DeleteBindingRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -1017,9 +1017,11 @@ var File_internal_infrastructure_server_grpc_proto_definitions_binding_proto pro
 
 const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_rawDesc = "" +
 	"\n" +
-	"Cinternal/infrastructure/server/grpc/proto/definitions/binding.proto\x12\abinding\"\xb4\x04\n" +
-	"\x14CreateBindingRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"Cinternal/infrastructure/server/grpc/proto/definitions/binding.proto\x12\abinding\"\xb8\x04\n" +
+	"\x14CreateBindingRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\"\n" +
 	"\fexchangeCode\x18\x03 \x01(\tR\fexchangeCode\x12\x1c\n" +
 	"\tqueueCode\x18\x04 \x01(\tR\tqueueCode\x12.\n" +
@@ -1042,9 +1044,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"[\n" +
 	"\x15CreateBindingResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12(\n" +
-	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\x91\x01\n" +
-	"\x11GetBindingRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\"\n" +
+	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\x95\x01\n" +
+	"\x11GetBindingRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\"\n" +
 	"\fexchangeCode\x18\x02 \x01(\tR\fexchangeCode\x12\x1c\n" +
 	"\tqueueCode\x18\x03 \x01(\tR\tqueueCode\x12\x1e\n" +
 	"\n" +
@@ -1052,9 +1056,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"vnamespace\"X\n" +
 	"\x12GetBindingResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12(\n" +
-	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\xba\x01\n" +
-	"\x12GetBindingsRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\f\n" +
+	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\xbe\x01\n" +
+	"\x12GetBindingsRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\f\n" +
 	"\x01q\x18\x02 \x01(\tR\x01q\x12\x16\n" +
 	"\x06cursor\x18\x03 \x01(\tR\x06cursor\x12\x1a\n" +
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
@@ -1117,9 +1123,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_binding_proto_r
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"c\n" +
 	"\x13GetBindingsResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x122\n" +
-	"\x06result\x18\x02 \x01(\v2\x1a.binding.BindingFindResultR\x06result\"f\n" +
-	"\x14DeleteBindingRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x06result\x18\x02 \x01(\v2\x1a.binding.BindingFindResultR\x06result\"j\n" +
+	"\x14DeleteBindingRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x03 \x01(\tR\n" +

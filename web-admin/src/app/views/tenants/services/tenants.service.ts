@@ -14,20 +14,20 @@ export class TenantsService {
     return this.http.get(`${this.apiUrl}?cursor=${cursor}&pageSize=${pageSize}&q=${q}`);
   }
 
-  getTenant(id: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${id}`);
+  getTenant(code: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${code}`);
   }
 
-  getTenantSummary(id: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${id}/summary`);
+  getTenantSummary(code: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${code}/summary`);
   }
 
   assertTenant(tenant: any): Observable<any> {
     return this.http.post(this.apiUrl, tenant);
   }
 
-  deleteTenant(id: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${id}`);
+  deleteTenant(code: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${code}`);
   }
 
   bulkAssertTenants(tenants: any): Observable<any> {

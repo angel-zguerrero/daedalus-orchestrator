@@ -83,10 +83,10 @@ func (ctrl *TenantController) BulkCreateTenantHandler(c *gin.Context) {
 	})
 }
 
-// GetTenantHandler handles GET /rest-api/tenants/:id
+// GetTenantHandler handles GET /rest-api/tenants/:code
 func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
-	tenantID := c.Param("id")
-	tenantInMaster, node, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenantCode := c.Param("code")
+	tenantInMaster, node, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -103,12 +103,12 @@ func (ctrl *TenantController) GetTenantHandler(c *gin.Context) {
 	})
 }
 
-// GetTenantSummaryHandler handles GET /rest-api/tenants/:id/summary
+// GetTenantSummaryHandler handles GET /rest-api/tenants/:code/summary
 func (ctrl *TenantController) GetTenantSummaryHandler(c *gin.Context) {
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
 	// Get tenant info first to extract CF and CFS
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -117,7 +117,7 @@ func (ctrl *TenantController) GetTenantSummaryHandler(c *gin.Context) {
 	cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
 	cfs := tenant.ID
 
-	tenantSummary, err := ctrl.TenantSummaryBO.GetTenantSummary(c.Request.Context(), tenantID, cf, cfs)
+	tenantSummary, err := ctrl.TenantSummaryBO.GetTenantSummary(c.Request.Context(), tenant.ID, cf, cfs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -130,16 +130,16 @@ func (ctrl *TenantController) GetTenantSummaryHandler(c *gin.Context) {
 }
 
 func (ctrl *TenantController) DeleteTenantHandler(c *gin.Context) {
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	err := ctrl.TenantBO.DeleteTenant(c.Request.Context(), tenantID)
+	err := ctrl.TenantBO.DeleteTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Tenant " + tenantID + " was deleted",
+		"message": "Tenant " + tenantCode + " was deleted",
 	})
 }
 

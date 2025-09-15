@@ -22,8 +22,6 @@ type GetTenantSummaryCommand struct {
 func (cmd *GetTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
 
-	fmt.Println("Executing GetTenantSummaryCommand for TenantId:", cmd.TenantId)
-
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
 	if err != nil {
@@ -31,7 +29,7 @@ func (cmd *GetTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 		return *commandResult
 	}
 
-	// Get tenant summary by tenant ID - only look in tenant-summaries table
+	// Get tenant summary by tenant code - only look in tenant-summaries table
 	tenantSummary, err := tenantSummaryRepo.GetTenantSummaryById(cmd.TenantId, now)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -39,7 +37,7 @@ func (cmd *GetTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 	}
 
 	if tenantSummary == nil {
-		commandResult.Error = fmt.Sprintf("tenant summary not found for tenant ID: %s", cmd.TenantId)
+		commandResult.Error = fmt.Sprintf("tenant summary not found for tenant id: %s", cmd.TenantId)
 		return *commandResult
 	}
 

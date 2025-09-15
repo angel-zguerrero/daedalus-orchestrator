@@ -10,7 +10,7 @@ export class VNamespacesService {
 
   constructor(private http: HttpClient) { }
 
-  getVNamespaces(tenantId: string, cursor: string = '', pageSize: number = 20, q: string = ''): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${tenantId}/vnamespaces?cursor=${cursor}&pageSize=${pageSize}&q=${q}`);
+  getVNamespaces(tenantCode: string, cursor: string = '', pageSize: number = 20, q: string = ''): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${tenantCode}/vnamespaces?cursor=${cursor}&pageSize=${pageSize}&q=${q}`);
   }
 }

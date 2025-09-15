@@ -30,7 +30,7 @@ func NewExchangeService(config *common.ServerConfing) *ExchangeService {
 }
 
 func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchangeRequest) (*pb.CreateExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchan
 }
 
 func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCreateExchangeRequest) (*pb.BulkCreateExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCrea
 }
 
 func (s *ExchangeService) GetExchange(ctx context.Context, r *pb.GetExchangeRequest) (*pb.GetExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (s *ExchangeService) GetExchange(ctx context.Context, r *pb.GetExchangeRequ
 }
 
 func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRequest) (*pb.GetExchangesResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRe
 }
 
 func (s *ExchangeService) DeleteExchange(ctx context.Context, r *pb.DeleteExchangeRequest) (*pb.DeleteExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}

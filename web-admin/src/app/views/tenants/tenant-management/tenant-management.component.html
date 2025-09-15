@@ -126,21 +126,21 @@
             <!-- Exchanges Tab -->
             <c-tab-panel itemKey="exchanges" class="p-3">
               <ng-container *ngIf="activeTab === 'exchanges'">
-                <app-exchanges [tenantId]="tenantId"></app-exchanges>
+                <app-exchanges [tenantCode]="tenantCode"></app-exchanges>
               </ng-container>
             </c-tab-panel>
 
             <!-- Queues Tab -->
             <c-tab-panel itemKey="queues" class="p-3">
               <ng-container *ngIf="activeTab === 'queues'">
-                <app-queues [tenantId]="tenantId"></app-queues>
+                <app-queues [tenantCode]="tenantCode"></app-queues>
               </ng-container>
             </c-tab-panel>
 
             <!-- Bindings Tab -->
             <c-tab-panel itemKey="bindings" class="p-3">
               <ng-container *ngIf="activeTab === 'bindings'">
-                <app-bindings [tenantId]="tenantId"></app-bindings>
+                <app-bindings [tenantCode]="tenantCode"></app-bindings>
               </ng-container>
             </c-tab-panel>
           </c-tabs-content>

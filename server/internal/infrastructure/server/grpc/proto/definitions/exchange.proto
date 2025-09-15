@@ -13,7 +13,7 @@ service ExchangeService {
 }
 
 message CreateExchangeRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string name = 3;
   string type = 4;
@@ -27,7 +27,7 @@ message CreateExchangeResponse {
 }
 
 message BulkCreateExchangeRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   repeated CreateExchangeItem exchanges = 2;
 }
 
@@ -45,7 +45,7 @@ message BulkCreateExchangeResponse {
 }
 
 message GetExchangeRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string vnamespace = 3;
 }
@@ -56,7 +56,7 @@ message GetExchangeResponse {
 }
 
 message GetExchangesRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string q = 2;
   string cursor = 3;
   int32 pageSize = 4;
@@ -85,7 +85,7 @@ message GetExchangesResponse {
 }
 
 message DeleteExchangeRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string vnamespace = 3;
 }

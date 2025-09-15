@@ -14,7 +14,7 @@ func init() {
 
 // MarkToDeletionTenantInMasterCommand represents a command to authenticate a user.
 type MarkToDeletionTenantInMasterCommand struct {
-	TenantId string
+	TenantCode string
 }
 
 func (cmd *MarkToDeletionTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -27,7 +27,7 @@ func (cmd *MarkToDeletionTenantInMasterCommand) Execute(uow *db.UnitOfWork, now 
 		return *commandResult
 	}
 
-	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantId(cmd.TenantId, now)
+	tenantInMasterFound, err := tenantInMasterRepo.GetTenantInMasterByTenantCode(cmd.TenantCode, now)
 
 	if err != nil {
 		commandResult.Error = err.Error()

@@ -19,7 +19,7 @@ service QueueService {
 }
 
 message CreateQueueRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string name = 3;
   string type = 4;
@@ -38,7 +38,7 @@ message CreateQueueResponse {
 }
 
 message BulkCreateQueueRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   repeated CreateQueueItem queues = 2;
 }
 
@@ -61,7 +61,7 @@ message BulkCreateQueueResponse {
 }
 
 message GetQueueRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string vnamespace = 3;
 }
@@ -72,7 +72,7 @@ message GetQueueResponse {
 }
 
 message GetQueuesRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string q = 2;
   string cursor = 3;
   int32 pageSize = 4;
@@ -108,7 +108,7 @@ message GetQueuesResponse {
 }
 
 message DeleteQueueRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string vnamespace = 3;
 }

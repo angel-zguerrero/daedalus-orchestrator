@@ -108,8 +108,8 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		return
 	}
 
-	tenantID := c.Param("id")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenantCode := c.Param("code")
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -155,14 +155,14 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 	})
 }
 
-// GetBindingHandler handles GET /rest-api/tenants/:id/binding/:exchangeCode/:queueCode/:vnamespace
+// GetBindingHandler handles GET /rest-api/tenants/:code/binding/:exchangeCode/:queueCode/:vnamespace
 func (ctrl *BindingController) GetBindingHandler(c *gin.Context) {
 	exchangeCode := c.Param("exchangeCode")
 	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -187,13 +187,13 @@ func (ctrl *BindingController) GetBindingHandler(c *gin.Context) {
 	})
 }
 
-// DeleteBindingHandler handles DELETE /rest-api/tenants/:id/binding/:code/:vnamespace
+// DeleteBindingHandler handles DELETE /rest-api/tenants/:code/binding/:bindingCode/:vnamespace
 func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
-	code := c.Param("code")
+	bindingCode := c.Param("bindingCode")
 	vnamespace := c.Param("vnamespace")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -201,7 +201,7 @@ func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 
 	err = ctrl.BindingBO.DeleteBinding(
 		c.Request.Context(),
-		code,
+		bindingCode,
 		vnamespace,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
@@ -212,16 +212,16 @@ func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("Binding with code %s in namespace %s was deleted", code, vnamespace),
+		"message": fmt.Sprintf("Binding with code %s in namespace %s was deleted", bindingCode, vnamespace),
 	})
 }
 
 // GetBindingsHandler handles GET /rest-api/tenants/:id/bindings
 func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

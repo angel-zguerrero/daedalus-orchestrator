@@ -25,9 +25,9 @@ func NewVNamespaceController(Config *common.ServerConfing) *VNamespaceController
 	return api
 }
 
-// GetVNamespacesHandler handles GET /rest-api/tenants/:id/vnamespaces
+// GetVNamespacesHandler handles GET /rest-api/tenants/:code/vnamespaces
 func (ctrl *VNamespaceController) GetVNamespacesHandler(c *gin.Context) {
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
 	// Get query parameters
 	query := c.DefaultQuery("q", "")
@@ -44,7 +44,7 @@ func (ctrl *VNamespaceController) GetVNamespacesHandler(c *gin.Context) {
 		pageSize = 100
 	}
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

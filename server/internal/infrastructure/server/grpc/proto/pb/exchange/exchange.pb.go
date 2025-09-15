@@ -23,7 +23,7 @@ const (
 
 type CreateExchangeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
@@ -63,9 +63,9 @@ func (*CreateExchangeRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateExchangeRequest) GetTenantId() string {
+func (x *CreateExchangeRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -159,7 +159,7 @@ func (x *CreateExchangeResponse) GetResult() *Exchange {
 
 type BulkCreateExchangeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Exchanges     []*CreateExchangeItem  `protobuf:"bytes,2,rep,name=exchanges,proto3" json:"exchanges,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -195,9 +195,9 @@ func (*BulkCreateExchangeRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *BulkCreateExchangeRequest) GetTenantId() string {
+func (x *BulkCreateExchangeRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -339,7 +339,7 @@ func (x *BulkCreateExchangeResponse) GetResult() []*Exchange {
 
 type GetExchangeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -376,9 +376,9 @@ func (*GetExchangeRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *GetExchangeRequest) GetTenantId() string {
+func (x *GetExchangeRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -451,7 +451,7 @@ func (x *GetExchangeResponse) GetResult() *Exchange {
 
 type GetExchangesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Q             string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
 	Cursor        string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
 	PageSize      int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
@@ -490,9 +490,9 @@ func (*GetExchangesRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *GetExchangesRequest) GetTenantId() string {
+func (x *GetExchangesRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -731,7 +731,7 @@ func (x *GetExchangesResponse) GetResult() *ExchangeFindResult {
 
 type DeleteExchangeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -768,9 +768,9 @@ func (*DeleteExchangeRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *DeleteExchangeRequest) GetTenantId() string {
+func (x *DeleteExchangeRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -837,9 +837,11 @@ var File_internal_infrastructure_server_grpc_proto_definitions_exchange_proto pr
 
 const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc = "" +
 	"\n" +
-	"Dinternal/infrastructure/server/grpc/proto/definitions/exchange.proto\x12\bexchange\"\x93\x02\n" +
-	"\x15CreateExchangeRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"Dinternal/infrastructure/server/grpc/proto/definitions/exchange.proto\x12\bexchange\"\x97\x02\n" +
+	"\x15CreateExchangeRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1e\n" +
@@ -852,9 +854,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"^\n" +
 	"\x16CreateExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
-	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"s\n" +
-	"\x19BulkCreateExchangeRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12:\n" +
+	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"w\n" +
+	"\x19BulkCreateExchangeRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12:\n" +
 	"\texchanges\x18\x02 \x03(\v2\x1c.exchange.CreateExchangeItemR\texchanges\"\xf1\x01\n" +
 	"\x12CreateExchangeItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
@@ -869,18 +873,22 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"b\n" +
 	"\x1aBulkCreateExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
-	"\x06result\x18\x02 \x03(\v2\x12.exchange.ExchangeR\x06result\"d\n" +
-	"\x12GetExchangeRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x06result\x18\x02 \x03(\v2\x12.exchange.ExchangeR\x06result\"h\n" +
+	"\x12GetExchangeRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x03 \x01(\tR\n" +
 	"vnamespace\"[\n" +
 	"\x13GetExchangeResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
-	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"\x93\x01\n" +
-	"\x13GetExchangesRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\f\n" +
+	"\x06result\x18\x02 \x01(\v2\x12.exchange.ExchangeR\x06result\"\x97\x01\n" +
+	"\x13GetExchangesRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\f\n" +
 	"\x01q\x18\x02 \x01(\tR\x01q\x12\x16\n" +
 	"\x06cursor\x18\x03 \x01(\tR\x06cursor\x12\x1a\n" +
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
@@ -906,9 +914,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"\x06Cursor\x18\x02 \x01(\tR\x06Cursor\"f\n" +
 	"\x14GetExchangesResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x124\n" +
-	"\x06result\x18\x02 \x01(\v2\x1c.exchange.ExchangeFindResultR\x06result\"g\n" +
-	"\x15DeleteExchangeRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x06result\x18\x02 \x01(\v2\x1c.exchange.ExchangeFindResultR\x06result\"k\n" +
+	"\x15DeleteExchangeRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x03 \x01(\tR\n" +

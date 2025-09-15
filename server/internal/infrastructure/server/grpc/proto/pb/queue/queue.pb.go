@@ -72,7 +72,7 @@ func (QueueType) EnumDescriptor() ([]byte, []int) {
 
 type CreateQueueRequest struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
-	TenantId                  string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode                string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code                      string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Name                      string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Type                      string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
@@ -117,9 +117,9 @@ func (*CreateQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateQueueRequest) GetTenantId() string {
+func (x *CreateQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -248,7 +248,7 @@ func (x *CreateQueueResponse) GetResult() *Queue {
 
 type BulkCreateQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Queues        []*CreateQueueItem     `protobuf:"bytes,2,rep,name=queues,proto3" json:"queues,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -284,9 +284,9 @@ func (*BulkCreateQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *BulkCreateQueueRequest) GetTenantId() string {
+func (x *BulkCreateQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -468,7 +468,7 @@ func (x *BulkCreateQueueResponse) GetResult() []*Queue {
 
 type GetQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -505,9 +505,9 @@ func (*GetQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *GetQueueRequest) GetTenantId() string {
+func (x *GetQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -580,7 +580,7 @@ func (x *GetQueueResponse) GetResult() *Queue {
 
 type GetQueuesRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	TenantId       string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode     string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Q              string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
 	Cursor         string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
 	PageSize       int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
@@ -620,9 +620,9 @@ func (*GetQueuesRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *GetQueuesRequest) GetTenantId() string {
+func (x *GetQueuesRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -916,7 +916,7 @@ func (x *GetQueuesResponse) GetResult() *QueueFindResult {
 
 type DeleteQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -953,9 +953,9 @@ func (*DeleteQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *DeleteQueueRequest) GetTenantId() string {
+func (x *DeleteQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -1022,9 +1022,11 @@ var File_internal_infrastructure_server_grpc_proto_definitions_queue_proto proto
 
 const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc = "" +
 	"\n" +
-	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xce\x04\n" +
-	"\x12CreateQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xd2\x04\n" +
+	"\x12CreateQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x04 \x01(\tR\x04type\x12\x14\n" +
@@ -1046,9 +1048,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"U\n" +
 	"\x13CreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"d\n" +
-	"\x16BulkCreateQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12.\n" +
+	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"h\n" +
+	"\x16BulkCreateQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12.\n" +
 	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xa9\x04\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
@@ -1072,18 +1076,22 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Y\n" +
 	"\x17BulkCreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"a\n" +
-	"\x0fGetQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"e\n" +
+	"\x0fGetQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x03 \x01(\tR\n" +
 	"vnamespace\"R\n" +
 	"\x10GetQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"\xb8\x01\n" +
-	"\x10GetQueuesRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\f\n" +
+	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"\xbc\x01\n" +
+	"\x10GetQueuesRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\f\n" +
 	"\x01q\x18\x02 \x01(\tR\x01q\x12\x16\n" +
 	"\x06cursor\x18\x03 \x01(\tR\x06cursor\x12\x1a\n" +
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
@@ -1123,9 +1131,11 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"]\n" +
 	"\x11GetQueuesResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12.\n" +
-	"\x06result\x18\x02 \x01(\v2\x16.queue.QueueFindResultR\x06result\"d\n" +
-	"\x12DeleteQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x06result\x18\x02 \x01(\v2\x16.queue.QueueFindResultR\x06result\"h\n" +
+	"\x12DeleteQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x03 \x01(\tR\n" +

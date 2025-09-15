@@ -53,7 +53,7 @@ func convertPriorityThresholdsToProto(modelMap map[int]int) map[int32]int32 {
 }
 
 func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest) (*pb.CreateQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 }
 
 func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueueRequest) (*pb.BulkCreateQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 }
 
 func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb.GetQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 }
 
 func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*pb.GetQueuesResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 }
 
 func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest) (*pb.DeleteQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}

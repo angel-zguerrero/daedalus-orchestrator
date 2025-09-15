@@ -10,23 +10,23 @@ export class BindingsService {
 
   constructor(private http: HttpClient) { }
 
-  getBindings(tenantId: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = '', includeObjects: boolean = false): Observable<any> {
+  getBindings(tenantCode: string, cursor: string = '', pageSize: number = 10, q: string = '', vnamespace: string = '', includeObjects: boolean = false): Observable<any> {
     let params = `cursor=${cursor}&pageSize=${pageSize}&q=${q}&includeObjects=${includeObjects}`;
     if (vnamespace) {
       params += `&vnamespace=${vnamespace}`;
     }
-    return this.http.get(`${this.apiUrl}/${tenantId}/bindings?${params}`);
+    return this.http.get(`${this.apiUrl}/${tenantCode}/bindings?${params}`);
   }
 
-  getBinding(tenantId: string, code: string, vnamespace: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/${tenantId}/binding/${code}/${vnamespace}`);
+  getBinding(tenantCode: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${tenantCode}/binding/${code}/${vnamespace}`);
   }
 
-  createBinding(tenantId: string, binding: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/${tenantId}/binding`, binding);
+  createBinding(tenantCode: string, binding: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${tenantCode}/binding`, binding);
   }
 
-  deleteBinding(tenantId: string, code: string, vnamespace: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${tenantId}/binding/${code}/${vnamespace}`);
+  deleteBinding(tenantCode: string, code: string, vnamespace: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${tenantCode}/binding/${code}/${vnamespace}`);
   }
 }

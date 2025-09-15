@@ -9,7 +9,7 @@ export const routes: Routes = [
     }
   },
   {
-    path: ':id/management',
+    path: ':code/management',
     loadComponent: () => import('./tenant-management/tenant-management.component').then(m => m.TenantManagementComponent),
     data: {
       title: 'Tenant Management'

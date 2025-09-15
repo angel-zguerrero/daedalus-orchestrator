@@ -154,9 +154,9 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 	return created, nil
 }
 
-func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.TenantInMaster, *dragonboat.RaftNode, *db4.NodeHostInfo, error) {
+func (bo *TenantBO) GetTenant(ctx context.Context, tenantCode string) (models.TenantInMaster, *dragonboat.RaftNode, *db4.NodeHostInfo, error) {
 	findTenantCommand := &tenant_command.FindTenantCommand{
-		TenantID: tenantID,
+		TenantCode: tenantCode,
 	}
 
 	queryCommand := &general_command.Query_Command{
@@ -207,12 +207,12 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantID string) (models.Tena
 	return tenantInMaster, node, nodeHostInfo, nil
 }
 
-func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
+func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantCode string) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
 	defer writeCancel()
 
 	markToDeletionTenantInMasterCommand := &tenant_command.MarkToDeletionTenantInMasterCommand{
-		TenantId: tenantID,
+		TenantCode: tenantCode,
 	}
 
 	atstCmd := general_command.FSM_Command{
@@ -223,7 +223,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 
 	result, err := bo.Config.MasterNode.Write(writeCtx, atstCmd)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("TenantID", tenantID).Msg("Failed to delete tenant")
+		bo.Config.Logger.Error().Err(err).Str("TenantCode", tenantCode).Msg("Failed to delete tenant")
 		return errors.New("Failed to delete tenant: " + err.Error())
 	}
 
@@ -231,7 +231,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantID string) error {
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("TenantID", tenantID).Msg("Tenant deletion command returned unexpected result type")
+		bo.Config.Logger.Error().Err(err).Str("TenantCode", tenantCode).Msg("Tenant deletion command returned unexpected result type")
 		return errors.New("Tenant deletion command returned unexpected error")
 	}
 
@@ -289,9 +289,17 @@ func (bo *TenantBO) GetTenants(ctx context.Context, q string, cursor string, pag
 	return findResult, nil
 }
 
-func (bo *TenantBO) GetTenantSummary(ctx context.Context, tenantID string) (models.TenantSummary, error) {
+func (bo *TenantBO) GetTenantSummary(ctx context.Context, tenantCode string) (models.TenantSummary, error) {
+
+	tenant, _, _, err := bo.GetTenant(ctx, tenantCode)
+
+	if err != nil {
+		bo.Config.Logger.Error().Str("error", err.Error()).Msg("Get tenant summary command failed")
+		return models.TenantSummary{}, err
+	}
+
 	getTenantSummaryCommand := &tenant_summary_command.GetTenantSummaryCommand{
-		TenantId: tenantID,
+		TenantId: tenant.ID,
 	}
 
 	queryCommand := &general_command.Query_Command{

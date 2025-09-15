@@ -130,7 +130,7 @@ interface Binding {
   ],
 })
 export class BindingsComponent implements OnInit {
-  @Input() tenantId: string = '';
+  @Input() tenantCode: string = '';
   
   bindings: any[] = [];
   cursor = '';
@@ -233,7 +233,7 @@ export class BindingsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.tenantId) {
+    if (this.tenantCode) {
       this.cursors.push('');
       this.loadBindings();
     }
@@ -375,7 +375,7 @@ export class BindingsComponent implements OnInit {
 
   private _filterVNamespaces(value: string): Observable<VNamespace[]> {
     this.loadingVNamespaces = true;
-    return this.vNamespacesService.getVNamespaces(this.tenantId, '', 50, value).pipe(
+    return this.vNamespacesService.getVNamespaces(this.tenantCode, '', 50, value).pipe(
       map(response => {
         this.loadingVNamespaces = false;
         
@@ -404,7 +404,7 @@ export class BindingsComponent implements OnInit {
     }
 
     this.loadingExchanges = true;
-    return this.exchangesService.getExchanges(this.tenantId, '', 50, value, this.selectedVNamespace.Code).pipe(
+    return this.exchangesService.getExchanges(this.tenantCode, '', 50, value, this.selectedVNamespace.Code).pipe(
       map(response => {
         this.loadingExchanges = false;
         let exchanges = (response.result?.Entities || []).map((item: any) => ({
@@ -437,7 +437,7 @@ export class BindingsComponent implements OnInit {
     }
 
     this.loadingExchanges = true;
-    return this.exchangesService.getExchanges(this.tenantId, '', 50, value, this.selectedVNamespace.Code).pipe(
+    return this.exchangesService.getExchanges(this.tenantCode, '', 50, value, this.selectedVNamespace.Code).pipe(
       map(response => {
         this.loadingExchanges = false;
         let exchanges = (response.result?.Entities || []).map((item: any) => ({
@@ -477,7 +477,7 @@ export class BindingsComponent implements OnInit {
     }
 
     this.loadingExchanges = true;
-    return this.exchangesService.getExchanges(this.tenantId, '', 50, value, this.selectedVNamespace.Code).pipe(
+    return this.exchangesService.getExchanges(this.tenantCode, '', 50, value, this.selectedVNamespace.Code).pipe(
       map(response => {
         this.loadingExchanges = false;
         let exchanges = (response.result?.Entities || []).map((item: any) => ({
@@ -514,7 +514,7 @@ export class BindingsComponent implements OnInit {
     }
 
     this.loadingQueues = true;
-    return this.queuesService.getQueues(this.tenantId, '', 50, value, this.selectedVNamespace.Code).pipe(
+    return this.queuesService.getQueues(this.tenantCode, '', 50, value, this.selectedVNamespace.Code).pipe(
       map(response => {
         this.loadingQueues = false;
         return (response.result?.Entities || []).map((item: any) => ({
@@ -956,7 +956,7 @@ export class BindingsComponent implements OnInit {
         headers: this.showHeaders ? this.getHeadersAsMap() : {}
       };
 
-      this.bindingsService.createBinding(this.tenantId, bindingData).subscribe({
+      this.bindingsService.createBinding(this.tenantCode, bindingData).subscribe({
         next: () => {
           this.createModalVisible = false;
           this.loadBindings();
@@ -1013,7 +1013,7 @@ export class BindingsComponent implements OnInit {
     
     const vnamespaceFilter = this.selectedVNamespaceFilter?.Code || this.selectedVNamespaceFilter?.Name || '';
 
-    this.bindingsService.getBindings(this.tenantId, cursor, this.pageSize, this.searchQuery, vnamespaceFilter, true).subscribe({
+    this.bindingsService.getBindings(this.tenantCode, cursor, this.pageSize, this.searchQuery, vnamespaceFilter, true).subscribe({
       next: (response) => {
         this.bindings = response.result.Entities || [];
         this.cursor = response.result.Cursor;
@@ -1082,7 +1082,7 @@ export class BindingsComponent implements OnInit {
       }
 
       this.bindingsService.deleteBinding(
-        this.tenantId, 
+        this.tenantCode, 
         this.selectedBinding.Code,
         vnamespace
       ).subscribe({

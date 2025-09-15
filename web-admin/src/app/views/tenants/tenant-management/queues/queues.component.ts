@@ -67,7 +67,7 @@ interface Queue {
   ]
 })
 export class QueuesComponent implements OnInit {
-  @Input() tenantId: string = '';
+  @Input() tenantCode: string = '';
   
   queues: Queue[] = [];
   cursor = '';
@@ -176,7 +176,7 @@ export class QueuesComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.tenantId) {
+    if (this.tenantCode) {
       this.cursors.push('');
       this.loadQueues();
     }
@@ -184,7 +184,7 @@ export class QueuesComponent implements OnInit {
 
   private _filterVNamespaces(value: string): Observable<any[]> {
     this.loadingVNamespaces = true;
-    return this.vNamespacesService.getVNamespaces(this.tenantId, '', 20, value).pipe(
+    return this.vNamespacesService.getVNamespaces(this.tenantCode, '', 20, value).pipe(
       map(response => {
         this.loadingVNamespaces = false;
         return response.data || [];
@@ -197,7 +197,7 @@ export class QueuesComponent implements OnInit {
       this.cursors.push(cursor);
     }
     
-    this.queuesService.getQueues(this.tenantId, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter, true).subscribe({
+    this.queuesService.getQueues(this.tenantCode, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter, true).subscribe({
       next: (response) => {
         this.queues = response.result.Entities || [];
         this.cursor = response.result.Cursor;
@@ -355,7 +355,7 @@ export class QueuesComponent implements OnInit {
         headers: headersObj
       };
 
-      this.queuesService.createQueue(this.tenantId, queueData).subscribe({
+      this.queuesService.createQueue(this.tenantCode, queueData).subscribe({
         next: () => {
           this.createModalVisible = false;
           this.loadQueues();
@@ -411,7 +411,7 @@ export class QueuesComponent implements OnInit {
         headers: headersObj
       };
       
-      this.queuesService.createQueue(this.tenantId, queueData).subscribe({
+      this.queuesService.createQueue(this.tenantCode, queueData).subscribe({
         next: () => {
           this.editModalVisible = false;
           this.loadQueues();
@@ -429,7 +429,7 @@ export class QueuesComponent implements OnInit {
   }
 
   deleteQueue(): void {
-    this.queuesService.deleteQueue(this.tenantId, this.selectedQueue.Code, this.selectedQueue.VNamespace).subscribe({
+    this.queuesService.deleteQueue(this.tenantCode, this.selectedQueue.Code, this.selectedQueue.VNamespace).subscribe({
       next: () => {
         this.deleteModalVisible = false;
         this.loadQueues();
@@ -613,7 +613,7 @@ export class QueuesComponent implements OnInit {
           };
         });
 
-        this.queuesService.bulkCreateQueues(this.tenantId, { queues: processedQueues }).subscribe({
+        this.queuesService.bulkCreateQueues(this.tenantCode, { queues: processedQueues }).subscribe({
           next: () => {
             this.bulkUploadModalVisible = false;
             this.loadQueues();
