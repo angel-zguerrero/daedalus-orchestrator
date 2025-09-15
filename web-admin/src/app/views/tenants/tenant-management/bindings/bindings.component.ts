@@ -15,7 +15,7 @@ import {
   AlertModule, 
   BadgeModule
 } from '@coreui/angular';
-import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators, FormControl, ValidatorFn, AbstractControl } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
@@ -465,11 +465,8 @@ export class BindingsComponent implements OnInit {
           Description: item.Description
         } as Exchange));
 
-        // Filter out Fanout exchanges for dynamic bindings
-        const bindingType = this.bindingForm.get('bindingType')?.value;
-        if (bindingType === 'dynamic') {
-          exchanges = exchanges.filter((exchange: Exchange) => exchange.Type !== 'fanout');
-        }
+        // Alternate exchanges must be of type 'fanout'
+        exchanges = exchanges.filter((exchange: Exchange) => exchange.Type === 'fanout');
 
         // Filter out the selected main exchange and target exchange
         exchanges = exchanges.filter((exchange: Exchange) => {
@@ -699,12 +696,14 @@ export class BindingsComponent implements OnInit {
     const patternControl = this.bindingForm.get('pattern');
     const queueControl = this.bindingForm.get('queue');
     const targetExchangeControl = this.bindingForm.get('targetExchange');
+    const alternateExchangeControl = this.bindingForm.get('alternateExchange');
 
     // Clear existing validators
     routingKeyControl?.clearValidators();
     patternControl?.clearValidators();
     queueControl?.clearValidators();
     targetExchangeControl?.clearValidators();
+    alternateExchangeControl?.clearValidators();
 
     // Set validators based on binding type and target exchange type
     const bindingType = this.bindingForm.get('bindingType')?.value;
@@ -717,6 +716,9 @@ export class BindingsComponent implements OnInit {
         targetExchangeControl?.setValidators([Validators.required]);
       }
     }
+
+    // Validate that alternate exchange is of type 'fanout'
+    alternateExchangeControl?.setValidators([this.alternateExchangeFanoutValidator()]);
 
     // Set validators based on exchange type and binding type
     if (this.selectedExchange) {
@@ -738,9 +740,26 @@ export class BindingsComponent implements OnInit {
     patternControl?.updateValueAndValidity();
     queueControl?.updateValueAndValidity();
     targetExchangeControl?.updateValueAndValidity();
+    alternateExchangeControl?.updateValueAndValidity();
   }
 
   // Modal and CRUD operations
+
+  // Custom validator for alternate exchange
+  private alternateExchangeFanoutValidator(): ValidatorFn {
+    return (control: AbstractControl): { [key: string]: any } | null => {
+      if (!control.value) {
+        return null; // No value, no validation error (optional field)
+      }
+      
+      const selectedAlternateExchange = this.selectedAlternateExchange;
+      if (selectedAlternateExchange && selectedAlternateExchange.Type !== 'fanout') {
+        return { 'alternateExchangeNotFanout': { value: control.value, actualType: selectedAlternateExchange.Type } };
+      }
+      
+      return null;
+    };
+  }
   openCreateModal(): void {
     this.createModalVisible = true;
     this.resetForm();

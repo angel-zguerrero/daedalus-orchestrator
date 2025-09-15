@@ -444,8 +444,11 @@
                 {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
               </mat-option>
             </mat-autocomplete>
+            <mat-error *ngIf="alternateExchangeCtrl.hasError('alternateExchangeNotFanout')">
+              Alternate Exchange must be of type 'fanout'. Selected exchange type: {{alternateExchangeCtrl.getError('alternateExchangeNotFanout')?.actualType}}
+            </mat-error>
           </mat-form-field>
-          <div class="form-text">Optional: Exchange to use when message routing fails</div>
+          <div class="form-text">Optional: Exchange to use when message routing fails (must be fanout type)</div>
         </c-col>
       </c-row>
 

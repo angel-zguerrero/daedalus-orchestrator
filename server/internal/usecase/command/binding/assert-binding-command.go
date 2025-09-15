@@ -212,6 +212,12 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 			commandResult.Error = "Alternate Exchange with Code '" + cmd.AlternateExchangeCode + "' in VNamespace '" + cmd.VNamespace + "' does not exist"
 			return *commandResult
 		}
+		
+		// Validate that Alternate Exchange must be of type Fanout
+		if alternateExchange.Type != models.Fanout {
+			commandResult.Error = "Alternate Exchange must be of type 'fanout', got '" + string(alternateExchange.Type) + "'"
+			return *commandResult
+		}
 	}
 
 	// Validate binding parameters according to Exchange Type
