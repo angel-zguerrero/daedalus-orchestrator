@@ -150,6 +150,9 @@ export class BindingsComponent implements OnInit {
   public isEditMode = false;
   public editBinding: Binding | null = null;
 
+  // Flag to prevent auto-reset during form population
+  private isPopulatingForm: boolean = false;
+
   // Form and selected models
   bindingForm: FormGroup;
   selectedBinding: Binding | null = null;
@@ -288,6 +291,11 @@ export class BindingsComponent implements OnInit {
 
     // Watch Exchange changes
     this.exchangeCtrl.valueChanges.subscribe(exchange => {
+      // Don't override selectedExchange if we're just populating the form
+      if (this.isPopulatingForm) {
+        return;
+      }
+      
       this.selectedExchange = exchange;
       this.onExchangeChange();
       // Refresh filters when main exchange changes
@@ -297,12 +305,22 @@ export class BindingsComponent implements OnInit {
 
     // Watch Queue changes
     this.queueCtrl.valueChanges.subscribe(queue => {
+      // Don't override selectedQueue if we're just populating the form
+      if (this.isPopulatingForm) {
+        return;
+      }
+      
       this.selectedQueue = queue;
       this.onQueueChange();
     });
 
     // Watch Target Exchange changes
     this.targetExchangeCtrl.valueChanges.subscribe(targetExchange => {
+      // Don't override selectedTargetExchange if we're just populating the form
+      if (this.isPopulatingForm) {
+        return;
+      }
+      
       this.selectedTargetExchange = targetExchange;
       // Refresh alternate exchange filter when target exchange changes
       this.refreshAlternateExchangeFilter();
@@ -310,6 +328,11 @@ export class BindingsComponent implements OnInit {
 
     // Watch Alternate Exchange changes
     this.alternateExchangeCtrl.valueChanges.subscribe(alternateExchange => {
+      // Don't override selectedAlternateExchange if we're just populating the form
+      if (this.isPopulatingForm) {
+        return;
+      }
+      
       this.selectedAlternateExchange = alternateExchange;
       // Refresh target exchange filter when alternate exchange changes
       this.refreshTargetExchangeFilter();
@@ -512,6 +535,11 @@ export class BindingsComponent implements OnInit {
 
   // Model change handlers
   private onVNamespaceChange(): void {
+    // Don't reset selections if we're just populating the form
+    if (this.isPopulatingForm) {
+      return;
+    }
+    
     // Reset dependent selections
     this.selectedExchange = null;
     this.selectedQueue = null;
@@ -821,6 +849,9 @@ export class BindingsComponent implements OnInit {
   }
 
   private populateFormWithBinding(binding: Binding): void {
+    // Set flag to prevent auto-reset during population
+    this.isPopulatingForm = true;
+    
     // Set selected models
     this.selectedVNamespace = binding.VNamespace ? { Code: binding.VNamespace, Name: binding.VNamespace } as VNamespace : null;
     this.selectedExchange = binding.Exchange || null;
@@ -873,6 +904,11 @@ export class BindingsComponent implements OnInit {
     // Refresh filters to exclude selected exchanges
     this.refreshTargetExchangeFilter();
     this.refreshAlternateExchangeFilter();
+    
+    // Reset the population flag after a short delay to allow all async operations to complete
+    setTimeout(() => {
+      this.isPopulatingForm = false;
+    }, 100);
   }
 
   createBinding(): void {
@@ -981,11 +1017,6 @@ export class BindingsComponent implements OnInit {
       next: (response) => {
         this.bindings = response.result.Entities || [];
         this.cursor = response.result.Cursor;
-        
-        // Debug: Log the first binding to see the structure
-        if (this.bindings.length > 0) {
-          console.log('Sample binding data:', this.bindings[0]);
-        }
       },
       error: (error) => {
         this.showAlert = true;
@@ -1041,11 +1072,8 @@ export class BindingsComponent implements OnInit {
   }
 
   deleteBinding(): void {
-    console.log('Deleting binding:::', this.selectedBinding);
     if (this.selectedBinding && this.selectedBinding.Code) {
       const vnamespace = this.getVNamespaceFromBinding(this.selectedBinding);
-      
-      console.log('Using vnamespace:', vnamespace);
       
       if (!vnamespace) {
         this.showAlert = true;
