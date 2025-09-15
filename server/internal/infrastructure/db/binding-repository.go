@@ -77,6 +77,24 @@ func (r *BindingRepository) DeleteBinding(id string, now time.Time) (bool, error
 	return r.Delete(id, now)
 }
 
+func (r *BindingRepository) ClearAlternateExchangeId(bindingID string, now time.Time) (bool, error) {
+	// Get the binding first
+	binding, err := r.GetBindingById(bindingID, now)
+	if err != nil {
+		return false, err
+	}
+	if binding == nil {
+		return false, nil
+	}
+
+	// Clear the AlternateExchangeID field
+	binding.AlternateExchangeID = ""
+	binding.UpdatedAt = now
+
+	// Update the binding
+	return r.Update(binding, now)
+}
+
 func (r *BindingRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Binding], error) {
 	if q == "" {
 		if vNamespace == "" {
