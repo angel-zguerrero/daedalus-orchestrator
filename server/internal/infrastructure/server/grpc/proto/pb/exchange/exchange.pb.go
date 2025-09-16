@@ -833,6 +833,226 @@ func (x *DeleteExchangeResponse) GetMessage() string {
 	return ""
 }
 
+type PublishMessageRequest struct {
+	state                          protoimpl.MessageState `protogen:"open.v1"`
+	TenantCode                     string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	ExchangeCode                   string                 `protobuf:"bytes,2,opt,name=exchangeCode,proto3" json:"exchangeCode,omitempty"`
+	RoutingKeyOrPatternOrQueueCode string                 `protobuf:"bytes,3,opt,name=routingKeyOrPatternOrQueueCode,proto3" json:"routingKeyOrPatternOrQueueCode,omitempty"`
+	Vnamespace                     string                 `protobuf:"bytes,4,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Message                        *QueueMessage          `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields                  protoimpl.UnknownFields
+	sizeCache                      protoimpl.SizeCache
+}
+
+func (x *PublishMessageRequest) Reset() {
+	*x = PublishMessageRequest{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishMessageRequest) ProtoMessage() {}
+
+func (x *PublishMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishMessageRequest.ProtoReflect.Descriptor instead.
+func (*PublishMessageRequest) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PublishMessageRequest) GetTenantCode() string {
+	if x != nil {
+		return x.TenantCode
+	}
+	return ""
+}
+
+func (x *PublishMessageRequest) GetExchangeCode() string {
+	if x != nil {
+		return x.ExchangeCode
+	}
+	return ""
+}
+
+func (x *PublishMessageRequest) GetRoutingKeyOrPatternOrQueueCode() string {
+	if x != nil {
+		return x.RoutingKeyOrPatternOrQueueCode
+	}
+	return ""
+}
+
+func (x *PublishMessageRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
+	}
+	return ""
+}
+
+func (x *PublishMessageRequest) GetMessage() *QueueMessage {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
+type QueueMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MessageId     string                 `protobuf:"bytes,1,opt,name=messageId,proto3" json:"messageId,omitempty"`
+	Handler       string                 `protobuf:"bytes,2,opt,name=handler,proto3" json:"handler,omitempty"`
+	Priority      int32                  `protobuf:"varint,3,opt,name=priority,proto3" json:"priority,omitempty"`
+	Parameters    map[string]string      `protobuf:"bytes,4,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Headers       map[string]string      `protobuf:"bytes,5,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ContentType   string                 `protobuf:"bytes,6,opt,name=contentType,proto3" json:"contentType,omitempty"`
+	Content       []byte                 `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueueMessage) Reset() {
+	*x = QueueMessage{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueueMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueueMessage) ProtoMessage() {}
+
+func (x *QueueMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueueMessage.ProtoReflect.Descriptor instead.
+func (*QueueMessage) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *QueueMessage) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *QueueMessage) GetHandler() string {
+	if x != nil {
+		return x.Handler
+	}
+	return ""
+}
+
+func (x *QueueMessage) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+func (x *QueueMessage) GetParameters() map[string]string {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
+}
+
+func (x *QueueMessage) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *QueueMessage) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *QueueMessage) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+type PublishMessageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	QueueCodes    []string               `protobuf:"bytes,2,rep,name=queueCodes,proto3" json:"queueCodes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishMessageResponse) Reset() {
+	*x = PublishMessageResponse{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishMessageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishMessageResponse) ProtoMessage() {}
+
+func (x *PublishMessageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishMessageResponse.ProtoReflect.Descriptor instead.
+func (*PublishMessageResponse) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PublishMessageResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PublishMessageResponse) GetQueueCodes() []string {
+	if x != nil {
+		return x.QueueCodes
+	}
+	return nil
+}
+
 var File_internal_infrastructure_server_grpc_proto_definitions_exchange_proto protoreflect.FileDescriptor
 
 const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc = "" +
@@ -924,13 +1144,45 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"vnamespace\x18\x03 \x01(\tR\n" +
 	"vnamespace\"2\n" +
 	"\x16DeleteExchangeResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2\xb7\x03\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\xf5\x01\n" +
+	"\x15PublishMessageRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\"\n" +
+	"\fexchangeCode\x18\x02 \x01(\tR\fexchangeCode\x12F\n" +
+	"\x1eroutingKeyOrPatternOrQueueCode\x18\x03 \x01(\tR\x1eroutingKeyOrPatternOrQueueCode\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x04 \x01(\tR\n" +
+	"vnamespace\x120\n" +
+	"\amessage\x18\x05 \x01(\v2\x16.exchange.QueueMessageR\amessage\"\xa0\x03\n" +
+	"\fQueueMessage\x12\x1c\n" +
+	"\tmessageId\x18\x01 \x01(\tR\tmessageId\x12\x18\n" +
+	"\ahandler\x18\x02 \x01(\tR\ahandler\x12\x1a\n" +
+	"\bpriority\x18\x03 \x01(\x05R\bpriority\x12F\n" +
+	"\n" +
+	"parameters\x18\x04 \x03(\v2&.exchange.QueueMessage.ParametersEntryR\n" +
+	"parameters\x12=\n" +
+	"\aheaders\x18\x05 \x03(\v2#.exchange.QueueMessage.HeadersEntryR\aheaders\x12 \n" +
+	"\vcontentType\x18\x06 \x01(\tR\vcontentType\x12\x18\n" +
+	"\acontent\x18\a \x01(\fR\acontent\x1a=\n" +
+	"\x0fParametersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"R\n" +
+	"\x16PublishMessageResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1e\n" +
+	"\n" +
+	"queueCodes\x18\x02 \x03(\tR\n" +
+	"queueCodes2\x8c\x04\n" +
 	"\x0fExchangeService\x12S\n" +
 	"\x0eCreateExchange\x12\x1f.exchange.CreateExchangeRequest\x1a .exchange.CreateExchangeResponse\x12_\n" +
 	"\x12BulkCreateExchange\x12#.exchange.BulkCreateExchangeRequest\x1a$.exchange.BulkCreateExchangeResponse\x12J\n" +
 	"\vGetExchange\x12\x1c.exchange.GetExchangeRequest\x1a\x1d.exchange.GetExchangeResponse\x12M\n" +
 	"\fGetExchanges\x12\x1d.exchange.GetExchangesRequest\x1a\x1e.exchange.GetExchangesResponse\x12S\n" +
-	"\x0eDeleteExchange\x12\x1f.exchange.DeleteExchangeRequest\x1a .exchange.DeleteExchangeResponseB\x16Z\x14pb/exchange;exchangeb\x06proto3"
+	"\x0eDeleteExchange\x12\x1f.exchange.DeleteExchangeRequest\x1a .exchange.DeleteExchangeResponse\x12S\n" +
+	"\x0ePublishMessage\x12\x1f.exchange.PublishMessageRequest\x1a .exchange.PublishMessageResponseB\x16Z\x14pb/exchange;exchangeb\x06proto3"
 
 var (
 	file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescOnce sync.Once
@@ -944,7 +1196,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_r
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_goTypes = []any{
 	(*CreateExchangeRequest)(nil),      // 0: exchange.CreateExchangeRequest
 	(*CreateExchangeResponse)(nil),     // 1: exchange.CreateExchangeResponse
@@ -959,35 +1211,45 @@ var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_go
 	(*GetExchangesResponse)(nil),       // 10: exchange.GetExchangesResponse
 	(*DeleteExchangeRequest)(nil),      // 11: exchange.DeleteExchangeRequest
 	(*DeleteExchangeResponse)(nil),     // 12: exchange.DeleteExchangeResponse
-	nil,                                // 13: exchange.CreateExchangeRequest.HeadersEntry
-	nil,                                // 14: exchange.CreateExchangeItem.HeadersEntry
-	nil,                                // 15: exchange.Exchange.HeadersEntry
+	(*PublishMessageRequest)(nil),      // 13: exchange.PublishMessageRequest
+	(*QueueMessage)(nil),               // 14: exchange.QueueMessage
+	(*PublishMessageResponse)(nil),     // 15: exchange.PublishMessageResponse
+	nil,                                // 16: exchange.CreateExchangeRequest.HeadersEntry
+	nil,                                // 17: exchange.CreateExchangeItem.HeadersEntry
+	nil,                                // 18: exchange.Exchange.HeadersEntry
+	nil,                                // 19: exchange.QueueMessage.ParametersEntry
+	nil,                                // 20: exchange.QueueMessage.HeadersEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_depIdxs = []int32{
-	13, // 0: exchange.CreateExchangeRequest.headers:type_name -> exchange.CreateExchangeRequest.HeadersEntry
+	16, // 0: exchange.CreateExchangeRequest.headers:type_name -> exchange.CreateExchangeRequest.HeadersEntry
 	8,  // 1: exchange.CreateExchangeResponse.result:type_name -> exchange.Exchange
 	3,  // 2: exchange.BulkCreateExchangeRequest.exchanges:type_name -> exchange.CreateExchangeItem
-	14, // 3: exchange.CreateExchangeItem.headers:type_name -> exchange.CreateExchangeItem.HeadersEntry
+	17, // 3: exchange.CreateExchangeItem.headers:type_name -> exchange.CreateExchangeItem.HeadersEntry
 	8,  // 4: exchange.BulkCreateExchangeResponse.result:type_name -> exchange.Exchange
 	8,  // 5: exchange.GetExchangeResponse.result:type_name -> exchange.Exchange
-	15, // 6: exchange.Exchange.headers:type_name -> exchange.Exchange.HeadersEntry
+	18, // 6: exchange.Exchange.headers:type_name -> exchange.Exchange.HeadersEntry
 	8,  // 7: exchange.ExchangeFindResult.Entities:type_name -> exchange.Exchange
 	9,  // 8: exchange.GetExchangesResponse.result:type_name -> exchange.ExchangeFindResult
-	0,  // 9: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
-	2,  // 10: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
-	5,  // 11: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
-	7,  // 12: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
-	11, // 13: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
-	1,  // 14: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
-	4,  // 15: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
-	6,  // 16: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
-	10, // 17: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
-	12, // 18: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
-	14, // [14:19] is the sub-list for method output_type
-	9,  // [9:14] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	14, // 9: exchange.PublishMessageRequest.message:type_name -> exchange.QueueMessage
+	19, // 10: exchange.QueueMessage.parameters:type_name -> exchange.QueueMessage.ParametersEntry
+	20, // 11: exchange.QueueMessage.headers:type_name -> exchange.QueueMessage.HeadersEntry
+	0,  // 12: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
+	2,  // 13: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
+	5,  // 14: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
+	7,  // 15: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
+	11, // 16: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
+	13, // 17: exchange.ExchangeService.PublishMessage:input_type -> exchange.PublishMessageRequest
+	1,  // 18: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
+	4,  // 19: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
+	6,  // 20: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
+	10, // 21: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
+	12, // 22: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
+	15, // 23: exchange.ExchangeService.PublishMessage:output_type -> exchange.PublishMessageResponse
+	18, // [18:24] is the sub-list for method output_type
+	12, // [12:18] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_init() }
@@ -1001,7 +1263,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_i
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -33,4 +33,8 @@ export class ExchangesService {
   deleteExchange(tenantCode: string, code: string, vnamespace: string): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${tenantCode}/exchange/${code}/${vnamespace}`);
   }
+
+  publishMessage(tenantCode: string, messageData: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${tenantCode}/exchange/publish-message`, messageData);
+  }
 }

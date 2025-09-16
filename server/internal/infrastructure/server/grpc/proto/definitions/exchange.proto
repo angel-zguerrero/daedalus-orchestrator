@@ -10,6 +10,7 @@ service ExchangeService {
   rpc GetExchange (GetExchangeRequest) returns (GetExchangeResponse);
   rpc GetExchanges (GetExchangesRequest) returns (GetExchangesResponse);
   rpc DeleteExchange (DeleteExchangeRequest) returns (DeleteExchangeResponse);
+  rpc PublishMessage (PublishMessageRequest) returns (PublishMessageResponse);
 }
 
 message CreateExchangeRequest {
@@ -92,6 +93,29 @@ message DeleteExchangeRequest {
 
 message DeleteExchangeResponse {
   string message = 1;
+}
+
+message PublishMessageRequest {
+  string tenantCode = 1;
+  string exchangeCode = 2;
+  string routingKeyOrPatternOrQueueCode = 3;
+  string vnamespace = 4;
+  QueueMessage message = 5;
+}
+
+message QueueMessage {
+  string messageId = 1;
+  string handler = 2;
+  int32 priority = 3;
+  map<string, string> parameters = 4;
+  map<string, string> headers = 5;
+  string contentType = 6;
+  bytes content = 7;
+}
+
+message PublishMessageResponse {
+  string message = 1;
+  repeated string queueCodes = 2;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/exchange.proto

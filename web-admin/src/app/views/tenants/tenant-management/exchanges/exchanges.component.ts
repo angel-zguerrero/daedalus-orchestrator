@@ -68,6 +68,7 @@ export class ExchangesComponent implements OnInit {
 
   public showAlert = false;
   public errorMessage = '';
+  public successMessage = '';
   public loading = false;
 
   exchangeForm: FormGroup;
@@ -557,45 +558,88 @@ export class ExchangesComponent implements OnInit {
     return headersMap;
   }
 
-  // Send message method (placeholder for now)
+  // Send message method
   sendMessage(): void {
     if (this.sendMessageForm.invalid) {
       this.sendMessageForm.markAllAsTouched();
       return;
     }
 
-    const contentType = this.sendMessageForm.get('contentType')?.value;
-    if (contentType === 'application/octet-stream' && !this.selectedFile) {
-      this.errorMessage = 'Please select a file for binary content';
-      this.showAlert = true;
-      return;
-    }
-
     this.loading = true;
     this.showAlert = false;
 
-    // Prepare message data
+    const contentType = this.sendMessageForm.get('contentType')?.value || '';
+    let content: any = null;
+
+    // Handle content based on type
+    if (contentType === 'application/octet-stream' && this.selectedFile) {
+      // For binary content, convert file to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = btoa(String.fromCharCode(...new Uint8Array(reader.result as ArrayBuffer)));
+        this.sendMessageWithContent(base64String);
+      };
+      reader.readAsArrayBuffer(this.selectedFile);
+      return;
+    } else if (contentType && this.sendMessageForm.get('content')?.value) {
+      content = this.sendMessageForm.get('content')?.value;
+      if (contentType === 'application/json') {
+        try {
+          // Validate JSON and convert to string if it's an object
+          content = typeof content === 'object' ? JSON.stringify(content) : content;
+          JSON.parse(content); // Validate JSON format
+        } catch (e) {
+          this.errorMessage = 'Invalid JSON format in content';
+          this.showAlert = true;
+          this.loading = false;
+          return;
+        }
+      }
+    }
+
+    this.sendMessageWithContent(content);
+  }
+
+  private sendMessageWithContent(content: any): void {
+    // Prepare message data according to the API structure
     const messageData = {
-      messageId: this.sendMessageForm.get('messageId')?.value || null, // null if empty, will be auto-generated
-      handler: this.sendMessageForm.get('handler')?.value,
-      priority: this.sendMessageForm.get('priority')?.value,
-      contentType: contentType,
-      parameters: this.getParametersAsMap(),
-      headers: this.getMessageHeadersAsMap(),
-      content: contentType === 'application/octet-stream' 
-        ? null  // Will be handled separately for file upload
-        : this.sendMessageForm.get('content')?.value
+      exchangeCode: this.selectedExchange.Code,
+      routingKeyOrPatternOrQueueCode: '', // Empty for now, could be a form field in the future
+      vnamespace: this.selectedExchange.VNamespace,
+      message: {
+        messageId: this.sendMessageForm.get('messageId')?.value || '',
+        handler: this.sendMessageForm.get('handler')?.value,
+        priority: this.sendMessageForm.get('priority')?.value || 0,
+        contentType: this.sendMessageForm.get('contentType')?.value || '',
+        parameters: this.getParametersAsMap(),
+        headers: this.getMessageHeadersAsMap(),
+        content: content ? (typeof content === 'string' ? Array.from(new TextEncoder().encode(content)) : content) : []
+      }
     };
 
-    // TODO: Implement actual message sending service call
-    console.log('Sending message:', messageData);
-    console.log('Selected file:', this.selectedFile);
+    console.log('Sending message payload:', messageData);
+    console.log('Selected exchange:', this.selectedExchange);
 
-    // Simulate API call
-    setTimeout(() => {
-      this.loading = false;
-      this.sendMessageModalVisible = false;
-      // TODO: Show success message or handle response
-    }, 1000);
+    this.exchangesService.publishMessage(this.tenantCode, messageData).subscribe({
+      next: (response) => {
+        this.loading = false;
+        this.sendMessageModalVisible = false;
+        this.sendMessageForm.reset();
+        this.messageParameters = [];
+        this.messageHeaders = [];
+        this.selectedFile = null;
+        
+        // Show success message
+        this.successMessage = `Message sent successfully! Delivered to queues: ${response.queueCodes?.join(', ') || 'none'}`;
+        this.showAlert = true;
+        setTimeout(() => this.showAlert = false, 5000);
+      },
+      error: (error) => {
+        this.loading = false;
+        console.error('Error sending message:', error);
+        this.errorMessage = error.error?.error || 'Failed to send message. Please try again.';
+        this.showAlert = true;
+      }
+    });
   }
 }

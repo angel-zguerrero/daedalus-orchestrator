@@ -38,6 +38,23 @@ type createBulkExchangeRequest struct {
 	Exchanges []createExchangeRequest `json:"exchanges" binding:"required"`
 }
 
+type publishMessageRequest struct {
+	ExchangeCode                   string           `json:"exchangeCode" binding:"required"`
+	RoutingKeyOrPatternOrQueueCode string           `json:"routingKeyOrPatternOrQueueCode"`
+	VNamespace                     string           `json:"vnamespace" binding:"required"`
+	Message                        queueMessageData `json:"message" binding:"required"`
+}
+
+type queueMessageData struct {
+	MessageID   string            `json:"messageId"`
+	Handler     string            `json:"handler" binding:"required"`
+	Priority    int               `json:"priority"`
+	Parameters  map[string]string `json:"parameters"`
+	Headers     map[string]string `json:"headers"`
+	ContentType string            `json:"contentType"`
+	Content     []byte            `json:"content"`
+}
+
 // CreateExchangeHandler handles POST /rest-api/tenants
 func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
 	var req createExchangeRequest
@@ -181,5 +198,52 @@ func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Exchange list",
 		"result":  findResult,
+	})
+}
+
+// PublishMessageHandler handles POST /rest-api/tenants/:code/exchange/publish-message
+func (ctrl *ExchangeController) PublishMessageHandler(c *gin.Context) {
+	var req publishMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ctrl.Config.Logger.Warn().Err(err).Msg("publish message attempt with invalid payload")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	tenantCode := c.Param("code")
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Convert request to models.QueueMessage
+	message := models.QueueMessage{
+		MessageID:   req.Message.MessageID,
+		Handler:     req.Message.Handler,
+		Priority:    req.Message.Priority,
+		Parameters:  req.Message.Parameters,
+		Headers:     req.Message.Headers,
+		ContentType: req.Message.ContentType,
+		Content:     req.Message.Content,
+	}
+
+	queueCodes, err := ctrl.ExchangeBO.PublishMessage(
+		c.Request.Context(),
+		req.ExchangeCode,
+		req.RoutingKeyOrPatternOrQueueCode,
+		req.VNamespace,
+		message,
+		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
+		tenant.ID,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Message published successfully",
+		"queueCodes": queueCodes,
 	})
 }

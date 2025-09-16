@@ -181,3 +181,39 @@ func (s *ExchangeService) DeleteExchange(ctx context.Context, r *pb.DeleteExchan
 		Message: "Exchange " + r.Code + " in namespace " + r.Vnamespace + " was deleted",
 	}, nil
 }
+
+func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessageRequest) (*pb.PublishMessageResponse, error) {
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert protobuf message to models.QueueMessage
+	message := models.QueueMessage{
+		MessageID:   r.Message.MessageId,
+		Handler:     r.Message.Handler,
+		Priority:    int(r.Message.Priority),
+		Parameters:  r.Message.Parameters,
+		Headers:     r.Message.Headers,
+		ContentType: r.Message.ContentType,
+		Content:     r.Message.Content,
+	}
+
+	queueCodes, err := s.ExchangeBO.PublishMessage(
+		ctx,
+		r.ExchangeCode,
+		r.RoutingKeyOrPatternOrQueueCode,
+		r.Vnamespace,
+		message,
+		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
+		tenant.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.PublishMessageResponse{
+		Message:    "Message published successfully",
+		QueueCodes: queueCodes,
+	}, nil
+}

@@ -6,7 +6,8 @@
     </h5>
   </c-card-header>
   <c-card-body>
-    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="danger" *ngIf="showAlert && errorMessage" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="success" *ngIf="showAlert && successMessage" [innerHTML]="successMessage"></c-alert>
     
     <!-- Search and Actions Row -->
     <c-row class="mb-3">
@@ -601,7 +602,8 @@
     <button (click)="sendMessageModalVisible = false" cButtonClose [disabled]="loading"></button>
   </c-modal-header>
   <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="danger" *ngIf="showAlert && errorMessage" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="success" *ngIf="showAlert && successMessage" [innerHTML]="successMessage"></c-alert>
     <form [formGroup]="sendMessageForm" (ngSubmit)="sendMessage()">
       
       <!-- Message ID Field (Optional) -->

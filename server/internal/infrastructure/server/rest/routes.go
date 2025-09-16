@@ -47,6 +47,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			{
 				tenantsGroup.POST("/:code/exchange", exchangeController.CreateExchangeHandler)
 				tenantsGroup.POST("/:code/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
+				tenantsGroup.POST("/:code/exchange/publish-message", exchangeController.PublishMessageHandler)
 				tenantsGroup.GET("/:code/exchange", exchangeController.GetExchangesHandler)
 				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.GetExchangeHandler)
 				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.DeleteExchangeHandler)
