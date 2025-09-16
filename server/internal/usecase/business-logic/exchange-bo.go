@@ -248,6 +248,8 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	// Calculate and assign ContentLength
 	message.ContentLength = int64(len(message.Content))
 
+	fmt.Println("Publishing message with ID:", message.MessageID, "to exchange:", exchangeCode, "with routingKeyOrPatternOrQueueCode:", routingKeyOrPatternOrQueueCode)
+
 	return []string{"queue_code_1", "queue_code_2"}, nil
 }
 

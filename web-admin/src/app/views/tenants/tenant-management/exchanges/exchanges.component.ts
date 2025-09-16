@@ -125,6 +125,7 @@ export class ExchangesComponent implements OnInit {
 
     this.sendMessageForm = this.fb.group({
       messageId: [''], // Optional field
+      routingKey: [''], // Optional field for routing key/pattern
       handler: ['', Validators.required], // Required field
       priority: [0, [Validators.min(0)]], // Optional, but must be >= 0 if provided
       contentType: [''], // Optional
@@ -449,21 +450,89 @@ export class ExchangesComponent implements OnInit {
     return typeColors[type] || 'secondary';
   }
 
+  // Helper methods for routing key field
+  shouldShowRoutingKeyField(): boolean {
+    if (!this.selectedExchange) return false;
+    const exchangeType = this.selectedExchange.Type?.toLowerCase();
+    return exchangeType === 'direct' || exchangeType === 'topic';
+  }
+
+  isRoutingKeyRequired(): boolean {
+    if (!this.selectedExchange) return false;
+    const exchangeType = this.selectedExchange.Type?.toLowerCase();
+    return exchangeType === 'direct'; // Direct exchanges typically require routing key, topic can be optional
+  }
+
+  getRoutingKeyPlaceholder(): string {
+    if (!this.selectedExchange) return 'Enter routing key or pattern';
+    
+    switch (this.selectedExchange.Type?.toLowerCase()) {
+      case 'direct':
+        return 'Enter exact routing key (e.g., user.created)';
+      case 'topic':
+        return 'Enter topic pattern (e.g., user.* or notifications.#)';
+      case 'fanout':
+        return 'Not used for fanout exchanges';
+      case 'headers':
+        return 'Not used for headers exchanges (uses headers instead)';
+      default:
+        return 'Enter routing key or pattern';
+    }
+  }
+
+  getRoutingKeyHelpText(): string {
+    if (!this.selectedExchange) return 'Routing information for message delivery';
+    
+    switch (this.selectedExchange.Type?.toLowerCase()) {
+      case 'direct':
+        return 'Direct exchange: exact match with bound queue routing keys';
+      case 'topic':
+        return 'Topic exchange: * matches one word, # matches zero or more words';
+      case 'fanout':
+        return 'Fanout exchange: messages sent to all bound queues (routing key ignored)';
+      case 'headers':
+        return 'Headers exchange: routing based on message headers (routing key ignored)';
+      default:
+        return 'Routing information for message delivery';
+    }
+  }
+
   // Send Message Modal Methods
   openSendMessageModal(exchange: any): void {
     this.selectedExchange = exchange;
     this.sendMessageForm.reset({
       messageId: '',
+      routingKey: '',
       handler: '',
       priority: 0,
       contentType: '',
       content: ''
     });
+    
+    // Update routing key validation based on exchange type
+    this.updateRoutingKeyValidation();
+    
     this.messageParameters = [];
     this.messageHeaders = [];
     this.selectedFile = null;
     this.sendMessageModalVisible = true;
     this.showAlert = false;
+  }
+
+  private updateRoutingKeyValidation(): void {
+    const routingKeyControl = this.sendMessageForm.get('routingKey');
+    if (routingKeyControl) {
+      // Clear existing validators
+      routingKeyControl.clearValidators();
+      
+      // Add required validator only for direct exchanges
+      if (this.isRoutingKeyRequired()) {
+        routingKeyControl.setValidators([Validators.required]);
+      }
+      
+      // Update the validity
+      routingKeyControl.updateValueAndValidity();
+    }
   }
 
   // Parameter management methods
@@ -604,7 +673,7 @@ export class ExchangesComponent implements OnInit {
     // Prepare message data according to the API structure
     const messageData = {
       exchangeCode: this.selectedExchange.Code,
-      routingKeyOrPatternOrQueueCode: '', // Empty for now, could be a form field in the future
+      routingKeyOrPatternOrQueueCode: this.sendMessageForm.get('routingKey')?.value || '',
       vnamespace: this.selectedExchange.VNamespace,
       message: {
         messageId: this.sendMessageForm.get('messageId')?.value || '',

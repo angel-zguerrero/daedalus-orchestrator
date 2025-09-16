@@ -618,6 +618,25 @@
         <div class="form-text">Leave empty to auto-generate a unique message ID</div>
       </div>
 
+      <!-- Routing Key Field (Only for Direct and Topic exchanges) -->
+      <div class="mb-3" *ngIf="shouldShowRoutingKeyField()">
+        <label cLabel for="routingKey">
+          Routing Key / Pattern 
+          <span *ngIf="isRoutingKeyRequired()" class="text-danger">*</span>
+          <span *ngIf="!isRoutingKeyRequired()" class="text-muted">(Optional)</span>
+        </label>
+        <input 
+          type="text" 
+          id="routingKey"
+          cFormControl 
+          formControlName="routingKey"
+          [placeholder]="getRoutingKeyPlaceholder()">
+        <div class="form-text">{{ getRoutingKeyHelpText() }}</div>
+        <div *ngIf="sendMessageForm.get('routingKey')?.invalid && sendMessageForm.get('routingKey')?.touched" class="text-danger small">
+          This field is required for {{ selectedExchange?.Type }} exchanges
+        </div>
+      </div>
+
       <!-- Handler Field -->
       <div class="mb-3">
         <label cLabel for="handler">Handler *</label>
