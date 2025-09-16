@@ -604,6 +604,18 @@
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <form [formGroup]="sendMessageForm" (ngSubmit)="sendMessage()">
       
+      <!-- Message ID Field (Optional) -->
+      <div class="mb-3">
+        <label cLabel for="messageId">Message ID (Optional)</label>
+        <input 
+          type="text" 
+          id="messageId"
+          cFormControl 
+          formControlName="messageId"
+          placeholder="Enter custom message ID (auto-generated if empty)">
+        <div class="form-text">Leave empty to auto-generate a unique message ID</div>
+      </div>
+
       <!-- Priority Field -->
       <div class="mb-3">
         <label cLabel for="priority">Priority</label>

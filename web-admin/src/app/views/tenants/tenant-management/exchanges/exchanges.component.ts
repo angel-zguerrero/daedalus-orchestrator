@@ -123,6 +123,7 @@ export class ExchangesComponent implements OnInit {
     });
 
     this.sendMessageForm = this.fb.group({
+      messageId: [''], // Optional field
       priority: [0, [Validators.required, Validators.min(0)]],
       contentType: ['', Validators.required],
       content: ['', Validators.required]
@@ -450,6 +451,7 @@ export class ExchangesComponent implements OnInit {
   openSendMessageModal(exchange: any): void {
     this.selectedExchange = exchange;
     this.sendMessageForm.reset({
+      messageId: '',
       priority: 0,
       contentType: '',
       content: ''
@@ -575,6 +577,7 @@ export class ExchangesComponent implements OnInit {
 
     // Prepare message data
     const messageData = {
+      messageId: this.sendMessageForm.get('messageId')?.value || null, // null if empty, will be auto-generated
       priority: this.sendMessageForm.get('priority')?.value,
       contentType: contentType,
       parameters: this.getParametersAsMap(),
