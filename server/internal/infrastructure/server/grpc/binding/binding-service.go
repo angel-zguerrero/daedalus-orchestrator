@@ -58,7 +58,7 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 			return nil, fmt.Errorf("targetExchangeCode should not be specified when targetExchangeType is queue")
 		}
 	} else if targetExchangeType == models.TargetExchangeTypeExchange {
-		if r.TargetExchangeCode == "" {
+		if r.TargetExchangeCode == "" && r.BindingType == "classic" {
 			return nil, fmt.Errorf("targetExchangeCode is required when targetExchangeType is exchange")
 		}
 		if r.QueueCode != "" {

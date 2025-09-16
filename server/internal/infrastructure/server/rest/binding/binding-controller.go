@@ -72,7 +72,7 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 			return
 		}
 	} else if targetExchangeType == models.TargetExchangeTypeExchange {
-		if req.TargetExchangeCode == "" {
+		if req.TargetExchangeCode == "" && req.BindingType == "classic" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "targetExchangeCode is required when targetExchangeType is exchange"})
 			return
 		}

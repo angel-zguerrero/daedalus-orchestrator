@@ -77,8 +77,7 @@ export class ExchangesComponent implements OnInit {
     { value: 'direct', label: 'Direct' },
     { value: 'fanout', label: 'Fanout' },
     { value: 'topic', label: 'Topic' },
-    { value: 'headers', label: 'Headers' },
-    { value: 'dead-letter', label: 'Dead Letter' }
+    { value: 'headers', label: 'Headers' }
   ];
 
   // VNamespace properties
@@ -429,8 +428,7 @@ export class ExchangesComponent implements OnInit {
       'direct': 'primary',
       'fanout': 'success',
       'topic': 'warning',
-      'headers': 'info',
-      'dead-letter': 'danger'
+      'headers': 'info'
     };
     return typeColors[type] || 'secondary';
   }
