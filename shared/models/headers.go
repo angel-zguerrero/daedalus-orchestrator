@@ -7,10 +7,10 @@ type RoutingHeader struct {
 
 	VNamespace string
 
-	ExchangeID string `orm:"unique-compound:0"`
-	QueueID    string `orm:"unique-compound:0"`
-	MessageID  string `orm:"unique-compound:0"`
-	BindingID  string `orm:"unique-compound:0"`
+	ExchangeID     string `orm:"unique-compound:0"`
+	QueueID        string `orm:"unique-compound:0"`
+	QueueMessageID string `orm:"unique-compound:0"`
+	BindingID      string `orm:"unique-compound:0"`
 
 	Key   string `orm:"unique-compound:0"`
 	Value string `orm:"data-only"`

@@ -102,6 +102,14 @@
                 </button>
                 <button 
                   cButton 
+                  color="success" 
+                  size="sm" 
+                  (click)="openSendMessageModal(exchange)"
+                  title="Send Message">
+                  <svg cIcon name="cil-envelope-closed"></svg>
+                </button>
+                <button 
+                  cButton 
                   color="danger" 
                   size="sm" 
                   (click)="openDeleteModal(exchange)"
@@ -579,6 +587,191 @@
       <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
       <svg *ngIf="!loading" cIcon name="cil-cloud-upload" class="me-1"></svg>
       {{ loading ? 'Uploading...' : 'Upload Exchanges' }}
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Send Message Modal -->
+<c-modal id="sendMessageModal" [visible]="sendMessageModalVisible" (visibleChange)="sendMessageModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-envelope-closed" class="me-2"></svg>
+      Send Message - {{ selectedExchange?.Name }}
+    </h5>
+    <button (click)="sendMessageModalVisible = false" cButtonClose [disabled]="loading"></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <form [formGroup]="sendMessageForm" (ngSubmit)="sendMessage()">
+      
+      <!-- Priority Field -->
+      <div class="mb-3">
+        <label cLabel for="priority">Priority</label>
+        <input 
+          type="number" 
+          id="priority"
+          cFormControl 
+          formControlName="priority"
+          min="0"
+          placeholder="Enter priority (0 or higher)">
+        <div *ngIf="sendMessageForm.get('priority')?.invalid && sendMessageForm.get('priority')?.touched" class="text-danger small">
+          Priority must be 0 or higher
+        </div>
+      </div>
+
+      <!-- Parameters Section -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label cLabel>Parameters</label>
+          <button type="button" cButton size="sm" color="success" variant="outline" (click)="addParameter()">
+            <svg cIcon name="cil-plus" class="me-1"></svg>
+            Add Parameter
+          </button>
+        </div>
+        <div *ngIf="messageParameters.length === 0" class="text-muted fst-italic">
+          No parameters added yet
+        </div>
+        <div *ngFor="let param of messageParameters; let i = index" class="d-flex mb-2">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Parameter Name"
+            [(ngModel)]="param.key"
+            [ngModelOptions]="{standalone: true}">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Parameter Value"
+            [(ngModel)]="param.value"
+            [ngModelOptions]="{standalone: true}">
+          <button 
+            type="button" 
+            cButton 
+            size="sm" 
+            color="danger" 
+            variant="outline"
+            (click)="removeParameter(i)"
+            title="Remove Parameter">
+            <svg cIcon name="cil-trash"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Headers Section -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label cLabel>Message Headers</label>
+          <button type="button" cButton size="sm" color="success" variant="outline" (click)="addHeader()">
+            <svg cIcon name="cil-plus" class="me-1"></svg>
+            Add Header
+          </button>
+        </div>
+        <div class="mb-2 p-2 bg-info bg-opacity-10 border border-info rounded">
+          <small class="text-info">
+            <svg cIcon name="cil-info" class="me-1"></svg>
+            <strong>Message Headers:</strong> 
+            Headers that will be attached to the message for routing and metadata purposes.
+          </small>
+        </div>
+        <div *ngIf="messageHeaders.length === 0" class="text-muted fst-italic">
+          No headers added yet
+        </div>
+        <div *ngFor="let header of messageHeaders; let i = index" class="d-flex mb-2">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Header Name (e.g., content-type)"
+            [(ngModel)]="header.key"
+            [ngModelOptions]="{standalone: true}">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Header Value (e.g., application/json)"
+            [(ngModel)]="header.value"
+            [ngModelOptions]="{standalone: true}">
+          <button 
+            type="button" 
+            cButton 
+            size="sm" 
+            color="danger" 
+            variant="outline"
+            (click)="removeHeader(i)"
+            title="Remove Header">
+            <svg cIcon name="cil-trash"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Content Type -->
+      <div class="mb-3">
+        <label cLabel for="contentType">Content Type</label>
+        <select cSelect id="contentType" formControlName="contentType" (change)="onContentTypeChange()">
+          <option value="">Select Content Type</option>
+          <option value="application/json">JSON</option>
+          <option value="text/plain">Text</option>
+          <option value="application/octet-stream">Binary</option>
+        </select>
+        <div *ngIf="sendMessageForm.get('contentType')?.invalid && sendMessageForm.get('contentType')?.touched" class="text-danger small">
+          Content type is required
+        </div>
+      </div>
+
+      <!-- Content Field -->
+      <div class="mb-3">
+        <label cLabel for="content">Content</label>
+        
+        <!-- JSON Content -->
+        <div *ngIf="sendMessageForm.get('contentType')?.value === 'application/json'">
+          <textarea 
+            id="content"
+            cFormControl 
+            formControlName="content"
+            rows="8"
+            placeholder='Enter valid JSON content (e.g., {"message": "Hello World"})'></textarea>
+          <div *ngIf="sendMessageForm.get('content')?.hasError('invalidJson') && sendMessageForm.get('content')?.touched" class="text-danger small">
+            Invalid JSON format
+          </div>
+        </div>
+
+        <!-- Text Content -->
+        <div *ngIf="sendMessageForm.get('contentType')?.value === 'text/plain'">
+          <textarea 
+            id="content"
+            cFormControl 
+            formControlName="content"
+            rows="8"
+            placeholder="Enter text content"></textarea>
+        </div>
+
+        <!-- Binary Content -->
+        <div *ngIf="sendMessageForm.get('contentType')?.value === 'application/octet-stream'">
+          <input 
+            type="file" 
+            id="content-file"
+            class="form-control"
+            (change)="onFileSelect($event)"
+            accept="*/*">
+          <div class="form-text">Select a file to upload as binary content</div>
+          <div *ngIf="selectedFile" class="mt-2">
+            <small class="text-muted">Selected file: {{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})</small>
+          </div>
+        </div>
+
+        <div *ngIf="sendMessageForm.get('content')?.invalid && sendMessageForm.get('content')?.touched && sendMessageForm.get('contentType')?.value !== 'application/octet-stream'" class="text-danger small">
+          Content is required
+        </div>
+      </div>
+
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="sendMessageModalVisible = false" cButton color="secondary" [disabled]="loading">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="sendMessage()" [disabled]="loading || sendMessageForm.invalid || (sendMessageForm.get('contentType')?.value === 'application/octet-stream' && !selectedFile)">
+      <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
+      <svg *ngIf="!loading" cIcon name="cil-envelope-closed" class="me-1"></svg>
+      {{ loading ? 'Sending...' : 'Send Message' }}
     </button>
   </c-modal-footer>
 </c-modal>

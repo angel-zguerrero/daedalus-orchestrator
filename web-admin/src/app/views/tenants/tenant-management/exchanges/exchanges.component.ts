@@ -64,6 +64,7 @@ export class ExchangesComponent implements OnInit {
   public deleteModalVisible = false;
   public detailsModalVisible = false;
   public bulkUploadModalVisible = false;
+  public sendMessageModalVisible = false;
 
   public showAlert = false;
   public errorMessage = '';
@@ -71,6 +72,7 @@ export class ExchangesComponent implements OnInit {
 
   exchangeForm: FormGroup;
   exchangeFormUpdate: FormGroup;
+  sendMessageForm: FormGroup;
   selectedExchange: any;
 
   exchangeTypes = [
@@ -98,6 +100,11 @@ export class ExchangesComponent implements OnInit {
   exchangeHeaders: { key: string, value: string }[] = [];
   exchangeUpdateHeaders: { key: string, value: string }[] = [];
 
+  // Send Message properties
+  messageParameters: { key: string, value: string }[] = [];
+  messageHeaders: { key: string, value: string }[] = [];
+  selectedFile: File | null = null;
+
   public file: File | null = null;
 
   constructor(
@@ -113,6 +120,12 @@ export class ExchangesComponent implements OnInit {
     });
     this.exchangeFormUpdate = this.fb.group({
       name: ['', Validators.required]
+    });
+
+    this.sendMessageForm = this.fb.group({
+      priority: [0, [Validators.required, Validators.min(0)]],
+      contentType: ['', Validators.required],
+      content: ['', Validators.required]
     });
 
     this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
@@ -431,5 +444,155 @@ export class ExchangesComponent implements OnInit {
       'headers': 'info'
     };
     return typeColors[type] || 'secondary';
+  }
+
+  // Send Message Modal Methods
+  openSendMessageModal(exchange: any): void {
+    this.selectedExchange = exchange;
+    this.sendMessageForm.reset({
+      priority: 0,
+      contentType: '',
+      content: ''
+    });
+    this.messageParameters = [];
+    this.messageHeaders = [];
+    this.selectedFile = null;
+    this.sendMessageModalVisible = true;
+    this.showAlert = false;
+  }
+
+  // Parameter management methods
+  addParameter(): void {
+    this.messageParameters.push({ key: '', value: '' });
+  }
+
+  removeParameter(index: number): void {
+    this.messageParameters.splice(index, 1);
+  }
+
+  // Header management methods
+  addHeader(): void {
+    this.messageHeaders.push({ key: '', value: '' });
+  }
+
+  removeHeader(index: number): void {
+    this.messageHeaders.splice(index, 1);
+  }
+
+  // Content type change handler
+  onContentTypeChange(): void {
+    const contentType = this.sendMessageForm.get('contentType')?.value;
+    const contentControl = this.sendMessageForm.get('content');
+    
+    if (contentType === 'application/octet-stream') {
+      // For binary content, we don't need the content field to be required
+      // as we'll use the file input instead
+      contentControl?.clearValidators();
+      contentControl?.setValue('');
+    } else {
+      // For text and JSON, content is required
+      contentControl?.setValidators([Validators.required]);
+      if (contentType === 'application/json') {
+        contentControl?.addValidators(this.jsonValidator);
+      }
+    }
+    contentControl?.updateValueAndValidity();
+    
+    // Clear file selection when changing from binary to other types
+    if (contentType !== 'application/octet-stream') {
+      this.selectedFile = null;
+    }
+  }
+
+  // JSON validator
+  jsonValidator(control: any) {
+    const value = control.value;
+    if (!value) return null;
+    
+    try {
+      JSON.parse(value);
+      return null;
+    } catch (e) {
+      return { invalidJson: true };
+    }
+  }
+
+  // File selection handler
+  onFileSelect(event: any): void {
+    const file = event.target.files[0];
+    if (file) {
+      this.selectedFile = file;
+    }
+  }
+
+  // Helper method to format file size
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // Get parameters as map
+  private getParametersAsMap(): { [key: string]: string } {
+    const parametersMap: { [key: string]: string } = {};
+    this.messageParameters.forEach(param => {
+      if (param.key && param.value) {
+        parametersMap[param.key] = param.value;
+      }
+    });
+    return parametersMap;
+  }
+
+  // Get headers as map
+  private getMessageHeadersAsMap(): { [key: string]: string } {
+    const headersMap: { [key: string]: string } = {};
+    this.messageHeaders.forEach(header => {
+      if (header.key && header.value) {
+        headersMap[header.key] = header.value;
+      }
+    });
+    return headersMap;
+  }
+
+  // Send message method (placeholder for now)
+  sendMessage(): void {
+    if (this.sendMessageForm.invalid) {
+      this.sendMessageForm.markAllAsTouched();
+      return;
+    }
+
+    const contentType = this.sendMessageForm.get('contentType')?.value;
+    if (contentType === 'application/octet-stream' && !this.selectedFile) {
+      this.errorMessage = 'Please select a file for binary content';
+      this.showAlert = true;
+      return;
+    }
+
+    this.loading = true;
+    this.showAlert = false;
+
+    // Prepare message data
+    const messageData = {
+      priority: this.sendMessageForm.get('priority')?.value,
+      contentType: contentType,
+      parameters: this.getParametersAsMap(),
+      headers: this.getMessageHeadersAsMap(),
+      content: contentType === 'application/octet-stream' 
+        ? null  // Will be handled separately for file upload
+        : this.sendMessageForm.get('content')?.value
+    };
+
+    // TODO: Implement actual message sending service call
+    console.log('Sending message:', messageData);
+    console.log('Selected file:', this.selectedFile);
+
+    // Simulate API call
+    setTimeout(() => {
+      this.loading = false;
+      this.sendMessageModalVisible = false;
+      // TODO: Show success message or handle response
+    }, 1000);
   }
 }

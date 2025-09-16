@@ -13,6 +13,13 @@ type QueueMessage struct {
 
 	NextQueueMessageID string
 
+	Parameters map[string]string `orm:"data-only"`
+
+	ContentType string
+	Content     []byte `orm:"data-only"`
+
+	Headers map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
