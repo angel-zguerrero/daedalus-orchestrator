@@ -239,8 +239,15 @@ func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string,
 
 func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode, vnamespace string, message models.QueueMessage, cf, cfs string) ([]string, error) {
 
-	fmt.Println("Publishing message to exchange:", exchangeCode, "with routing key/pattern/queue code:", routingKeyOrPatternOrQueueCode, "in vNamespace:", vnamespace)
-	fmt.Println("Message details:", message)
+	// Generate MessageID if empty
+	if message.MessageID == "" {
+		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")
+		fmt.Println("Generated new MessageID:", message.MessageID)
+	}
+
+	// Calculate and assign ContentLength
+	message.ContentLength = int64(len(message.Content))
+
 	return []string{"queue_code_1", "queue_code_2"}, nil
 }
 

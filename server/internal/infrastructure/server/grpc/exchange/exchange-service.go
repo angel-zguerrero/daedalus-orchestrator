@@ -190,13 +190,14 @@ func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessa
 
 	// Convert protobuf message to models.QueueMessage
 	message := models.QueueMessage{
-		MessageID:   r.Message.MessageId,
-		Handler:     r.Message.Handler,
-		Priority:    int(r.Message.Priority),
-		Parameters:  r.Message.Parameters,
-		Headers:     r.Message.Headers,
-		ContentType: r.Message.ContentType,
-		Content:     r.Message.Content,
+		MessageID:     r.Message.MessageId,
+		Handler:       r.Message.Handler,
+		Priority:      int(r.Message.Priority),
+		Parameters:    r.Message.Parameters,
+		Headers:       r.Message.Headers,
+		ContentType:   r.Message.ContentType,
+		Content:       r.Message.Content,
+		ContentLength: int64(len(r.Message.Content)),
 	}
 
 	queueCodes, err := s.ExchangeBO.PublishMessage(

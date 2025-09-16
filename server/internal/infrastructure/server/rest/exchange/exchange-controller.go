@@ -219,13 +219,14 @@ func (ctrl *ExchangeController) PublishMessageHandler(c *gin.Context) {
 
 	// Convert request to models.QueueMessage
 	message := models.QueueMessage{
-		MessageID:   req.Message.MessageID,
-		Handler:     req.Message.Handler,
-		Priority:    req.Message.Priority,
-		Parameters:  req.Message.Parameters,
-		Headers:     req.Message.Headers,
-		ContentType: req.Message.ContentType,
-		Content:     req.Message.Content,
+		MessageID:     req.Message.MessageID,
+		Handler:       req.Message.Handler,
+		Priority:      req.Message.Priority,
+		Parameters:    req.Message.Parameters,
+		Headers:       req.Message.Headers,
+		ContentType:   req.Message.ContentType,
+		Content:       req.Message.Content,
+		ContentLength: int64(len(req.Message.Content)),
 	}
 
 	queueCodes, err := ctrl.ExchangeBO.PublishMessage(

@@ -15,8 +15,9 @@ type QueueMessage struct {
 
 	Parameters map[string]string `orm:"data-only"`
 
-	ContentType string
-	Content     []byte `orm:"data-only"`
+	ContentType   string
+	ContentLength int64
+	Content       []byte `orm:"data-only"`
 
 	Headers map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
 
