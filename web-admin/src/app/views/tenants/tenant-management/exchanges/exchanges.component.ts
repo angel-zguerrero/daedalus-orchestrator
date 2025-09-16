@@ -124,9 +124,10 @@ export class ExchangesComponent implements OnInit {
 
     this.sendMessageForm = this.fb.group({
       messageId: [''], // Optional field
-      priority: [0, [Validators.required, Validators.min(0)]],
-      contentType: ['', Validators.required],
-      content: ['', Validators.required]
+      handler: ['', Validators.required], // Required field
+      priority: [0, [Validators.min(0)]], // Optional, but must be >= 0 if provided
+      contentType: [''], // Optional
+      content: [''] // Optional
     });
 
     this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
@@ -452,6 +453,7 @@ export class ExchangesComponent implements OnInit {
     this.selectedExchange = exchange;
     this.sendMessageForm.reset({
       messageId: '',
+      handler: '',
       priority: 0,
       contentType: '',
       content: ''
@@ -486,18 +488,15 @@ export class ExchangesComponent implements OnInit {
     const contentType = this.sendMessageForm.get('contentType')?.value;
     const contentControl = this.sendMessageForm.get('content');
     
-    if (contentType === 'application/octet-stream') {
-      // For binary content, we don't need the content field to be required
-      // as we'll use the file input instead
-      contentControl?.clearValidators();
-      contentControl?.setValue('');
-    } else {
-      // For text and JSON, content is required
-      contentControl?.setValidators([Validators.required]);
-      if (contentType === 'application/json') {
-        contentControl?.addValidators(this.jsonValidator);
-      }
+    // Clear all validators first
+    contentControl?.clearValidators();
+    contentControl?.setValue('');
+    
+    // Add JSON validator only for JSON content type
+    if (contentType === 'application/json') {
+      contentControl?.addValidators(this.jsonValidator);
     }
+    
     contentControl?.updateValueAndValidity();
     
     // Clear file selection when changing from binary to other types
@@ -578,6 +577,7 @@ export class ExchangesComponent implements OnInit {
     // Prepare message data
     const messageData = {
       messageId: this.sendMessageForm.get('messageId')?.value || null, // null if empty, will be auto-generated
+      handler: this.sendMessageForm.get('handler')?.value,
       priority: this.sendMessageForm.get('priority')?.value,
       contentType: contentType,
       parameters: this.getParametersAsMap(),

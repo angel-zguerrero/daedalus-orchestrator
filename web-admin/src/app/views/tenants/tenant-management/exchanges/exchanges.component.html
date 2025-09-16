@@ -616,16 +616,30 @@
         <div class="form-text">Leave empty to auto-generate a unique message ID</div>
       </div>
 
+      <!-- Handler Field -->
+      <div class="mb-3">
+        <label cLabel for="handler">Handler *</label>
+        <input 
+          type="text" 
+          id="handler"
+          cFormControl 
+          formControlName="handler"
+          placeholder="Enter handler name">
+        <div *ngIf="sendMessageForm.get('handler')?.invalid && sendMessageForm.get('handler')?.touched" class="text-danger small">
+          Handler is required
+        </div>
+      </div>
+
       <!-- Priority Field -->
       <div class="mb-3">
-        <label cLabel for="priority">Priority</label>
+        <label cLabel for="priority">Priority (Optional)</label>
         <input 
           type="number" 
           id="priority"
           cFormControl 
           formControlName="priority"
           min="0"
-          placeholder="Enter priority (0 or higher)">
+          placeholder="Enter priority (0 or higher, default: 0)">
         <div *ngIf="sendMessageForm.get('priority')?.invalid && sendMessageForm.get('priority')?.touched" class="text-danger small">
           Priority must be 0 or higher
         </div>
@@ -716,21 +730,18 @@
 
       <!-- Content Type -->
       <div class="mb-3">
-        <label cLabel for="contentType">Content Type</label>
+        <label cLabel for="contentType">Content Type (Optional)</label>
         <select cSelect id="contentType" formControlName="contentType" (change)="onContentTypeChange()">
-          <option value="">Select Content Type</option>
+          <option value="">Select Content Type (Optional)</option>
           <option value="application/json">JSON</option>
           <option value="text/plain">Text</option>
           <option value="application/octet-stream">Binary</option>
         </select>
-        <div *ngIf="sendMessageForm.get('contentType')?.invalid && sendMessageForm.get('contentType')?.touched" class="text-danger small">
-          Content type is required
-        </div>
       </div>
 
       <!-- Content Field -->
       <div class="mb-3">
-        <label cLabel for="content">Content</label>
+        <label cLabel for="content">Content (Optional)</label>
         
         <!-- JSON Content -->
         <div *ngIf="sendMessageForm.get('contentType')?.value === 'application/json'">
@@ -769,9 +780,6 @@
           </div>
         </div>
 
-        <div *ngIf="sendMessageForm.get('content')?.invalid && sendMessageForm.get('content')?.touched && sendMessageForm.get('contentType')?.value !== 'application/octet-stream'" class="text-danger small">
-          Content is required
-        </div>
       </div>
 
     </form>
@@ -780,7 +788,7 @@
     <button (click)="sendMessageModalVisible = false" cButton color="secondary" [disabled]="loading">
       Cancel
     </button>
-    <button cButton color="primary" (click)="sendMessage()" [disabled]="loading || sendMessageForm.invalid || (sendMessageForm.get('contentType')?.value === 'application/octet-stream' && !selectedFile)">
+    <button cButton color="primary" (click)="sendMessage()" [disabled]="loading || sendMessageForm.invalid">
       <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
       <svg *ngIf="!loading" cIcon name="cil-envelope-closed" class="me-1"></svg>
       {{ loading ? 'Sending...' : 'Send Message' }}

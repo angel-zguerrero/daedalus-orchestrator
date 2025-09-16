@@ -20,6 +20,8 @@ type QueueMessage struct {
 
 	Headers map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
 
+	Handler string
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
