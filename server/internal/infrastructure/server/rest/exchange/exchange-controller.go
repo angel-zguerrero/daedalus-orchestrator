@@ -233,8 +233,8 @@ func (ctrl *ExchangeController) PublishMessageHandler(c *gin.Context) {
 		c.Request.Context(),
 		req.ExchangeCode,
 		req.RoutingKeyOrPatternOrQueueCode,
-		req.VNamespace,
 		message,
+		req.VNamespace,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
 	)

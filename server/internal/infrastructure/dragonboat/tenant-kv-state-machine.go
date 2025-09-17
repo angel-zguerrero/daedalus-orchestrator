@@ -59,6 +59,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return paginateBindingsCommand.Execute(uow, now)
 	}
 
+	paginateByExchangeBindingsCommand, ok := cmd.(binding_command.PaginateByExchangeBindingsCommand)
+	if ok {
+		return paginateByExchangeBindingsCommand.Execute(uow, now)
+	}
+
 	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
 	if ok {
 		return paginateVNamespacesCommand.Execute(uow, now)

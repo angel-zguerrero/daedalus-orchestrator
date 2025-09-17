@@ -204,8 +204,8 @@ func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessa
 		ctx,
 		r.ExchangeCode,
 		r.RoutingKeyOrPatternOrQueueCode,
-		r.Vnamespace,
 		message,
+		r.Vnamespace,
 		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
 		tenant.ID,
 	)

@@ -110,3 +110,13 @@ func (r *BindingRepository) Paginate(q string, pageSize int, cursor string, vNam
 		}
 	}
 }
+
+func (r *BindingRepository) PaginateByExchangeID(exchangeID string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Binding], error) {
+	if exchangeID == "" {
+		return nil, fmt.Errorf("exchangeID is required")
+	}
+	if vNamespace == "" {
+		return nil, fmt.Errorf("vNamespace is required")
+	}
+	return r.Find("ExchangeID = "+exchangeID+" & VNamespace = "+vNamespace, pageSize, cursor, now)
+}

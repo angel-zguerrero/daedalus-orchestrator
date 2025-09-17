@@ -237,23 +237,38 @@ func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string,
 	return findResult, nil
 }
 
-func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode, vnamespace string, message models.QueueMessage, cf, cfs string) ([]string, error) {
+func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) ([]string, error) {
 
-	// Generate MessageID if empty
 	if message.MessageID == "" {
 		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")
-		fmt.Println("Generated new MessageID:", message.MessageID)
 	}
 
-	// Calculate and assign ContentLength
 	message.ContentLength = int64(len(message.Content))
 
 	fmt.Println("Publishing message with ID:", message.MessageID, "to exchange:", exchangeCode, "with routingKeyOrPatternOrQueueCode:", routingKeyOrPatternOrQueueCode)
 
+	queues, err := bo.GetQueuesFromExchange(ctx, exchangeCode, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs)
+	if err != nil {
+		bo.Config.Logger.Error().Err(err).Msg("Failed to get queues from exchange")
+		return nil, fmt.Errorf("failed to get queues from exchange: %w", err)
+	}
+
+	if len(queues) == 0 {
+		bo.Config.Logger.Info().Str("exchangeCode", exchangeCode).Str("routingKeyOrPatternOrQueueCode", routingKeyOrPatternOrQueueCode).Msg("No queues matched for the given routing key or pattern")
+		return []string{}, nil
+	}
+
+	bo.Config.Logger.Info().Str("exchangeCode", exchangeCode).Str("routingKeyOrPatternOrQueueCode", routingKeyOrPatternOrQueueCode).Int("queueCount", len(queues)).Msg("Queues matched for the given routing key or pattern")
+
+	fmt.Println("Matched queues:")
+	for _, q := range queues {
+		fmt.Println(" - Queue ID:", q.ID, "Code:", q.Code)
+	}
+
 	return []string{"queue_code_1", "queue_code_2"}, nil
 }
 
-func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode, vnamespace string, message models.QueueMessage, cf, cfs string) ([]models.Queue, error) {
+func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) ([]models.Queue, error) {
 	// First, get the exchange
 	exchange, err := bo.GetExchange(ctx, exchangeCode, vnamespace, cf, cfs)
 	if err != nil {
@@ -273,8 +288,7 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 	for _, binding := range bindings {
 		queues, err := bo.processBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges)
 		if err != nil {
-			bo.Config.Logger.Warn().Err(err).Str("bindingID", binding.ID).Msg("Failed to process binding")
-			continue
+			return nil, fmt.Errorf("failed to process binding: %w", err)
 		}
 		resultQueues = append(resultQueues, queues...)
 	}
@@ -284,52 +298,60 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 
 // Helper method to get bindings by exchange ID
 func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, cf, cfs string) ([]models.Binding, error) {
-	paginateBindingsCommand := &binding_command.PaginateBindingsCommand{
-		Query:          "",
-		Cursor:         "",
-		PageSize:       1000, // Get all bindings
-		VNamespace:     "",   // All namespaces
-		IncludeObjects: true, // Include exchange, queue objects
-		CF:             cf,
-		CFS:            cfs,
-	}
+	var allBindings []models.Binding
+	cursor := ""
+	pageSize := 100
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: paginateBindingsCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bindings: %w", err)
-	}
-
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		return nil, fmt.Errorf("failed to decode bindings result: %w", err)
-	}
-
-	if parsedResult.Error != "" {
-		return nil, fmt.Errorf("bindings query failed: %s", parsedResult.Error)
-	}
-
-	findResult := parsedResult.Result.(db.FindResult[models.Binding])
-
-	// Filter bindings for this specific exchange
-	var filteredBindings []models.Binding
-	for _, binding := range findResult.Entities {
-		if binding.ExchangeID == exchangeID {
-			filteredBindings = append(filteredBindings, binding)
+	for {
+		paginateBindingsCommand := &binding_command.PaginateByExchangeBindingsCommand{
+			ExchangeID:     exchangeID,
+			Cursor:         cursor,
+			PageSize:       pageSize,
+			VNamespace:     "",   // All namespaces
+			IncludeObjects: true, // Include exchange, queue objects
+			CF:             cf,
+			CFS:            cfs,
 		}
+
+		queryCommand := &general_command.Query_Command{
+			Command: &general_command.Repository_Command{
+				CMD: paginateBindingsCommand,
+			},
+			Now: time.Now().UnixNano(),
+		}
+
+		readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+		result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+		cancel()
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get bindings: %w", err)
+		}
+
+		buf := bytes.NewBuffer(result.([]byte))
+		dec := gob.NewDecoder(buf)
+		parsedResult := &commands.CommandResult{}
+		if err := dec.Decode(parsedResult); err != nil {
+			return nil, fmt.Errorf("failed to decode bindings result: %w", err)
+		}
+
+		if parsedResult.Error != "" {
+			return nil, fmt.Errorf("bindings query failed: %s", parsedResult.Error)
+		}
+
+		findResult := parsedResult.Result.(db.FindResult[models.Binding])
+
+		// Filter bindings for this specific exchange and add to collection
+		allBindings = append(allBindings, findResult.Entities...)
+
+		// Check if there are more pages
+		if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
+			break
+		}
+		cursor = findResult.Cursor
 	}
 
-	return filteredBindings, nil
+	return allBindings, nil
 }
 
 // Process a single binding to determine if it matches and return queues
@@ -359,6 +381,14 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 
 	// Check if binding matches routing criteria
 	if !bo.matchesRoutingCriteria(binding, routingKeyOrPatternOrQueueCode, message) {
+		if binding.AlternateExchange != nil {
+			queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+			if err != nil {
+				return resultQueues, fmt.Errorf("failed to get queues from alternate exchange: %w", err)
+			} else {
+				resultQueues = append(resultQueues, queues...)
+			}
+		}
 		return resultQueues, nil
 	}
 
@@ -369,9 +399,9 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 
 	// If target is an exchange, recurse
 	if binding.TargetExchangeType == models.TargetExchangeTypeExchange && binding.TargetExchange != nil {
-		queues, err := bo.GetQueuesFromExchange(ctx, binding.TargetExchange.Code, routingKeyOrPatternOrQueueCode, binding.VNamespace, message, cf, cfs)
+		queues, err := bo.GetQueuesFromExchange(ctx, binding.TargetExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
 		if err != nil {
-			bo.Config.Logger.Warn().Err(err).Str("targetExchangeCode", binding.TargetExchange.Code).Msg("Failed to get queues from target exchange")
+			return resultQueues, fmt.Errorf("failed to get queues from target exchange: %w", err)
 		} else {
 			resultQueues = append(resultQueues, queues...)
 		}
