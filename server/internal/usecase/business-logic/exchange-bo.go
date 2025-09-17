@@ -376,17 +376,22 @@ func (bo *ExchangeBO) processBinding(ctx context.Context, binding models.Binding
 
 // Process classic binding (static routing)
 func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool) ([]models.Queue, error) {
-	_ = visitedExchanges // TODO: Use for recursion detection
 	var resultQueues []models.Queue
 
 	// Check if binding matches routing criteria
 	if !bo.matchesRoutingCriteria(binding, routingKeyOrPatternOrQueueCode, message) {
 		if binding.AlternateExchange != nil {
-			queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
-			if err != nil {
-				return resultQueues, fmt.Errorf("failed to get queues from alternate exchange: %w", err)
-			} else {
-				resultQueues = append(resultQueues, queues...)
+			// Check if we've already visited this alternate exchange to prevent infinite recursion
+			if !visitedExchanges[binding.AlternateExchange.ID] {
+				// Mark this alternate exchange as visited
+				visitedExchanges[binding.AlternateExchange.ID] = true
+
+				queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+				if err != nil {
+					return resultQueues, fmt.Errorf("failed to get queues from alternate exchange: %w", err)
+				} else {
+					resultQueues = append(resultQueues, queues...)
+				}
 			}
 		}
 		return resultQueues, nil
@@ -399,11 +404,17 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 
 	// If target is an exchange, recurse
 	if binding.TargetExchangeType == models.TargetExchangeTypeExchange && binding.TargetExchange != nil {
-		queues, err := bo.GetQueuesFromExchange(ctx, binding.TargetExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
-		if err != nil {
-			return resultQueues, fmt.Errorf("failed to get queues from target exchange: %w", err)
-		} else {
-			resultQueues = append(resultQueues, queues...)
+		// Check if we've already visited this target exchange to prevent infinite recursion
+		if !visitedExchanges[binding.TargetExchange.ID] {
+			// Mark this target exchange as visited
+			visitedExchanges[binding.TargetExchange.ID] = true
+
+			queues, err := bo.GetQueuesFromExchange(ctx, binding.TargetExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+			if err != nil {
+				return resultQueues, fmt.Errorf("failed to get queues from target exchange: %w", err)
+			} else {
+				resultQueues = append(resultQueues, queues...)
+			}
 		}
 	}
 
@@ -459,29 +470,76 @@ func (bo *ExchangeBO) matchesRoutingCriteria(binding models.Binding, routingKeyO
 	}
 }
 
-// Match topic pattern (simplified implementation)
+// Match topic pattern (AMQP-compliant implementation)
 func (bo *ExchangeBO) matchesTopicPattern(pattern, routingKey string) bool {
-	// This is a simplified pattern matching
-	// In a real implementation, you would implement full AMQP topic pattern matching
-	// with * (matches one word) and # (matches zero or more words)
-	if pattern == "" || pattern == "#" {
-		return true
+	// Handle special cases
+	if pattern == "" {
+		return routingKey == ""
+	}
+	if pattern == "#" {
+		return true // # matches everything
 	}
 
-	// Exact match for now - expand this with proper pattern matching
-	return pattern == routingKey || strings.Contains(routingKey, strings.ReplaceAll(pattern, "*", ""))
+	// Split pattern and routing key by dots
+	patternWords := strings.Split(pattern, ".")
+	routingWords := strings.Split(routingKey, ".")
+
+	return bo.matchTopicWords(patternWords, routingWords)
+}
+
+// Helper function to match topic words recursively
+func (bo *ExchangeBO) matchTopicWords(patternWords, routingWords []string) bool {
+	// Base cases
+	if len(patternWords) == 0 && len(routingWords) == 0 {
+		return true // Both empty, match
+	}
+	if len(patternWords) == 0 {
+		return false // Pattern exhausted but routing key has more words
+	}
+
+	currentPattern := patternWords[0]
+	remainingPattern := patternWords[1:]
+
+	switch currentPattern {
+	case "#":
+		// # can match zero or more words
+		if len(remainingPattern) == 0 {
+			return true // # at the end matches everything remaining
+		}
+
+		// Try matching # with 0, 1, 2, ... words from routing key
+		for i := 0; i <= len(routingWords); i++ {
+			if bo.matchTopicWords(remainingPattern, routingWords[i:]) {
+				return true
+			}
+		}
+		return false
+
+	case "*":
+		// * must match exactly one word
+		if len(routingWords) == 0 {
+			return false // No word to match
+		}
+		// Match one word and continue with remaining
+		return bo.matchTopicWords(remainingPattern, routingWords[1:])
+
+	default:
+		// Literal word - must match exactly
+		if len(routingWords) == 0 || routingWords[0] != currentPattern {
+			return false
+		}
+		// Exact match, continue with remaining
+		return bo.matchTopicWords(remainingPattern, routingWords[1:])
+	}
 }
 
 // Match headers based on XMatch type
 func (bo *ExchangeBO) matchesHeaders(binding models.Binding, message models.QueueMessage) bool {
-	_ = message // TODO: Extract headers from message when available
 	if len(binding.Headers) == 0 {
 		return true // No headers to match
 	}
 
-	// Get message headers - assuming we have access to them
-	// In a real implementation, message would contain headers
-	messageHeaders := make(map[string]string) // TODO: Get from message
+	messageHeaders := message.Headers
 
 	switch binding.XMatch {
 	case models.XMatchTypeAll:
