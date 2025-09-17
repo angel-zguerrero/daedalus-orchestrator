@@ -13,6 +13,7 @@ import (
 	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	"deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"errors"
@@ -243,8 +244,6 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")
 	}
 
-	message.ContentLength = int64(len(message.Content))
-
 	fmt.Println("Publishing message with ID:", message.MessageID, "to exchange:", exchangeCode, "with routingKeyOrPatternOrQueueCode:", routingKeyOrPatternOrQueueCode, "and vnamespace:", vnamespace)
 
 	queues, err := bo.GetQueuesFromExchange(ctx, exchangeCode, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs)
@@ -258,7 +257,66 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 		return []string{}, nil
 	}
 
-	return []string{}, nil
+	queueCodes := make([]string, len(queues))
+	for i, q := range queues {
+		queueCodes[i] = q.Code
+	}
+
+	queueMessages := make([]models.QueueMessage, len(queues))
+	for i, q := range queues {
+		message := models.QueueMessage{
+			ID:          strings.ReplaceAll(uuid.New().String(), "-", ""),
+			MessageID:   message.MessageID,
+			Content:     message.Content,
+			ContentType: message.ContentType,
+			Headers:     message.Headers,
+			QueueID:     q.ID,
+			Priority:    message.Priority,
+			Handler:     message.Handler,
+			Parameters:  message.Parameters,
+		}
+		queueMessages[i] = message
+	}
+
+	enqueueCommand := &queue.EnqueueCommand{
+		Messages: make([]models.QueueMessage, len(queueMessages)),
+		CF:       cf,
+		CFS:      cfs,
+	}
+	copy(enqueueCommand.Messages, queueMessages)
+
+	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queueMessages)))
+	defer writeCancel()
+
+	fsmCmd := general_command.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: general_command.REPOSITORY_COMMAND,
+		CMD:  enqueueCommand,
+	}
+
+	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
+	if err != nil {
+		bo.Config.Logger.Error().Err(err).Msg("Failed to enqueue messages to queues")
+		return nil, fmt.Errorf("failed to enqueue messages to queues: %w", err)
+	}
+
+	buf := bytes.NewBuffer(result.Data)
+	dec := gob.NewDecoder(buf)
+	parsedResult := &commands.CommandResult{}
+	if err := dec.Decode(parsedResult); err != nil {
+		bo.Config.Logger.Error().Err(err).Msg("Enqueue command returned unexpected result type")
+		return nil, fmt.Errorf("enqueue command returned decode error: %w", err)
+	}
+
+	if parsedResult.Error != "" {
+		bo.Config.Logger.Error().Msg("Enqueue command failed")
+		return nil, fmt.Errorf("enqueue command failed: %s", parsedResult.Error)
+	}
+
+	createdMessages := parsedResult.Result.([]models.QueueMessage)
+	fmt.Println("Enqueued messages:", createdMessages)
+
+	return queueCodes, nil
 }
 
 func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) ([]models.Queue, error) {

@@ -68,8 +68,11 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 
 		// Generate message ID if not provided
 		if message.ID == "" {
-			message.ID = idFactory.GenerateID()
+			commandResult.Error = "Message ID is required for all messages"
+			return *commandResult
 		}
+
+		message.ContentLength = int64(len(message.Content))
 
 		// Group messages by QueueID
 		if messagesByQueue[message.QueueID] == nil {
