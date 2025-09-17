@@ -53,6 +53,12 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		return *commandResult
 	}
 
+	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// First pass: Group messages by QueueID and validate QueueIDs
 	messagesByQueue := make(map[string][]models.QueueMessage)
 	queuesCache := make(map[string]*models.Queue)
@@ -239,6 +245,16 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		queue := queuesCache[queueID]
 		queue.MessagesCount += len(messages)
 		_, err = queueRepo.UpdateQueue(queue, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+	}
+
+	// Update tenant summary with the total count of new messages created
+	totalMessagesCreated := len(processedMessages)
+	if totalMessagesCreated > 0 {
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, totalMessagesCreated, 0, 0, 0, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

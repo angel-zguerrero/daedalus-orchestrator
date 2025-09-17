@@ -816,3 +816,69 @@
     </button>
   </c-modal-footer>
 </c-modal>
+
+<!-- Message Result Modal -->
+<c-modal [visible]="messageResultModalVisible" backdrop="static" keyboard="false">
+  <c-modal-header>
+    <h4 cModalTitle>
+      <svg cIcon name="cil-check-circle" class="me-2 text-success"></svg>
+      Message Sent Successfully
+    </h4>
+  </c-modal-header>
+  <c-modal-body>
+    <div *ngIf="messageResults.length === 0" class="text-center py-4">
+      <div class="text-warning mb-3">
+        <svg cIcon name="cil-warning" size="xl"></svg>
+      </div>
+      <h5>No Queues Matched</h5>
+      <p class="text-muted">
+        The message was sent successfully, but no queues matched the routing criteria.
+        This can happen when:
+      </p>
+      <ul class="text-start text-muted">
+        <li>No bindings exist for this exchange</li>
+        <li>Routing key doesn't match any bound queues</li>
+        <li>Headers don't match the criteria (for headers exchanges)</li>
+      </ul>
+    </div>
+
+    <div *ngIf="messageResults.length > 0">
+      <div class="alert alert-success d-flex align-items-center mb-3">
+        <svg cIcon name="cil-check-circle" class="me-2"></svg>
+        <div>
+          Message delivered to <strong>{{ messageResults.length }}</strong> 
+          queue{{ messageResults.length > 1 ? 's' : '' }}
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table cTable hover striped>
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Queue Code</th>
+              <th scope="col">Message ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let result of messageResults; let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>
+                <code>{{ result.queueCode }}</code>
+              </td>
+              <td>
+                <code class="text-primary">{{ result.messageId }}</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="justify-content-center">
+    <button cButton color="primary" (click)="closeMessageResultModal()">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Accept
+    </button>
+  </c-modal-footer>
+</c-modal>

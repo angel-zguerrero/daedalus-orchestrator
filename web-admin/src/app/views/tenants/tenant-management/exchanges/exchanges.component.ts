@@ -65,11 +65,16 @@ export class ExchangesComponent implements OnInit {
   public detailsModalVisible = false;
   public bulkUploadModalVisible = false;
   public sendMessageModalVisible = false;
+  public messageResultModalVisible = false;
 
   public showAlert = false;
   public errorMessage = '';
   public successMessage = '';
   public loading = false;
+
+  // Message result properties
+  public messageResults: { queueCode: string, messageId: string }[] = [];
+  public messageSentSuccessfully = false;
 
   exchangeForm: FormGroup;
   exchangeFormUpdate: FormGroup;
@@ -519,6 +524,13 @@ export class ExchangesComponent implements OnInit {
     this.showAlert = false;
   }
 
+  // Close message result modal
+  closeMessageResultModal(): void {
+    this.messageResultModalVisible = false;
+    this.messageResults = [];
+    this.messageSentSuccessfully = false;
+  }
+
   private updateRoutingKeyValidation(): void {
     const routingKeyControl = this.sendMessageForm.get('routingKey');
     if (routingKeyControl) {
@@ -698,10 +710,13 @@ export class ExchangesComponent implements OnInit {
         this.messageHeaders = [];
         this.selectedFile = null;
         
-        // Show success message
-        this.successMessage = `Message sent successfully! Delivered to queues: ${response.queueCodes?.join(', ') || 'none'}`;
-        this.showAlert = true;
-        setTimeout(() => this.showAlert = false, 5000);
+        // Prepare message results for display in modal
+        const queueMessages = response.queueMessages || {};
+        this.messageResults = Object.entries(queueMessages)
+          .map(([queueCode, messageId]) => ({ queueCode, messageId: messageId as string }));
+        
+        this.messageSentSuccessfully = true;
+        this.messageResultModalVisible = true;
       },
       error: (error) => {
         this.loading = false;
