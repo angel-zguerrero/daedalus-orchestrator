@@ -229,7 +229,7 @@ func (ctrl *ExchangeController) PublishMessageHandler(c *gin.Context) {
 		ContentLength: int64(len(req.Message.Content)),
 	}
 
-	queueCodes, err := ctrl.ExchangeBO.PublishMessage(
+	queueMessages, err := ctrl.ExchangeBO.PublishMessage(
 		c.Request.Context(),
 		req.ExchangeCode,
 		req.RoutingKeyOrPatternOrQueueCode,
@@ -244,7 +244,7 @@ func (ctrl *ExchangeController) PublishMessageHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "Message published successfully",
-		"queueCodes": queueCodes,
+		"message":       "Message published successfully",
+		"queueMessages": queueMessages, // map[string]string where key=queueCode, value=messageID
 	})
 }

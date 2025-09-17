@@ -115,7 +115,7 @@ message QueueMessage {
 
 message PublishMessageResponse {
   string message = 1;
-  repeated string queueCodes = 2;
+  map<string, string> queueMessages = 2; // queueCode -> messageID
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/exchange.proto

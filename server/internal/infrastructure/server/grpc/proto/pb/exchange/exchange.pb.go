@@ -1004,7 +1004,7 @@ func (x *QueueMessage) GetContent() []byte {
 type PublishMessageResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	QueueCodes    []string               `protobuf:"bytes,2,rep,name=queueCodes,proto3" json:"queueCodes,omitempty"`
+	QueueMessages map[string]string      `protobuf:"bytes,2,rep,name=queueMessages,proto3" json:"queueMessages,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // queueCode -> messageID
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1046,9 +1046,9 @@ func (x *PublishMessageResponse) GetMessage() string {
 	return ""
 }
 
-func (x *PublishMessageResponse) GetQueueCodes() []string {
+func (x *PublishMessageResponse) GetQueueMessages() map[string]string {
 	if x != nil {
-		return x.QueueCodes
+		return x.QueueMessages
 	}
 	return nil
 }
@@ -1170,12 +1170,13 @@ const file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"R\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcf\x01\n" +
 	"\x16PublishMessageResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1e\n" +
-	"\n" +
-	"queueCodes\x18\x02 \x03(\tR\n" +
-	"queueCodes2\x8c\x04\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12Y\n" +
+	"\rqueueMessages\x18\x02 \x03(\v23.exchange.PublishMessageResponse.QueueMessagesEntryR\rqueueMessages\x1a@\n" +
+	"\x12QueueMessagesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\x8c\x04\n" +
 	"\x0fExchangeService\x12S\n" +
 	"\x0eCreateExchange\x12\x1f.exchange.CreateExchangeRequest\x1a .exchange.CreateExchangeResponse\x12_\n" +
 	"\x12BulkCreateExchange\x12#.exchange.BulkCreateExchangeRequest\x1a$.exchange.BulkCreateExchangeResponse\x12J\n" +
@@ -1196,7 +1197,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_r
 	return file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_goTypes = []any{
 	(*CreateExchangeRequest)(nil),      // 0: exchange.CreateExchangeRequest
 	(*CreateExchangeResponse)(nil),     // 1: exchange.CreateExchangeResponse
@@ -1219,6 +1220,7 @@ var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_go
 	nil,                                // 18: exchange.Exchange.HeadersEntry
 	nil,                                // 19: exchange.QueueMessage.ParametersEntry
 	nil,                                // 20: exchange.QueueMessage.HeadersEntry
+	nil,                                // 21: exchange.PublishMessageResponse.QueueMessagesEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_depIdxs = []int32{
 	16, // 0: exchange.CreateExchangeRequest.headers:type_name -> exchange.CreateExchangeRequest.HeadersEntry
@@ -1233,23 +1235,24 @@ var file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_de
 	14, // 9: exchange.PublishMessageRequest.message:type_name -> exchange.QueueMessage
 	19, // 10: exchange.QueueMessage.parameters:type_name -> exchange.QueueMessage.ParametersEntry
 	20, // 11: exchange.QueueMessage.headers:type_name -> exchange.QueueMessage.HeadersEntry
-	0,  // 12: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
-	2,  // 13: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
-	5,  // 14: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
-	7,  // 15: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
-	11, // 16: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
-	13, // 17: exchange.ExchangeService.PublishMessage:input_type -> exchange.PublishMessageRequest
-	1,  // 18: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
-	4,  // 19: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
-	6,  // 20: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
-	10, // 21: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
-	12, // 22: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
-	15, // 23: exchange.ExchangeService.PublishMessage:output_type -> exchange.PublishMessageResponse
-	18, // [18:24] is the sub-list for method output_type
-	12, // [12:18] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	21, // 12: exchange.PublishMessageResponse.queueMessages:type_name -> exchange.PublishMessageResponse.QueueMessagesEntry
+	0,  // 13: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
+	2,  // 14: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
+	5,  // 15: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
+	7,  // 16: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
+	11, // 17: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
+	13, // 18: exchange.ExchangeService.PublishMessage:input_type -> exchange.PublishMessageRequest
+	1,  // 19: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
+	4,  // 20: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
+	6,  // 21: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
+	10, // 22: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
+	12, // 23: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
+	15, // 24: exchange.ExchangeService.PublishMessage:output_type -> exchange.PublishMessageResponse
+	19, // [19:25] is the sub-list for method output_type
+	13, // [13:19] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_init() }
@@ -1263,7 +1266,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_i
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_exchange_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

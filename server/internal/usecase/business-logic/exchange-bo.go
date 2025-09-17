@@ -238,7 +238,7 @@ func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string,
 	return findResult, nil
 }
 
-func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) ([]string, error) {
+func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) (map[string]string, error) {
 
 	if message.MessageID == "" {
 		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")
@@ -254,12 +254,12 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 
 	if len(queues) == 0 {
 		bo.Config.Logger.Info().Str("exchangeCode", exchangeCode).Str("routingKeyOrPatternOrQueueCode", routingKeyOrPatternOrQueueCode).Msg("No queues matched for the given routing key or pattern")
-		return []string{}, nil
+		return nil, nil
 	}
 
-	queueCodes := make([]string, len(queues))
-	for i, q := range queues {
-		queueCodes[i] = q.Code
+	queueCodeMap := make(map[string]string, len(queues))
+	for _, q := range queues {
+		queueCodeMap[q.ID] = q.Code
 	}
 
 	queueMessages := make([]models.QueueMessage, len(queues))
@@ -314,9 +314,13 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	}
 
 	createdMessages := parsedResult.Result.([]models.QueueMessage)
-	fmt.Println("Enqueued messages:", createdMessages)
+	resultingMessages := make(map[string]string, len(createdMessages))
+	for _, msg := range createdMessages {
+		queueCode := queueCodeMap[msg.QueueID]
+		resultingMessages[queueCode] = msg.ID
+	}
 
-	return queueCodes, nil
+	return resultingMessages, nil
 }
 
 func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) ([]models.Queue, error) {

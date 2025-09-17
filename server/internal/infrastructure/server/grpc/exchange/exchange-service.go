@@ -200,7 +200,7 @@ func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessa
 		ContentLength: int64(len(r.Message.Content)),
 	}
 
-	queueCodes, err := s.ExchangeBO.PublishMessage(
+	queueMessages, err := s.ExchangeBO.PublishMessage(
 		ctx,
 		r.ExchangeCode,
 		r.RoutingKeyOrPatternOrQueueCode,
@@ -214,7 +214,7 @@ func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessa
 	}
 
 	return &pb.PublishMessageResponse{
-		Message:    "Message published successfully",
-		QueueCodes: queueCodes,
+		Message:       "Message published successfully",
+		QueueMessages: queueMessages, // map[string]string where key=queueCode, value=messageID
 	}, nil
 }
