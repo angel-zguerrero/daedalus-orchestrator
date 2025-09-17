@@ -245,7 +245,7 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 
 	message.ContentLength = int64(len(message.Content))
 
-	fmt.Println("Publishing message with ID:", message.MessageID, "to exchange:", exchangeCode, "with routingKeyOrPatternOrQueueCode:", routingKeyOrPatternOrQueueCode)
+	fmt.Println("Publishing message with ID:", message.MessageID, "to exchange:", exchangeCode, "with routingKeyOrPatternOrQueueCode:", routingKeyOrPatternOrQueueCode, "and vnamespace:", vnamespace)
 
 	queues, err := bo.GetQueuesFromExchange(ctx, exchangeCode, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs)
 	if err != nil {
@@ -258,14 +258,7 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 		return []string{}, nil
 	}
 
-	bo.Config.Logger.Info().Str("exchangeCode", exchangeCode).Str("routingKeyOrPatternOrQueueCode", routingKeyOrPatternOrQueueCode).Int("queueCount", len(queues)).Msg("Queues matched for the given routing key or pattern")
-
-	fmt.Println("Matched queues:")
-	for _, q := range queues {
-		fmt.Println(" - Queue ID:", q.ID, "Code:", q.Code)
-	}
-
-	return []string{"queue_code_1", "queue_code_2"}, nil
+	return []string{}, nil
 }
 
 func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) ([]models.Queue, error) {
@@ -276,7 +269,7 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 	}
 
 	// Get bindings for this exchange
-	bindings, err := bo.getBindingsByExchange(ctx, exchange.ID, cf, cfs)
+	bindings, err := bo.getBindingsByExchange(ctx, exchange.ID, vnamespace, cf, cfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bindings for exchange: %w", err)
 	}
@@ -297,7 +290,7 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 }
 
 // Helper method to get bindings by exchange ID
-func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, cf, cfs string) ([]models.Binding, error) {
+func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, vnamespace, cf, cfs string) ([]models.Binding, error) {
 	var allBindings []models.Binding
 	cursor := ""
 	pageSize := 100
@@ -307,8 +300,8 @@ func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, cf,
 			ExchangeID:     exchangeID,
 			Cursor:         cursor,
 			PageSize:       pageSize,
-			VNamespace:     "",   // All namespaces
-			IncludeObjects: true, // Include exchange, queue objects
+			VNamespace:     vnamespace, // All namespaces
+			IncludeObjects: true,       // Include exchange, queue objects
 			CF:             cf,
 			CFS:            cfs,
 		}
