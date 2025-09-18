@@ -478,22 +478,30 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 
 // Process dynamic binding (pattern-based routing)
 func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool) ([]models.Queue, error) {
-	_ = visitedExchanges // TODO: Use for recursion detection
 	var resultQueues []models.Queue
-
-	// For dynamic bindings, we need to search for queues that match the pattern
-	// This is a simplified implementation - in a real system, you might have more sophisticated pattern matching
-	queues, err := bo.findQueuesByPattern(ctx, routingKeyOrPatternOrQueueCode, binding.VNamespace, cf, cfs)
+	queues, err := bo.findQueuesByPattern(ctx, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs, visitedExchanges)
 	if err != nil {
 		return resultQueues, fmt.Errorf("failed to find queues by pattern: %w", err)
 	}
 
-	// Filter queues based on headers if exchange is of type Headers
-	if binding.Exchange != nil && binding.Exchange.Type == models.Headers {
-		queues = bo.filterQueuesByHeaders(queues, message, binding)
-	}
-
 	resultQueues = append(resultQueues, queues...)
+
+	if len(resultQueues) == 0 {
+		if binding.AlternateExchange != nil {
+			// Check if we've already visited this alternate exchange to prevent infinite recursion
+			if !visitedExchanges[binding.AlternateExchange.ID] {
+				// Mark this alternate exchange as visited
+				visitedExchanges[binding.AlternateExchange.ID] = true
+
+				queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+				if err != nil {
+					return resultQueues, fmt.Errorf("failed to get queues from alternate exchange: %w", err)
+				} else {
+					resultQueues = append(resultQueues, queues...)
+				}
+			}
+		}
+	}
 	return resultQueues, nil
 }
 
@@ -621,44 +629,20 @@ func (bo *ExchangeBO) matchesHeaders(binding models.Binding, message models.Queu
 }
 
 // Find queues by pattern for dynamic bindings
-func (bo *ExchangeBO) findQueuesByPattern(ctx context.Context, pattern, vnamespace, cf, cfs string) ([]models.Queue, error) {
-	_ = ctx        // TODO: Use context for timeout
-	_ = pattern    // TODO: Implement pattern matching
-	_ = vnamespace // TODO: Filter by namespace
-	_ = cf         // TODO: Use CF parameter
-	_ = cfs        // TODO: Use CFS parameter
+func (bo *ExchangeBO) findQueuesByPattern(ctx context.Context, pattern string, message models.QueueMessage, vnamespace, cf, cfs string, visitedExchanges map[string]bool) ([]models.Queue, error) {
+	_ = ctx              // TODO: Use context for timeout
+	_ = pattern          // TODO: Implement pattern matching
+	_ = vnamespace       // TODO: Filter by namespace
+	_ = cf               // TODO: Use CF parameter
+	_ = cfs              // TODO: Use CFS parameter
+	_ = visitedExchanges // To prevent infinite recursion in case of exchanges
+	_ = message          // TODO: Use message for headers matching if needed
 
 	// This would use a queue service to find queues matching the pattern
 	// For now, return empty slice as placeholder
 	return []models.Queue{}, nil
 }
 
-// Filter queues based on headers
-func (bo *ExchangeBO) filterQueuesByHeaders(queues []models.Queue, message models.QueueMessage, binding models.Binding) []models.Queue {
-	var filteredQueues []models.Queue
-
-	for _, queue := range queues {
-		// Check if queue headers match message headers based on XMatch type
-		if bo.queueMatchesHeaders(queue, message, binding) {
-			filteredQueues = append(filteredQueues, queue)
-		}
-	}
-
-	return filteredQueues
-}
-
-// Check if queue matches headers
-func (bo *ExchangeBO) queueMatchesHeaders(queue models.Queue, message models.QueueMessage, binding models.Binding) bool {
-	_ = queue   // TODO: Use queue headers
-	_ = message // TODO: Use message headers
-	_ = binding // TODO: Use binding headers
-
-	// Implementation depends on how queue headers are stored and message headers are provided
-	// This is a placeholder
-	return true
-}
-
-// Deduplicate queues to avoid sending the same message to a queue multiple times
 func (bo *ExchangeBO) deduplicateQueues(queues []models.Queue) []models.Queue {
 	seen := make(map[string]bool)
 	var result []models.Queue

@@ -310,7 +310,7 @@
           <div *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'" class="mt-2">
             <small class="text-warning">
               <svg cIcon name="cil-warning" class="me-1"></svg>
-              <strong>Dynamic Mode:</strong> Fanout exchanges are filtered out as they don't support routing
+              <strong>Dynamic Mode:</strong> Fanout and Topic exchanges are filtered out as they don't support this routing type
             </small>
           </div>
           <div *ngIf="selectedExchange" class="mt-2">
@@ -374,6 +374,10 @@
           <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'fanout'">
             <svg cIcon name="cil-info" class="me-2"></svg>
             <strong>{{ getDynamicBindingMessage('fanout') }}</strong>
+          </div>
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'topic'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>{{ getDynamicBindingMessage('topic') }}</strong>
           </div>
         </c-col>
       </c-row>
@@ -726,6 +730,10 @@
         <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'fanout'">
           <svg cIcon name="cil-info" class="me-2"></svg>
           <strong>{{ getDynamicBindingDetailsMessage('fanout') }}</strong>
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'topic'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>{{ getDynamicBindingDetailsMessage('topic') }}</strong>
         </div>
       </div>
 

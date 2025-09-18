@@ -41,14 +41,13 @@ func newTestPebbleStoreForAssertBinding(t *testing.T, cfNames []string, ttlCfNam
 // Helper function to setup test exchange and queue
 func setupTestExchangeAndQueue(t *testing.T, store db.KVStore, cf, cfs string, now time.Time) (*models.Exchange, *models.Queue) {
 	uow := db.NewUnitOfWork(store, nil)
-	idFactory := &db.DefaultIDGeneratorFactory{}
-
+	idFactory := &db.DeterministicIDGeneratorFactory{}
 	// Create VNamespace first
 	vNamespaceRepo, err := db.NewVNamespaceRepository(uow, idFactory, cf, cfs)
 	require.NoError(t, err)
 
 	vNamespace := &models.VNamespace{
-		ID:   idFactory.GenerateID(),
+		ID:   "test-namespace-id",
 		Name: "test-namespace",
 	}
 	_, err = vNamespaceRepo.CreateVNamespace(vNamespace, now)
@@ -59,7 +58,7 @@ func setupTestExchangeAndQueue(t *testing.T, store db.KVStore, cf, cfs string, n
 	require.NoError(t, err)
 
 	exchange := &models.Exchange{
-		ID:         idFactory.GenerateID(),
+		ID:         "test-exchange-id",
 		Code:       "TEST_EXCHANGE",
 		Name:       "Test Exchange",
 		VNamespace: "test-namespace",
@@ -77,7 +76,7 @@ func setupTestExchangeAndQueue(t *testing.T, store db.KVStore, cf, cfs string, n
 	require.NoError(t, err)
 
 	queue := &models.Queue{
-		ID:                        idFactory.GenerateID(),
+		ID:                        "test-queue-id",
 		Code:                      "TEST_QUEUE",
 		Name:                      "Test Queue",
 		VNamespace:                "test-namespace",
@@ -128,9 +127,9 @@ func TestAssertBindingCommand_CreateNewBinding(t *testing.T) {
 
 	// Execute command for Direct exchange
 	uow := db.NewUnitOfWork(store, nil)
-	idFactory := &db.DefaultIDGeneratorFactory{}
+
 	cmd := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-001",
 		Code:         "TEST_BINDING_001",
 		QueueCode:    queue.Code,
 		ExchangeCode: exchange.Code,
@@ -165,9 +164,9 @@ func TestAssertBindingCommand_UpdateExistingBinding(t *testing.T) {
 
 	// Create initial binding
 	uow1 := db.NewUnitOfWork(store, nil)
-	idFactory := &db.DefaultIDGeneratorFactory{}
+
 	cmd1 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-002",
 		Code:         "TEST_BINDING_002",
 		QueueCode:    queue.Code,
 		ExchangeCode: exchange.Code,
@@ -185,7 +184,7 @@ func TestAssertBindingCommand_UpdateExistingBinding(t *testing.T) {
 	// Update binding with new routing key
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-002",
 		Code:         "TEST_BINDING_002", // Same code to update existing binding
 		ExchangeCode: exchange.Code,
 		VNamespace:   "test-namespace",
@@ -211,9 +210,9 @@ func TestAssertBindingCommand_ValidationErrors(t *testing.T) {
 
 	// Test missing ExchangeCode
 	uow1 := db.NewUnitOfWork(store, nil)
-	idFactory := &db.DefaultIDGeneratorFactory{}
+
 	cmd1 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-003",
 		Code:         "TEST_BINDING_003",
 		QueueCode:    "some-queue-code",
 		VNamespace:   "test-namespace",
@@ -229,7 +228,7 @@ func TestAssertBindingCommand_ValidationErrors(t *testing.T) {
 	// Test missing QueueCode
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-004",
 		Code:         "TEST_BINDING_004",
 		ExchangeCode: "some-exchange-code",
 		VNamespace:   "test-namespace",
@@ -245,7 +244,7 @@ func TestAssertBindingCommand_ValidationErrors(t *testing.T) {
 	// Test non-existent exchange
 	uow3 := db.NewUnitOfWork(store, nil)
 	cmd3 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-005",
 		Code:         "TEST_BINDING_005",
 		ExchangeCode: "non-existent-exchange",
 		QueueCode:    "some-queue-code",
@@ -266,13 +265,13 @@ func TestAssertBindingCommand_ExchangeTypeValidation(t *testing.T) {
 
 	// Setup different exchange types
 	uow := db.NewUnitOfWork(store, nil)
-	idFactory := &db.DefaultIDGeneratorFactory{}
 
+	idFactory := &db.DeterministicIDGeneratorFactory{}
 	// Create VNamespace
 	vNamespaceRepo, err := db.NewVNamespaceRepository(uow, idFactory, AssertBindingTestFC, AssertBindingTestCFS)
 	require.NoError(t, err)
 	vNamespace := &models.VNamespace{
-		ID:   idFactory.GenerateID(),
+		ID:   "test-namespace-id",
 		Name: "test-namespace",
 	}
 	_, err = vNamespaceRepo.CreateVNamespace(vNamespace, now)
@@ -282,7 +281,7 @@ func TestAssertBindingCommand_ExchangeTypeValidation(t *testing.T) {
 	exchangeRepo, err := db.NewExchangeRepository(uow, idFactory, AssertBindingTestFC, AssertBindingTestCFS)
 	require.NoError(t, err)
 	topicExchange := &models.Exchange{
-		ID:         idFactory.GenerateID(),
+		ID:         "test-topic-exchange-id",
 		Code:       "TEST_TOPIC_EXCHANGE",
 		Name:       "Test Topic Exchange",
 		VNamespace: "test-namespace",
@@ -297,7 +296,7 @@ func TestAssertBindingCommand_ExchangeTypeValidation(t *testing.T) {
 	queueRepo, err := db.NewQueueRepository(uow, idFactory, AssertBindingTestFC, AssertBindingTestCFS)
 	require.NoError(t, err)
 	queue := &models.Queue{
-		ID:                        idFactory.GenerateID(),
+		ID:                        "test-queue-id",
 		Name:                      "Test Queue",
 		Code:                      "TEST_QUEUE",
 		VNamespace:                "test-namespace",
@@ -319,7 +318,7 @@ func TestAssertBindingCommand_ExchangeTypeValidation(t *testing.T) {
 	// Test Topic exchange requires Pattern (should fail without pattern)
 	uow1 := db.NewUnitOfWork(store, nil)
 	cmd1 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "NewBindingID",
 		Code:         "TEST_BINDING_006",
 		ExchangeCode: "TEST_TOPIC_EXCHANGE",
 		QueueCode:    "TEST_QUEUE",
@@ -336,7 +335,7 @@ func TestAssertBindingCommand_ExchangeTypeValidation(t *testing.T) {
 	// Test Topic exchange with Pattern (should succeed)
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-007",
 		Code:         "TEST_BINDING_007",
 		ExchangeCode: "TEST_TOPIC_EXCHANGE",
 		QueueCode:    "TEST_QUEUE",
@@ -364,9 +363,9 @@ func TestAssertBindingCommand_PreventDuplicateClassicBindings(t *testing.T) {
 
 	// Create first classic binding
 	uow1 := db.NewUnitOfWork(store, nil)
-	idFactory := &db.DefaultIDGeneratorFactory{}
+
 	cmd1 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-008",
 		Code:         "TEST_BINDING_008",
 		QueueCode:    queue.Code,
 		ExchangeCode: exchange.Code,
@@ -384,7 +383,7 @@ func TestAssertBindingCommand_PreventDuplicateClassicBindings(t *testing.T) {
 	// Try to create second classic binding with same exchange and queue but different code
 	uow2 := db.NewUnitOfWork(store, nil)
 	cmd2 := &bindingCommand.AssertBindingCommand{
-		NewBindingID: idFactory.GenerateID(),
+		NewBindingID: "test-binding-id-009",
 		Code:         "TEST_BINDING_009", // Different code
 		QueueCode:    queue.Code,         // Same queue
 		ExchangeCode: exchange.Code,      // Same exchange
@@ -400,4 +399,187 @@ func TestAssertBindingCommand_PreventDuplicateClassicBindings(t *testing.T) {
 	assert.NotEmpty(t, result2.Error)
 	assert.Contains(t, result2.Error, "A classic binding between exchange")
 	assert.Contains(t, result2.Error, "already exists with Code 'TEST_BINDING_008'")
+}
+
+func TestAssertBindingCommand_RejectDynamicBindingsForFanoutAndTopicExchanges(t *testing.T) {
+	store := newTestPebbleStoreForAssertBinding(t, []string{AssertBindingDefaultFC, AssertBindingTestFC, "admin"}, []string{AssertBindingTemporalFC})
+	now := time.Now()
+
+	// Test with Fanout exchange
+	t.Run("Fanout exchange should be rejected for dynamic binding", func(t *testing.T) {
+		// Setup fanout exchange
+		fanoutExchange := setupTestFanoutExchange(t, store, AssertBindingTestFC, AssertBindingTestCFS, now)
+
+		uow := db.NewUnitOfWork(store, nil)
+		cmd := &bindingCommand.AssertBindingCommand{
+			NewBindingID:       "test-fanout-binding-id",
+			Code:               "TEST_FANOUT_DYNAMIC_BINDING",
+			ExchangeCode:       fanoutExchange.Code,
+			VNamespace:         "test-namespace-fanout",
+			BindingType:        models.BindingTypeDynamic,
+			TargetExchangeType: models.TargetExchangeTypeQueue,
+			CF:                 AssertBindingTestFC,
+			CFS:                AssertBindingTestCFS,
+		}
+
+		result := cmd.Execute(uow, now)
+		assert.NotEmpty(t, result.Error)
+		assert.Contains(t, result.Error, "Dynamic bindings cannot use fanout exchanges")
+	})
+
+	// Test with Topic exchange
+	t.Run("Topic exchange should be rejected for dynamic binding", func(t *testing.T) {
+		// Setup topic exchange
+		topicExchange := setupTestTopicExchange(t, store, AssertBindingTestFC, AssertBindingTestCFS, now)
+
+		uow := db.NewUnitOfWork(store, nil)
+		cmd := &bindingCommand.AssertBindingCommand{
+			NewBindingID:       "test-topic-binding-id",
+			Code:               "TEST_TOPIC_DYNAMIC_BINDING",
+			ExchangeCode:       topicExchange.Code,
+			VNamespace:         "test-namespace-topic",
+			BindingType:        models.BindingTypeDynamic,
+			TargetExchangeType: models.TargetExchangeTypeQueue,
+			CF:                 AssertBindingTestFC,
+			CFS:                AssertBindingTestCFS,
+		}
+
+		result := cmd.Execute(uow, now)
+		assert.NotEmpty(t, result.Error)
+		assert.Contains(t, result.Error, "Dynamic bindings cannot use topic exchanges")
+	})
+
+	// Test with Direct exchange (should succeed)
+	t.Run("Direct exchange should be accepted for dynamic binding", func(t *testing.T) {
+		// Setup direct exchange
+		directExchange := setupTestDirectExchange(t, store, AssertBindingTestFC, AssertBindingTestCFS, now)
+
+		uow := db.NewUnitOfWork(store, nil)
+		cmd := &bindingCommand.AssertBindingCommand{
+			NewBindingID:       "test-direct-binding-id",
+			Code:               "TEST_DIRECT_DYNAMIC_BINDING",
+			ExchangeCode:       directExchange.Code,
+			VNamespace:         "test-namespace-direct",
+			BindingType:        models.BindingTypeDynamic,
+			TargetExchangeType: models.TargetExchangeTypeQueue,
+			CF:                 AssertBindingTestFC,
+			CFS:                AssertBindingTestCFS,
+		}
+
+		result := cmd.Execute(uow, now)
+		require.Empty(t, result.Error, "Expected no error but got: %s", result.Error)
+		err := uow.Commit()
+		require.NoError(t, err)
+	})
+}
+
+// Helper function to setup test fanout exchange
+func setupTestFanoutExchange(t *testing.T, store db.KVStore, cf, cfs string, now time.Time) *models.Exchange {
+	uow := db.NewUnitOfWork(store, nil)
+
+	idFactory := &db.DeterministicIDGeneratorFactory{}
+	// Create VNamespace first
+	vNamespaceRepo, err := db.NewVNamespaceRepository(uow, idFactory, cf, cfs)
+	require.NoError(t, err)
+
+	vNamespace := &models.VNamespace{
+		ID:   "test-namespace-fanout-id",
+		Name: "test-namespace-fanout",
+	}
+	_, err = vNamespaceRepo.CreateVNamespace(vNamespace, now)
+	require.NoError(t, err)
+
+	// Create exchange repository
+	exchangeRepo, err := db.NewExchangeRepository(uow, idFactory, cf, cfs)
+	require.NoError(t, err)
+
+	// Create fanout exchange
+	exchange := &models.Exchange{
+		ID:         "test-fanout-exchange-id",
+		Code:       "TEST_FANOUT_EXCHANGE",
+		Name:       "Test Fanout Exchange",
+		Type:       models.Fanout,
+		VNamespace: "test-namespace-fanout",
+	}
+
+	_, err = exchangeRepo.CreateExchange(exchange, now)
+	require.NoError(t, err)
+	err = uow.Commit()
+	require.NoError(t, err)
+
+	return exchange
+}
+
+// Helper function to setup test topic exchange
+func setupTestTopicExchange(t *testing.T, store db.KVStore, cf, cfs string, now time.Time) *models.Exchange {
+	uow := db.NewUnitOfWork(store, nil)
+
+	idFactory := &db.DeterministicIDGeneratorFactory{}
+	// Create VNamespace first
+	vNamespaceRepo, err := db.NewVNamespaceRepository(uow, idFactory, cf, cfs)
+	require.NoError(t, err)
+
+	vNamespace := &models.VNamespace{
+		ID:   "test-namespace-topic-id",
+		Name: "test-namespace-topic",
+	}
+	_, err = vNamespaceRepo.CreateVNamespace(vNamespace, now)
+	require.NoError(t, err)
+
+	// Create exchange repository
+	exchangeRepo, err := db.NewExchangeRepository(uow, idFactory, cf, cfs)
+	require.NoError(t, err)
+
+	// Create topic exchange
+	exchange := &models.Exchange{
+		ID:         "test-topic-exchange-id",
+		Code:       "TEST_TOPIC_EXCHANGE",
+		Name:       "Test Topic Exchange",
+		Type:       models.Topic,
+		VNamespace: "test-namespace-topic",
+	}
+
+	_, err = exchangeRepo.CreateExchange(exchange, now)
+	require.NoError(t, err)
+	err = uow.Commit()
+	require.NoError(t, err)
+
+	return exchange
+}
+
+// Helper function to setup test direct exchange
+func setupTestDirectExchange(t *testing.T, store db.KVStore, cf, cfs string, now time.Time) *models.Exchange {
+	uow := db.NewUnitOfWork(store, nil)
+
+	idFactory := &db.DeterministicIDGeneratorFactory{}
+	// Create VNamespace first
+	vNamespaceRepo, err := db.NewVNamespaceRepository(uow, idFactory, cf, cfs)
+	require.NoError(t, err)
+
+	vNamespace := &models.VNamespace{
+		ID:   "test-namespace-direct-id",
+		Name: "test-namespace-direct",
+	}
+	_, err = vNamespaceRepo.CreateVNamespace(vNamespace, now)
+	require.NoError(t, err)
+
+	// Create exchange repository
+	exchangeRepo, err := db.NewExchangeRepository(uow, idFactory, cf, cfs)
+	require.NoError(t, err)
+
+	// Create direct exchange
+	exchange := &models.Exchange{
+		ID:         "test-direct-exchange-id",
+		Code:       "TEST_DIRECT_EXCHANGE",
+		Name:       "Test Direct Exchange",
+		Type:       models.Direct,
+		VNamespace: "test-namespace-direct",
+	}
+
+	_, err = exchangeRepo.CreateExchange(exchange, now)
+	require.NoError(t, err)
+	err = uow.Commit()
+	require.NoError(t, err)
+
+	return exchange
 }

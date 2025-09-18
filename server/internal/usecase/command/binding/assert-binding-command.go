@@ -6,6 +6,7 @@ import (
 	"deadalus-orch/shared/models"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -166,9 +167,9 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
-	// Validate that dynamic bindings cannot use Fanout exchanges
-	if cmd.BindingType == models.BindingTypeDynamic && exchange.Type == models.Fanout {
-		commandResult.Error = "Dynamic bindings cannot use Fanout exchanges as they don't support routing"
+	// Validate that dynamic bindings cannot use Fanout or Topic exchanges
+	if cmd.BindingType == models.BindingTypeDynamic && (exchange.Type == models.Fanout || exchange.Type == models.Topic) {
+		commandResult.Error = fmt.Sprintf("Dynamic bindings cannot use %s exchanges as they don't support this routing type", exchange.Type)
 		return *commandResult
 	}
 
@@ -212,7 +213,7 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 			commandResult.Error = "Alternate Exchange with Code '" + cmd.AlternateExchangeCode + "' in VNamespace '" + cmd.VNamespace + "' does not exist"
 			return *commandResult
 		}
-		
+
 		// Validate that Alternate Exchange must be of type Fanout
 		if alternateExchange.Type != models.Fanout {
 			commandResult.Error = "Alternate Exchange must be of type 'fanout', got '" + string(alternateExchange.Type) + "'"

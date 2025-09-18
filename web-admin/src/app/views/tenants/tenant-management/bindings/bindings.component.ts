@@ -415,10 +415,12 @@ export class BindingsComponent implements OnInit {
           Description: item.Description
         } as Exchange));
 
-        // Filter out Fanout exchanges for dynamic bindings
+        // Filter out Fanout and Topic exchanges for dynamic bindings
         const bindingType = this.bindingForm.get('bindingType')?.value;
         if (bindingType === 'dynamic') {
-          exchanges = exchanges.filter((exchange: Exchange) => exchange.Type !== 'fanout');
+          exchanges = exchanges.filter((exchange: Exchange) => 
+            exchange.Type !== 'fanout' && exchange.Type !== 'topic'
+          );
         }
 
         return exchanges;
@@ -448,10 +450,12 @@ export class BindingsComponent implements OnInit {
           Description: item.Description
         } as Exchange));
 
-        // Filter out Fanout exchanges for dynamic bindings
+        // Filter out Fanout and Topic exchanges for dynamic bindings
         const bindingType = this.bindingForm.get('bindingType')?.value;
         if (bindingType === 'dynamic') {
-          exchanges = exchanges.filter((exchange: Exchange) => exchange.Type !== 'fanout');
+          exchanges = exchanges.filter((exchange: Exchange) => 
+            exchange.Type !== 'fanout' && exchange.Type !== 'topic'
+          );
         }
 
         // Filter out the selected main exchange and alternate exchange
@@ -1339,11 +1343,11 @@ export class BindingsComponent implements OnInit {
       case 'direct':
         return `Dynamic Direct Binding: ${entityType} will be determined automatically by the ${targetType} code.`;
       case 'topic':
-        return `Dynamic Topic Binding: ${entityTypePlural} will be determined where the code matches the pattern.`;
+        return `Topic exchanges are not supported for dynamic bindings as they use pattern-based routing.`;
       case 'headers':
         return `Dynamic Headers Binding: ${entityTypePlural} will be determined by ${targetType} headers, message headers, and X-Match type.`;
       case 'fanout':
-        return `Dynamic Fanout Binding: ${entityType} will be determined automatically by the ${targetType} code.`;
+        return `Fanout exchanges are not supported for dynamic bindings as they don't use routing keys.`;
       default:
         return `Dynamic Binding: ${entityTypePlural} will be determined automatically.`;
     }
@@ -1358,11 +1362,11 @@ export class BindingsComponent implements OnInit {
       case 'direct':
         return `Dynamic Direct Binding: ${entityType} is determined automatically by the ${targetType} code.`;
       case 'topic':
-        return `Dynamic Topic Binding: ${entityTypePlural} are determined where the code matches the pattern.`;
+        return `Topic exchanges are not supported for dynamic bindings as they use pattern-based routing.`;
       case 'headers':
         return `Dynamic Headers Binding: ${entityTypePlural} are determined by ${targetType} headers, message headers, and X-Match type.`;
       case 'fanout':
-        return `Dynamic Fanout Binding: ${entityType} is determined automatically by the ${targetType} code.`;
+        return `Fanout exchanges are not supported for dynamic bindings as they don't use routing keys.`;
       default:
         return `Dynamic Binding: ${entityTypePlural} are determined automatically.`;
     }
