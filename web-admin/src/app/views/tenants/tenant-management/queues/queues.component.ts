@@ -80,13 +80,21 @@ export class QueuesComponent implements OnInit {
   public deleteModalVisible = false;
   public detailsModalVisible = false;
   public bulkUploadModalVisible = false;
+  public sendMessageModalVisible = false;
+  public messageResultModalVisible = false;
 
   public showAlert = false;
   public errorMessage = '';
+  public successMessage = '';
   public loading = false;
+
+  // Message result properties
+  public messageResults: { queueCode: string, messageId: string }[] = [];
+  public messageSentSuccessfully = false;
 
   queueForm: FormGroup;
   queueFormUpdate: FormGroup;
+  sendMessageForm: FormGroup;
   selectedQueue: any;
 
   queueTypes = [
@@ -108,6 +116,15 @@ export class QueuesComponent implements OnInit {
   selectedVNamespaceFilter = '';
 
   public file: File | null = null;
+
+  // Send Message properties
+  messageParameters: { key: string, value: string }[] = [];
+  messageHeaders: { key: string, value: string }[] = [];
+  selectedFile: File | null = null;
+  messageParameterKey: string = '';
+  messageParameterValue: string = '';
+  messageHeaderKey: string = '';
+  messageHeaderValue: string = '';
 
   // Priority management properties
   priorityType: string = 'normal';
@@ -160,6 +177,14 @@ export class QueuesComponent implements OnInit {
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
       priorityType: ['normal', Validators.required],
       maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]]
+    });
+
+    this.sendMessageForm = this.fb.group({
+      messageId: [''],
+      handler: [''],
+      priority: [0, [Validators.min(0)]],
+      contentType: [''],
+      content: ['']
     });
 
     this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
@@ -845,5 +870,172 @@ export class QueuesComponent implements OnInit {
     
     // Fallback to MaxPriority or maxPriority if available
     return queue?.MaxPriority || queue?.maxPriority || 1;
+  }
+
+  // Send Message Modal Methods
+  openSendMessageModal(queue: any): void {
+    this.selectedQueue = queue;
+    this.sendMessageForm.reset({
+      messageId: '',
+      handler: '',
+      priority: 0,
+      contentType: '',
+      content: ''
+    });
+    
+    this.messageParameters = [];
+    this.messageHeaders = [];
+    this.selectedFile = null;
+    this.sendMessageModalVisible = true;
+    this.showAlert = false;
+  }
+
+  // Close message result modal
+  closeMessageResultModal(): void {
+    this.messageResultModalVisible = false;
+    this.messageResults = [];
+    this.messageSentSuccessfully = false;
+  }
+
+  // Parameter management methods
+  addParameter(): void {
+    if (this.messageParameterKey.trim() && this.messageParameterValue.trim()) {
+      this.messageParameters.push({
+        key: this.messageParameterKey.trim(),
+        value: this.messageParameterValue.trim()
+      });
+      this.messageParameterKey = '';
+      this.messageParameterValue = '';
+    }
+  }
+
+  removeParameter(index: number): void {
+    this.messageParameters.splice(index, 1);
+  }
+
+  // Header management methods
+  addMessageHeader(): void {
+    if (this.messageHeaderKey.trim() && this.messageHeaderValue.trim()) {
+      this.messageHeaders.push({
+        key: this.messageHeaderKey.trim(),
+        value: this.messageHeaderValue.trim()
+      });
+      this.messageHeaderKey = '';
+      this.messageHeaderValue = '';
+    }
+  }
+
+  removeMessageHeader(index: number): void {
+    this.messageHeaders.splice(index, 1);
+  }
+
+  // File upload methods
+  onFileSelected(event: any): void {
+    this.selectedFile = event.target.files[0];
+    if (this.selectedFile) {
+      // Automatically set content type for binary files
+      this.sendMessageForm.patchValue({
+        contentType: 'application/octet-stream'
+      });
+    }
+  }
+
+  // Helper methods for message sending
+  private getParametersAsMap(): { [key: string]: string } {
+    const parametersMap: { [key: string]: string } = {};
+    for (const param of this.messageParameters) {
+      parametersMap[param.key] = param.value;
+    }
+    return parametersMap;
+  }
+
+  private getMessageHeadersAsMap(): { [key: string]: string } {
+    const headersMap: { [key: string]: string } = {};
+    for (const header of this.messageHeaders) {
+      headersMap[header.key] = header.value;
+    }
+    return headersMap;
+  }
+
+  // Send message method
+  sendMessage(): void {
+    if (this.sendMessageForm.invalid) {
+      this.sendMessageForm.markAllAsTouched();
+      return;
+    }
+
+    this.loading = true;
+    this.showAlert = false;
+
+    const contentType = this.sendMessageForm.get('contentType')?.value || '';
+    let content: any = null;
+
+    // Handle content based on type
+    if (contentType === 'application/octet-stream' && this.selectedFile) {
+      // For binary content, convert file to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = btoa(String.fromCharCode(...new Uint8Array(reader.result as ArrayBuffer)));
+        this.sendMessageWithContent(base64String);
+      };
+      reader.readAsArrayBuffer(this.selectedFile);
+      return;
+    } else if (contentType && this.sendMessageForm.get('content')?.value) {
+      content = this.sendMessageForm.get('content')?.value;
+      if (contentType === 'application/json') {
+        try {
+          // Validate JSON and convert to string if it's an object
+          content = typeof content === 'object' ? JSON.stringify(content) : content;
+          JSON.parse(content); // Validate JSON format
+        } catch (e) {
+          this.errorMessage = 'Invalid JSON format in content';
+          this.showAlert = true;
+          this.loading = false;
+          return;
+        }
+      }
+    }
+
+    this.sendMessageWithContent(content);
+  }
+
+  private sendMessageWithContent(content: any): void {
+    // Prepare message data according to the API structure
+    const messageData = {
+      queueCode: this.selectedQueue.Code,
+      vnamespace: this.selectedQueue.VNamespace,
+      content: content || '',
+      contentType: this.sendMessageForm.get('contentType')?.value || '',
+      headers: this.getMessageHeadersAsMap(),
+      priority: this.sendMessageForm.get('priority')?.value || 0,
+      handler: this.sendMessageForm.get('handler')?.value || '',
+      parameters: this.getParametersAsMap()
+    };
+
+    console.log('Sending message payload:', messageData);
+    console.log('Selected queue:', this.selectedQueue);
+
+    this.queuesService.enqueueMessage(this.tenantCode, messageData).subscribe({
+      next: (response) => {
+        this.loading = false;
+        this.sendMessageModalVisible = false;
+        this.sendMessageForm.reset();
+        this.messageParameters = [];
+        this.messageHeaders = [];
+        this.selectedFile = null;
+        
+        // Prepare message results for display in modal
+        this.messageResults = [{ queueCode: this.selectedQueue.Code, messageId: response.messageId }];
+        
+        this.messageSentSuccessfully = true;
+        this.messageResultModalVisible = true;
+      },
+      error: (error) => {
+        this.loading = false;
+        console.error('Error sending message:', error);
+        this.errorMessage = error.error?.error || 'Failed to send message. Please try again.';
+        this.showAlert = true;
+      }
+    });
   }
 }

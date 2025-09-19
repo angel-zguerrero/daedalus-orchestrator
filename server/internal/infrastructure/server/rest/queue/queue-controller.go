@@ -44,6 +44,15 @@ type createBulkQueueRequest struct {
 	Queues []createQueueRequest `json:"queues" binding:"required"`
 }
 
+type enqueueMessageRequest struct {
+	Content     string            `json:"content"`
+	ContentType string            `json:"contentType"`
+	Headers     map[string]string `json:"headers"`
+	Priority    int               `json:"priority"`
+	Handler     string            `json:"handler" binding:"required"`
+	Parameters  map[string]string `json:"parameters"`
+}
+
 // CreateQueueHandler handles POST /rest-api/tenants/:id/queue
 func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 	var req createQueueRequest
@@ -243,6 +252,52 @@ func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Queue list",
 		"result":  findResult,
+	})
+}
+
+// EnqueueMessageHandler handles POST /rest-api/tenants/:code/queue/:queueCode/:vnamespace/enqueue
+func (ctrl *QueueController) EnqueueMessageHandler(c *gin.Context) {
+	var req enqueueMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ctrl.Config.Logger.Warn().Err(err).Msg("enqueue message attempt with invalid payload")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	queueCode := c.Param("queueCode")
+	vnamespace := c.Param("vnamespace")
+	tenantCode := c.Param("code")
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create the message
+	message := models.QueueMessage{
+		Content:     []byte(req.Content),
+		ContentType: req.ContentType,
+		Headers:     req.Headers,
+		Priority:    req.Priority,
+		Handler:     req.Handler,
+		Parameters:  req.Parameters,
+		VNamespace:  vnamespace,
+	}
+
+	// Enqueue the message
+	messageID, err := ctrl.QueueBO.EnqueueMessage(c.Request.Context(), queueCode, message, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Message enqueued successfully",
+		"messageId": messageID,
+		"result": gin.H{
+			queueCode: messageID,
+		},
 	})
 }
 

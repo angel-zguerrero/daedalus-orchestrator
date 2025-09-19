@@ -268,6 +268,40 @@ func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest
 	}, nil
 }
 
+func (s *QueueService) EnqueueMessage(ctx context.Context, r *pb.EnqueueMessageRequest) (*pb.EnqueueMessageResponse, error) {
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the message
+	message := models.QueueMessage{
+		Content:     []byte(r.Content),
+		ContentType: r.ContentType,
+		Headers:     r.Headers,
+		Priority:    int(r.Priority),
+		Handler:     r.Handler,
+		Parameters:  r.Parameters,
+		VNamespace:  r.Vnamespace,
+	}
+
+	// Enqueue the message
+	messageID, err := s.QueueBO.EnqueueMessage(ctx, r.QueueCode, message, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build result map
+	result := make(map[string]string)
+	result[r.QueueCode] = messageID
+
+	return &pb.EnqueueMessageResponse{
+		Message:   "Message enqueued successfully",
+		MessageId: messageID,
+		Result:    result,
+	}, nil
+}
+
 // isValidQueueType validates if the queue type is one of the allowed types
 func isValidQueueType(queueType string) bool {
 	switch queueType {

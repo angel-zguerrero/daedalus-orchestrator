@@ -252,3 +252,73 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 
 	return findResult, nil
 }
+
+func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) (string, error) {
+	// First, get the queue to ensure it exists
+	queue, err := bo.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs)
+	if err != nil {
+		bo.Config.Logger.Error().Err(err).Msg("Failed to get queue")
+		return "", fmt.Errorf("failed to get queue: %w", err)
+	}
+
+	// Generate message ID if not provided
+	if message.MessageID == "" {
+		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")
+	}
+
+	// Create the queue message with the queue ID
+	queueMessage := models.QueueMessage{
+		ID:          strings.ReplaceAll(uuid.New().String(), "-", ""),
+		MessageID:   message.MessageID,
+		Content:     message.Content,
+		ContentType: message.ContentType,
+		Headers:     message.Headers,
+		QueueID:     queue.ID,
+		Priority:    message.Priority,
+		Handler:     message.Handler,
+		Parameters:  message.Parameters,
+		VNamespace:  vnamespace,
+	}
+
+	// Enqueue the message
+	enqueueCommand := &queue_command.EnqueueCommand{
+		Messages: []models.QueueMessage{queueMessage},
+		CF:       cf,
+		CFS:      cfs,
+	}
+
+	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+	defer writeCancel()
+
+	fsmCmd := general_command.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: general_command.REPOSITORY_COMMAND,
+		CMD:  enqueueCommand,
+	}
+
+	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
+	if err != nil {
+		bo.Config.Logger.Error().Err(err).Msg("Failed to enqueue message to queue")
+		return "", fmt.Errorf("failed to enqueue message to queue: %w", err)
+	}
+
+	buf := bytes.NewBuffer(result.Data)
+	dec := gob.NewDecoder(buf)
+	parsedResult := &commands.CommandResult{}
+	if err := dec.Decode(parsedResult); err != nil {
+		bo.Config.Logger.Error().Err(err).Msg("Enqueue command returned unexpected result type")
+		return "", fmt.Errorf("enqueue command returned decode error: %w", err)
+	}
+
+	if parsedResult.Error != "" {
+		bo.Config.Logger.Error().Err(errors.New(parsedResult.Error)).Msg("Enqueue command failed")
+		return "", fmt.Errorf("enqueue command failed: %s", parsedResult.Error)
+	}
+
+	createdMessages := parsedResult.Result.([]models.QueueMessage)
+	if len(createdMessages) > 0 {
+		return createdMessages[0].ID, nil
+	}
+
+	return "", fmt.Errorf("no message was created")
+}

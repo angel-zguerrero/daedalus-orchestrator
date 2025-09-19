@@ -54,6 +54,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 				tenantsGroup.POST("/:code/queue", queueController.CreateQueueHandler)
 				tenantsGroup.POST("/:code/queue/bulk", queueController.BulkCreateQueueHandler)
+				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", queueController.EnqueueMessageHandler)
 				tenantsGroup.GET("/:code/queue", queueController.GetQueuesHandler)
 				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace", queueController.GetQueueHandler)
 				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", queueController.DeleteQueueHandler)
