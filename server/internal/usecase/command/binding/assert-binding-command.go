@@ -512,6 +512,7 @@ func (cmd *AssertBindingCommand) upsertRoutingHeaders(routingHeadersRepo *db.Rou
 				Value:      value,
 				CreatedAt:  now,
 				UpdatedAt:  now,
+				HeaderType: models.HeaderTypeBinding,
 			}
 
 			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)

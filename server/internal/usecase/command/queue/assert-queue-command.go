@@ -182,10 +182,11 @@ func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.Routing
 			headerID := queueID + "_" + key
 			// Create new header
 			routingHeader := &models.RoutingHeader{
-				ID:      headerID,
-				QueueID: queueID,
-				Key:     key,
-				Value:   value,
+				ID:         headerID,
+				QueueID:    queueID,
+				Key:        key,
+				Value:      value,
+				HeaderType: models.HeaderTypeQueue,
 			}
 			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
 			if err != nil {

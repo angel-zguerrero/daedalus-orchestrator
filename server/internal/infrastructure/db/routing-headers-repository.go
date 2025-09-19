@@ -24,12 +24,18 @@ func NewRoutingHeadersRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf
 }
 
 func (r *RoutingHeadersRepository) CreateRoutingHeader(input *models.RoutingHeader, now time.Time) (string, error) {
+	if input.HeaderType == "" || input.HeaderType != models.HeaderTypeExchange && input.HeaderType != models.HeaderTypeQueue && input.HeaderType != models.HeaderTypeQueueMessage && input.HeaderType != models.HeaderTypeBinding {
+		return "", fmt.Errorf("Invalid HeaderType: %s", input.HeaderType)
+	}
 	input.CreatedAt = now
 	input.UpdatedAt = now
 	return r.Create(input, now)
 }
 
 func (r *RoutingHeadersRepository) UpdateRoutingHeader(input *models.RoutingHeader, now time.Time) (bool, error) {
+	if input.HeaderType == "" || input.HeaderType != models.HeaderTypeExchange && input.HeaderType != models.HeaderTypeQueue && input.HeaderType != models.HeaderTypeQueueMessage && input.HeaderType != models.HeaderTypeBinding {
+		return false, fmt.Errorf("Invalid HeaderType: %s", input.HeaderType)
+	}
 	input.UpdatedAt = now
 	return r.Update(input, now)
 }

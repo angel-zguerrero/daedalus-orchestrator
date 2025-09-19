@@ -13,6 +13,7 @@ import (
 	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	header_command "deadalus-orch/server/internal/usecase/command/header"
 	"deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -479,6 +480,116 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 // Process dynamic binding (pattern-based routing)
 func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool) ([]models.Queue, error) {
 	var resultQueues []models.Queue
+
+	// Prevent infinite recursion by checking if we've already visited this exchange
+	if binding.Exchange != nil && visitedExchanges[binding.Exchange.ID] {
+		return resultQueues, nil
+	}
+
+	// Mark this exchange as visited
+	if binding.Exchange != nil {
+		visitedExchanges[binding.Exchange.ID] = true
+	}
+
+	if binding.TargetExchangeType == models.TargetExchangeTypeQueue {
+		// Only apply this logic for direct exchanges
+		if binding.Exchange != nil && binding.Exchange.Type == models.Direct {
+			// Search for queue by Code using routingKeyOrPatternOrQueueCode
+			findQueueCommand := &queue.FindQueueCommand{
+				Code:           routingKeyOrPatternOrQueueCode,
+				VNamespace:     binding.VNamespace,
+				IncludeHeaders: false, // Not necessary to include headers
+				CF:             cf,
+				CFS:            cfs,
+			}
+
+			queryCommand := &general_command.Query_Command{
+				Command: &general_command.Repository_Command{
+					CMD: findQueueCommand,
+				},
+				Now: time.Now().UnixNano(),
+			}
+
+			readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+			defer cancel()
+
+			result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+			if err != nil {
+				return resultQueues, fmt.Errorf("failed to execute find queue command: %w", err)
+			}
+
+			buf := bytes.NewBuffer(result.([]byte))
+			dec := gob.NewDecoder(buf)
+			parsedResult := &commands.CommandResult{}
+			if err := dec.Decode(parsedResult); err != nil {
+				return resultQueues, fmt.Errorf("failed to decode cluster response: %w", err)
+			}
+
+			if parsedResult.Error != "" {
+				return nil, fmt.Errorf("find queue command failed: %s", parsedResult.Error)
+			}
+
+			if parsedResult.Result != nil {
+				foundQueue, ok := parsedResult.Result.(models.Queue)
+				if ok {
+					resultQueues = append(resultQueues, foundQueue)
+				}
+			}
+
+			return resultQueues, nil
+		}
+
+		// TODO: Implement logic for headers exchange type when TargetExchangeType is Queue
+		if binding.Exchange != nil && binding.Exchange.Type == models.Headers {
+			messageHeaders := message.Headers
+			var listHeaders []models.RoutingHeader
+			for key, _ := range messageHeaders {
+				// Use ListHeadersCommand to get routing headers for this key
+				listHeadersCommand := &header_command.ListHeadersCommand{
+					Key:               key,
+					RoutingHeaderType: models.HeaderTypeQueueMessage,
+					VNamespace:        binding.VNamespace,
+					CF:                cf,
+					CFS:               cfs,
+				}
+
+				queryCommand := &general_command.Query_Command{
+					Command: &general_command.Repository_Command{
+						CMD: listHeadersCommand,
+					},
+					Now: time.Now().UnixNano(),
+				}
+
+				readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+				result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+				cancel()
+
+				if err != nil {
+					return resultQueues, fmt.Errorf("failed to get routing headers for key %s: %w", key, err)
+				}
+
+				buf := bytes.NewBuffer(result.([]byte))
+				dec := gob.NewDecoder(buf)
+				parsedResult := &commands.CommandResult{}
+				if err := dec.Decode(parsedResult); err != nil {
+					return resultQueues, fmt.Errorf("failed to decode routing headers result for key %s: %w", key, err)
+				}
+
+				if parsedResult.Error != "" {
+					return resultQueues, fmt.Errorf("routing headers query failed for key %s: %s", key, parsedResult.Error)
+				}
+
+				if parsedResult.Result != nil {
+					allQueueHeaders := parsedResult.Result.([]models.RoutingHeader)
+					listHeaders = append(listHeaders, allQueueHeaders...)
+				}
+			}
+			return resultQueues, nil
+		}
+
+		return resultQueues, nil
+	}
+
 	queues, err := bo.findQueuesByPattern(ctx, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs, visitedExchanges)
 	if err != nil {
 		return resultQueues, fmt.Errorf("failed to find queues by pattern: %w", err)

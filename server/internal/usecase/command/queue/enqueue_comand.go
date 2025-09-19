@@ -59,6 +59,12 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		return *commandResult
 	}
 
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// First pass: Group messages by QueueID and validate QueueIDs
 	messagesByQueue := make(map[string][]models.QueueMessage)
 	queuesCache := make(map[string]*models.Queue)
@@ -251,6 +257,18 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		}
 	}
 
+	// Seventh pass: Process headers for messages that have them
+	for _, message := range processedMessages {
+		// If this message has headers, upsert them
+		if message.Headers != nil && len(message.Headers) > 0 {
+			err = cmd.upsertQueueMessageHeaders(routingHeadersRepo, message.ID, message.Headers, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+		}
+	}
+
 	// Update tenant summary with the total count of new messages created
 	totalMessagesCreated := len(processedMessages)
 	if totalMessagesCreated > 0 {
@@ -270,4 +288,64 @@ func getKeysFromMap(m map[int]int) []int {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// upsertQueueMessageHeaders creates or updates routing headers for a queue message
+func (cmd *EnqueueCommand) upsertQueueMessageHeaders(routingHeadersRepo *db.RoutingHeadersRepository, messageID string, headers map[string]string, now time.Time) error {
+	// Get existing headers for this message
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByMessage(messageID, now)
+	if err != nil {
+		return err
+	}
+
+	// Create a map for quick lookup of existing headers
+	existingByKey := make(map[string]*models.RoutingHeader)
+	if existingHeaders != nil {
+		for i := range existingHeaders.Entities {
+			header := &existingHeaders.Entities[i]
+			existingByKey[header.Key] = header
+		}
+	}
+
+	// Process each header from input
+	for key, value := range headers {
+		if existingHeader, exists := existingByKey[key]; exists {
+			// Update existing header if value changed
+			if existingHeader.Value != value {
+				existingHeader.Value = value
+				_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			headerID := messageID + "_" + key
+			// Create new header
+			routingHeader := &models.RoutingHeader{
+				ID:             headerID,
+				QueueMessageID: messageID,
+				Key:            key,
+				Value:          value,
+				HeaderType:     models.HeaderTypeQueueMessage,
+			}
+			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Remove headers that are no longer in the input
+	if existingHeaders != nil {
+		for _, existingHeader := range existingHeaders.Entities {
+			if _, stillExists := headers[existingHeader.Key]; !stillExists {
+				_, err := routingHeadersRepo.DeleteRoutingHeader(existingHeader.ID, now)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }

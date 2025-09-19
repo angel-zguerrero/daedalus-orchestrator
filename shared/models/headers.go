@@ -2,10 +2,21 @@ package models
 
 import "time"
 
+type RoutingHeaderType string
+
+const (
+	HeaderTypeExchange     RoutingHeaderType = "exchange"
+	HeaderTypeQueue        RoutingHeaderType = "queue"
+	HeaderTypeQueueMessage RoutingHeaderType = "queue-message"
+	HeaderTypeBinding      RoutingHeaderType = "binding"
+)
+
 type RoutingHeader struct {
 	ID string `orm:"primary-key"`
 
 	VNamespace string
+
+	HeaderType RoutingHeaderType
 
 	ExchangeID     string `orm:"unique-compound:0"`
 	QueueID        string `orm:"unique-compound:0"`

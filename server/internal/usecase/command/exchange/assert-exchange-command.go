@@ -184,6 +184,7 @@ func (cmd *AssertExchangeCommand) upsertExchangeHeaders(routingHeadersRepo *db.R
 				ExchangeID: exchangeID,
 				Key:        key,
 				Value:      value,
+				HeaderType: models.HeaderTypeExchange,
 			}
 			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
 			if err != nil {
