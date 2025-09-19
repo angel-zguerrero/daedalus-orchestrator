@@ -646,7 +646,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				findQueuesByIDsCommand := &queue.FindQueueByIDsCommand{
 					IDs:            matchingQueueIDs,
 					VNamespace:     binding.VNamespace,
-					IncludeHeaders: false, // Not necessary to include headers for routing
+					IncludeHeaders: true,
 					CF:             cf,
 					CFS:            cfs,
 				}
@@ -680,7 +680,30 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				if queueParsedResult.Result != nil {
 					foundQueues, ok := queueParsedResult.Result.([]models.Queue)
 					if ok {
-						resultQueues = append(resultQueues, foundQueues...)
+						// Si XMatch=All, filtrar los queues para que todos los headers del mensaje hagan match exacto con los headers del queue
+						if binding.XMatch == models.XMatchTypeAll {
+							filteredQueues := make([]models.Queue, 0, len(foundQueues))
+							for _, q := range foundQueues {
+								queueHeaders := q.Headers // map[string]string
+								allMatch := true
+								for qhKey, qhValue := range queueHeaders {
+									messageValue, exists := messageHeaders[qhKey]
+									if !exists || messageValue != qhValue {
+										allMatch = false
+										break
+									}
+								}
+								if allMatch {
+									filteredQueues = append(filteredQueues, q)
+								}
+							}
+							resultQueues = append(resultQueues, filteredQueues...)
+						} else {
+							// Si XMatch=Any o cualquier otro, incluir todos los queues encontrados
+							resultQueues = append(resultQueues, foundQueues...)
+						}
+					} else {
+						return resultQueues, fmt.Errorf("unexpected result type for queues query")
 					}
 				}
 			}
