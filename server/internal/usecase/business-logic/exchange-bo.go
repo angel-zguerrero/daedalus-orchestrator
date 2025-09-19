@@ -613,8 +613,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 							}
 						}
 					}
-					// Queue matches if it has all message headers with correct values
-					if matchCount == messageHeadersCount {
+					if matchCount > 0 {
 						matchingQueueIDs = append(matchingQueueIDs, queueID)
 					}
 				}
@@ -791,7 +790,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 					}
 				}
 				// Exchange matches if it has all message headers with correct values
-				if matchCount == messageHeadersCount {
+				if matchCount > 0 {
 					matchingExchangeIDs = append(matchingExchangeIDs, exchangeID)
 				}
 			}
