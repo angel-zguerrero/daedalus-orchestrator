@@ -542,8 +542,8 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 		// TODO: Implement logic for headers exchange type when TargetExchangeType is Queue
 		if binding.Exchange != nil && binding.Exchange.Type == models.Headers {
 			messageHeaders := message.Headers
-			var listHeaders []models.RoutingHeader
-			for key, _ := range messageHeaders {
+			var listQueueHeaders []models.RoutingHeader
+			for key := range messageHeaders {
 				// Use ListHeadersCommand to get routing headers for this key
 				listHeadersCommand := &header_command.ListHeadersCommand{
 					Key:               key,
@@ -581,9 +581,75 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 
 				if parsedResult.Result != nil {
 					allQueueHeaders := parsedResult.Result.([]models.RoutingHeader)
-					listHeaders = append(listHeaders, allQueueHeaders...)
+					listQueueHeaders = append(listQueueHeaders, allQueueHeaders...)
 				}
 			}
+
+			// Cross information with binding.XMatch to get queue IDs
+			var matchingQueueIDs []string
+
+			switch binding.XMatch {
+			case models.XMatchTypeAll:
+				// All message headers must match - find queues that have ALL message headers with matching values
+				messageHeadersCount := len(messageHeaders)
+				if messageHeadersCount == 0 {
+					// No headers to match, return empty
+					return resultQueues, nil
+				}
+
+				// Group headers by QueueID
+				queueHeadersMap := make(map[string]map[string]string)
+				for _, header := range listQueueHeaders {
+					if header.QueueID != "" {
+						if queueHeadersMap[header.QueueID] == nil {
+							queueHeadersMap[header.QueueID] = make(map[string]string)
+						}
+						queueHeadersMap[header.QueueID][header.Key] = header.Value
+					}
+				}
+
+				// Check each queue to see if it has all message headers with matching values
+				for queueID, queueHeaders := range queueHeadersMap {
+					matchCount := 0
+					for messageKey, messageValue := range messageHeaders {
+						if queueValue, queueHasKey := queueHeaders[messageKey]; queueHasKey {
+							if queueValue == messageValue {
+								matchCount++
+							}
+						}
+					}
+					// Queue matches if it has all message headers with correct values
+					if matchCount == messageHeadersCount {
+						matchingQueueIDs = append(matchingQueueIDs, queueID)
+					}
+				}
+
+			case models.XMatchTypeAny:
+				// At least one message header must match - find queues that have ANY message header with matching value
+				queueMatches := make(map[string]bool)
+				for _, queueHeader := range listQueueHeaders {
+					if queueHeader.QueueID != "" {
+						// Check if this queue header matches any message header
+						if messageValue, exists := messageHeaders[queueHeader.Key]; exists {
+							if queueHeader.Value == messageValue {
+								queueMatches[queueHeader.QueueID] = true
+							}
+						}
+					}
+				}
+				// Collect all matching queue IDs
+				for queueID := range queueMatches {
+					matchingQueueIDs = append(matchingQueueIDs, queueID)
+				}
+
+			default:
+				// Unknown XMatch type, return empty
+				return resultQueues, nil
+			}
+
+			// Store the matching queue IDs (we'll use these in the next step)
+			_ = matchingQueueIDs // TODO: Use these IDs to get actual Queue objects
+
 			return resultQueues, nil
 		}
 
