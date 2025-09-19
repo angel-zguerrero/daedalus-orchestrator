@@ -819,14 +819,15 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 			return nil, fmt.Errorf("unknown XMatch type: %s", binding.XMatch)
 		}
 
-		// For each matching exchange, call GetQueuesFromExchange
+		// Get all exchanges by ID first to apply additional filtering for XMatch=All
+		var foundExchanges []models.Exchange
 		for _, exchangeID := range matchingExchangeIDs {
 			// Skip if we've already visited this exchange to prevent infinite recursion
 			if visitedExchanges[exchangeID] {
 				continue
 			}
 
-			// Get the exchange by ID to get its Code
+			// Get the exchange by ID to get its Code and Headers
 			findExchangeByIDCommand := &exchange_command.FindExchangeByIDCommand{
 				ID:         exchangeID,
 				VNamespace: binding.VNamespace,
@@ -863,17 +864,44 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 			if exchangeParsedResult.Result != nil {
 				foundExchange, ok := exchangeParsedResult.Result.(models.Exchange)
 				if ok {
-					// Mark this exchange as visited
-					visitedExchanges[exchangeID] = true
-
-					// Call GetQueuesFromExchange for this exchange
-					queues, err := bo.GetQueuesFromExchange(ctx, foundExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
-					if err != nil {
-						return resultQueues, fmt.Errorf("failed to get queues from matched exchange %s: %w", foundExchange.Code, err)
-					}
-					resultQueues = append(resultQueues, queues...)
+					foundExchanges = append(foundExchanges, foundExchange)
 				}
 			}
+		}
+
+		// Apply additional filtering for XMatch=All - verify all message headers match exactly with exchange headers
+		var filteredExchanges []models.Exchange
+		if binding.XMatch == models.XMatchTypeAll {
+			for _, exchange := range foundExchanges {
+				exchangeHeaders := exchange.Headers // map[string]string
+				allMatch := true
+				for ehKey, ehValue := range exchangeHeaders {
+					messageValue, exists := messageHeaders[ehKey]
+					if !exists || messageValue != ehValue {
+						allMatch = false
+						break
+					}
+				}
+				if allMatch {
+					filteredExchanges = append(filteredExchanges, exchange)
+				}
+			}
+		} else {
+			// Si XMatch=Any o cualquier otro, incluir todos los exchanges encontrados
+			filteredExchanges = foundExchanges
+		}
+
+		// For each filtered exchange, call GetQueuesFromExchange
+		for _, exchange := range filteredExchanges {
+			// Mark this exchange as visited
+			visitedExchanges[exchange.ID] = true
+
+			// Call GetQueuesFromExchange for this exchange
+			queues, err := bo.GetQueuesFromExchange(ctx, exchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+			if err != nil {
+				return resultQueues, fmt.Errorf("failed to get queues from matched exchange %s: %w", exchange.Code, err)
+			}
+			resultQueues = append(resultQueues, queues...)
 		}
 	}
 
