@@ -535,8 +535,6 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 					resultQueues = append(resultQueues, foundQueue)
 				}
 			}
-
-			return resultQueues, nil
 		}
 
 		// TODO: Implement logic for headers exchange type when TargetExchangeType is Queue
@@ -647,21 +645,52 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				return resultQueues, nil
 			}
 
-			// Store the matching queue IDs (we'll use these in the next step)
-			_ = matchingQueueIDs // TODO: Use these IDs to get actual Queue objects
+			// Use FindQueueByIDsCommand to get actual Queue objects from the matching IDs
+			if len(matchingQueueIDs) > 0 {
+				findQueuesByIDsCommand := &queue.FindQueueByIDsCommand{
+					IDs:            matchingQueueIDs,
+					VNamespace:     binding.VNamespace,
+					IncludeHeaders: false, // Not necessary to include headers for routing
+					CF:             cf,
+					CFS:            cfs,
+				}
 
-			return resultQueues, nil
+				queueQueryCommand := &general_command.Query_Command{
+					Command: &general_command.Repository_Command{
+						CMD: findQueuesByIDsCommand,
+					},
+					Now: time.Now().UnixNano(),
+				}
+
+				queueReadCtx, queueCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+				queueResult, err := bo.Config.TenantNodesDictionary[cfs].Read(queueReadCtx, *queueQueryCommand)
+				queueCancel()
+
+				if err != nil {
+					return resultQueues, fmt.Errorf("failed to find queues by IDs: %w", err)
+				}
+
+				queueBuf := bytes.NewBuffer(queueResult.([]byte))
+				queueDec := gob.NewDecoder(queueBuf)
+				queueParsedResult := &commands.CommandResult{}
+				if err := queueDec.Decode(queueParsedResult); err != nil {
+					return resultQueues, fmt.Errorf("failed to decode queues result: %w", err)
+				}
+
+				if queueParsedResult.Error != "" {
+					return resultQueues, fmt.Errorf("queues query failed: %s", queueParsedResult.Error)
+				}
+
+				if queueParsedResult.Result != nil {
+					foundQueues, ok := queueParsedResult.Result.([]models.Queue)
+					if ok {
+						resultQueues = append(resultQueues, foundQueues...)
+					}
+				}
+			}
+
 		}
-
-		return resultQueues, nil
 	}
-
-	queues, err := bo.findQueuesByPattern(ctx, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs, visitedExchanges)
-	if err != nil {
-		return resultQueues, fmt.Errorf("failed to find queues by pattern: %w", err)
-	}
-
-	resultQueues = append(resultQueues, queues...)
 
 	if len(resultQueues) == 0 {
 		if binding.AlternateExchange != nil {
