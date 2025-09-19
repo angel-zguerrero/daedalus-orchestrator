@@ -7,6 +7,7 @@ import (
 	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	header_command "deadalus-orch/server/internal/usecase/command/header"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
@@ -97,6 +98,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	findExchangeByIDCommand, ok := cmd.(exchange_command.FindExchangeByIDCommand)
 	if ok {
 		return findExchangeByIDCommand.Execute(uow, now)
+	}
+
+	listHeadersCommand, ok := cmd.(header_command.ListHeadersCommand)
+	if ok {
+		return listHeadersCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

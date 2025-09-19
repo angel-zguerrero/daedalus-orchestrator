@@ -23,6 +23,8 @@ type QueueMessage struct {
 
 	Handler string
 
+	VNamespace string
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

@@ -126,7 +126,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 		// Update headers if provided
 		if queue.Headers != nil && len(queue.Headers) > 0 {
-			err = cmd.upsertQueueHeaders(routingHeadersRepo, queue.ID, queue.Headers, now)
+			err = cmd.upsertQueueHeaders(routingHeadersRepo, queue, queue.Headers, now)
 			if err != nil {
 				commandResult.Error = err.Error()
 				return *commandResult
@@ -150,9 +150,9 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 }
 
 // upsertQueueHeaders creates or updates routing headers for a queue
-func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.RoutingHeadersRepository, queueID string, headers map[string]string, now time.Time) error {
+func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.RoutingHeadersRepository, queue models.Queue, headers map[string]string, now time.Time) error {
 	// Get existing headers for this queue
-	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByQueue(queueID, now)
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByQueue(queue.ID, now)
 	if err != nil {
 		return err
 	}
@@ -172,6 +172,7 @@ func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.Routing
 			// Update existing header if value changed
 			if existingHeader.Value != value {
 				existingHeader.Value = value
+				existingHeader.HeaderType = models.HeaderTypeQueue
 				_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
 				if err != nil {
 					return err
@@ -179,11 +180,12 @@ func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.Routing
 			}
 		} else {
 
-			headerID := queueID + "_" + key
+			headerID := queue.ID + "_" + key
 			// Create new header
 			routingHeader := &models.RoutingHeader{
 				ID:         headerID,
-				QueueID:    queueID,
+				QueueID:    queue.ID,
+				VNamespace: queue.VNamespace,
 				Key:        key,
 				Value:      value,
 				HeaderType: models.HeaderTypeQueue,

@@ -245,8 +245,6 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")
 	}
 
-	fmt.Println("Publishing message with ID:", message.MessageID, "to exchange:", exchangeCode, "with routingKeyOrPatternOrQueueCode:", routingKeyOrPatternOrQueueCode, "and vnamespace:", vnamespace)
-
 	queues, err := bo.GetQueuesFromExchange(ctx, exchangeCode, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Msg("Failed to get queues from exchange")
@@ -275,6 +273,7 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 			Priority:    message.Priority,
 			Handler:     message.Handler,
 			Parameters:  message.Parameters,
+			VNamespace:  vnamespace,
 		}
 		queueMessages[i] = message
 	}
@@ -310,7 +309,7 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	}
 
 	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Msg("Enqueue command failed")
+		bo.Config.Logger.Error().Err(errors.New(parsedResult.Error)).Msg("Enqueue command failed")
 		return nil, fmt.Errorf("enqueue command failed: %s", parsedResult.Error)
 	}
 
@@ -418,7 +417,6 @@ func (bo *ExchangeBO) processBinding(ctx context.Context, binding models.Binding
 	if visitedExchanges[binding.ExchangeID] {
 		return resultQueues, nil
 	}
-	visitedExchanges[binding.ExchangeID] = true
 
 	switch binding.BindingType {
 	case models.BindingTypeClassic:
@@ -545,7 +543,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				// Use ListHeadersCommand to get routing headers for this key
 				listHeadersCommand := &header_command.ListHeadersCommand{
 					Key:               key,
-					RoutingHeaderType: models.HeaderTypeQueueMessage,
+					RoutingHeaderType: models.HeaderTypeQueue,
 					VNamespace:        binding.VNamespace,
 					CF:                cf,
 					CFS:               cfs,
@@ -591,8 +589,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				// All message headers must match - find queues that have ALL message headers with matching values
 				messageHeadersCount := len(messageHeaders)
 				if messageHeadersCount == 0 {
-					// No headers to match, return empty
-					return resultQueues, nil
+					break
 				}
 
 				// Group headers by QueueID
@@ -746,8 +743,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 			// All message headers must match - find exchanges that have ALL message headers with matching values
 			messageHeadersCount := len(messageHeaders)
 			if messageHeadersCount == 0 {
-				// No headers to match, return empty
-				return resultQueues, nil
+				break
 			}
 
 			// Group headers by ExchangeID

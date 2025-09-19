@@ -1255,7 +1255,11 @@ export class BindingsComponent implements OnInit {
   }
 
   shouldShowHeadersInDetails(): boolean {
-    return this.getSelectedBindingExchangeType() === 'headers';
+    const isHeadersExchange = this.getSelectedBindingExchangeType() === 'headers';
+    const bindingType = this.selectedBinding?.BindingType || this.selectedBinding?.bindingType;
+    const isDynamic = bindingType === 'dynamic';
+    
+    return isHeadersExchange && !isDynamic;
   }
 
   getSelectedBindingHeaders(): { key: string; value: string }[] {

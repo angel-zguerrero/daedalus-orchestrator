@@ -496,7 +496,7 @@ func (cmd *AssertBindingCommand) upsertRoutingHeaders(routingHeadersRepo *db.Rou
 		if existingHeader, exists := existingByKey[key]; exists {
 			// Update existing header
 			existingHeader.Value = value
-			existingHeader.UpdatedAt = now
+			existingHeader.HeaderType = models.HeaderTypeBinding
 
 			_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
 			if err != nil {

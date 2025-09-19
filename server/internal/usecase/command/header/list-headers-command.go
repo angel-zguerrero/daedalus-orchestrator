@@ -13,6 +13,8 @@ import (
 func init() {
 	gob.Register(ListHeadersCommand{})
 	gob.Register(db.FindResult[models.RoutingHeader]{})
+	gob.Register(models.RoutingHeader{})
+	gob.Register([]models.RoutingHeader{})
 }
 
 type ListHeadersCommand struct {
@@ -45,19 +47,19 @@ func (cmd *ListHeadersCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		switch cmd.RoutingHeaderType {
 		case models.HeaderTypeQueueMessage:
 			// For queue messages, construct query and use generic Find method
-			query := "HeaderType = " + string(models.HeaderTypeQueueMessage) + " & Key = " + cmd.Key
+			query := "HeaderType = " + string(models.HeaderTypeQueueMessage) + " & Key = " + cmd.Key + " & VNamespace = " + cmd.VNamespace
 			findResult, err = routingHeadersRepo.Find(query, config.GlobalConfiguration.MaxHeaders, cursor, now)
 		case models.HeaderTypeQueue:
 			// For queue headers, construct query and use generic Find method
-			query := "HeaderType = " + string(models.HeaderTypeQueue) + " & Key = " + cmd.Key
+			query := "HeaderType = " + string(models.HeaderTypeQueue) + " & Key = " + cmd.Key + " & VNamespace = " + cmd.VNamespace
 			findResult, err = routingHeadersRepo.Find(query, config.GlobalConfiguration.MaxHeaders, cursor, now)
 		case models.HeaderTypeExchange:
 			// For exchange headers, construct query and use generic Find method
-			query := "HeaderType = " + string(models.HeaderTypeExchange) + " & Key = " + cmd.Key
+			query := "HeaderType = " + string(models.HeaderTypeExchange) + " & Key = " + cmd.Key + " & VNamespace = " + cmd.VNamespace
 			findResult, err = routingHeadersRepo.Find(query, config.GlobalConfiguration.MaxHeaders, cursor, now)
 		case models.HeaderTypeBinding:
 			// For binding headers, construct query and use generic Find method
-			query := "HeaderType = " + string(models.HeaderTypeBinding) + " & Key = " + cmd.Key
+			query := "HeaderType = " + string(models.HeaderTypeBinding) + " & Key = " + cmd.Key + " & VNamespace = " + cmd.VNamespace
 			findResult, err = routingHeadersRepo.Find(query, config.GlobalConfiguration.MaxHeaders, cursor, now)
 		default:
 			commandResult.Error = fmt.Sprintf("unsupported routing header type: %s", cmd.RoutingHeaderType)

@@ -54,8 +54,8 @@ func (r *RoutingHeadersRepository) GetRoutingHeadersByExchange(exchangeID string
 	return r.Find(query, config.GlobalConfiguration.MaxHeaders, "", now)
 }
 
-func (r *RoutingHeadersRepository) GetRoutingHeadersByMessage(messageID string, now time.Time) (*FindResult[models.RoutingHeader], error) {
-	query := "MessageID = " + messageID
+func (r *RoutingHeadersRepository) GetRoutingHeadersByMessage(QueueMessageID string, now time.Time) (*FindResult[models.RoutingHeader], error) {
+	query := "QueueMessageID = " + QueueMessageID
 	return r.Find(query, config.GlobalConfiguration.MaxHeaders, "", now)
 }
 

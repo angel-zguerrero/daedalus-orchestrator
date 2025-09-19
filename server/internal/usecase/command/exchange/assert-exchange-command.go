@@ -125,7 +125,7 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 		// Update headers if provided
 		if exchange.Headers != nil && len(exchange.Headers) > 0 {
-			err = cmd.upsertExchangeHeaders(routingHeadersRepo, exchange.ID, exchange.Headers, now)
+			err = cmd.upsertExchangeHeaders(routingHeadersRepo, exchange, exchange.Headers, now)
 			if err != nil {
 				commandResult.Error = err.Error()
 				return *commandResult
@@ -149,9 +149,9 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 }
 
 // upsertExchangeHeaders creates or updates routing headers for an exchange
-func (cmd *AssertExchangeCommand) upsertExchangeHeaders(routingHeadersRepo *db.RoutingHeadersRepository, exchangeID string, headers map[string]string, now time.Time) error {
+func (cmd *AssertExchangeCommand) upsertExchangeHeaders(routingHeadersRepo *db.RoutingHeadersRepository, exchange models.Exchange, headers map[string]string, now time.Time) error {
 	// Get existing headers for this exchange
-	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByExchange(exchangeID, now)
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByExchange(exchange.ID, now)
 	if err != nil {
 		return err
 	}
@@ -171,19 +171,21 @@ func (cmd *AssertExchangeCommand) upsertExchangeHeaders(routingHeadersRepo *db.R
 			// Update existing header if value changed
 			if existingHeader.Value != value {
 				existingHeader.Value = value
+				existingHeader.HeaderType = models.HeaderTypeExchange
 				_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			headerID := exchangeID + "_" + key
+			headerID := exchange.ID + "_" + key
 			// Create new header
 			routingHeader := &models.RoutingHeader{
 				ID:         headerID,
-				ExchangeID: exchangeID,
+				ExchangeID: exchange.ID,
 				Key:        key,
 				Value:      value,
+				VNamespace: "",
 				HeaderType: models.HeaderTypeExchange,
 			}
 			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)

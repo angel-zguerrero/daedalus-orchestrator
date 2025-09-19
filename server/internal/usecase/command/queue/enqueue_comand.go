@@ -261,7 +261,7 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 	for _, message := range processedMessages {
 		// If this message has headers, upsert them
 		if message.Headers != nil && len(message.Headers) > 0 {
-			err = cmd.upsertQueueMessageHeaders(routingHeadersRepo, message.ID, message.Headers, now)
+			err = cmd.upsertQueueMessageHeaders(routingHeadersRepo, message, message.Headers, now)
 			if err != nil {
 				commandResult.Error = err.Error()
 				return *commandResult
@@ -291,9 +291,9 @@ func getKeysFromMap(m map[int]int) []int {
 }
 
 // upsertQueueMessageHeaders creates or updates routing headers for a queue message
-func (cmd *EnqueueCommand) upsertQueueMessageHeaders(routingHeadersRepo *db.RoutingHeadersRepository, messageID string, headers map[string]string, now time.Time) error {
+func (cmd *EnqueueCommand) upsertQueueMessageHeaders(routingHeadersRepo *db.RoutingHeadersRepository, message models.QueueMessage, headers map[string]string, now time.Time) error {
 	// Get existing headers for this message
-	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByMessage(messageID, now)
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByMessage(message.ID, now)
 	if err != nil {
 		return err
 	}
@@ -319,14 +319,15 @@ func (cmd *EnqueueCommand) upsertQueueMessageHeaders(routingHeadersRepo *db.Rout
 				}
 			}
 		} else {
-			headerID := messageID + "_" + key
+			headerID := message.ID + "_" + key
 			// Create new header
 			routingHeader := &models.RoutingHeader{
 				ID:             headerID,
-				QueueMessageID: messageID,
+				QueueMessageID: message.ID,
 				Key:            key,
 				Value:          value,
 				HeaderType:     models.HeaderTypeQueueMessage,
+				VNamespace:     message.VNamespace,
 			}
 			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
 			if err != nil {
