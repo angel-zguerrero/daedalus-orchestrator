@@ -40,7 +40,7 @@ func (cmd *FindQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.
 	}
 
 	if queue == nil {
-		commandResult.Error = "queue not found"
+
 		return *commandResult
 	}
 
