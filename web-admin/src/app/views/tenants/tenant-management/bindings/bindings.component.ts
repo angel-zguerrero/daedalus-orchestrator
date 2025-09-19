@@ -1118,6 +1118,22 @@ export class BindingsComponent implements OnInit {
     return xMatchColors[xMatch || 'all'] || 'secondary';
   }
 
+  getTargetTypeColor(targetType?: string): string {
+    const targetTypeColors: { [key: string]: string } = {
+      'queue': 'primary',
+      'exchange': 'success'
+    };
+    return targetTypeColors[targetType || 'queue'] || 'secondary';
+  }
+
+  getTargetTypeDisplayName(targetType?: string): string {
+    const targetTypeNames: { [key: string]: string } = {
+      'queue': 'Queue',
+      'exchange': 'Exchange'
+    };
+    return targetTypeNames[targetType || 'queue'] || 'Unknown';
+  }
+
   // Public method for template
   onVNamespaceFilterChange(event?: any): void {
     this.applyFilters();

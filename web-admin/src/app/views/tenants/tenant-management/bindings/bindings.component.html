@@ -61,6 +61,7 @@
             <th>Exchange</th>
             <th>Queue</th>
             <th>Target Exchange</th>
+            <th>Target Type</th>
             <th>VNamespace</th>
             <th>Routing Key</th>
             <th>Pattern</th>
@@ -130,6 +131,11 @@
                 <ng-template #noTargetExchange>-</ng-template>
               </ng-template>
             </td>
+            <td>
+              <c-badge [color]="getTargetTypeColor(binding.TargetExchangeType || binding.targetExchangeType)" shape="rounded-pill">
+                {{ getTargetTypeDisplayName(binding.TargetExchangeType || binding.targetExchangeType) }}
+              </c-badge>
+            </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ getVNamespace(binding) || '-' }}">
               {{ getVNamespace(binding) || '-' }}
             </td>
@@ -186,7 +192,7 @@
             </td>
           </tr>
           <tr *ngIf="bindings.length === 0">
-            <td colspan="10" class="text-center py-4">
+            <td colspan="11" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No bindings found</h6>
@@ -667,6 +673,24 @@
             </div>
             <div class="form-text">Type of binding (classic or dynamic)</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Target Type Section -->
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Type</label>
+            <div class="p-2 rounded">
+              <c-badge [color]="getTargetTypeColor(selectedBinding.TargetExchangeType || selectedBinding.targetExchangeType)" shape="rounded-pill">
+                {{ getTargetTypeDisplayName(selectedBinding.TargetExchangeType || selectedBinding.targetExchangeType) }}
+              </c-badge>
+            </div>
+            <div class="form-text">Destination type for message routing (queue or exchange)</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <!-- Empty column for spacing -->
         </div>
       </div>
 
