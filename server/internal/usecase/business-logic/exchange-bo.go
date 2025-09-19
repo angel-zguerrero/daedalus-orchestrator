@@ -641,8 +641,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				}
 
 			default:
-				// Unknown XMatch type, return empty
-				return resultQueues, nil
+				return nil, fmt.Errorf("unknown XMatch type: %s", binding.XMatch)
 			}
 
 			// Use FindQueueByIDsCommand to get actual Queue objects from the matching IDs
@@ -689,6 +688,173 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				}
 			}
 
+		}
+	}
+
+	if binding.TargetExchangeType == models.TargetExchangeTypeExchange {
+		// Use headers to find matching exchanges and call GetQueuesFromExchange for each
+		messageHeaders := message.Headers
+		var listExchangeHeaders []models.RoutingHeader
+
+		for key := range messageHeaders {
+			// Use ListHeadersCommand to get routing headers for exchanges with this key
+			listHeadersCommand := &header_command.ListHeadersCommand{
+				Key:               key,
+				RoutingHeaderType: models.HeaderTypeExchange, // Looking for exchange headers
+				VNamespace:        binding.VNamespace,
+				CF:                cf,
+				CFS:               cfs,
+			}
+
+			queryCommand := &general_command.Query_Command{
+				Command: &general_command.Repository_Command{
+					CMD: listHeadersCommand,
+				},
+				Now: time.Now().UnixNano(),
+			}
+
+			readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+			result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+			cancel()
+
+			if err != nil {
+				return resultQueues, fmt.Errorf("failed to get exchange routing headers for key %s: %w", key, err)
+			}
+
+			buf := bytes.NewBuffer(result.([]byte))
+			dec := gob.NewDecoder(buf)
+			parsedResult := &commands.CommandResult{}
+			if err := dec.Decode(parsedResult); err != nil {
+				return resultQueues, fmt.Errorf("failed to decode exchange routing headers result for key %s: %w", key, err)
+			}
+
+			if parsedResult.Error != "" {
+				return resultQueues, fmt.Errorf("exchange routing headers query failed for key %s: %s", key, parsedResult.Error)
+			}
+
+			if parsedResult.Result != nil {
+				allExchangeHeaders := parsedResult.Result.([]models.RoutingHeader)
+				listExchangeHeaders = append(listExchangeHeaders, allExchangeHeaders...)
+			}
+		}
+
+		// Cross information with binding.XMatch to get exchange IDs
+		var matchingExchangeIDs []string
+
+		switch binding.XMatch {
+		case models.XMatchTypeAll:
+			// All message headers must match - find exchanges that have ALL message headers with matching values
+			messageHeadersCount := len(messageHeaders)
+			if messageHeadersCount == 0 {
+				// No headers to match, return empty
+				return resultQueues, nil
+			}
+
+			// Group headers by ExchangeID
+			exchangeHeadersMap := make(map[string]map[string]string)
+			for _, header := range listExchangeHeaders {
+				if header.ExchangeID != "" {
+					if exchangeHeadersMap[header.ExchangeID] == nil {
+						exchangeHeadersMap[header.ExchangeID] = make(map[string]string)
+					}
+					exchangeHeadersMap[header.ExchangeID][header.Key] = header.Value
+				}
+			}
+
+			// Check each exchange to see if it has all message headers with matching values
+			for exchangeID, exchangeHeaders := range exchangeHeadersMap {
+				matchCount := 0
+				for messageKey, messageValue := range messageHeaders {
+					if exchangeValue, exchangeHasKey := exchangeHeaders[messageKey]; exchangeHasKey {
+						if exchangeValue == messageValue {
+							matchCount++
+						}
+					}
+				}
+				// Exchange matches if it has all message headers with correct values
+				if matchCount == messageHeadersCount {
+					matchingExchangeIDs = append(matchingExchangeIDs, exchangeID)
+				}
+			}
+
+		case models.XMatchTypeAny:
+			// At least one message header must match - find exchanges that have ANY message header with matching value
+			exchangeMatches := make(map[string]bool)
+			for _, exchangeHeader := range listExchangeHeaders {
+				if exchangeHeader.ExchangeID != "" {
+					// Check if this exchange header matches any message header
+					if messageValue, exists := messageHeaders[exchangeHeader.Key]; exists {
+						if exchangeHeader.Value == messageValue {
+							exchangeMatches[exchangeHeader.ExchangeID] = true
+						}
+					}
+				}
+			}
+			// Collect all matching exchange IDs
+			for exchangeID := range exchangeMatches {
+				matchingExchangeIDs = append(matchingExchangeIDs, exchangeID)
+			}
+
+		default:
+			// Unknown XMatch type, return empty
+			return nil, fmt.Errorf("unknown XMatch type: %s", binding.XMatch)
+		}
+
+		// For each matching exchange, call GetQueuesFromExchange
+		for _, exchangeID := range matchingExchangeIDs {
+			// Skip if we've already visited this exchange to prevent infinite recursion
+			if visitedExchanges[exchangeID] {
+				continue
+			}
+
+			// Get the exchange by ID to get its Code
+			findExchangeByIDCommand := &exchange_command.FindExchangeByIDCommand{
+				ID:         exchangeID,
+				VNamespace: binding.VNamespace,
+				CF:         cf,
+				CFS:        cfs,
+			}
+
+			exchangeQueryCommand := &general_command.Query_Command{
+				Command: &general_command.Repository_Command{
+					CMD: findExchangeByIDCommand,
+				},
+				Now: time.Now().UnixNano(),
+			}
+
+			exchangeReadCtx, exchangeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
+			exchangeResult, err := bo.Config.TenantNodesDictionary[cfs].Read(exchangeReadCtx, *exchangeQueryCommand)
+			exchangeCancel()
+
+			if err != nil {
+				return resultQueues, fmt.Errorf("failed to find exchange by ID %s: %w", exchangeID, err)
+			}
+
+			exchangeBuf := bytes.NewBuffer(exchangeResult.([]byte))
+			exchangeDec := gob.NewDecoder(exchangeBuf)
+			exchangeParsedResult := &commands.CommandResult{}
+			if err := exchangeDec.Decode(exchangeParsedResult); err != nil {
+				return resultQueues, fmt.Errorf("failed to decode exchange result for ID %s: %w", exchangeID, err)
+			}
+
+			if exchangeParsedResult.Error != "" {
+				return resultQueues, fmt.Errorf("exchange query failed for ID %s: %s", exchangeID, exchangeParsedResult.Error)
+			}
+
+			if exchangeParsedResult.Result != nil {
+				foundExchange, ok := exchangeParsedResult.Result.(models.Exchange)
+				if ok {
+					// Mark this exchange as visited
+					visitedExchanges[exchangeID] = true
+
+					// Call GetQueuesFromExchange for this exchange
+					queues, err := bo.GetQueuesFromExchange(ctx, foundExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+					if err != nil {
+						return resultQueues, fmt.Errorf("failed to get queues from matched exchange %s: %w", foundExchange.Code, err)
+					}
+					resultQueues = append(resultQueues, queues...)
+				}
+			}
 		}
 	}
 

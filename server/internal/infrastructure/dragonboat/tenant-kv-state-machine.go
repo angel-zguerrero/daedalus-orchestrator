@@ -84,6 +84,21 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return getTenantSummaryCommand.Execute(uow, now)
 	}
 
+	findQueueByIDCommand, ok := cmd.(queue_command.FindQueueByIDCommand)
+	if ok {
+		return findQueueByIDCommand.Execute(uow, now)
+	}
+
+	findQueueByIDsCommand, ok := cmd.(queue_command.FindQueueByIDsCommand)
+	if ok {
+		return findQueueByIDsCommand.Execute(uow, now)
+	}
+
+	findExchangeByIDCommand, ok := cmd.(exchange_command.FindExchangeByIDCommand)
+	if ok {
+		return findExchangeByIDCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
