@@ -59,22 +59,22 @@
 
     <!-- Exchanges Table -->
     <div class="table-responsive">
-      <table cTable class="mt-4" [hover]="true">
+      <table cTable class="mt-4" [hover]="true" style="min-width: 800px;">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Code</th>
-            <th>Type</th>
-            <th>VNamespace</th>
-            <th>Actions</th>
+            <th style="min-width: 150px;">Name</th>
+            <th style="min-width: 120px;">Code</th>
+            <th style="min-width: 100px;">Type</th>
+            <th style="min-width: 120px;">VNamespace</th>
+            <th style="min-width: 200px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let exchange of exchanges" class="align-middle">
-            <td class="text-truncate" style="max-width: 180px;" title="{{ exchange.Name }}">
+            <td class="text-truncate" style="max-width: 150px;" title="{{ exchange.Name }}">
               <strong>{{ exchange.Name }}</strong>
             </td>
-            <td class="text-truncate" style="max-width: 150px;" title="{{ exchange.Code }}">
+            <td class="text-truncate" style="max-width: 120px;" title="{{ exchange.Code }}">
               <code>{{ exchange.Code }}</code>
             </td>
             <td>
@@ -82,9 +82,11 @@
                 {{ exchange.Type }}
               </c-badge>
             </td>
-            <td class="text-truncate" style="max-width: 120px;" title="{{ exchange.VNamespace || '-' }}">{{ exchange.VNamespace || '-' }}</td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ exchange.VNamespace || '-' }}">
+              {{ exchange.VNamespace || '-' }}
+            </td>
             <td>
-              <div class="btn-group" role="group">
+              <div class="btn-group" role="group" aria-label="Exchange actions">
                 <button 
                   cButton 
                   color="info" 

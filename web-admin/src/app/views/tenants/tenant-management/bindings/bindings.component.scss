@@ -1,12 +1,39 @@
-// Bindings component styles
-.table-responsive { border-radius: 0.5rem; overflow: hidden; }
-.table th { white-space: nowrap; }
-.table td { vertical-align: middle; &.text-truncate { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
-.btn-group .btn { border-radius: 0.25rem !important; margin-right: 0.125rem; &:last-child { margin-right: 0; } }
-.binding-type-badge { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
-.empty-state { padding: 3rem 1rem; text-align: center; }
-.search-input-group { max-width: 300px; }
-.actions-container { gap: 0.5rem; }
+/* Bindings Component Styles */
+
+.table-responsive {
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  
+  table {
+    min-width: 1200px;
+    margin-bottom: 0;
+  }
+  
+  th, td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+}
+
+.binding-type-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.empty-state {
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.search-input-group {
+  max-width: 300px;
+}
+
+.actions-container {
+  gap: 0.5rem;
+}
 
 // Material autocomplete complete fixes
 ::ng-deep {

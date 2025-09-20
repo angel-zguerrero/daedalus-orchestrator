@@ -54,25 +54,25 @@
 
     <!-- Bindings Table -->
     <div class="table-responsive">
-      <table cTable class="mt-4" [hover]="true">
+      <table cTable class="mt-4" [hover]="true" style="min-width: 1200px;">
         <thead>
           <tr>
-            <th>Code</th>
-            <th>Exchange</th>
-            <th>Queue</th>
-            <th>Target Exchange</th>
-            <th>Target Type</th>
-            <th>VNamespace</th>
-            <th>Routing Key</th>
-            <th>Pattern</th>
-            <th>X-Match</th>
-            <th>Type</th>
-            <th>Actions</th>
+            <th style="min-width: 120px;">Code</th>
+            <th style="min-width: 150px;">Exchange</th>
+            <th style="min-width: 150px;">Queue</th>
+            <th style="min-width: 150px;">Target Exchange</th>
+            <th style="min-width: 100px;">Target Type</th>
+            <th style="min-width: 120px;">VNamespace</th>
+            <th style="min-width: 120px;">Routing Key</th>
+            <th style="min-width: 100px;">Pattern</th>
+            <th style="min-width: 100px;">X-Match</th>
+            <th style="min-width: 100px;">Type</th>
+            <th style="min-width: 180px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let binding of bindings" class="align-middle">
-            <td class="text-truncate" style="max-width: 200px;" title="{{ binding.Code || binding.code || '-' }}">
+            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.Code || binding.code || '-' }}">
               <code>{{ binding.Code || binding.code || '-' }}</code>
             </td>
             <td class="text-truncate" style="max-width: 150px;">
@@ -163,7 +163,7 @@
             </td>
             
             <td>
-              <div class="btn-group" role="group">
+              <div class="btn-group" role="group" aria-label="Binding actions">
                 <button 
                   cButton 
                   color="info" 

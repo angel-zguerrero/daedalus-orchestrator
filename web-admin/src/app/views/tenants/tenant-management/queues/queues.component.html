@@ -58,26 +58,26 @@
 
     <!-- Queues Table -->
     <div class="table-responsive">
-      <table cTable class="mt-4" [hover]="true">
+      <table cTable class="mt-4" [hover]="true" style="min-width: 1000px;">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Code</th>
-            <th>Type</th>
-            <th>VNamespace</th>
-            <th>TTL (seconds)</th>
-            <th>Max Attempts</th>
-            <th>Allow Duplicated</th>
-            <th>Priority Type</th>
-            <th>Actions</th>
+            <th style="min-width: 150px;">Name</th>
+            <th style="min-width: 120px;">Code</th>
+            <th style="min-width: 100px;">Type</th>
+            <th style="min-width: 120px;">VNamespace</th>
+            <th style="min-width: 100px;">TTL (seconds)</th>
+            <th style="min-width: 100px;">Max Attempts</th>
+            <th style="min-width: 120px;">Allow Duplicated</th>
+            <th style="min-width: 120px;">Priority Type</th>
+            <th style="min-width: 240px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let queue of queues" class="align-middle">
-            <td class="text-truncate" style="max-width: 180px;" title="{{ queue.Name }}">
+            <td class="text-truncate" style="max-width: 150px;" title="{{ queue.Name }}">
               <strong>{{ queue.Name }}</strong>
             </td>
-            <td class="text-truncate" style="max-width: 150px;" title="{{ queue.Code }}">
+            <td class="text-truncate" style="max-width: 120px;" title="{{ queue.Code }}">
               <code>{{ queue.Code }}</code>
             </td>
             <td>
@@ -85,7 +85,9 @@
                 {{ queue.Type }}
               </c-badge>
             </td>
-            <td class="text-truncate" style="max-width: 120px;" title="{{ queue.VNamespace || '-' }}">{{ queue.VNamespace || '-' }}</td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ queue.VNamespace || '-' }}">
+              {{ queue.VNamespace || '-' }}
+            </td>
             <td class="text-center">
               {{ queue.TTLQueue || 0 }}{{ (queue.TTLQueue && queue.TTLQueue > 0) ? 's' : '' }}
             </td>
@@ -101,7 +103,7 @@
               </c-badge>
             </td>
             <td>
-              <div class="btn-group" role="group">
+              <div class="btn-group" role="group" aria-label="Queue actions">
                 <button 
                   cButton 
                   color="info" 
