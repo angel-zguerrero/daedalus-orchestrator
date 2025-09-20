@@ -47,6 +47,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	queuePartitionRepo, err := db.NewQueuePartitionRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	fmt.Println("Attempting to delete queue with code:", cmd.Code, "in vNamespace:", cmd.VNamespace)
 	// First find the queue by code
 	queue, err := queueRepo.GetQueueByCode(cmd.Code, cmd.VNamespace, now)
@@ -144,6 +150,36 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		// Update cursor for next page
 		messageCursor = messagesResult.Cursor
 		if messageCursor == "" {
+			break
+		}
+	}
+
+	// Delete all queue partitions associated with this queue
+	partitionCursor := ""
+
+	for {
+		partitionsResult, err := queuePartitionRepo.Find("QueueID = "+queue.ID, 100, partitionCursor, now)
+		if err != nil {
+			commandResult.Error = "error retrieving queue partitions: " + err.Error()
+			return *commandResult
+		}
+
+		if partitionsResult == nil || len(partitionsResult.Entities) == 0 {
+			break
+		}
+
+		for _, partition := range partitionsResult.Entities {
+			// Delete the partition
+			_, err = queuePartitionRepo.Delete(partition.ID, now)
+			if err != nil {
+				commandResult.Error = "error deleting queue partition: " + err.Error()
+				return *commandResult
+			}
+		}
+
+		// Update cursor for next page
+		partitionCursor = partitionsResult.Cursor
+		if partitionCursor == "" {
 			break
 		}
 	}
