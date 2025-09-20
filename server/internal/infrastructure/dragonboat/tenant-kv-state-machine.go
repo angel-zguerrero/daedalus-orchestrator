@@ -172,6 +172,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return enqueueCommand.Execute(uow, now)
 	}
 
+	markQueuesAsDrainCommand, ok := cmd.(queue_command.MarkQueuesAsDrainCommand)
+	if ok {
+		return markQueuesAsDrainCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult

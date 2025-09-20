@@ -29,6 +29,7 @@ interface Queue {
   Name: string;
   Code: string;
   Type: string;
+  State: string;
   VNamespace: string;
   TTLQueue: number;
   AllowDuplicated: boolean;
@@ -667,6 +668,26 @@ export class QueuesComponent implements OnInit {
       'dead-letter': 'danger'
     };
     return typeColors[type] || 'secondary';
+  }
+
+  getQueueStateColor(state: string): string {
+    const stateColors: { [key: string]: string } = {
+      'QueueActive': 'success',
+      'QueuePaused': 'warning',
+      'QueueDraining': 'info',
+      'QueueStopped': 'danger'
+    };
+    return stateColors[state] || 'secondary';
+  }
+
+  getQueueStateLabel(state: string): string {
+    const stateLabels: { [key: string]: string } = {
+      'QueueActive': 'Active',
+      'QueuePaused': 'Paused',
+      'QueueDraining': 'Draining',
+      'QueueStopped': 'Stopped'
+    };
+    return stateLabels[state] || state;
   }
 
   // Priority management methods

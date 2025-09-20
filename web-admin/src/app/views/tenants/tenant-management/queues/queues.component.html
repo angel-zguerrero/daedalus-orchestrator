@@ -64,6 +64,7 @@
             <th style="min-width: 150px;">Name</th>
             <th style="min-width: 120px;">Code</th>
             <th style="min-width: 100px;">Type</th>
+            <th style="min-width: 100px;">State</th>
             <th style="min-width: 120px;">VNamespace</th>
             <th style="min-width: 100px;">TTL (seconds)</th>
             <th style="min-width: 100px;">Max Attempts</th>
@@ -83,6 +84,11 @@
             <td>
               <c-badge [color]="getQueueTypeColor(queue.Type)" shape="rounded-pill">
                 {{ queue.Type }}
+              </c-badge>
+            </td>
+            <td>
+              <c-badge [color]="getQueueStateColor(queue.State)" shape="rounded-pill">
+                {{ getQueueStateLabel(queue.State) }}
               </c-badge>
             </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ queue.VNamespace || '-' }}">
@@ -140,7 +146,7 @@
             </td>
           </tr>
           <tr *ngIf="queues.length === 0">
-            <td colspan="9" class="text-center py-4">
+            <td colspan="10" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No queues found</h6>
@@ -680,6 +686,15 @@
             </c-badge>
           </div>
           <div class="form-text">Queue type determines message processing behavior</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">State</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="getQueueStateColor(selectedQueue?.State || selectedQueue?.state)" shape="rounded-pill">
+              {{ getQueueStateLabel(selectedQueue?.State || selectedQueue?.state) }}
+            </c-badge>
+          </div>
+          <div class="form-text">Current queue processing state</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Virtual Namespace</label>

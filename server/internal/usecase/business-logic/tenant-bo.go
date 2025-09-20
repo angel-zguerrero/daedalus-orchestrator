@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"deadalus-orch/server/internal/pkg/config"
+	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
@@ -163,12 +164,83 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantCode string) (models.Te
 }
 
 func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantCode string) error {
+	// First get the tenant to obtain its information
+	tenant, tenantNode, _, err := bo.GetTenant(ctx, tenantCode)
+	if err != nil {
+		return fmt.Errorf("failed to get tenant: %w", err)
+	}
+
+	if tenantNode == nil {
+		return fmt.Errorf("tenant node not found for tenant %s", tenantCode)
+	}
+
+	// Get all queue IDs for this tenant to mark them as draining
+	// We'll get all queues and extract their IDs
+	cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
+	cfs := tenant.ID
+
+	// Create a temporary QueueBO instance to get queues
+	queueBO := &QueueBO{Config: bo.Config}
+
+	// Get all queues for this tenant (using pagination to handle large numbers)
+	var allQueueIDs []string
+	cursor := ""
+	pageSize := 100
+
+	for {
+		queuesResult, err := queueBO.GetQueues(ctx, "", cursor, pageSize, "", false, cf, cfs)
+		if err != nil {
+			bo.Config.Logger.Warn().Err(err).Msg("Failed to get queues for tenant deletion, continuing anyway")
+			break
+		}
+
+		if queuesResult.Entities == nil || len(queuesResult.Entities) == 0 {
+			break
+		}
+
+		// Extract queue IDs
+		for _, queue := range queuesResult.Entities {
+			allQueueIDs = append(allQueueIDs, queue.ID)
+		}
+
+		// Check if there are more pages
+		if queuesResult.Cursor == "" || len(queuesResult.Entities) < pageSize {
+			break
+		}
+		cursor = queuesResult.Cursor
+	}
+
+	// Mark all queues as draining before deleting the tenant
+	fmt.Println("Marking", len(allQueueIDs), "queues as draining for tenant", tenantCode)
+	fmt.Println("Queue IDs:", allQueueIDs)
+	if len(allQueueIDs) > 0 {
+		markQueuesAsDrainCommand := &queue_command.MarkQueuesAsDrainCommand{
+			QueueIDs: allQueueIDs,
+			CF:       cf,
+			CFS:      cfs,
+		}
+
+		_, err = dragonboat.ExecuteRepositoryCommand[[]models.Queue](
+			tenantNode,
+			ctx,
+			markQueuesAsDrainCommand,
+			config.GlobalConfiguration.ApiRaftTimeout,
+			bo.Config.Logger,
+			"mark queues as drain",
+		)
+		if err != nil {
+			bo.Config.Logger.Warn().Err(err).Msg("Failed to mark queues as draining, continuing with tenant deletion")
+			return fmt.Errorf("failed to mark queues as draining: %w", err)
+		}
+	}
+
+	// Now proceed with marking the tenant for deletion
 	markToDeletionTenantInMasterCommand := &tenant_command.MarkToDeletionTenantInMasterCommand{
 		TenantCode: tenantCode,
 	}
 
 	// Using the new generic function instead of repetitive code
-	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
+	_, err = dragonboat.ExecuteRepositoryCommand[interface{}](
 		bo.Config.MasterNode,
 		ctx,
 		markToDeletionTenantInMasterCommand,
