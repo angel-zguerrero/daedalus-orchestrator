@@ -72,7 +72,7 @@ func (QueueType) EnumDescriptor() ([]byte, []int) {
 
 type CreateQueueRequest struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
-	TenantId                  string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode                string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Code                      string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
 	Name                      string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Type                      string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
@@ -82,6 +82,7 @@ type CreateQueueRequest struct {
 	AllowDuplicated           bool                   `protobuf:"varint,8,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
 	MaxAttempts               int32                  `protobuf:"varint,9,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
 	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,10,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                   map[string]string      `protobuf:"bytes,11,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -116,9 +117,9 @@ func (*CreateQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateQueueRequest) GetTenantId() string {
+func (x *CreateQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -186,6 +187,13 @@ func (x *CreateQueueRequest) GetDesiredPriorityThresholds() map[int32]int32 {
 	return nil
 }
 
+func (x *CreateQueueRequest) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
 type CreateQueueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
@@ -240,7 +248,7 @@ func (x *CreateQueueResponse) GetResult() *Queue {
 
 type BulkCreateQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
 	Queues        []*CreateQueueItem     `protobuf:"bytes,2,rep,name=queues,proto3" json:"queues,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -276,9 +284,9 @@ func (*BulkCreateQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *BulkCreateQueueRequest) GetTenantId() string {
+func (x *BulkCreateQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -301,6 +309,7 @@ type CreateQueueItem struct {
 	AllowDuplicated           bool                   `protobuf:"varint,7,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
 	MaxAttempts               int32                  `protobuf:"varint,8,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
 	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,9,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                   map[string]string      `protobuf:"bytes,10,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -398,6 +407,13 @@ func (x *CreateQueueItem) GetDesiredPriorityThresholds() map[int32]int32 {
 	return nil
 }
 
+func (x *CreateQueueItem) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
 type BulkCreateQueueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
@@ -452,8 +468,9 @@ func (x *BulkCreateQueueResponse) GetResult() []*Queue {
 
 type GetQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	QueueId       string                 `protobuf:"bytes,2,opt,name=queueId,proto3" json:"queueId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -488,16 +505,23 @@ func (*GetQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *GetQueueRequest) GetTenantId() string {
+func (x *GetQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
 
-func (x *GetQueueRequest) GetQueueId() string {
+func (x *GetQueueRequest) GetCode() string {
 	if x != nil {
-		return x.QueueId
+		return x.Code
+	}
+	return ""
+}
+
+func (x *GetQueueRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
 	}
 	return ""
 }
@@ -555,14 +579,15 @@ func (x *GetQueueResponse) GetResult() *Queue {
 }
 
 type GetQueuesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	Q             string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
-	Cursor        string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	PageSize      int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
-	Vnamespace    string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TenantCode     string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	Q              string                 `protobuf:"bytes,2,opt,name=q,proto3" json:"q,omitempty"`
+	Cursor         string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	PageSize       int32                  `protobuf:"varint,4,opt,name=pageSize,proto3" json:"pageSize,omitempty"`
+	Vnamespace     string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	IncludeHeaders bool                   `protobuf:"varint,6,opt,name=includeHeaders,proto3" json:"includeHeaders,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetQueuesRequest) Reset() {
@@ -595,9 +620,9 @@ func (*GetQueuesRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *GetQueuesRequest) GetTenantId() string {
+func (x *GetQueuesRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
@@ -630,6 +655,13 @@ func (x *GetQueuesRequest) GetVnamespace() string {
 	return ""
 }
 
+func (x *GetQueuesRequest) GetIncludeHeaders() bool {
+	if x != nil {
+		return x.IncludeHeaders
+	}
+	return false
+}
+
 type Queue struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
 	Id                        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -645,6 +677,7 @@ type Queue struct {
 	MaxAttempts               int32                  `protobuf:"varint,11,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
 	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,12,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 	PriorityThresholds        map[int32]int32        `protobuf:"bytes,13,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                   map[string]string      `protobuf:"bytes,14,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -770,6 +803,13 @@ func (x *Queue) GetPriorityThresholds() map[int32]int32 {
 	return nil
 }
 
+func (x *Queue) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
 type QueueFindResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Entities      []*Queue               `protobuf:"bytes,1,rep,name=entities,proto3" json:"entities,omitempty"`
@@ -876,8 +916,9 @@ func (x *GetQueuesResponse) GetResult() *QueueFindResult {
 
 type DeleteQueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenantId,proto3" json:"tenantId,omitempty"`
-	QueueId       string                 `protobuf:"bytes,2,opt,name=queueId,proto3" json:"queueId,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -912,16 +953,23 @@ func (*DeleteQueueRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *DeleteQueueRequest) GetTenantId() string {
+func (x *DeleteQueueRequest) GetTenantCode() string {
 	if x != nil {
-		return x.TenantId
+		return x.TenantCode
 	}
 	return ""
 }
 
-func (x *DeleteQueueRequest) GetQueueId() string {
+func (x *DeleteQueueRequest) GetCode() string {
 	if x != nil {
-		return x.QueueId
+		return x.Code
+	}
+	return ""
+}
+
+func (x *DeleteQueueRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
 	}
 	return ""
 }
@@ -970,13 +1018,183 @@ func (x *DeleteQueueResponse) GetMessage() string {
 	return ""
 }
 
+type EnqueueMessageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	QueueCode     string                 `protobuf:"bytes,2,opt,name=queueCode,proto3" json:"queueCode,omitempty"`
+	Vnamespace    string                 `protobuf:"bytes,3,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Content       string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	ContentType   string                 `protobuf:"bytes,5,opt,name=contentType,proto3" json:"contentType,omitempty"`
+	Headers       map[string]string      `protobuf:"bytes,6,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Priority      int32                  `protobuf:"varint,7,opt,name=priority,proto3" json:"priority,omitempty"`
+	Handler       string                 `protobuf:"bytes,8,opt,name=handler,proto3" json:"handler,omitempty"`
+	Parameters    map[string]string      `protobuf:"bytes,9,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnqueueMessageRequest) Reset() {
+	*x = EnqueueMessageRequest{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnqueueMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnqueueMessageRequest) ProtoMessage() {}
+
+func (x *EnqueueMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnqueueMessageRequest.ProtoReflect.Descriptor instead.
+func (*EnqueueMessageRequest) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *EnqueueMessageRequest) GetTenantCode() string {
+	if x != nil {
+		return x.TenantCode
+	}
+	return ""
+}
+
+func (x *EnqueueMessageRequest) GetQueueCode() string {
+	if x != nil {
+		return x.QueueCode
+	}
+	return ""
+}
+
+func (x *EnqueueMessageRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
+	}
+	return ""
+}
+
+func (x *EnqueueMessageRequest) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *EnqueueMessageRequest) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *EnqueueMessageRequest) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *EnqueueMessageRequest) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+func (x *EnqueueMessageRequest) GetHandler() string {
+	if x != nil {
+		return x.Handler
+	}
+	return ""
+}
+
+func (x *EnqueueMessageRequest) GetParameters() map[string]string {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
+}
+
+type EnqueueMessageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	MessageId     string                 `protobuf:"bytes,2,opt,name=messageId,proto3" json:"messageId,omitempty"`
+	Result        map[string]string      `protobuf:"bytes,3,rep,name=result,proto3" json:"result,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnqueueMessageResponse) Reset() {
+	*x = EnqueueMessageResponse{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnqueueMessageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnqueueMessageResponse) ProtoMessage() {}
+
+func (x *EnqueueMessageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnqueueMessageResponse.ProtoReflect.Descriptor instead.
+func (*EnqueueMessageResponse) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *EnqueueMessageResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *EnqueueMessageResponse) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *EnqueueMessageResponse) GetResult() map[string]string {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 var File_internal_infrastructure_server_grpc_proto_definitions_queue_proto protoreflect.FileDescriptor
 
 const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc = "" +
 	"\n" +
-	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xd0\x03\n" +
-	"\x12CreateQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xd2\x04\n" +
+	"\x12CreateQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x04 \x01(\tR\x04type\x12\x14\n" +
@@ -988,16 +1206,22 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x0fallowDuplicated\x18\b \x01(\bR\x0fallowDuplicated\x12 \n" +
 	"\vmaxAttempts\x18\t \x01(\x05R\vmaxAttempts\x12v\n" +
 	"\x19desiredPriorityThresholds\x18\n" +
-	" \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x1aL\n" +
+	" \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12@\n" +
+	"\aheaders\x18\v \x03(\v2&.queue.CreateQueueRequest.HeadersEntryR\aheaders\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"U\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"U\n" +
 	"\x13CreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"d\n" +
-	"\x16BulkCreateQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xae\x03\n" +
+	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"h\n" +
+	"\x16BulkCreateQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12.\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xa9\x04\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1009,27 +1233,40 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\bttlQueue\x18\x06 \x01(\x05R\bttlQueue\x12(\n" +
 	"\x0fallowDuplicated\x18\a \x01(\bR\x0fallowDuplicated\x12 \n" +
 	"\vmaxAttempts\x18\b \x01(\x05R\vmaxAttempts\x12s\n" +
-	"\x19desiredPriorityThresholds\x18\t \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x1aL\n" +
+	"\x19desiredPriorityThresholds\x18\t \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12=\n" +
+	"\aheaders\x18\n" +
+	" \x03(\v2#.queue.CreateQueueItem.HeadersEntryR\aheaders\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"Y\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Y\n" +
 	"\x17BulkCreateQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"G\n" +
-	"\x0fGetQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x18\n" +
-	"\aqueueId\x18\x02 \x01(\tR\aqueueId\"R\n" +
+	"\x06result\x18\x02 \x03(\v2\f.queue.QueueR\x06result\"e\n" +
+	"\x0fGetQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x03 \x01(\tR\n" +
+	"vnamespace\"R\n" +
 	"\x10GetQueueResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12$\n" +
-	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"\x90\x01\n" +
-	"\x10GetQueuesRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\f\n" +
+	"\x06result\x18\x02 \x01(\v2\f.queue.QueueR\x06result\"\xbc\x01\n" +
+	"\x10GetQueuesRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\f\n" +
 	"\x01q\x18\x02 \x01(\tR\x01q\x12\x16\n" +
 	"\x06cursor\x18\x03 \x01(\tR\x06cursor\x12\x1a\n" +
 	"\bpageSize\x18\x04 \x01(\x05R\bpageSize\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\"\x83\x05\n" +
+	"vnamespace\x12&\n" +
+	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\xf4\x05\n" +
 	"\x05Queue\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -1046,34 +1283,73 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	" \x01(\bR\x0fallowDuplicated\x12 \n" +
 	"\vmaxAttempts\x18\v \x01(\x05R\vmaxAttempts\x12i\n" +
 	"\x19desiredPriorityThresholds\x18\f \x03(\v2+.queue.Queue.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12T\n" +
-	"\x12priorityThresholds\x18\r \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x1aL\n" +
+	"\x12priorityThresholds\x18\r \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x123\n" +
+	"\aheaders\x18\x0e \x03(\v2\x19.queue.Queue.HeadersEntryR\aheaders\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aE\n" +
 	"\x17PriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"S\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"S\n" +
 	"\x0fQueueFindResult\x12(\n" +
 	"\bentities\x18\x01 \x03(\v2\f.queue.QueueR\bentities\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\"]\n" +
 	"\x11GetQueuesResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12.\n" +
-	"\x06result\x18\x02 \x01(\v2\x16.queue.QueueFindResultR\x06result\"J\n" +
-	"\x12DeleteQueueRequest\x12\x1a\n" +
-	"\btenantId\x18\x01 \x01(\tR\btenantId\x12\x18\n" +
-	"\aqueueId\x18\x02 \x01(\tR\aqueueId\"/\n" +
+	"\x06result\x18\x02 \x01(\v2\x16.queue.QueueFindResultR\x06result\"h\n" +
+	"\x12DeleteQueueRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x03 \x01(\tR\n" +
+	"vnamespace\"/\n" +
 	"\x13DeleteQueueResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage*7\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\xf5\x03\n" +
+	"\x15EnqueueMessageRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x12\x1c\n" +
+	"\tqueueCode\x18\x02 \x01(\tR\tqueueCode\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x03 \x01(\tR\n" +
+	"vnamespace\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x12 \n" +
+	"\vcontentType\x18\x05 \x01(\tR\vcontentType\x12C\n" +
+	"\aheaders\x18\x06 \x03(\v2).queue.EnqueueMessageRequest.HeadersEntryR\aheaders\x12\x1a\n" +
+	"\bpriority\x18\a \x01(\x05R\bpriority\x12\x18\n" +
+	"\ahandler\x18\b \x01(\tR\ahandler\x12L\n" +
+	"\n" +
+	"parameters\x18\t \x03(\v2,.queue.EnqueueMessageRequest.ParametersEntryR\n" +
+	"parameters\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a=\n" +
+	"\x0fParametersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xce\x01\n" +
+	"\x16EnqueueMessageResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1c\n" +
+	"\tmessageId\x18\x02 \x01(\tR\tmessageId\x12A\n" +
+	"\x06result\x18\x03 \x03(\v2).queue.EnqueueMessageResponse.ResultEntryR\x06result\x1a9\n" +
+	"\vResultEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*7\n" +
 	"\tQueueType\x12\f\n" +
 	"\bSTANDARD\x10\x00\x12\v\n" +
 	"\aDELAYED\x10\x01\x12\x0f\n" +
-	"\vDEAD_LETTER\x10\x022\xe9\x02\n" +
+	"\vDEAD_LETTER\x10\x022\xb8\x03\n" +
 	"\fQueueService\x12D\n" +
 	"\vCreateQueue\x12\x19.queue.CreateQueueRequest\x1a\x1a.queue.CreateQueueResponse\x12P\n" +
 	"\x0fBulkCreateQueue\x12\x1d.queue.BulkCreateQueueRequest\x1a\x1e.queue.BulkCreateQueueResponse\x12;\n" +
 	"\bGetQueue\x12\x16.queue.GetQueueRequest\x1a\x17.queue.GetQueueResponse\x12>\n" +
 	"\tGetQueues\x12\x17.queue.GetQueuesRequest\x1a\x18.queue.GetQueuesResponse\x12D\n" +
-	"\vDeleteQueue\x12\x19.queue.DeleteQueueRequest\x1a\x1a.queue.DeleteQueueResponseB\x10Z\x0epb/queue;queueb\x06proto3"
+	"\vDeleteQueue\x12\x19.queue.DeleteQueueRequest\x1a\x1a.queue.DeleteQueueResponse\x12M\n" +
+	"\x0eEnqueueMessage\x12\x1c.queue.EnqueueMessageRequest\x1a\x1d.queue.EnqueueMessageResponseB\x10Z\x0epb/queue;queueb\x06proto3"
 
 var (
 	file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDescOnce sync.Once
@@ -1088,7 +1364,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawD
 }
 
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_goTypes = []any{
 	(QueueType)(0),                  // 0: queue.QueueType
 	(*CreateQueueRequest)(nil),      // 1: queue.CreateQueueRequest
@@ -1104,37 +1380,53 @@ var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_goTyp
 	(*GetQueuesResponse)(nil),       // 11: queue.GetQueuesResponse
 	(*DeleteQueueRequest)(nil),      // 12: queue.DeleteQueueRequest
 	(*DeleteQueueResponse)(nil),     // 13: queue.DeleteQueueResponse
-	nil,                             // 14: queue.CreateQueueRequest.DesiredPriorityThresholdsEntry
-	nil,                             // 15: queue.CreateQueueItem.DesiredPriorityThresholdsEntry
-	nil,                             // 16: queue.Queue.DesiredPriorityThresholdsEntry
-	nil,                             // 17: queue.Queue.PriorityThresholdsEntry
+	(*EnqueueMessageRequest)(nil),   // 14: queue.EnqueueMessageRequest
+	(*EnqueueMessageResponse)(nil),  // 15: queue.EnqueueMessageResponse
+	nil,                             // 16: queue.CreateQueueRequest.DesiredPriorityThresholdsEntry
+	nil,                             // 17: queue.CreateQueueRequest.HeadersEntry
+	nil,                             // 18: queue.CreateQueueItem.DesiredPriorityThresholdsEntry
+	nil,                             // 19: queue.CreateQueueItem.HeadersEntry
+	nil,                             // 20: queue.Queue.DesiredPriorityThresholdsEntry
+	nil,                             // 21: queue.Queue.PriorityThresholdsEntry
+	nil,                             // 22: queue.Queue.HeadersEntry
+	nil,                             // 23: queue.EnqueueMessageRequest.HeadersEntry
+	nil,                             // 24: queue.EnqueueMessageRequest.ParametersEntry
+	nil,                             // 25: queue.EnqueueMessageResponse.ResultEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_depIdxs = []int32{
-	14, // 0: queue.CreateQueueRequest.desiredPriorityThresholds:type_name -> queue.CreateQueueRequest.DesiredPriorityThresholdsEntry
-	9,  // 1: queue.CreateQueueResponse.result:type_name -> queue.Queue
-	4,  // 2: queue.BulkCreateQueueRequest.queues:type_name -> queue.CreateQueueItem
-	15, // 3: queue.CreateQueueItem.desiredPriorityThresholds:type_name -> queue.CreateQueueItem.DesiredPriorityThresholdsEntry
-	9,  // 4: queue.BulkCreateQueueResponse.result:type_name -> queue.Queue
-	9,  // 5: queue.GetQueueResponse.result:type_name -> queue.Queue
-	16, // 6: queue.Queue.desiredPriorityThresholds:type_name -> queue.Queue.DesiredPriorityThresholdsEntry
-	17, // 7: queue.Queue.priorityThresholds:type_name -> queue.Queue.PriorityThresholdsEntry
-	9,  // 8: queue.QueueFindResult.entities:type_name -> queue.Queue
-	10, // 9: queue.GetQueuesResponse.result:type_name -> queue.QueueFindResult
-	1,  // 10: queue.QueueService.CreateQueue:input_type -> queue.CreateQueueRequest
-	3,  // 11: queue.QueueService.BulkCreateQueue:input_type -> queue.BulkCreateQueueRequest
-	6,  // 12: queue.QueueService.GetQueue:input_type -> queue.GetQueueRequest
-	8,  // 13: queue.QueueService.GetQueues:input_type -> queue.GetQueuesRequest
-	12, // 14: queue.QueueService.DeleteQueue:input_type -> queue.DeleteQueueRequest
-	2,  // 15: queue.QueueService.CreateQueue:output_type -> queue.CreateQueueResponse
-	5,  // 16: queue.QueueService.BulkCreateQueue:output_type -> queue.BulkCreateQueueResponse
-	7,  // 17: queue.QueueService.GetQueue:output_type -> queue.GetQueueResponse
-	11, // 18: queue.QueueService.GetQueues:output_type -> queue.GetQueuesResponse
-	13, // 19: queue.QueueService.DeleteQueue:output_type -> queue.DeleteQueueResponse
-	15, // [15:20] is the sub-list for method output_type
-	10, // [10:15] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	16, // 0: queue.CreateQueueRequest.desiredPriorityThresholds:type_name -> queue.CreateQueueRequest.DesiredPriorityThresholdsEntry
+	17, // 1: queue.CreateQueueRequest.headers:type_name -> queue.CreateQueueRequest.HeadersEntry
+	9,  // 2: queue.CreateQueueResponse.result:type_name -> queue.Queue
+	4,  // 3: queue.BulkCreateQueueRequest.queues:type_name -> queue.CreateQueueItem
+	18, // 4: queue.CreateQueueItem.desiredPriorityThresholds:type_name -> queue.CreateQueueItem.DesiredPriorityThresholdsEntry
+	19, // 5: queue.CreateQueueItem.headers:type_name -> queue.CreateQueueItem.HeadersEntry
+	9,  // 6: queue.BulkCreateQueueResponse.result:type_name -> queue.Queue
+	9,  // 7: queue.GetQueueResponse.result:type_name -> queue.Queue
+	20, // 8: queue.Queue.desiredPriorityThresholds:type_name -> queue.Queue.DesiredPriorityThresholdsEntry
+	21, // 9: queue.Queue.priorityThresholds:type_name -> queue.Queue.PriorityThresholdsEntry
+	22, // 10: queue.Queue.headers:type_name -> queue.Queue.HeadersEntry
+	9,  // 11: queue.QueueFindResult.entities:type_name -> queue.Queue
+	10, // 12: queue.GetQueuesResponse.result:type_name -> queue.QueueFindResult
+	23, // 13: queue.EnqueueMessageRequest.headers:type_name -> queue.EnqueueMessageRequest.HeadersEntry
+	24, // 14: queue.EnqueueMessageRequest.parameters:type_name -> queue.EnqueueMessageRequest.ParametersEntry
+	25, // 15: queue.EnqueueMessageResponse.result:type_name -> queue.EnqueueMessageResponse.ResultEntry
+	1,  // 16: queue.QueueService.CreateQueue:input_type -> queue.CreateQueueRequest
+	3,  // 17: queue.QueueService.BulkCreateQueue:input_type -> queue.BulkCreateQueueRequest
+	6,  // 18: queue.QueueService.GetQueue:input_type -> queue.GetQueueRequest
+	8,  // 19: queue.QueueService.GetQueues:input_type -> queue.GetQueuesRequest
+	12, // 20: queue.QueueService.DeleteQueue:input_type -> queue.DeleteQueueRequest
+	14, // 21: queue.QueueService.EnqueueMessage:input_type -> queue.EnqueueMessageRequest
+	2,  // 22: queue.QueueService.CreateQueue:output_type -> queue.CreateQueueResponse
+	5,  // 23: queue.QueueService.BulkCreateQueue:output_type -> queue.BulkCreateQueueResponse
+	7,  // 24: queue.QueueService.GetQueue:output_type -> queue.GetQueueResponse
+	11, // 25: queue.QueueService.GetQueues:output_type -> queue.GetQueuesResponse
+	13, // 26: queue.QueueService.DeleteQueue:output_type -> queue.DeleteQueueResponse
+	15, // 27: queue.QueueService.EnqueueMessage:output_type -> queue.EnqueueMessageResponse
+	22, // [22:28] is the sub-list for method output_type
+	16, // [16:22] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_init() }
@@ -1148,7 +1440,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_init
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -2,6 +2,7 @@ package rest_server
 
 import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
+	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/nodescheduler"
@@ -20,6 +21,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	tenantController := tenant.NewTenantController(s.Config)
 	exchangeController := exchange.NewExchangeController(s.Config)
 	queueController := queue.NewQueueController(s.Config)
+	bindingController := binding.NewBindingController(s.Config)
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 	nodeSchedulerController := nodescheduler.NewNodeSchedulerController(s.Config)
 
@@ -34,34 +36,41 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 		tenantsGroup := restAPIGroup.Group("/tenants")
 		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
-		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 20))
+		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			tenantsGroup.GET("", tenantController.GetTenantsHandler)
 			tenantsGroup.POST("", tenantController.CreateTenantHandler)
 			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
-			tenantsGroup.GET("/:id", tenantController.GetTenantHandler)
-			tenantsGroup.GET("/:id/summary", tenantController.GetTenantSummaryHandler)
-			tenantsGroup.DELETE("/:id", tenantController.DeleteTenantHandler)
+			tenantsGroup.GET("/:code", tenantController.GetTenantHandler)
+			tenantsGroup.GET("/:code/summary", tenantController.GetTenantSummaryHandler)
+			tenantsGroup.DELETE("/:code", tenantController.DeleteTenantHandler)
 			{
-				tenantsGroup.POST("/:id/exchange", exchangeController.CreateExchangeHandler)
-				tenantsGroup.POST("/:id/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
-				tenantsGroup.GET("/:id/exchange", exchangeController.GetExchangesHandler)
-				tenantsGroup.GET("/:id/exchange/:exchangeId", exchangeController.GetExchangeHandler)
-				tenantsGroup.DELETE("/:id/exchange/:exchangeId", exchangeController.DeleteExchangeHandler)
+				tenantsGroup.POST("/:code/exchange", exchangeController.CreateExchangeHandler)
+				tenantsGroup.POST("/:code/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
+				tenantsGroup.POST("/:code/exchange/publish-message", exchangeController.PublishMessageHandler)
+				tenantsGroup.GET("/:code/exchange", exchangeController.GetExchangesHandler)
+				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.GetExchangeHandler)
+				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.DeleteExchangeHandler)
 
-				tenantsGroup.POST("/:id/queue", queueController.CreateQueueHandler)
-				tenantsGroup.POST("/:id/queue/bulk", queueController.BulkCreateQueueHandler)
-				tenantsGroup.GET("/:id/queue", queueController.GetQueuesHandler)
-				tenantsGroup.GET("/:id/queue/:queueId", queueController.GetQueueHandler)
-				tenantsGroup.DELETE("/:id/queue/:queueId", queueController.DeleteQueueHandler)
+				tenantsGroup.POST("/:code/queue", queueController.CreateQueueHandler)
+				tenantsGroup.POST("/:code/queue/bulk", queueController.BulkCreateQueueHandler)
+				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", queueController.EnqueueMessageHandler)
+				tenantsGroup.GET("/:code/queue", queueController.GetQueuesHandler)
+				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace", queueController.GetQueueHandler)
+				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", queueController.DeleteQueueHandler)
 
-				tenantsGroup.GET("/:id/vnamespaces", vnamespaceController.GetVNamespacesHandler)
+				tenantsGroup.POST("/:code/binding", bindingController.CreateBindingHandler)
+				tenantsGroup.GET("/:code/bindings", bindingController.GetBindingsHandler)
+				tenantsGroup.GET("/:code/binding/:exchangeCode/:queueCode/:vnamespace", bindingController.GetBindingHandler)
+				tenantsGroup.DELETE("/:code/binding/:bindingCode/:vnamespace", bindingController.DeleteBindingHandler)
+
+				tenantsGroup.GET("/:code/vnamespaces", vnamespaceController.GetVNamespacesHandler)
 			}
 		}
 
 		nodeSchedulersGroup := restAPIGroup.Group("/node-schedulers")
 		nodeSchedulersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
-		nodeSchedulersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 20))
+		nodeSchedulersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			nodeSchedulersGroup.GET("", nodeSchedulerController.GetNodeSchedulersHandler)
 			nodeSchedulersGroup.GET("/:id", nodeSchedulerController.GetNodeSchedulerHandler)
@@ -70,6 +79,6 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	}
 	metricsAPIGroup := engine.Group("/metrics")
 	metricsAPIGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
-	metricsAPIGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 20))
+	metricsAPIGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 	metricsAPIGroup.GET("/", metricsController.GetSystemMetricsHandler)
 }

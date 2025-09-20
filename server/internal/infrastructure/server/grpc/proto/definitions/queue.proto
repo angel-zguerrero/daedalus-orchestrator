@@ -16,10 +16,11 @@ service QueueService {
   rpc GetQueue (GetQueueRequest) returns (GetQueueResponse);
   rpc GetQueues (GetQueuesRequest) returns (GetQueuesResponse);
   rpc DeleteQueue (DeleteQueueRequest) returns (DeleteQueueResponse);
+  rpc EnqueueMessage (EnqueueMessageRequest) returns (EnqueueMessageResponse);
 }
 
 message CreateQueueRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string name = 3;
   string type = 4;
@@ -29,6 +30,7 @@ message CreateQueueRequest {
   bool allowDuplicated = 8;
   int32 maxAttempts = 9;
   map<int32, int32> desiredPriorityThresholds = 10;
+  map<string, string> headers = 11;
 }
 
 message CreateQueueResponse {
@@ -37,7 +39,7 @@ message CreateQueueResponse {
 }
 
 message BulkCreateQueueRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   repeated CreateQueueItem queues = 2;
 }
 
@@ -51,6 +53,7 @@ message CreateQueueItem {
   bool allowDuplicated = 7;
   int32 maxAttempts = 8;
   map<int32, int32> desiredPriorityThresholds = 9;
+  map<string, string> headers = 10;
 }
 
 message BulkCreateQueueResponse {
@@ -59,8 +62,9 @@ message BulkCreateQueueResponse {
 }
 
 message GetQueueRequest {
-  string tenantId = 1;
-  string queueId = 2;
+  string tenantCode = 1;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message GetQueueResponse {
@@ -69,11 +73,12 @@ message GetQueueResponse {
 }
 
 message GetQueuesRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string q = 2;
   string cursor = 3;
   int32 pageSize = 4;
   string vnamespace = 5;
+  bool includeHeaders = 6;
 }
 
 message Queue {
@@ -90,6 +95,7 @@ message Queue {
   int32 maxAttempts = 11;
   map<int32, int32> desiredPriorityThresholds = 12;
   map<int32, int32> priorityThresholds = 13;
+  map<string, string> headers = 14;
 }
 
 message QueueFindResult {
@@ -103,12 +109,31 @@ message GetQueuesResponse {
 }
 
 message DeleteQueueRequest {
-  string tenantId = 1;
-  string queueId = 2;
+  string tenantCode = 1;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message DeleteQueueResponse {
   string message = 1;
+}
+
+message EnqueueMessageRequest {
+  string tenantCode = 1;
+  string queueCode = 2;
+  string vnamespace = 3;
+  string content = 4;
+  string contentType = 5;
+  map<string, string> headers = 6;
+  int32 priority = 7;
+  string handler = 8;
+  map<string, string> parameters = 9;
+}
+
+message EnqueueMessageResponse {
+  string message = 1;
+  string messageId = 2;
+  map<string, string> result = 3;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/queue.proto

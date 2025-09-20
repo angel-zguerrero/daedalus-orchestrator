@@ -154,11 +154,12 @@ const DefaultFC = "default"
 const TemporalFC = "temporal_fc"
 
 type testEntity struct {
-	ID       string `orm:"primary-key"`
-	Name     string `orm:"unique"`
-	LastName string
-	Age      int
-	TTL      int `orm:"ttl"`
+	ID          string `orm:"primary-key"`
+	Name        string `orm:"unique"`
+	LastName    string
+	Age         int
+	TTL         int               `orm:"ttl"`
+	VirtualData map[string]string `orm:"virtual"` // Virtual field for testing - not stored in DB
 }
 
 func (testEntity) TableName() string {
@@ -389,6 +390,21 @@ func (DataOnlyEntity) TableName() string {
 	return "data_only_entities"
 }
 
+// VirtualFieldEntity for testing virtual fields - these fields should not be stored
+type VirtualFieldEntity struct {
+	ID          string            `orm:"primary-key"`
+	Name        string            `orm:"unique"`
+	SearchField string            // Normal searchable field
+	VirtualData map[string]string `orm:"virtual"` // Should not be stored
+	TempCache   []string          `orm:"virtual"` // Should not be stored
+	RuntimeInfo interface{}       `orm:"virtual"` // Should not be stored
+	CreatedAt   time.Time
+}
+
+func (VirtualFieldEntity) TableName() string {
+	return "virtual_field_entities"
+}
+
 // InvalidDataOnlyUniqueEntity for testing validation - data-only fields cannot be unique
 type InvalidDataOnlyUniqueEntity struct {
 	ID     string            `orm:"primary-key"`
@@ -408,4 +424,35 @@ type InvalidDataOnlyCompoundEntity struct {
 
 func (InvalidDataOnlyCompoundEntity) TableName() string {
 	return "invalid_data_only_compound"
+}
+
+// InvalidVirtualUniqueEntity for testing validation - virtual fields cannot be unique
+type InvalidVirtualUniqueEntity struct {
+	ID          string            `orm:"primary-key"`
+	VirtualData map[string]string `orm:"virtual,unique"`
+}
+
+func (InvalidVirtualUniqueEntity) TableName() string {
+	return "invalid_virtual_unique"
+}
+
+// InvalidVirtualPrimaryEntity for testing validation - virtual fields cannot be primary
+type InvalidVirtualPrimaryEntity struct {
+	ID        string `orm:"primary-key"`
+	VirtualID string `orm:"virtual,primary-key"`
+	Name      string
+}
+
+func (InvalidVirtualPrimaryEntity) TableName() string {
+	return "invalid_virtual_primary"
+}
+
+// InvalidVirtualDataOnlyEntity for testing validation - virtual fields cannot be data-only
+type InvalidVirtualDataOnlyEntity struct {
+	ID          string            `orm:"primary-key"`
+	VirtualData map[string]string `orm:"virtual,data-only"`
+}
+
+func (InvalidVirtualDataOnlyEntity) TableName() string {
+	return "invalid_virtual_data_only"
 }

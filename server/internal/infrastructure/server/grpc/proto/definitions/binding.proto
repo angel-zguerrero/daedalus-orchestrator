@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package binding;
+
+option go_package = "pb/binding;binding";
+
+service BindingService {
+  rpc CreateBinding (CreateBindingRequest) returns (CreateBindingResponse);
+  rpc GetBinding (GetBindingRequest) returns (GetBindingResponse);
+  rpc GetBindings (GetBindingsRequest) returns (GetBindingsResponse);
+  rpc DeleteBinding (DeleteBindingRequest) returns (DeleteBindingResponse);
+}
+
+message CreateBindingRequest {
+  string tenantCode = 1;
+  string code = 2;
+  string exchangeCode = 3;
+  string queueCode = 4;
+  string targetExchangeCode = 5;
+  string alternateExchangeCode = 6;
+  string vnamespace = 7;
+  string routingKey = 8;
+  string pattern = 9;
+  string xMatch = 10;
+  string bindingType = 11;
+  string targetExchangeType = 12;
+  map<string, string> headers = 13;
+}
+
+message CreateBindingResponse {
+  string message = 1;
+  Binding result = 2;
+}
+
+message GetBindingRequest {
+  string tenantCode = 1;
+  string exchangeCode = 2;
+  string queueCode = 3;
+  string vnamespace = 4;
+}
+
+message GetBindingResponse {
+  string message = 1;
+  Binding result = 2;
+}
+
+message GetBindingsRequest {
+  string tenantCode = 1;
+  string q = 2;
+  string cursor = 3;
+  int32 pageSize = 4;
+  string vnamespace = 5;
+  bool includeObjects = 6;
+}
+
+message Exchange {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string type = 4;
+  string vnamespace = 5;
+  string createdAt = 6;
+  string updatedAt = 7;
+}
+
+message Queue {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string vnamespace = 4;
+  string state = 5;
+  string type = 6;
+  int32 messagesCount = 7;
+  string createdAt = 8;
+  string updatedAt = 9;
+}
+
+message Binding {
+  string id = 1;
+  string code = 2;
+  string exchangeCode = 3;
+  string queueCode = 4;
+  string targetExchangeCode = 5;
+  string alternateExchangeCode = 6;
+  string vnamespace = 7;
+  string routingKey = 8;
+  string pattern = 9;
+  string xMatch = 10;
+  string bindingType = 11;
+  string targetExchangeType = 12;
+  string createdAt = 13;
+  string updatedAt = 14;
+  Exchange exchange = 15;
+  Queue queue = 16;
+  Exchange targetExchange = 17;
+  Exchange alternateExchange = 18;
+  map<string, string> headers = 19;
+}
+
+message BindingFindResult {
+  repeated Binding entities = 1;
+  string cursor = 2;
+}
+
+message GetBindingsResponse {
+  string message = 1;
+  BindingFindResult result = 2;
+}
+
+message DeleteBindingRequest {
+  string tenantCode = 1;
+  string code = 2;
+  string vnamespace = 3;
+}
+
+message DeleteBindingResponse {
+  string message = 1;
+}
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/binding.proto

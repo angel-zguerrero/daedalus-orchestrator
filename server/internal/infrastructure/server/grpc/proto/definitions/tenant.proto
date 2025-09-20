@@ -14,11 +14,11 @@ service TenantService {
 }
 
 message TenantInfoRequest {
-   string ID = 1;
+   string Code = 1;
 }
 
 message TenantSummaryRequest {
-   string ID = 1;
+   string Code = 1;
 }
 
 message TenantSummary {
@@ -55,7 +55,7 @@ message TenantInfoResponse {
 }
 
 message DeleteTenantRequest {
-  string ID = 1;
+  string Code = 1;
 }
 
 message DeleteTenantResponse {

@@ -1,0 +1,937 @@
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-link" class="me-2"></svg>
+      Bindings Management
+    </h5>
+  </c-card-header>
+  <c-card-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    
+    <!-- Search and Actions Row -->
+    <c-row class="mb-3">
+      <c-col [md]="3">
+        <div class="input-group">
+          <input 
+            type="text" 
+            cFormControl 
+            placeholder="Search bindings" 
+            [(ngModel)]="searchQuery" 
+            (keydown.enter)="searchBindings()"/>
+          <button 
+            cButton 
+            type="button" 
+            color="secondary" 
+            variant="outline" 
+            (click)="searchBindings()">
+            <svg cIcon name="cil-search"></svg>
+          </button>
+        </div>
+      </c-col>
+      <c-col [md]="3">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by VNamespace</mat-label>
+          <input 
+            type="text"
+            matInput
+            [formControl]="vnamespaceFilterCtrl"
+            [matAutocomplete]="autoFilter"
+            (ngModelChange)="onVNamespaceFilterChange($event)">
+          <mat-autocomplete #autoFilter="matAutocomplete">
+            <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+              {{vns.Name}}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+      <c-col [md]="6" class="d-flex justify-content-end align-items-end">
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create Binding
+        </button>
+      </c-col>
+    </c-row>
+
+    <!-- Bindings Table -->
+    <div class="table-responsive">
+      <table cTable class="mt-4" [hover]="true" style="min-width: 1200px;">
+        <thead>
+          <tr>
+            <th style="min-width: 120px;">Code</th>
+            <th style="min-width: 150px;">Exchange</th>
+            <th style="min-width: 150px;">Queue</th>
+            <th style="min-width: 150px;">Target Exchange</th>
+            <th style="min-width: 100px;">Target Type</th>
+            <th style="min-width: 120px;">VNamespace</th>
+            <th style="min-width: 120px;">Routing Key</th>
+            <th style="min-width: 100px;">Pattern</th>
+            <th style="min-width: 100px;">X-Match</th>
+            <th style="min-width: 100px;">Type</th>
+            <th style="min-width: 180px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let binding of bindings" class="align-middle">
+            <td class="text-truncate" style="max-width: 120px;" title="{{ binding.Code || binding.code || '-' }}">
+              <code>{{ binding.Code || binding.code || '-' }}</code>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;">
+              <div *ngIf="binding.Exchange || binding.exchange; else simpleExchangeCode">
+                <div class="fw-bold" title="{{ (binding.Exchange || binding.exchange)?.Code }}">
+                  <code>{{ (binding.Exchange || binding.exchange)?.Code }}</code>
+                </div>
+                <small class="text-muted" title="{{ (binding.Exchange || binding.exchange)?.Name }}">
+                  {{ (binding.Exchange || binding.exchange)?.Name }}
+                </small>
+                <br>
+                <small class="text-info">
+                  {{ (binding.Exchange || binding.exchange)?.Type }}
+                </small>
+              </div>
+              <ng-template #simpleExchangeCode>
+                <code title="{{ binding.ExchangeCode || binding.exchangeCode }}">
+                  {{ binding.ExchangeCode || binding.exchangeCode }}
+                </code>
+              </ng-template>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;">
+              <div *ngIf="binding.Queue || binding.queue; else simpleQueueCode">
+                <div class="fw-bold" title="{{ (binding.Queue || binding.queue)?.Code }}">
+                  <code>{{ (binding.Queue || binding.queue)?.Code }}</code>
+                </div>
+                <small class="text-muted" title="{{ (binding.Queue || binding.queue)?.Name }}">
+                  {{ (binding.Queue || binding.queue)?.Name }}
+                </small>
+              </div>
+              <ng-template #simpleQueueCode>
+                <code title="{{ binding.QueueCode || binding.queueCode }}">
+                  {{ binding.QueueCode || binding.queueCode }}
+                </code>
+              </ng-template>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;">
+              <div *ngIf="binding.TargetExchange || binding.targetExchange; else simpleTargetExchangeCode">
+                <div class="fw-bold" title="{{ (binding.TargetExchange || binding.targetExchange)?.Code }}">
+                  <code>{{ (binding.TargetExchange || binding.targetExchange)?.Code }}</code>
+                </div>
+                <small class="text-muted" title="{{ (binding.TargetExchange || binding.targetExchange)?.Name }}">
+                  {{ (binding.TargetExchange || binding.targetExchange)?.Name }}
+                </small>
+                <br>
+                <small class="text-info">
+                  {{ (binding.TargetExchange || binding.targetExchange)?.Type }}
+                </small>
+              </div>
+              <ng-template #simpleTargetExchangeCode>
+                <span *ngIf="binding.targetExchangeCode; else noTargetExchange">
+                  <code title="{{ binding.targetExchangeCode }}">
+                    {{ binding.targetExchangeCode }}
+                  </code>
+                </span>
+                <ng-template #noTargetExchange>-</ng-template>
+              </ng-template>
+            </td>
+            <td>
+              <c-badge [color]="getTargetTypeColor(binding.TargetExchangeType || binding.targetExchangeType)" shape="rounded-pill">
+                {{ getTargetTypeDisplayName(binding.TargetExchangeType || binding.targetExchangeType) }}
+              </c-badge>
+            </td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ getVNamespace(binding) || '-' }}">
+              {{ getVNamespace(binding) || '-' }}
+            </td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ binding.RoutingKey || binding.routingKey || '-' }}">
+              <span *ngIf="binding.RoutingKey || binding.routingKey; else emptyRoutingKey">
+                <code>{{ binding.RoutingKey || binding.routingKey }}</code>
+              </span>
+              <ng-template #emptyRoutingKey>-</ng-template>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ binding.Pattern || binding.pattern || '-' }}">
+              <span *ngIf="binding.Pattern || binding.pattern; else emptyPattern">
+                <code>{{ binding.Pattern || binding.pattern }}</code>
+              </span>
+              <ng-template #emptyPattern>-</ng-template>
+            </td>
+            <td>
+              <c-badge [color]="getXMatchColor(binding.XMatch || binding.xMatch)" shape="rounded-pill">
+                {{ binding.XMatch || binding.xMatch || 'all' }}
+              </c-badge>
+            </td>
+            <td>
+              <c-badge [color]="getBindingTypeColor(binding.BindingType || binding.bindingType)" shape="rounded-pill">
+                {{ binding.BindingType || binding.bindingType || 'classic' }}
+              </c-badge>
+            </td>
+            
+            <td>
+              <div class="btn-group" role="group" aria-label="Binding actions">
+                <button 
+                  cButton 
+                  color="info" 
+                  size="sm" 
+                  (click)="openDetailsModal(binding)"
+                  title="View Details">
+                  <svg cIcon name="cil-info"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="warning" 
+                  size="sm" 
+                  (click)="openEditModal(binding)"
+                  title="Edit">
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="danger" 
+                  size="sm" 
+                  (click)="openDeleteModal(binding)"
+                  title="Delete">
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="bindings.length === 0">
+            <td colspan="11" class="text-center py-4">
+              <div class="text-muted">
+                <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                <h6>No bindings found</h6>
+                <p class="mb-0">Create your first binding to connect exchanges and queues.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex justify-content-end mt-3" *ngIf="bindings.length > 0">
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="cursors.length === 1" 
+        (click)="previousPage()">
+        <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+        Previous
+      </button>
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="!cursor" 
+        (click)="nextPage()" 
+        class="ms-2">
+        Next
+        <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create Binding Modal -->
+<c-modal id="createModal" [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-plus" class="me-2"></svg>
+      {{ isEditMode ? 'Edit Binding' : 'Create Binding' }}
+    </h5>
+    <button (click)="createModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <form [formGroup]="bindingForm" (ngSubmit)="createBinding()" (keydown.enter)="createBinding()">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="bindingType">Binding Type *</label>
+          <select cSelect id="bindingType" formControlName="bindingType" (change)="onBindingTypeChange($event)">
+            <option *ngFor="let bindingType of bindingTypes" [value]="bindingType.value">
+              {{ bindingType.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted">Type of binding behavior</small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="code">Code *</label>
+          <input 
+            cFormControl 
+            id="code" 
+            formControlName="code" 
+            placeholder="Enter binding code"
+            [readonly]="isEditMode" />
+          <small class="form-text text-muted">
+            {{ isEditMode ? 'Binding code cannot be changed' : 'Unique identifier for this binding' }}
+          </small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <mat-form-field class="w-100">
+            <mat-label>Virtual Namespace *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="vnamespaceCtrl"
+              [matAutocomplete]="autoVNamespace">
+            <mat-autocomplete #autoVNamespace="matAutocomplete" [displayWith]="displayVNamespace" (optionSelected)="onVNamespaceSelected($event)">
+              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns">
+                {{vns.Name}}
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Required: Select the virtual namespace first</div>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="targetExchangeType">Target Type *</label>
+          <select cSelect id="targetExchangeType" formControlName="targetExchangeType">
+            <option *ngFor="let targetType of targetExchangeTypes" [value]="targetType.value">
+              {{ targetType.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted">Whether this binding targets a queue or another exchange</small>
+        </c-col>
+        <c-col [md]="6">
+          <!-- Placeholder for future fields or spacing -->
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="xMatch">Exchange</label>
+          <mat-form-field class="w-100">
+            <mat-label>Exchange *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="exchangeCtrl"
+              [matAutocomplete]="autoExchange"
+              [disabled]="exchangeDisabled"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoExchange="matAutocomplete" (optionSelected)="onExchangeSelected($event)" [displayWith]="displayExchangeFn">
+              <mat-option *ngFor="let exchange of filteredExchanges | async" [value]="exchange">
+                {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Required: Select the source exchange</div>
+          <div *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'" class="mt-2">
+            <small class="text-warning">
+              <svg cIcon name="cil-warning" class="me-1"></svg>
+              <strong>Dynamic Mode:</strong> Fanout and Topic exchanges are filtered out as they don't support this routing type
+            </small>
+          </div>
+          <div *ngIf="selectedExchange" class="mt-2">
+            <small class="text-info">
+              <svg cIcon name="cil-info" class="me-1"></svg>
+              Exchange Type: <strong>{{getExchangeTypeDisplayName()}}</strong>
+            </small>
+          </div>
+        </c-col>
+        <c-col [md]="6" *ngIf="showQueue || showTargetExchange">
+          <!-- Queue field when target type is 'queue' -->
+          <label cLabel for="Queue"  *ngIf="showQueue">Queue</label>
+          <mat-form-field class="w-100" *ngIf="showQueue">
+            <mat-label>Queue *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="queueCtrl"
+              [matAutocomplete]="autoQueue"
+              [disabled]="queueDisabled"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoQueue="matAutocomplete" [displayWith]="displayQueue" (optionSelected)="onQueueSelected($event)">
+              <mat-option *ngFor="let queue of filteredQueues | async" [value]="queue">
+                {{queue.Code}} - {{queue.Name}} ({{queue.Type}})
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text" *ngIf="showQueue">Required: Select the destination queue</div>
+          
+          <!-- Target Exchange field when target type is 'exchange' -->
+          <label cLabel for="Target-Exchange" *ngIf="showTargetExchange">Target Exchange</label>
+          <mat-form-field class="w-100" *ngIf="showTargetExchange">
+            <mat-label>Target Exchange *</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="targetExchangeCtrl"
+              [matAutocomplete]="autoTargetExchange"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoTargetExchange="matAutocomplete" [displayWith]="displayTargetExchange" (optionSelected)="onTargetExchangeSelected($event)">
+              <mat-option *ngFor="let exchange of filteredTargetExchanges | async" [value]="exchange">
+                {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text" *ngIf="showTargetExchange">Required when target type is Exchange: Select the target exchange</div>
+        </c-col>
+        <c-col [md]="6" *ngIf="!showQueue && selectedExchange">
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'direct'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>{{ getDynamicBindingMessage('direct') }}</strong>
+          </div>
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'topic'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>{{ getDynamicBindingMessage('topic') }}</strong>
+          </div>
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'headers'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>{{ getDynamicBindingMessage('headers') }}</strong>
+          </div>
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'fanout'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>{{ getDynamicBindingMessage('fanout') }}</strong>
+          </div>
+          <div class="alert alert-info" *ngIf="selectedExchange?.Type?.toLowerCase() === 'topic'">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            <strong>{{ getDynamicBindingMessage('topic') }}</strong>
+          </div>
+        </c-col>
+      </c-row>
+      
+      <!-- Conditional fields based on exchange type -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="selectedExchange">
+        <c-col [md]="6" *ngIf="showRoutingKey">
+          <label cLabel for="routingKey">
+            Routing Key 
+            <span *ngIf="isFieldRequired('routingKey')" class="text-danger">*</span>
+          </label>
+          <input 
+            cFormControl 
+            id="routingKey" 
+            formControlName="routingKey" 
+            placeholder="Enter routing key" />
+          <small class="form-text text-muted">Used for direct exchanges to route messages</small>
+        </c-col>
+        <c-col [md]="6" *ngIf="showPattern">
+          <label cLabel for="pattern">
+            Pattern 
+            <span *ngIf="isFieldRequired('pattern')" class="text-danger">*</span>
+          </label>
+          <input 
+            cFormControl 
+            id="pattern" 
+            formControlName="pattern" 
+            placeholder="Enter pattern (e.g., user.*.created)" />
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'">
+            Used for topic exchanges to automatically find and bind matching queues
+          </small>
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value !== 'dynamic'">
+            Used for topic exchanges pattern matching
+          </small>
+        </c-col>
+        <c-col [md]="6" *ngIf="showXMatch">
+          <label cLabel for="xMatch">X-Match Type</label>
+          <select cSelect id="xMatch" formControlName="xMatch">
+            <option *ngFor="let xMatchType of xMatchTypes" [value]="xMatchType.value">
+              {{ xMatchType.label }}
+            </option>
+          </select>
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value === 'classic'">
+            Used for headers exchanges matching
+          </small>
+          <small class="form-text text-muted" *ngIf="bindingForm.get('bindingType')?.value === 'dynamic'">
+            Queues will be determined automatically based on message headers and queue header conditions
+          </small>
+          <div *ngIf="selectedExchange?.Type?.toLowerCase() === 'headers'" class="mt-2">
+            <small class="text-info">
+              <svg cIcon name="cil-info" class="me-1"></svg>
+              Exchange Type: <strong>Headers</strong> (attribute-based routing)
+            </small>
+          </div>
+        </c-col>
+        <c-col [md]="6" *ngIf="showXMatch && showAlternateExchange">
+          <label cLabel for="xMatch">Alternate Exchange (Optional)</label>
+          <mat-form-field class="w-100">
+            <mat-label>Alternate Exchange (Optional)</mat-label>
+            <input 
+              type="text"
+              matInput
+              [formControl]="alternateExchangeCtrl"
+              [matAutocomplete]="autoAlternateExchange"
+              placeholder="Select a virtual namespace first">
+            <mat-autocomplete #autoAlternateExchange="matAutocomplete" [displayWith]="displayAlternateExchange" (optionSelected)="onAlternateExchangeSelected($event)">
+              <mat-option *ngFor="let exchange of filteredAlternateExchanges | async" [value]="exchange">
+                {{exchange.Code}} - {{exchange.Name}} ({{exchange.Type}})
+              </mat-option>
+            </mat-autocomplete>
+            <mat-error *ngIf="alternateExchangeCtrl.hasError('alternateExchangeNotFanout')">
+              Alternate Exchange must be of type 'fanout'. Selected exchange type: {{alternateExchangeCtrl.getError('alternateExchangeNotFanout')?.actualType}}
+            </mat-error>
+          </mat-form-field>
+          <div class="form-text">Optional: Exchange to use when message routing fails (must be fanout type)</div>
+        </c-col>
+      </c-row>
+
+      <!-- Headers Configuration Section - only for Headers exchanges -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="showHeaders">
+        <c-col [md]="12">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Binding Headers (Optional)
+          </h6>
+        </c-col>
+      </c-row>
+
+      <!-- Headers Management -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="showHeaders">
+        <c-col [md]="5">
+          <label cLabel for="headerKey">Header Key</label>
+          <input cFormControl id="headerKey" [value]="newHeaderKey" (input)="onHeaderKeyInput($event)" placeholder="e.g., content-type" />
+        </c-col>
+        <c-col [md]="5">
+          <label cLabel for="headerValue">Header Value</label>
+          <input cFormControl id="headerValue" [value]="newHeaderValue" (input)="onHeaderValueInput($event)" placeholder="e.g., application/json" />
+        </c-col>
+        <c-col [md]="2" class="d-flex align-items-end">
+          <button cButton color="success" variant="outline" (click)="addHeader()" [disabled]="!newHeaderKey.trim() || !newHeaderValue.trim()">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </c-col>
+      </c-row>
+
+      <!-- Headers List -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}" *ngIf="showHeaders && headers.length > 0">
+        <c-col [md]="12">
+          <div class="table-responsive">
+            <table cTable class="table-sm">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="80">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let header of headers; let i = index">
+                  <td><code>{{ header.key }}</code></td>
+                  <td>{{ header.value }}</td>
+                  <td>
+                    <button cButton color="danger" variant="outline" size="sm" (click)="removeHeader(i)">
+                      <svg cIcon name="cil-trash"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="createModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="createBinding()" [disabled]="!bindingForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      {{ isEditMode ? 'Save Changes' : 'Create Binding' }}
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Delete Binding Modal -->
+<c-modal id="deleteModal" [visible]="deleteModalVisible" (visibleChange)="deleteModalVisible = $event">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-trash" class="me-2"></svg>
+      Delete {{ getBindingTypeDisplayName(selectedBinding?.bindingType) }} Binding
+    </h5>
+    <button (click)="deleteModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center">
+      <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
+      <h6>Are you sure you want to delete this {{ getBindingTypeDisplayName(selectedBinding?.bindingType) | lowercase }} binding?</h6>
+      
+      <!-- Content based on binding type and exchange type -->
+      <div *ngIf="selectedBinding" class="text-muted mb-0">
+        <!-- Classic Binding Display -->
+        <div *ngIf="selectedBinding.bindingType === 'classic'">
+          <p class="mb-2">
+            <strong>{{ selectedBinding.exchangeCode }}</strong> 
+            <svg cIcon name="cil-arrow-right" class="mx-2"></svg>
+            <strong>{{ selectedBinding.queueCode }}</strong>
+          </p>
+          <p class="mb-2">
+            <strong>Code:</strong> <code>{{ selectedBinding.Code || selectedBinding.code }}</code>
+          </p>
+          <p class="small mb-2">
+            <span class="badge" [style.background-color]="getExchangeTypeColor(selectedBinding.virtualExchange?.exchangeType)">
+              {{ selectedBinding.virtualExchange?.exchangeType | titlecase }} Exchange
+            </span>
+            <svg cIcon name="cil-arrow-right" class="mx-2"></svg>
+            <span class="badge badge-light">{{ selectedBinding.virtualQueue?.queueType | titlecase }} Queue</span>
+          </p>
+          <!-- Headers for Headers Exchange -->
+          <div *ngIf="selectedBinding.virtualExchange?.exchangeType === 'headers' && selectedBinding.routingHeaders && selectedBinding.routingHeaders.length > 0" 
+               class="mt-3 p-2 border rounded bg-light">
+            <small class="text-muted d-block mb-1">Routing Headers:</small>
+            <div class="d-flex flex-wrap gap-1">
+              <span *ngFor="let header of selectedBinding.routingHeaders" 
+                    class="badge bg-info small">
+                {{ header.key }}: {{ header.value }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Binding Display -->
+        <div *ngIf="selectedBinding.bindingType === 'dynamic'">
+          <p class="mb-2">
+            <strong>Code:</strong> {{ selectedBinding.Code }}
+          </p>
+          <p class="small mb-2">
+            <span class="badge bg-success">Dynamic Binding</span>
+            <span *ngIf="selectedBinding.routingKey" class="ms-2">
+              <strong>Routing Key:</strong> {{ selectedBinding.routingKey }}
+            </span>
+          </p>
+          <!-- Headers for Dynamic Bindings -->
+          <div *ngIf="selectedBinding.routingHeaders && selectedBinding.routingHeaders.length > 0" 
+               class="mt-3 p-2 border rounded bg-light">
+            <small class="text-muted d-block mb-1">Dynamic Headers:</small>
+            <div class="d-flex flex-wrap gap-1">
+              <span *ngFor="let header of selectedBinding.routingHeaders" 
+                    class="badge bg-success small">
+                {{ header.key }}: {{ header.value }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <p class="small mt-3">
+          <strong>Namespace:</strong> {{ getVNamespace(selectedBinding) }}
+        </p>
+        <p class="text-warning small mt-2">This action cannot be undone.</p>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="deleteModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="danger" (click)="deleteBinding()">
+      <svg cIcon name="cil-trash" class="me-1"></svg>
+      Delete {{ getBindingTypeDisplayName(selectedBinding?.bindingType) }} Binding
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Binding Details Modal -->
+<c-modal id="detailsModal" [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-info" class="me-2"></svg>
+      Binding Details
+    </h5>
+    <button (click)="detailsModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedBinding">
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    
+    <!-- Binding Configuration Section -->
+    <div class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-link" class="me-2"></svg>
+        Binding Configuration
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">ID</label>
+            <div class="p-2 bg-dark rounded">{{ selectedBinding.ID || selectedBinding.id || 'N/A' }}</div>
+            <div class="form-text">Unique system identifier</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code class="text-white">{{ selectedBinding.Code || selectedBinding.code || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Binding unique code identifier</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Virtual Namespace</label>
+            <div class="p-2 bg-dark rounded">{{ getVNamespace(selectedBinding) || '-' }}</div>
+            <div class="form-text">Virtual namespace for logical grouping</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Binding Type</label>
+            <div class="p-2 rounded">
+              <c-badge [color]="getBindingTypeColor(selectedBinding.BindingType || selectedBinding.bindingType)" shape="rounded-pill">
+                {{ getBindingTypeDisplayName(selectedBinding.BindingType || selectedBinding.bindingType) }}
+              </c-badge>
+            </div>
+            <div class="form-text">Type of binding (classic or dynamic)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Target Type Section -->
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Type</label>
+            <div class="p-2 rounded">
+              <c-badge [color]="getTargetTypeColor(selectedBinding.TargetExchangeType || selectedBinding.targetExchangeType)" shape="rounded-pill">
+                {{ getTargetTypeDisplayName(selectedBinding.TargetExchangeType || selectedBinding.targetExchangeType) }}
+              </c-badge>
+            </div>
+            <div class="form-text">Destination type for message routing (queue or exchange)</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <!-- Empty column for spacing -->
+        </div>
+      </div>
+
+      <!-- Routing Configuration based on Exchange Type -->
+      <div class="row">
+        <!-- Routing Key - shown for Direct exchanges -->
+        <div class="col-md-6" *ngIf="shouldShowRoutingKeyInDetails()">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Routing Key</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ selectedBinding.RoutingKey || selectedBinding.routingKey || '-' }}</code>
+            </div>
+            <div class="form-text">Used for direct exchange routing</div>
+          </div>
+        </div>
+
+        <!-- Pattern - shown for Topic exchanges -->
+        <div class="col-md-6" *ngIf="shouldShowPatternInDetails()">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Pattern</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ selectedBinding.Pattern || selectedBinding.pattern || '-' }}</code>
+            </div>
+            <div class="form-text">Used for topic exchange pattern matching</div>
+          </div>
+        </div>
+
+        <!-- X-Match Type - shown for Headers exchanges -->
+        <div class="col-md-6" *ngIf="shouldShowXMatchInDetails()">
+          <div class="mb-3">
+            <label class="form-label fw-bold">X-Match Type</label>
+            <div class="p-2 bg-dark rounded">
+              <c-badge [color]="getXMatchColor(selectedBinding.XMatch || selectedBinding.xMatch)" shape="rounded-pill">
+                {{ selectedBinding.XMatch || selectedBinding.xMatch || 'all' }}
+              </c-badge>
+            </div>
+            <div class="form-text">Headers exchange matching strategy</div>
+          </div>
+        </div>
+
+        <!-- Binding Type - always shown -->
+        <div class="col-md-6">
+
+        </div>
+      </div>
+
+      <!-- Dynamic Binding Explanation - shown for dynamic bindings -->
+      <div *ngIf="(selectedBinding.BindingType || selectedBinding.bindingType) === 'dynamic'" class="mb-3">
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'direct'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>{{ getDynamicBindingDetailsMessage('direct') }}</strong>
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'topic'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>{{ getDynamicBindingDetailsMessage('topic') }}</strong>
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'headers'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>{{ getDynamicBindingDetailsMessage('headers') }}</strong>
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'fanout'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>{{ getDynamicBindingDetailsMessage('fanout') }}</strong>
+        </div>
+        <div class="alert alert-info" *ngIf="getSelectedBindingExchangeType() === 'topic'">
+          <svg cIcon name="cil-info" class="me-2"></svg>
+          <strong>{{ getDynamicBindingDetailsMessage('topic') }}</strong>
+        </div>
+      </div>
+
+      <!-- Headers Section - shown for Headers exchanges -->
+      <div *ngIf="shouldShowHeadersInDetails()" class="mb-3">
+        <label class="form-label fw-bold">
+          <svg cIcon name="cil-tags" class="me-2"></svg>
+          Headers
+        </label>
+        <div class="form-text mb-2">Headers used for routing in this Headers exchange</div>
+        
+        <div *ngIf="getSelectedBindingHeaders().length > 0; else noHeaders" class="border rounded p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Routing Headers ({{ getSelectedBindingHeaders().length }})</h6>
+            <c-badge [color]="getXMatchColor(selectedBinding.XMatch || selectedBinding.xMatch)" shape="rounded-pill">
+              X-Match: {{ selectedBinding.XMatch || selectedBinding.xMatch || 'all' }}
+            </c-badge>
+          </div>
+          
+          <div class="row">
+            <div *ngFor="let header of getSelectedBindingHeaders()" class="col-md-6 mb-2">
+              <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
+                <div class="d-flex flex-column flex-grow-1">
+                  <code class="text-info mb-1">{{ header.key }}</code>
+                  <code class="text-light">{{ header.value }}</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <ng-template #noHeaders>
+          <div class="border rounded p-3 text-center text-muted">
+            <svg cIcon name="cil-info" class="me-2"></svg>
+            No headers configured for this binding
+          </div>
+        </ng-template>
+      </div>
+
+    </div>
+
+    <!-- Exchange Information Section -->
+    <div *ngIf="selectedBinding.Exchange || selectedBinding.exchange" class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-share" class="me-2"></svg>
+        Exchange Information
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Exchange Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ (selectedBinding.Exchange || selectedBinding.exchange)?.Code || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Exchange identifier</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Exchange Name</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.Exchange || selectedBinding.exchange)?.Name || 'N/A' }}</div>
+            <div class="form-text">Exchange display name</div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Exchange Type</label>
+            <div class="p-2 bg-dark rounded">
+              <c-badge color="info" shape="rounded-pill" class="me-2">
+                {{ (selectedBinding.Exchange || selectedBinding.exchange)?.Type || 'N/A' }}
+              </c-badge>
+              <span class="text-muted">{{ getSelectedBindingExchangeTypeDisplayName() }}</span>
+            </div>
+            <div class="form-text">Exchange type determines routing behavior</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue Information Section -->
+    <div *ngIf="selectedBinding.Queue || selectedBinding.queue" class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-list" class="me-2"></svg>
+        Queue Information
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Queue Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ (selectedBinding.Queue || selectedBinding.queue)?.Code || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Queue identifier</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Queue Name</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.Queue || selectedBinding.queue)?.Name || 'N/A' }}</div>
+            <div class="form-text">Queue display name</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Target Exchange Information Section -->
+    <div *ngIf="selectedBinding.TargetExchange || selectedBinding.targetExchange || selectedBinding.targetExchangeCode" class="mb-4">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-share" class="me-2"></svg>
+        Target Exchange Information
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Exchange Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ (selectedBinding.TargetExchange || selectedBinding.targetExchange)?.Code || selectedBinding.targetExchangeCode || 'N/A' }}</code>
+            </div>
+            <div class="form-text">Target exchange identifier</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Exchange Name</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.TargetExchange || selectedBinding.targetExchange)?.Name || 'N/A' }}</div>
+            <div class="form-text">Target exchange display name</div>
+          </div>
+        </div>
+      </div>
+      <div class="row" *ngIf="selectedBinding.TargetExchange || selectedBinding.targetExchange">
+        <div class="col-md-12">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Target Exchange Type</label>
+            <div class="p-2 bg-dark rounded">
+              <c-badge color="success" shape="rounded-pill" class="me-2">
+                {{ (selectedBinding.TargetExchange || selectedBinding.targetExchange)?.Type || 'N/A' }}
+              </c-badge>
+              <span class="text-muted">Destination exchange for message routing</span>
+            </div>
+            <div class="form-text">Target exchange type determines routing behavior</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Timestamps Section -->
+    <div class="mb-3">
+      <h6 class="mb-3">
+        <svg cIcon name="cil-clock" class="me-2"></svg>
+        Timestamps
+      </h6>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Created At</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.CreatedAt || selectedBinding.createdAt) | date:'full' }}</div>
+            <div class="form-text">Binding creation timestamp</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Updated At</label>
+            <div class="p-2 bg-dark rounded">{{ (selectedBinding.UpdatedAt || selectedBinding.updatedAt) | date:'full' }}</div>
+            <div class="form-text">Last modification timestamp</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="detailsModalVisible = false" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>

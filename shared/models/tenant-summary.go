@@ -3,12 +3,11 @@ package models
 import "time"
 
 type TenantSummary struct {
-	ID       string `orm:"primary-key"`
-	TenantId string
-	Code     string
+	ID string `orm:"primary-key"`
 
 	ExchangesCount int
 	QueuesCount    int
+	BindingsCount  int
 	MessagesCount  int
 
 	CreatedAt time.Time

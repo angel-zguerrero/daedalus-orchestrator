@@ -41,6 +41,12 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	var resultExchanges []models.Exchange
 	newExchangesCount := 0
 
@@ -58,7 +64,7 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		}
 
 		// Look for existing exchange by code (primary upsert strategy)
-		existing, err := exchangeRepo.GetExchangeByCode(exchange.Code, now)
+		existing, err := exchangeRepo.GetExchangeByCode(exchange.Code, exchange.VNamespace, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
@@ -116,12 +122,22 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
+
+		// Update headers if provided
+		if exchange.Headers != nil && len(exchange.Headers) > 0 {
+			err = cmd.upsertExchangeHeaders(routingHeadersRepo, exchange, exchange.Headers, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+		}
+
 		resultExchanges = append(resultExchanges, exchange)
 	}
 
 	// Update tenant summary with the total count of new exchanges created
 	if newExchangesCount > 0 {
-		err = tenantSummaryRepo.IncreaseExchangeCount(cmd.CFS, newExchangesCount, now)
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, newExchangesCount, 0, 0, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
@@ -130,4 +146,66 @@ func (cmd *AssertExchangeCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 	commandResult.Result = resultExchanges
 	return *commandResult
+}
+
+// upsertExchangeHeaders creates or updates routing headers for an exchange
+func (cmd *AssertExchangeCommand) upsertExchangeHeaders(routingHeadersRepo *db.RoutingHeadersRepository, exchange models.Exchange, headers map[string]string, now time.Time) error {
+	// Get existing headers for this exchange
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByExchange(exchange.ID, now)
+	if err != nil {
+		return err
+	}
+
+	// Create a map for quick lookup of existing headers
+	existingByKey := make(map[string]*models.RoutingHeader)
+	if existingHeaders != nil {
+		for i := range existingHeaders.Entities {
+			header := &existingHeaders.Entities[i]
+			existingByKey[header.Key] = header
+		}
+	}
+
+	// Process each header from input
+	for key, value := range headers {
+		if existingHeader, exists := existingByKey[key]; exists {
+			// Update existing header if value changed
+			if existingHeader.Value != value {
+				existingHeader.Value = value
+				existingHeader.HeaderType = models.HeaderTypeExchange
+				_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			headerID := exchange.ID + "_" + key
+			// Create new header
+			routingHeader := &models.RoutingHeader{
+				ID:         headerID,
+				ExchangeID: exchange.ID,
+				Key:        key,
+				Value:      value,
+				VNamespace: "",
+				HeaderType: models.HeaderTypeExchange,
+			}
+			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Remove headers that are no longer in the input
+	if existingHeaders != nil {
+		for _, existingHeader := range existingHeaders.Entities {
+			if _, stillExists := headers[existingHeader.Key]; !stillExists {
+				_, err := routingHeadersRepo.DeleteRoutingHeader(existingHeader.ID, now)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }

@@ -134,7 +134,7 @@ export class TenantsComponent implements OnInit {
   }
 
   openTenantManagement(tenant: any): void {
-    this.router.navigate(['/tenants', tenant.ID, 'management'], {
+    this.router.navigate(['/tenants', tenant.Code, 'management'], {
       queryParams: { name: tenant.Name }
     });
   }
@@ -179,7 +179,7 @@ export class TenantsComponent implements OnInit {
   }
 
   deleteTenant(): void {
-    this.tenantsService.deleteTenant(this.selectedTenant.ID).subscribe(() => {
+    this.tenantsService.deleteTenant(this.selectedTenant.Code).subscribe(() => {
       this.deleteModalVisible = false;
       this.loadTenants();
     });

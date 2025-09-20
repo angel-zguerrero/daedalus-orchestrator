@@ -10,14 +10,16 @@ service ExchangeService {
   rpc GetExchange (GetExchangeRequest) returns (GetExchangeResponse);
   rpc GetExchanges (GetExchangesRequest) returns (GetExchangesResponse);
   rpc DeleteExchange (DeleteExchangeRequest) returns (DeleteExchangeResponse);
+  rpc PublishMessage (PublishMessageRequest) returns (PublishMessageResponse);
 }
 
 message CreateExchangeRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string code = 2;
   string name = 3;
   string type = 4;
   string vnamespace = 5;
+  map<string, string> headers = 6;
 }
 
 message CreateExchangeResponse {
@@ -26,7 +28,7 @@ message CreateExchangeResponse {
 }
 
 message BulkCreateExchangeRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   repeated CreateExchangeItem exchanges = 2;
 }
 
@@ -35,6 +37,7 @@ message CreateExchangeItem {
   string name = 2;
   string type = 3;
   string vnamespace = 4;
+  map<string, string> headers = 5;
 }
 
 message BulkCreateExchangeResponse {
@@ -43,8 +46,9 @@ message BulkCreateExchangeResponse {
 }
 
 message GetExchangeRequest {
-  string tenantId = 1;
-  string exchangeId = 2;
+  string tenantCode = 1;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message GetExchangeResponse {
@@ -53,7 +57,7 @@ message GetExchangeResponse {
 }
 
 message GetExchangesRequest {
-  string tenantId = 1;
+  string tenantCode = 1;
   string q = 2;
   string cursor = 3;
   int32 pageSize = 4;
@@ -68,6 +72,7 @@ message Exchange {
   string VNamespace = 5;
   string CreatedAt = 6;
   string UpdatedAt = 7;
+  map<string, string> headers = 8;
 }
 
 message ExchangeFindResult {
@@ -81,12 +86,36 @@ message GetExchangesResponse {
 }
 
 message DeleteExchangeRequest {
-  string tenantId = 1;
-  string exchangeId = 2;
+  string tenantCode = 1;
+  string code = 2;
+  string vnamespace = 3;
 }
 
 message DeleteExchangeResponse {
   string message = 1;
+}
+
+message PublishMessageRequest {
+  string tenantCode = 1;
+  string exchangeCode = 2;
+  string routingKeyOrPatternOrQueueCode = 3;
+  string vnamespace = 4;
+  QueueMessage message = 5;
+}
+
+message QueueMessage {
+  string messageId = 1;
+  string handler = 2;
+  int32 priority = 3;
+  map<string, string> parameters = 4;
+  map<string, string> headers = 5;
+  string contentType = 6;
+  bytes content = 7;
+}
+
+message PublishMessageResponse {
+  string message = 1;
+  map<string, string> queueMessages = 2; // queueCode -> messageID
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/exchange.proto

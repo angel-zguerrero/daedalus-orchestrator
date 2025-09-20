@@ -58,26 +58,26 @@
 
     <!-- Queues Table -->
     <div class="table-responsive">
-      <table cTable class="mt-4" [hover]="true">
+      <table cTable class="mt-4" [hover]="true" style="min-width: 1000px;">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Code</th>
-            <th>Type</th>
-            <th>VNamespace</th>
-            <th>TTL (seconds)</th>
-            <th>Max Attempts</th>
-            <th>Allow Duplicated</th>
-            <th>Priority Type</th>
-            <th>Actions</th>
+            <th style="min-width: 150px;">Name</th>
+            <th style="min-width: 120px;">Code</th>
+            <th style="min-width: 100px;">Type</th>
+            <th style="min-width: 120px;">VNamespace</th>
+            <th style="min-width: 100px;">TTL (seconds)</th>
+            <th style="min-width: 100px;">Max Attempts</th>
+            <th style="min-width: 120px;">Allow Duplicated</th>
+            <th style="min-width: 120px;">Priority Type</th>
+            <th style="min-width: 240px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let queue of queues" class="align-middle">
-            <td class="text-truncate" style="max-width: 180px;" title="{{ queue.Name }}">
+            <td class="text-truncate" style="max-width: 150px;" title="{{ queue.Name }}">
               <strong>{{ queue.Name }}</strong>
             </td>
-            <td class="text-truncate" style="max-width: 150px;" title="{{ queue.Code }}">
+            <td class="text-truncate" style="max-width: 120px;" title="{{ queue.Code }}">
               <code>{{ queue.Code }}</code>
             </td>
             <td>
@@ -85,7 +85,9 @@
                 {{ queue.Type }}
               </c-badge>
             </td>
-            <td class="text-truncate" style="max-width: 120px;" title="{{ queue.VNamespace || '-' }}">{{ queue.VNamespace || '-' }}</td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ queue.VNamespace || '-' }}">
+              {{ queue.VNamespace || '-' }}
+            </td>
             <td class="text-center">
               {{ queue.TTLQueue || 0 }}{{ (queue.TTLQueue && queue.TTLQueue > 0) ? 's' : '' }}
             </td>
@@ -101,7 +103,7 @@
               </c-badge>
             </td>
             <td>
-              <div class="btn-group" role="group">
+              <div class="btn-group" role="group" aria-label="Queue actions">
                 <button 
                   cButton 
                   color="info" 
@@ -117,6 +119,14 @@
                   (click)="openEditModal(queue)"
                   title="Edit">
                   <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="success" 
+                  size="sm" 
+                  (click)="openSendMessageModal(queue)"
+                  title="Send Message">
+                  <svg cIcon name="cil-envelope-closed"></svg>
                 </button>
                 <button 
                   cButton 
@@ -271,50 +281,44 @@
       </c-row>
 
       <!-- Fair Priority Thresholds Configuration -->
-                                          <!-- Fair Priority Thresholds Section -->
-                  <div class="mb-3 priority-fair-section" [style.display]="queueFormUpdate.value.priorityType === 'fair' ? 'block' : 'none'">
-                    <label class="form-label fw-bold">Desired Priority Thresholds</label>
-                    <div class="mb-3">
-                      <div class="d-flex align-items-center gap-3 mb-3">
-                        <label class="form-label mb-0">Number of Priority Levels:</label>
-                        <div class="btn-group" role="group">
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 2" (click)="setEditPriorityLevels(2)">2</button>
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 3" (click)="setEditPriorityLevels(3)">3</button>
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 4" (click)="setEditPriorityLevels(4)">4</button>
-                          <button type="button" class="btn btn-outline-primary btn-sm" [class.active]="editPriorityLevels === 5" (click)="setEditPriorityLevels(5)">5</button>
-                        </div>
-                      </div>
-                      
-                      <!-- Priority Threshold Inputs -->
-                      <div class="row g-3">
-                        <div class="col-6 col-md-4 col-lg-3" *ngFor="let level of getEditPriorityLevelsArray(); let i = index">
-                          <div class="form-group">
-                            <label class="form-label small fw-bold">Priority {{i + 1}}</label>
-                            <input 
-                              type="number" 
-                              class="form-control form-control-sm" 
-                              [ngModel]="editDesiredPriorityThresholds[i] || 0"
-                              (ngModelChange)="updateEditDesiredPriorityThresholds(i, $event)"
-                              [ngModelOptions]="{standalone: true}"
-                              [name]="'editPriorityThreshold_' + i"
-                              min="0"
-                              placeholder="0 = All tasks"
-                            >
-                            <div class="form-text small">
-                              {{editDesiredPriorityThresholds[i] === 0 ? 'Process all tasks' : 'tasks limit'}}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div class="mt-3 p-2 bg-info bg-opacity-10 border border-info rounded">
-                        <small class="text-info">
-                          <svg cIcon name="cil-info" class="me-1"></svg>
-                          <strong>Note:</strong> These are your desired values. The system will transition to these values when appropriate, considering current queue usage.
-                        </small>
-                      </div>
-                    </div>
-                  </div>
+      <div *ngIf="priorityType === 'fair'" class="mb-3">
+        <c-row class="mb-2">
+          <c-col [md]="12">
+            <label class="form-label fw-bold">Desired Priority Thresholds</label>
+            <p class="text-muted small">
+              Set the desired number of tasks to process for each priority before moving to the next priority level.
+              Use 0 to process all tasks of a priority before moving to the next one.
+            </p>
+          </c-col>
+        </c-row>
+        <c-row [gutter]="{gy: 2, gx: 3}">
+          <c-col [md]="6" [lg]="4" *ngFor="let priority of getPriorityArray(); let i = index">
+            <div class="border rounded p-3 mb-2">
+              <label class="form-label">Priority {{i + 1}}</label>
+              <input 
+                cFormControl 
+                type="number" 
+                min="0" 
+                max="10000"
+                placeholder="0"
+                [(ngModel)]="desiredPriorityThresholds[i]" 
+                [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="updateDesiredPriorityThresholds(i, $event)"
+                class="form-control" />
+              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this priority first)</small>
+            </div>
+          </c-col>
+        </c-row>
+        <div *ngIf="priorityType === 'fair' && maxPriority > 0" class="mt-2">
+          <c-alert color="info" class="mb-0">
+            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
+            Higher priorities (higher numbers) will be processed first, but after processing the specified number 
+            of tasks, the system will move to the next priority level.
+            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
+            before moving to the next priority level.
+          </c-alert>
+        </div>
+      </div>
 
       <!-- Normal Priority Information -->
       <div *ngIf="priorityType === 'normal'" class="mb-3">
@@ -323,6 +327,62 @@
           Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
+
+      <!-- Headers Configuration Section -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Queue Headers (Optional)
+          </h6>
+        </c-col>
+      </c-row>
+
+      <!-- Headers Management -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="5">
+          <label cLabel for="headerKey">Header Key</label>
+          <input cFormControl id="headerKey" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}" placeholder="e.g., content-type" />
+        </c-col>
+        <c-col [md]="5">
+          <label cLabel for="headerValue">Header Value</label>
+          <input cFormControl id="headerValue" [(ngModel)]="queueHeaderValue" [ngModelOptions]="{standalone: true}" placeholder="e.g., application/json" />
+        </c-col>
+        <c-col [md]="2" class="d-flex align-items-end">
+          <button cButton color="success" variant="outline" (click)="addQueueHeader()" [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </c-col>
+      </c-row>
+
+      <!-- Headers List -->
+      <c-row class="mb-3" *ngIf="queueHeaders.length > 0" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <div class="table-responsive">
+            <table cTable class="table-sm">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="80">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let header of queueHeaders; let i = index">
+                  <td><code>{{ header.key }}</code></td>
+                  <td>{{ header.value }}</td>
+                  <td>
+                    <button cButton color="danger" variant="outline" size="sm" (click)="removeQueueHeader(i)">
+                      <svg cIcon name="cil-trash"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </c-col>
+      </c-row>
     </form>
   </c-modal-body>
   <c-modal-footer>
@@ -481,6 +541,62 @@
           Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
+
+      <!-- Headers Configuration Section -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Queue Headers (Optional)
+          </h6>
+        </c-col>
+      </c-row>
+
+      <!-- Headers Management -->
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="5">
+          <label cLabel for="headerKey-update">Header Key</label>
+          <input cFormControl id="headerKey-update" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}" placeholder="e.g., content-type" />
+        </c-col>
+        <c-col [md]="5">
+          <label cLabel for="headerValue-update">Header Value</label>
+          <input cFormControl id="headerValue-update" [(ngModel)]="queueHeaderValue" [ngModelOptions]="{standalone: true}" placeholder="e.g., application/json" />
+        </c-col>
+        <c-col [md]="2" class="d-flex align-items-end">
+          <button cButton color="success" variant="outline" (click)="addQueueHeader()" [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </c-col>
+      </c-row>
+
+      <!-- Headers List -->
+      <c-row class="mb-3" *ngIf="queueHeaders.length > 0" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <div class="table-responsive">
+            <table cTable class="table-sm">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th width="80">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let header of queueHeaders; let i = index">
+                  <td><code>{{ header.key }}</code></td>
+                  <td>{{ header.value }}</td>
+                  <td>
+                    <button cButton color="danger" variant="outline" size="sm" (click)="removeQueueHeader(i)">
+                      <svg cIcon name="cil-trash"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </c-col>
+      </c-row>
     </form>
   </c-modal-body>
   <c-modal-footer>
@@ -719,6 +835,40 @@
             Currently active priority configuration - tasks with higher priority values are processed first
           </div>
         </div>
+
+        <!-- Headers Section -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <svg cIcon name="cil-tags" class="me-2"></svg>
+            Queue Headers
+          </label>
+          <div class="form-text mb-2">Headers associated with this queue for routing and metadata</div>
+          
+          <div *ngIf="selectedQueue?.Headers && getHeadersArray(selectedQueue.Headers).length > 0; else noQueueHeaders" class="border rounded p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="mb-0">Queue Headers ({{ getHeadersArray(selectedQueue.Headers).length }})</h6>
+            </div>
+            
+            <div class="row">
+              <div *ngFor="let header of getHeadersArray(selectedQueue.Headers)" class="col-md-6 mb-2">
+                <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
+                  <div class="d-flex flex-column flex-grow-1">
+                    <code class="text-info mb-1">{{ header.key }}</code>
+                    <code class="text-light">{{ header.value }}</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <ng-template #noQueueHeaders>
+            <div class="border rounded p-3 text-center text-muted">
+              <svg cIcon name="cil-tags" size="2xl" class="mb-2 opacity-50"></svg>
+              <div>No headers configured for this queue</div>
+              <small class="mt-1 d-block">Custom headers can be configured when creating or editing the queue</small>
+            </div>
+          </ng-template>
+        </div>
       </div>
     </div>
   </c-modal-body>
@@ -775,7 +925,291 @@
     <button cButton color="primary" (click)="uploadQueues()" [disabled]="loading || !file">
       <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
       <svg *ngIf="!loading" cIcon name="cil-cloud-upload" class="me-1"></svg>
-      {{ loading ? 'Uploading...' : 'Upload Queues' }}
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Send Message Modal -->
+<c-modal id="sendMessageModal" [visible]="sendMessageModalVisible" (visibleChange)="sendMessageModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-envelope-closed" class="me-2"></svg>
+      Send Message - {{ selectedQueue?.Name }}
+    </h5>
+    <button (click)="sendMessageModalVisible = false" cButtonClose [disabled]="loading"></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert && errorMessage" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="success" *ngIf="showAlert && successMessage" [innerHTML]="successMessage"></c-alert>
+    <form [formGroup]="sendMessageForm" (ngSubmit)="sendMessage()">
+      
+      <!-- Message ID Field (Optional) -->
+      <div class="mb-3">
+        <label cLabel for="messageId">Message ID (Optional)</label>
+        <input 
+          type="text" 
+          id="messageId"
+          cFormControl 
+          formControlName="messageId"
+          placeholder="Enter custom message ID (auto-generated if empty)">
+        <div class="form-text">Leave empty to auto-generate a unique message ID</div>
+      </div>
+
+      <!-- Handler Field -->
+      <div class="mb-3">
+        <label cLabel for="handler">Handler</label>
+        <input 
+          type="text" 
+          id="handler"
+          cFormControl 
+          formControlName="handler"
+          placeholder="Enter handler name">
+      </div>
+
+      <!-- Priority Field -->
+      <div class="mb-3">
+        <label cLabel for="priority">Priority (Optional)</label>
+        <input 
+          type="number" 
+          id="priority"
+          cFormControl 
+          formControlName="priority"
+          min="0"
+          placeholder="Enter priority (0 or higher, default: 0)">
+        <div *ngIf="sendMessageForm.get('priority')?.invalid && sendMessageForm.get('priority')?.touched" class="text-danger small">
+          Priority must be 0 or higher
+        </div>
+      </div>
+
+      <!-- Parameters Section -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label cLabel>Parameters</label>
+        </div>
+        <div class="d-flex mb-2">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Parameter Name"
+            [(ngModel)]="messageParameterKey"
+            [ngModelOptions]="{standalone: true}">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Parameter Value"
+            [(ngModel)]="messageParameterValue"
+            [ngModelOptions]="{standalone: true}">
+          <button 
+            type="button" 
+            cButton 
+            size="sm" 
+            color="success" 
+            variant="outline"
+            (click)="addParameter()"
+            title="Add Parameter">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </div>
+        <div *ngIf="messageParameters.length === 0" class="text-muted fst-italic">
+          No parameters added yet
+        </div>
+        <div *ngFor="let param of messageParameters; let i = index" class="d-flex mb-2">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Parameter Name"
+            [(ngModel)]="param.key"
+            [ngModelOptions]="{standalone: true}">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Parameter Value"
+            [(ngModel)]="param.value"
+            [ngModelOptions]="{standalone: true}">
+          <button 
+            type="button" 
+            cButton 
+            size="sm" 
+            color="danger" 
+            variant="outline"
+            (click)="removeParameter(i)"
+            title="Remove Parameter">
+            <svg cIcon name="cil-trash"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Headers Section -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label cLabel>Message Headers</label>
+        </div>
+        <div class="mb-2 p-2 bg-info bg-opacity-10 border border-info rounded">
+          <small class="text-info">
+            <svg cIcon name="cil-info" class="me-1"></svg>
+            <strong>Message Headers:</strong> 
+            Headers that will be attached to the message for routing and metadata purposes.
+          </small>
+        </div>
+        <div class="d-flex mb-2">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Header Name (e.g., content-type)"
+            [(ngModel)]="messageHeaderKey"
+            [ngModelOptions]="{standalone: true}">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Header Value (e.g., application/json)"
+            [(ngModel)]="messageHeaderValue"
+            [ngModelOptions]="{standalone: true}">
+          <button 
+            type="button" 
+            cButton 
+            size="sm" 
+            color="success" 
+            variant="outline"
+            (click)="addMessageHeader()"
+            title="Add Header">
+            <svg cIcon name="cil-plus"></svg>
+          </button>
+        </div>
+        <div *ngIf="messageHeaders.length === 0" class="text-muted fst-italic">
+          No headers added yet
+        </div>
+        <div *ngFor="let header of messageHeaders; let i = index" class="d-flex mb-2">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Header Name (e.g., content-type)"
+            [(ngModel)]="header.key"
+            [ngModelOptions]="{standalone: true}">
+          <input 
+            type="text" 
+            class="form-control me-2" 
+            placeholder="Header Value (e.g., application/json)"
+            [(ngModel)]="header.value"
+            [ngModelOptions]="{standalone: true}">
+          <button 
+            type="button" 
+            cButton 
+            size="sm" 
+            color="danger" 
+            variant="outline"
+            (click)="removeMessageHeader(i)"
+            title="Remove Header">
+            <svg cIcon name="cil-trash"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Content Type -->
+      <div class="mb-3">
+        <label cLabel for="contentType">Content Type (Optional)</label>
+        <select cSelect id="contentType" formControlName="contentType">
+          <option value="">Select Content Type (Optional)</option>
+          <option value="application/json">JSON</option>
+          <option value="text/plain">Text</option>
+          <option value="application/octet-stream">Binary</option>
+        </select>
+      </div>
+
+      <!-- Content Field -->
+      <div class="mb-3">
+        <label cLabel for="content">Content (Optional)</label>
+        
+        <!-- JSON Content -->
+        <div *ngIf="sendMessageForm.get('contentType')?.value === 'application/json'">
+          <textarea 
+            id="content"
+            cFormControl 
+            formControlName="content"
+            rows="8"
+            placeholder='Enter valid JSON content (e.g., {"message": "Hello World"})'></textarea>
+        </div>
+
+        <!-- Text Content -->
+        <div *ngIf="sendMessageForm.get('contentType')?.value === 'text/plain'">
+          <textarea 
+            id="content"
+            cFormControl 
+            formControlName="content"
+            rows="8"
+            placeholder="Enter text content"></textarea>
+        </div>
+
+        <!-- Binary Content -->
+        <div *ngIf="sendMessageForm.get('contentType')?.value === 'application/octet-stream'">
+          <input 
+            type="file" 
+            id="content-file"
+            class="form-control"
+            (change)="onFileSelected($event)"
+            accept="*/*">
+          <div class="form-text">Select a file to upload as binary content</div>
+          <div *ngIf="selectedFile" class="mt-2">
+            <small class="text-muted">Selected file: {{ selectedFile.name }}</small>
+          </div>
+        </div>
+
+      </div>
+
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="sendMessageModalVisible = false" cButton color="secondary" [disabled]="loading">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="sendMessage()" [disabled]="loading || sendMessageForm.invalid">
+      <c-spinner *ngIf="loading" size="sm" class="me-2"></c-spinner>
+      <svg *ngIf="!loading" cIcon name="cil-envelope-closed" class="me-1"></svg>
+      {{ loading ? 'Sending...' : 'Send Message' }}
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Message Result Modal -->
+<c-modal [visible]="messageResultModalVisible" backdrop="static" keyboard="false">
+  <c-modal-header>
+    <h4 cModalTitle>
+      <svg cIcon name="cil-check-circle" class="me-2 text-success"></svg>
+      Message Sent Successfully
+    </h4>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="alert alert-success d-flex align-items-center mb-3">
+      <svg cIcon name="cil-check-circle" class="me-2"></svg>
+      <div>
+        Message delivered to queue <strong>{{ selectedQueue?.Code }}</strong>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table cTable hover striped>
+        <thead>
+          <tr>
+            <th scope="col">Queue Code</th>
+            <th scope="col">Message ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let result of messageResults">
+            <td>
+              <code>{{ result.queueCode }}</code>
+            </td>
+            <td>
+              <code class="text-primary">{{ result.messageId }}</code>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="justify-content-center">
+    <button cButton color="primary" (click)="closeMessageResultModal()">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Accept
     </button>
   </c-modal-footer>
 </c-modal>

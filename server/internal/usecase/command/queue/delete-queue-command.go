@@ -1,9 +1,10 @@
-package queue_command
+package queue
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
+	"fmt"
 	"time"
 )
 
@@ -12,9 +13,10 @@ func init() {
 }
 
 type DeleteQueueCommand struct {
-	ID  string
-	CF  string
-	CFS string
+	Code       string
+	VNamespace string
+	CF         string
+	CFS        string
 }
 
 func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -27,13 +29,105 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	bindingRepo, err := db.NewBindingRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
 
-	deleted, err := queueRepo.DeleteQueueById(cmd.ID, now)
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	fmt.Println("Attempting to delete queue with code:", cmd.Code, "in vNamespace:", cmd.VNamespace)
+	// First find the queue by code
+	queue, err := queueRepo.GetQueueByCode(cmd.Code, cmd.VNamespace, now)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	if queue == nil {
+		commandResult.Error = "queue not found"
+		return *commandResult
+	}
+
+	// Find and delete all bindings associated with this queue (with pagination)
+	bindingCount := 0
+	cursor := ""
+
+	for {
+		bindingsResult, err := bindingRepo.Find("QueueID = "+queue.ID, 100, cursor, now)
+		if err != nil {
+			commandResult.Error = "error retrieving queue bindings: " + err.Error()
+			return *commandResult
+		}
+
+		if bindingsResult == nil || len(bindingsResult.Entities) == 0 {
+			break
+		}
+
+		for _, binding := range bindingsResult.Entities {
+			// Delete all routing headers associated with this binding
+			headersResult, err := routingHeadersRepo.GetRoutingHeadersByBinding(binding.ID, now)
+			if err != nil {
+				commandResult.Error = "error retrieving binding headers: " + err.Error()
+				return *commandResult
+			}
+
+			if headersResult != nil && len(headersResult.Entities) > 0 {
+				for _, header := range headersResult.Entities {
+					_, err := routingHeadersRepo.DeleteRoutingHeader(header.ID, now)
+					if err != nil {
+						commandResult.Error = "error deleting binding header: " + err.Error()
+						return *commandResult
+					}
+				}
+			}
+
+			// Delete the binding
+			_, err = bindingRepo.DeleteBinding(binding.ID, now)
+			if err != nil {
+				commandResult.Error = "error deleting binding: " + err.Error()
+				return *commandResult
+			}
+			bindingCount++
+		}
+
+		// Update cursor for next page
+		cursor = bindingsResult.Cursor
+		if cursor == "" {
+			break
+		}
+	}
+
+	// Delete all routing headers associated directly with this queue
+	headersResult, err := routingHeadersRepo.GetRoutingHeadersByQueue(queue.ID, now)
+	if err != nil {
+		commandResult.Error = "error retrieving queue headers: " + err.Error()
+		return *commandResult
+	}
+
+	if headersResult != nil && len(headersResult.Entities) > 0 {
+		for _, header := range headersResult.Entities {
+			_, err := routingHeadersRepo.DeleteRoutingHeader(header.ID, now)
+			if err != nil {
+				commandResult.Error = "error deleting queue header: " + err.Error()
+				return *commandResult
+			}
+		}
+	}
+
+	// Now delete the queue by ID
+	deleted, err := queueRepo.DeleteQueueById(queue.ID, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -44,7 +138,9 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
-	err = tenantSummaryRepo.DecreaseQueueCount(cmd.CFS, 1, now)
+	// Update tenant summary with a single operation
+	// Decrease queue count by 1 and binding count by bindingCount
+	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, 0, -1, -bindingCount, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

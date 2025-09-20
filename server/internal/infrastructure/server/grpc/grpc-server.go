@@ -44,7 +44,7 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 
 	otelHandler := otelgrpc.NewServerHandler()
 	authInterceptor := UnaryAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
-	rateLimitInterceptor := UnaryRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Minute, 20)
+	rateLimitInterceptor := UnaryRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Minute, 300)
 
 	server := grpc.NewServer(
 		grpc.StatsHandler(otelHandler),

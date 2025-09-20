@@ -1,4 +1,4 @@
-package queue_command
+package queue
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -12,6 +12,7 @@ func init() {
 	gob.Register(AssertQueueCommand{})
 	gob.Register(models.Queue{})
 	gob.Register([]models.Queue{})
+	gob.Register(models.RoutingHeader{})
 }
 
 type AssertQueueCommand struct {
@@ -41,6 +42,12 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	routingHeadersRepo, err := db.NewRoutingHeadersRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	var resultQueues []models.Queue
 	newQueuesCount := 0
 
@@ -58,7 +65,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		}
 
 		// Look for existing queue by code (primary upsert strategy)
-		existing, err := queueRepo.GetQueueByCode(queue.Code, now)
+		existing, err := queueRepo.GetQueueByCode(queue.Code, queue.VNamespace, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
@@ -116,12 +123,22 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
+
+		// Update headers if provided
+		if queue.Headers != nil && len(queue.Headers) > 0 {
+			err = cmd.upsertQueueHeaders(routingHeadersRepo, queue, queue.Headers, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+		}
+
 		resultQueues = append(resultQueues, queue)
 	}
 
 	// Update tenant summary with the total count of new queues created
 	if newQueuesCount > 0 {
-		err = tenantSummaryRepo.IncreaseQueueCount(cmd.CFS, newQueuesCount, now)
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, 0, newQueuesCount, 0, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
@@ -130,4 +147,67 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 	commandResult.Result = resultQueues
 	return *commandResult
+}
+
+// upsertQueueHeaders creates or updates routing headers for a queue
+func (cmd *AssertQueueCommand) upsertQueueHeaders(routingHeadersRepo *db.RoutingHeadersRepository, queue models.Queue, headers map[string]string, now time.Time) error {
+	// Get existing headers for this queue
+	existingHeaders, err := routingHeadersRepo.GetRoutingHeadersByQueue(queue.ID, now)
+	if err != nil {
+		return err
+	}
+
+	// Create a map for quick lookup of existing headers
+	existingByKey := make(map[string]*models.RoutingHeader)
+	if existingHeaders != nil {
+		for i := range existingHeaders.Entities {
+			header := &existingHeaders.Entities[i]
+			existingByKey[header.Key] = header
+		}
+	}
+
+	// Process each header from input
+	for key, value := range headers {
+		if existingHeader, exists := existingByKey[key]; exists {
+			// Update existing header if value changed
+			if existingHeader.Value != value {
+				existingHeader.Value = value
+				existingHeader.HeaderType = models.HeaderTypeQueue
+				_, err := routingHeadersRepo.UpdateRoutingHeader(existingHeader, now)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+
+			headerID := queue.ID + "_" + key
+			// Create new header
+			routingHeader := &models.RoutingHeader{
+				ID:         headerID,
+				QueueID:    queue.ID,
+				VNamespace: queue.VNamespace,
+				Key:        key,
+				Value:      value,
+				HeaderType: models.HeaderTypeQueue,
+			}
+			_, err := routingHeadersRepo.CreateRoutingHeader(routingHeader, now)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Remove headers that are no longer in the input
+	if existingHeaders != nil {
+		for _, existingHeader := range existingHeaders.Entities {
+			if _, stillExists := headers[existingHeader.Key]; !stillExists {
+				_, err := routingHeadersRepo.DeleteRoutingHeader(existingHeader.ID, now)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }

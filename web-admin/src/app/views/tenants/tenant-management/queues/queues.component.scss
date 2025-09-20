@@ -2,19 +2,19 @@
 
 .table-responsive {
   border-radius: 0.5rem;
-  overflow: hidden;
-}
-
-.btn-group .btn {
-  margin: 0 2px;
-}
-
-.btn-group .btn:first-child {
-  margin-left: 0;
-}
-
-.btn-group .btn:last-child {
-  margin-right: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  
+  table {
+    min-width: 1000px;
+    margin-bottom: 0;
+  }
+  
+  th, td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
 }
 
 .queue-type-badge {

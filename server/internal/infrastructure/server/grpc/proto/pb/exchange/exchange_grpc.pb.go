@@ -24,6 +24,7 @@ const (
 	ExchangeService_GetExchange_FullMethodName        = "/exchange.ExchangeService/GetExchange"
 	ExchangeService_GetExchanges_FullMethodName       = "/exchange.ExchangeService/GetExchanges"
 	ExchangeService_DeleteExchange_FullMethodName     = "/exchange.ExchangeService/DeleteExchange"
+	ExchangeService_PublishMessage_FullMethodName     = "/exchange.ExchangeService/PublishMessage"
 )
 
 // ExchangeServiceClient is the client API for ExchangeService service.
@@ -35,6 +36,7 @@ type ExchangeServiceClient interface {
 	GetExchange(ctx context.Context, in *GetExchangeRequest, opts ...grpc.CallOption) (*GetExchangeResponse, error)
 	GetExchanges(ctx context.Context, in *GetExchangesRequest, opts ...grpc.CallOption) (*GetExchangesResponse, error)
 	DeleteExchange(ctx context.Context, in *DeleteExchangeRequest, opts ...grpc.CallOption) (*DeleteExchangeResponse, error)
+	PublishMessage(ctx context.Context, in *PublishMessageRequest, opts ...grpc.CallOption) (*PublishMessageResponse, error)
 }
 
 type exchangeServiceClient struct {
@@ -95,6 +97,16 @@ func (c *exchangeServiceClient) DeleteExchange(ctx context.Context, in *DeleteEx
 	return out, nil
 }
 
+func (c *exchangeServiceClient) PublishMessage(ctx context.Context, in *PublishMessageRequest, opts ...grpc.CallOption) (*PublishMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublishMessageResponse)
+	err := c.cc.Invoke(ctx, ExchangeService_PublishMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ExchangeServiceServer is the server API for ExchangeService service.
 // All implementations must embed UnimplementedExchangeServiceServer
 // for forward compatibility.
@@ -104,6 +116,7 @@ type ExchangeServiceServer interface {
 	GetExchange(context.Context, *GetExchangeRequest) (*GetExchangeResponse, error)
 	GetExchanges(context.Context, *GetExchangesRequest) (*GetExchangesResponse, error)
 	DeleteExchange(context.Context, *DeleteExchangeRequest) (*DeleteExchangeResponse, error)
+	PublishMessage(context.Context, *PublishMessageRequest) (*PublishMessageResponse, error)
 	mustEmbedUnimplementedExchangeServiceServer()
 }
 
@@ -128,6 +141,9 @@ func (UnimplementedExchangeServiceServer) GetExchanges(context.Context, *GetExch
 }
 func (UnimplementedExchangeServiceServer) DeleteExchange(context.Context, *DeleteExchangeRequest) (*DeleteExchangeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteExchange not implemented")
+}
+func (UnimplementedExchangeServiceServer) PublishMessage(context.Context, *PublishMessageRequest) (*PublishMessageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PublishMessage not implemented")
 }
 func (UnimplementedExchangeServiceServer) mustEmbedUnimplementedExchangeServiceServer() {}
 func (UnimplementedExchangeServiceServer) testEmbeddedByValue()                         {}
@@ -240,6 +256,24 @@ func _ExchangeService_DeleteExchange_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ExchangeService_PublishMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ExchangeServiceServer).PublishMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ExchangeService_PublishMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ExchangeServiceServer).PublishMessage(ctx, req.(*PublishMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ExchangeService_ServiceDesc is the grpc.ServiceDesc for ExchangeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +300,10 @@ var ExchangeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteExchange",
 			Handler:    _ExchangeService_DeleteExchange_Handler,
+		},
+		{
+			MethodName: "PublishMessage",
+			Handler:    _ExchangeService_PublishMessage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

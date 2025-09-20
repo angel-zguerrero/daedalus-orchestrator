@@ -28,19 +28,29 @@ func NewQueueController(Config *common.ServerConfing) *QueueController {
 }
 
 type createQueueRequest struct {
-	Code                      string      `json:"code" binding:"required"`
-	Name                      string      `json:"name" binding:"required"`
-	Type                      string      `json:"type" binding:"required"`
-	State                     string      `json:"state"`
-	VNamespace                string      `json:"vnamespace" binding:"required"`
-	TTLQueue                  int         `json:"ttlQueue"`
-	AllowDuplicated           bool        `json:"allowDuplicated"`
-	MaxAttempts               int         `json:"maxAttempts"`
-	DesiredPriorityThresholds map[int]int `json:"desiredPriorityThresholds"`
+	Code                      string            `json:"code" binding:"required"`
+	Name                      string            `json:"name" binding:"required"`
+	Type                      string            `json:"type" binding:"required"`
+	State                     string            `json:"state"`
+	VNamespace                string            `json:"vnamespace" binding:"required"`
+	TTLQueue                  int               `json:"ttlQueue"`
+	AllowDuplicated           bool              `json:"allowDuplicated"`
+	MaxAttempts               int               `json:"maxAttempts"`
+	DesiredPriorityThresholds map[int]int       `json:"desiredPriorityThresholds"`
+	Headers                   map[string]string `json:"headers"`
 }
 
 type createBulkQueueRequest struct {
 	Queues []createQueueRequest `json:"queues" binding:"required"`
+}
+
+type enqueueMessageRequest struct {
+	Content     string            `json:"content"`
+	ContentType string            `json:"contentType"`
+	Headers     map[string]string `json:"headers"`
+	Priority    int               `json:"priority"`
+	Handler     string            `json:"handler" binding:"required"`
+	Parameters  map[string]string `json:"parameters"`
 }
 
 // CreateQueueHandler handles POST /rest-api/tenants/:id/queue
@@ -58,8 +68,8 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		return
 	}
 
-	tenantID := c.Param("id")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenantCode := c.Param("code")
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -86,6 +96,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		AllowDuplicated:           req.AllowDuplicated,
 		MaxAttempts:               req.MaxAttempts,
 		DesiredPriorityThresholds: req.DesiredPriorityThresholds,
+		Headers:                   req.Headers, // Add headers support
 	}
 
 	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), []*models.Queue{queue}, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
@@ -116,9 +127,9 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 		}
 	}
 
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -146,6 +157,7 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			AllowDuplicated:           t.AllowDuplicated,
 			MaxAttempts:               t.MaxAttempts,
 			DesiredPriorityThresholds: t.DesiredPriorityThresholds,
+			Headers:                   t.Headers, // Add headers support
 		}
 		queues = append(queues, queue)
 	}
@@ -162,17 +174,18 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 	})
 }
 
-// GetQueueHandler handles GET /rest-api/tenants/:id/queue/:queueId
+// GetQueueHandler handles GET /rest-api/tenants/:code/queue/:queueCode/:vnamespace
 func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
-	queueID := c.Param("queueId")
-	tenantID := c.Param("id")
+	queueCode := c.Param("queueCode")
+	vnamespace := c.Param("vnamespace")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueCode, vnamespace, false, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -184,33 +197,34 @@ func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 	})
 }
 
-// DeleteQueueHandler handles DELETE /rest-api/tenants/:id/queue/:queueId
+// DeleteQueueHandler handles DELETE /rest-api/tenants/:code/queue/:queueCode/:vnamespace
 func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
-	queueID := c.Param("queueId")
-	tenantID := c.Param("id")
+	queueCode := c.Param("queueCode")
+	vnamespace := c.Param("vnamespace")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueID, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err = ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Queue " + queueID + " was deleted",
+		"message": "Queue " + queueCode + " in namespace " + vnamespace + " was deleted",
 	})
 }
 
 func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantID := c.Param("id")
+	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantID)
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -222,7 +236,10 @@ func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 		page = 1000
 	}
 
-	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	// Check if headers should be included from query parameter
+	includeHeaders := c.Query("includeHeaders") == "true"
+
+	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), includeHeaders, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -235,6 +252,52 @@ func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Queue list",
 		"result":  findResult,
+	})
+}
+
+// EnqueueMessageHandler handles POST /rest-api/tenants/:code/queue/:queueCode/:vnamespace/enqueue
+func (ctrl *QueueController) EnqueueMessageHandler(c *gin.Context) {
+	var req enqueueMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ctrl.Config.Logger.Warn().Err(err).Msg("enqueue message attempt with invalid payload")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	queueCode := c.Param("queueCode")
+	vnamespace := c.Param("vnamespace")
+	tenantCode := c.Param("code")
+
+	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create the message
+	message := models.QueueMessage{
+		Content:     []byte(req.Content),
+		ContentType: req.ContentType,
+		Headers:     req.Headers,
+		Priority:    req.Priority,
+		Handler:     req.Handler,
+		Parameters:  req.Parameters,
+		VNamespace:  vnamespace,
+	}
+
+	// Enqueue the message
+	messageID, err := ctrl.QueueBO.EnqueueMessage(c.Request.Context(), queueCode, message, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Message enqueued successfully",
+		"messageId": messageID,
+		"result": gin.H{
+			queueCode: messageID,
+		},
 	})
 }
 

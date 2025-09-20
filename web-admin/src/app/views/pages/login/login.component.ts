@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { CommonModule, NgStyle } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { IconDirective } from '@coreui/icons-angular';
 import {
   ButtonDirective,
@@ -17,7 +17,7 @@ import {
   AlertComponent,
 } from '@coreui/angular';
 import { FormsModule, NgForm } from '@angular/forms'; // Import FormsModule
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../auth/auth.service'; // Import AuthService
 
 @Component({
@@ -37,9 +37,7 @@ import { AuthService } from '../../../auth/auth.service'; // Import AuthService
     IconDirective,
     FormControlDirective,
     ButtonDirective,
-    NgStyle,
     FormsModule, // Add FormsModule here
-    RouterLink,
     TextColorDirective,
     AlertComponent,
     CommonModule

@@ -53,7 +53,7 @@ func convertPriorityThresholdsToProto(modelMap map[int]int) map[int32]int32 {
 }
 
 func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest) (*pb.CreateQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +74,7 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 		AllowDuplicated:           r.AllowDuplicated,
 		MaxAttempts:               int(r.MaxAttempts),
 		DesiredPriorityThresholds: convertDesiredPriorityThresholds(r.DesiredPriorityThresholds),
+		Headers:                   r.Headers, // Add headers support
 	}
 
 	// Set defaults if not provided
@@ -104,12 +105,13 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 			MaxAttempts:               int32(result.MaxAttempts),
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(result.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(result.PriorityThresholds),
+			Headers:                   result.Headers, // Include headers in response
 		},
 	}, nil
 }
 
 func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueueRequest) (*pb.BulkCreateQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +133,7 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 			AllowDuplicated:           t.AllowDuplicated,
 			MaxAttempts:               int(t.MaxAttempts),
 			DesiredPriorityThresholds: convertDesiredPriorityThresholds(t.DesiredPriorityThresholds),
+			Headers:                   t.Headers, // Add headers support
 		}
 		// Set defaults if not provided
 		if queue.MaxAttempts == 0 {
@@ -160,6 +163,7 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 			MaxAttempts:               int32(e.MaxAttempts),
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(e.PriorityThresholds),
+			Headers:                   e.Headers, // Include headers in response
 		}
 		rQueues = append(rQueues, ex)
 	}
@@ -171,12 +175,12 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 }
 
 func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb.GetQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
 
-	queue, err := s.QueueBO.GetQueue(ctx, r.QueueId, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queue, err := s.QueueBO.GetQueue(ctx, r.Code, r.Vnamespace, false, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -197,17 +201,18 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 			MaxAttempts:               int32(queue.MaxAttempts),
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(queue.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(queue.PriorityThresholds),
+			Headers:                   queue.Headers, // Include headers in response
 		},
 	}, nil
 }
 
 func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*pb.GetQueuesResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
 
-	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, r.IncludeHeaders, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -229,6 +234,12 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 			DesiredPriorityThresholds: convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
 			PriorityThresholds:        convertPriorityThresholdsToProto(e.PriorityThresholds),
 		}
+
+		// Add headers if requested and available
+		if r.IncludeHeaders && e.Headers != nil {
+			ex.Headers = e.Headers
+		}
+
 		rQueues = append(rQueues, ex)
 	}
 
@@ -242,18 +253,52 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 }
 
 func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest) (*pb.DeleteQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantId)
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.QueueBO.DeleteQueue(ctx, r.QueueId, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err = s.QueueBO.DeleteQueue(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.DeleteQueueResponse{
-		Message: "Queue " + r.QueueId + " was deleted",
+		Message: "Queue " + r.Code + " in namespace " + r.Vnamespace + " was deleted",
+	}, nil
+}
+
+func (s *QueueService) EnqueueMessage(ctx context.Context, r *pb.EnqueueMessageRequest) (*pb.EnqueueMessageResponse, error) {
+	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the message
+	message := models.QueueMessage{
+		Content:     []byte(r.Content),
+		ContentType: r.ContentType,
+		Headers:     r.Headers,
+		Priority:    int(r.Priority),
+		Handler:     r.Handler,
+		Parameters:  r.Parameters,
+		VNamespace:  r.Vnamespace,
+	}
+
+	// Enqueue the message
+	messageID, err := s.QueueBO.EnqueueMessage(ctx, r.QueueCode, message, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build result map
+	result := make(map[string]string)
+	result[r.QueueCode] = messageID
+
+	return &pb.EnqueueMessageResponse{
+		Message:   "Message enqueued successfully",
+		MessageId: messageID,
+		Result:    result,
 	}, nil
 }
 

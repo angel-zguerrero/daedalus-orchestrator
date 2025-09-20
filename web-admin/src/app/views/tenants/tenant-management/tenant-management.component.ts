@@ -14,6 +14,7 @@ import {
 import { IconDirective } from '@coreui/icons-angular';
 import { ExchangesComponent } from './exchanges/exchanges.component';
 import { QueuesComponent } from './queues/queues.component';
+import { BindingsComponent } from './bindings/bindings.component';
 import { TenantsService } from '../services/tenants.service';
 
 @Component({
@@ -33,11 +34,12 @@ import { TenantsService } from '../services/tenants.service';
     TabsListComponent,
     IconDirective,
     ExchangesComponent,
-    QueuesComponent
+    QueuesComponent,
+    BindingsComponent
   ]
 })
 export class TenantManagementComponent implements OnInit {
-  tenantId: string = '';
+  tenantCode: string = '';
   tenantName: string = '';
   activeTab: string = 'summary';
   selectedTenant: any = null;
@@ -53,9 +55,9 @@ export class TenantManagementComponent implements OnInit {
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
-      this.tenantId = params['id'];
-      // Load tenant details when tenant ID is available
-      if (this.tenantId) {
+      this.tenantCode = params['code'];
+      // Load tenant details when tenant code is available
+      if (this.tenantCode) {
         this.loadTenantDetails();
       }
     });
@@ -73,7 +75,7 @@ export class TenantManagementComponent implements OnInit {
   loadTenantSummary(): void {
     this.tenantSummaryLoading = true;
     this.tenantSummaryNotFound = false;
-    this.tenantsService.getTenantSummary(this.tenantId).subscribe({
+    this.tenantsService.getTenantSummary(this.tenantCode).subscribe({
       next: (response) => {
         this.tenantSummary = response.result;
         this.tenantSummaryLoading = false;
@@ -89,7 +91,7 @@ export class TenantManagementComponent implements OnInit {
 
   loadTenantDetails(): void {
     // Load tenant basic information
-    this.tenantsService.getTenant(this.tenantId).subscribe({
+    this.tenantsService.getTenant(this.tenantCode).subscribe({
       next: (response) => {
         this.selectedTenant = response.result;
         if (!this.tenantName && response.result.Name) {

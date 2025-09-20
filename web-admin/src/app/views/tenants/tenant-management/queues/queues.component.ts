@@ -24,6 +24,22 @@ import { Observable, of } from 'rxjs';
 import { startWith, map, debounceTime, switchMap } from 'rxjs/operators';
 import { ErrorUtil } from '../../../../shared/utils/error.util';
 
+interface Queue {
+  ID: string;
+  Name: string;
+  Code: string;
+  Type: string;
+  VNamespace: string;
+  TTLQueue: number;
+  AllowDuplicated: boolean;
+  MaxAttempts: number;
+  DesiredPriorityThresholds: { [key: number]: number };
+  PriorityThresholds: { [key: number]: number };
+  Headers?: { [key: string]: string };
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
 @Component({
   selector: 'app-queues',
   templateUrl: './queues.component.html',
@@ -51,9 +67,9 @@ import { ErrorUtil } from '../../../../shared/utils/error.util';
   ]
 })
 export class QueuesComponent implements OnInit {
-  @Input() tenantId: string = '';
+  @Input() tenantCode: string = '';
   
-  queues: any[] = [];
+  queues: Queue[] = [];
   cursor = '';
   cursors: string[] = [];
   pageSize = 20;
@@ -64,13 +80,21 @@ export class QueuesComponent implements OnInit {
   public deleteModalVisible = false;
   public detailsModalVisible = false;
   public bulkUploadModalVisible = false;
+  public sendMessageModalVisible = false;
+  public messageResultModalVisible = false;
 
   public showAlert = false;
   public errorMessage = '';
+  public successMessage = '';
   public loading = false;
+
+  // Message result properties
+  public messageResults: { queueCode: string, messageId: string }[] = [];
+  public messageSentSuccessfully = false;
 
   queueForm: FormGroup;
   queueFormUpdate: FormGroup;
+  sendMessageForm: FormGroup;
   selectedQueue: any;
 
   queueTypes = [
@@ -93,6 +117,15 @@ export class QueuesComponent implements OnInit {
 
   public file: File | null = null;
 
+  // Send Message properties
+  messageParameters: { key: string, value: string }[] = [];
+  messageHeaders: { key: string, value: string }[] = [];
+  selectedFile: File | null = null;
+  messageParameterKey: string = '';
+  messageParameterValue: string = '';
+  messageHeaderKey: string = '';
+  messageHeaderValue: string = '';
+
   // Priority management properties
   priorityType: string = 'normal';
   maxPriority: number = 1;
@@ -106,6 +139,11 @@ export class QueuesComponent implements OnInit {
   // Priority levels management
   priorityLevels: number = 3;
   editPriorityLevels: number = 3;
+
+  // Headers management properties
+  queueHeaders: { key: string, value: string }[] = [];
+  queueHeaderKey: string = '';
+  queueHeaderValue: string = '';
 
   // Valid queue types
   private validQueueTypes = ['standard', 'delayed', 'dead-letter'];
@@ -141,6 +179,14 @@ export class QueuesComponent implements OnInit {
       maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]]
     });
 
+    this.sendMessageForm = this.fb.group({
+      messageId: [''],
+      handler: [''],
+      priority: [0, [Validators.min(0)]],
+      contentType: [''],
+      content: ['']
+    });
+
     this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
       startWith(''),
       debounceTime(300),
@@ -155,7 +201,7 @@ export class QueuesComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.tenantId) {
+    if (this.tenantCode) {
       this.cursors.push('');
       this.loadQueues();
     }
@@ -163,7 +209,7 @@ export class QueuesComponent implements OnInit {
 
   private _filterVNamespaces(value: string): Observable<any[]> {
     this.loadingVNamespaces = true;
-    return this.vNamespacesService.getVNamespaces(this.tenantId, '', 20, value).pipe(
+    return this.vNamespacesService.getVNamespaces(this.tenantCode, '', 20, value).pipe(
       map(response => {
         this.loadingVNamespaces = false;
         return response.data || [];
@@ -176,7 +222,7 @@ export class QueuesComponent implements OnInit {
       this.cursors.push(cursor);
     }
     
-    this.queuesService.getQueues(this.tenantId, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter).subscribe({
+    this.queuesService.getQueues(this.tenantCode, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter, true).subscribe({
       next: (response) => {
         this.queues = response.result.Entities || [];
         this.cursor = response.result.Cursor;
@@ -229,7 +275,10 @@ export class QueuesComponent implements OnInit {
     });
     this.priorityType = 'normal';
     this.maxPriority = 1;
-    this.desiredPriorityThresholds = [];
+    this.desiredPriorityThresholds = [0]; // Initialize with one element for maxPriority = 1
+    this.queueHeaders = []; // Clear headers
+    this.queueHeaderKey = '';
+    this.queueHeaderValue = '';
     this.showAlert = false;
   }
 
@@ -270,6 +319,19 @@ export class QueuesComponent implements OnInit {
       this.editDesiredPriorityThresholds = [];
     }
     
+    // Load existing headers
+    this.queueHeaders = [];
+    if (queue.Headers) {
+      Object.keys(queue.Headers).forEach(key => {
+        this.queueHeaders.push({
+          key: key,
+          value: queue.Headers[key]
+        });
+      });
+    }
+    this.queueHeaderKey = '';
+    this.queueHeaderValue = '';
+    
     this.editModalVisible = true;
     this.showAlert = false;
   }
@@ -299,19 +361,26 @@ export class QueuesComponent implements OnInit {
           desiredPriorityThresholds[i] = 0;
         }
       } else if (formValue.priorityType === 'fair') {
-        // For fair priority, create object with 1-indexed keys: {1: value, 2: value, etc}
+        // For fair priority, create object with 0-indexed keys: {0: value, 1: value, etc}
         for (let i = 0; i < this.maxPriority; i++) {
-          desiredPriorityThresholds[i + 1] = this.desiredPriorityThresholds[i] || 0;
+          desiredPriorityThresholds[i] = this.desiredPriorityThresholds[i] || 0;
         }
       }
+
+      // Convert headers array to object
+      const headersObj: { [key: string]: string } = {};
+      this.queueHeaders.forEach(header => {
+        headersObj[header.key] = header.value;
+      });
 
       const queueData = {
         ...formValue,
         desiredPriorityThresholds,
-        maxPriority: this.maxPriority
+        maxPriority: this.maxPriority,
+        headers: headersObj
       };
 
-      this.queuesService.createQueue(this.tenantId, queueData).subscribe({
+      this.queuesService.createQueue(this.tenantCode, queueData).subscribe({
         next: () => {
           this.createModalVisible = false;
           this.loadQueues();
@@ -340,11 +409,17 @@ export class QueuesComponent implements OnInit {
           desiredPriorityThresholds[i] = 0;
         }
       } else if (formValue.priorityType === 'fair') {
-        // For fair priority, create object with 1-indexed keys: {1: value, 2: value, etc}
+        // For fair priority, create object with 0-indexed keys: {0: value, 1: value, etc}
         for (let i = 0; i < this.updateMaxPriority; i++) {
-          desiredPriorityThresholds[i + 1] = this.editDesiredPriorityThresholds[i] || 0;
+          desiredPriorityThresholds[i] = this.editDesiredPriorityThresholds[i] || 0;
         }
       }
+
+      // Convert headers array to object
+      const headersObj: { [key: string]: string } = {};
+      this.queueHeaders.forEach(header => {
+        headersObj[header.key] = header.value;
+      });
 
       const queueData = {
         name: formValue.name,
@@ -357,10 +432,11 @@ export class QueuesComponent implements OnInit {
         maxAttempts: formValue.maxAttempts,
         priorityType: formValue.priorityType,
         maxPriority: this.updateMaxPriority,
-        desiredPriorityThresholds
+        desiredPriorityThresholds,
+        headers: headersObj
       };
       
-      this.queuesService.createQueue(this.tenantId, queueData).subscribe({
+      this.queuesService.createQueue(this.tenantCode, queueData).subscribe({
         next: () => {
           this.editModalVisible = false;
           this.loadQueues();
@@ -378,7 +454,7 @@ export class QueuesComponent implements OnInit {
   }
 
   deleteQueue(): void {
-    this.queuesService.deleteQueue(this.tenantId, this.selectedQueue.ID).subscribe({
+    this.queuesService.deleteQueue(this.tenantCode, this.selectedQueue.Code, this.selectedQueue.VNamespace).subscribe({
       next: () => {
         this.deleteModalVisible = false;
         this.loadQueues();
@@ -393,6 +469,36 @@ export class QueuesComponent implements OnInit {
   openBulkUploadModal(): void {
     this.bulkUploadModalVisible = true;
     this.showAlert = false;
+  }
+
+  // Headers management methods
+  addQueueHeader(): void {
+    if (this.queueHeaderKey.trim() && this.queueHeaderValue.trim()) {
+      // Check if header key already exists
+      const existingIndex = this.queueHeaders.findIndex(h => h.key === this.queueHeaderKey.trim());
+      if (existingIndex >= 0) {
+        // Update existing header
+        this.queueHeaders[existingIndex].value = this.queueHeaderValue.trim();
+      } else {
+        // Add new header
+        this.queueHeaders.push({
+          key: this.queueHeaderKey.trim(),
+          value: this.queueHeaderValue.trim()
+        });
+      }
+      this.queueHeaderKey = '';
+      this.queueHeaderValue = '';
+    }
+  }
+
+  removeQueueHeader(index: number): void {
+    this.queueHeaders.splice(index, 1);
+  }
+
+  // Helper method to convert headers object to array for display
+  getHeadersArray(headers: { [key: string]: string }): { key: string, value: string }[] {
+    if (!headers) return [];
+    return Object.keys(headers).map(key => ({ key, value: headers[key] }));
   }
 
   onFileChange(event: any): void {
@@ -532,7 +638,7 @@ export class QueuesComponent implements OnInit {
           };
         });
 
-        this.queuesService.bulkCreateQueues(this.tenantId, { queues: processedQueues }).subscribe({
+        this.queuesService.bulkCreateQueues(this.tenantCode, { queues: processedQueues }).subscribe({
           next: () => {
             this.bulkUploadModalVisible = false;
             this.loadQueues();
@@ -568,15 +674,10 @@ export class QueuesComponent implements OnInit {
     const formValue = this.queueForm.get('priorityType')?.value;
     this.priorityType = formValue || 'normal';
     
-    if (this.priorityType === 'normal') {
-      // For normal priority, auto-generate priorityThresholds based on maxPriority
-      // with all values set to 0 (0-indexed array)
-      this.desiredPriorityThresholds = [];
-      for (let i = 0; i < this.maxPriority; i++) {
-        this.desiredPriorityThresholds.push(0);
-      }
-    } else if (this.priorityType === 'fair') {
-      this.updateFairThresholds();
+    // Ensure the thresholds array is properly sized for the current maxPriority
+    this.desiredPriorityThresholds = [];
+    for (let i = 0; i < this.maxPriority; i++) {
+      this.desiredPriorityThresholds.push(0);
     }
   }
 
@@ -584,14 +685,18 @@ export class QueuesComponent implements OnInit {
     const formValue = this.queueForm.get('maxPriority')?.value;
     this.maxPriority = Number(formValue) || 1;
     
-    if (this.priorityType === 'normal') {
-      // For normal priority, regenerate desiredPriorityThresholds array based on new maxPriority
-      this.desiredPriorityThresholds = [];
-      for (let i = 0; i < this.maxPriority; i++) {
+    // Resize the thresholds array to match the new maxPriority
+    const currentLength = this.desiredPriorityThresholds.length;
+    const targetLength = this.maxPriority;
+    
+    if (targetLength > currentLength) {
+      // Add new thresholds with default value of 0
+      for (let i = currentLength; i < targetLength; i++) {
         this.desiredPriorityThresholds.push(0);
       }
-    } else if (this.priorityType === 'fair') {
-      this.updateFairThresholds();
+    } else if (targetLength < currentLength) {
+      // Remove excess thresholds
+      this.desiredPriorityThresholds = this.desiredPriorityThresholds.slice(0, targetLength);
     }
   }
 
@@ -765,5 +870,172 @@ export class QueuesComponent implements OnInit {
     
     // Fallback to MaxPriority or maxPriority if available
     return queue?.MaxPriority || queue?.maxPriority || 1;
+  }
+
+  // Send Message Modal Methods
+  openSendMessageModal(queue: any): void {
+    this.selectedQueue = queue;
+    this.sendMessageForm.reset({
+      messageId: '',
+      handler: '',
+      priority: 0,
+      contentType: '',
+      content: ''
+    });
+    
+    this.messageParameters = [];
+    this.messageHeaders = [];
+    this.selectedFile = null;
+    this.sendMessageModalVisible = true;
+    this.showAlert = false;
+  }
+
+  // Close message result modal
+  closeMessageResultModal(): void {
+    this.messageResultModalVisible = false;
+    this.messageResults = [];
+    this.messageSentSuccessfully = false;
+  }
+
+  // Parameter management methods
+  addParameter(): void {
+    if (this.messageParameterKey.trim() && this.messageParameterValue.trim()) {
+      this.messageParameters.push({
+        key: this.messageParameterKey.trim(),
+        value: this.messageParameterValue.trim()
+      });
+      this.messageParameterKey = '';
+      this.messageParameterValue = '';
+    }
+  }
+
+  removeParameter(index: number): void {
+    this.messageParameters.splice(index, 1);
+  }
+
+  // Header management methods
+  addMessageHeader(): void {
+    if (this.messageHeaderKey.trim() && this.messageHeaderValue.trim()) {
+      this.messageHeaders.push({
+        key: this.messageHeaderKey.trim(),
+        value: this.messageHeaderValue.trim()
+      });
+      this.messageHeaderKey = '';
+      this.messageHeaderValue = '';
+    }
+  }
+
+  removeMessageHeader(index: number): void {
+    this.messageHeaders.splice(index, 1);
+  }
+
+  // File upload methods
+  onFileSelected(event: any): void {
+    this.selectedFile = event.target.files[0];
+    if (this.selectedFile) {
+      // Automatically set content type for binary files
+      this.sendMessageForm.patchValue({
+        contentType: 'application/octet-stream'
+      });
+    }
+  }
+
+  // Helper methods for message sending
+  private getParametersAsMap(): { [key: string]: string } {
+    const parametersMap: { [key: string]: string } = {};
+    for (const param of this.messageParameters) {
+      parametersMap[param.key] = param.value;
+    }
+    return parametersMap;
+  }
+
+  private getMessageHeadersAsMap(): { [key: string]: string } {
+    const headersMap: { [key: string]: string } = {};
+    for (const header of this.messageHeaders) {
+      headersMap[header.key] = header.value;
+    }
+    return headersMap;
+  }
+
+  // Send message method
+  sendMessage(): void {
+    if (this.sendMessageForm.invalid) {
+      this.sendMessageForm.markAllAsTouched();
+      return;
+    }
+
+    this.loading = true;
+    this.showAlert = false;
+
+    const contentType = this.sendMessageForm.get('contentType')?.value || '';
+    let content: any = null;
+
+    // Handle content based on type
+    if (contentType === 'application/octet-stream' && this.selectedFile) {
+      // For binary content, convert file to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = btoa(String.fromCharCode(...new Uint8Array(reader.result as ArrayBuffer)));
+        this.sendMessageWithContent(base64String);
+      };
+      reader.readAsArrayBuffer(this.selectedFile);
+      return;
+    } else if (contentType && this.sendMessageForm.get('content')?.value) {
+      content = this.sendMessageForm.get('content')?.value;
+      if (contentType === 'application/json') {
+        try {
+          // Validate JSON and convert to string if it's an object
+          content = typeof content === 'object' ? JSON.stringify(content) : content;
+          JSON.parse(content); // Validate JSON format
+        } catch (e) {
+          this.errorMessage = 'Invalid JSON format in content';
+          this.showAlert = true;
+          this.loading = false;
+          return;
+        }
+      }
+    }
+
+    this.sendMessageWithContent(content);
+  }
+
+  private sendMessageWithContent(content: any): void {
+    // Prepare message data according to the API structure
+    const messageData = {
+      queueCode: this.selectedQueue.Code,
+      vnamespace: this.selectedQueue.VNamespace,
+      content: content || '',
+      contentType: this.sendMessageForm.get('contentType')?.value || '',
+      headers: this.getMessageHeadersAsMap(),
+      priority: this.sendMessageForm.get('priority')?.value || 0,
+      handler: this.sendMessageForm.get('handler')?.value || '',
+      parameters: this.getParametersAsMap()
+    };
+
+    console.log('Sending message payload:', messageData);
+    console.log('Selected queue:', this.selectedQueue);
+
+    this.queuesService.enqueueMessage(this.tenantCode, messageData).subscribe({
+      next: (response) => {
+        this.loading = false;
+        this.sendMessageModalVisible = false;
+        this.sendMessageForm.reset();
+        this.messageParameters = [];
+        this.messageHeaders = [];
+        this.selectedFile = null;
+        
+        // Prepare message results for display in modal
+        this.messageResults = [{ queueCode: this.selectedQueue.Code, messageId: response.messageId }];
+        
+        this.messageSentSuccessfully = true;
+        this.messageResultModalVisible = true;
+      },
+      error: (error) => {
+        this.loading = false;
+        console.error('Error sending message:', error);
+        this.errorMessage = error.error?.error || 'Failed to send message. Please try again.';
+        this.showAlert = true;
+      }
+    });
   }
 }

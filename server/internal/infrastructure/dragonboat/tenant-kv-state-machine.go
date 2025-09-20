@@ -4,8 +4,10 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
+	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	header_command "deadalus-orch/server/internal/usecase/command/header"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
@@ -48,6 +50,21 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return paginateQueuesCommand.Execute(uow, now)
 	}
 
+	findBindingCommand, ok := cmd.(binding_command.FindBindingCommand)
+	if ok {
+		return findBindingCommand.Execute(uow, now)
+	}
+
+	paginateBindingsCommand, ok := cmd.(binding_command.PaginateBindingsCommand)
+	if ok {
+		return paginateBindingsCommand.Execute(uow, now)
+	}
+
+	paginateByExchangeBindingsCommand, ok := cmd.(binding_command.PaginateByExchangeBindingsCommand)
+	if ok {
+		return paginateByExchangeBindingsCommand.Execute(uow, now)
+	}
+
 	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
 	if ok {
 		return paginateVNamespacesCommand.Execute(uow, now)
@@ -66,6 +83,26 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	getTenantSummaryCommand, ok := cmd.(tenant_summary_command.GetTenantSummaryCommand)
 	if ok {
 		return getTenantSummaryCommand.Execute(uow, now)
+	}
+
+	findQueueByIDCommand, ok := cmd.(queue_command.FindQueueByIDCommand)
+	if ok {
+		return findQueueByIDCommand.Execute(uow, now)
+	}
+
+	findQueueByIDsCommand, ok := cmd.(queue_command.FindQueueByIDsCommand)
+	if ok {
+		return findQueueByIDsCommand.Execute(uow, now)
+	}
+
+	findExchangeByIDCommand, ok := cmd.(exchange_command.FindExchangeByIDCommand)
+	if ok {
+		return findExchangeByIDCommand.Execute(uow, now)
+	}
+
+	listHeadersCommand, ok := cmd.(header_command.ListHeadersCommand)
+	if ok {
+		return listHeadersCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
@@ -110,6 +147,16 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return deleteQueueCommand.Execute(uow, now)
 	}
 
+	assertBindingCommand, ok := cmd.(binding_command.AssertBindingCommand)
+	if ok {
+		return assertBindingCommand.Execute(uow, now)
+	}
+
+	deleteBindingCommand, ok := cmd.(binding_command.DeleteBindingCommand)
+	if ok {
+		return deleteBindingCommand.Execute(uow, now)
+	}
+
 	refreshLastUpdateAtFromCommand, ok := cmd.(tenant_summary_command.RefreshLastUpdateAtFromCommand)
 	if ok {
 		return refreshLastUpdateAtFromCommand.Execute(uow, now)
@@ -118,6 +165,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	updateTenantSummaryCommand, ok := cmd.(tenant_summary_command.UpdateTenantSummaryCommand)
 	if ok {
 		return updateTenantSummaryCommand.Execute(uow, now)
+	}
+
+	enqueueCommand, ok := cmd.(queue_command.EnqueueCommand)
+	if ok {
+		return enqueueCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

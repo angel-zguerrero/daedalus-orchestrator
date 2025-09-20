@@ -32,6 +32,10 @@
               <svg cIcon name="cil-list" class="me-2"></svg>
               Queues
             </button>
+            <button cTab itemKey="bindings">
+              <svg cIcon name="cil-link" class="me-2"></svg>
+              Bindings
+            </button>
           </c-tabs-list>
           
           <c-tabs-content>
@@ -65,7 +69,7 @@
 
                   <!-- Summary data -->
                   <div *ngIf="tenantSummary && !tenantSummaryLoading" class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                       <div class="card border-success mb-3">
                         <div class="card-body text-center">
                           <svg cIcon name="cil-share" size="3xl" class="text-success mb-2"></svg>
@@ -74,7 +78,7 @@
                         </div>
                       </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                       <div class="card border-warning mb-3">
                         <div class="card-body text-center">
                           <svg cIcon name="cil-list" size="3xl" class="text-warning mb-2"></svg>
@@ -83,7 +87,16 @@
                         </div>
                       </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                      <div class="card border-primary mb-3">
+                        <div class="card-body text-center">
+                          <svg cIcon name="cil-link" size="3xl" class="text-primary mb-2"></svg>
+                          <h3 class="card-title text-primary">{{ tenantSummary.BindingsCount || 0 }}</h3>
+                          <p class="card-text">Bindings</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
                       <div class="card border-info mb-3">
                         <div class="card-body text-center">
                           <svg cIcon name="cil-envelope-letter" size="3xl" class="text-info mb-2"></svg>
@@ -113,14 +126,21 @@
             <!-- Exchanges Tab -->
             <c-tab-panel itemKey="exchanges" class="p-3">
               <ng-container *ngIf="activeTab === 'exchanges'">
-                <app-exchanges [tenantId]="tenantId"></app-exchanges>
+                <app-exchanges [tenantCode]="tenantCode"></app-exchanges>
               </ng-container>
             </c-tab-panel>
 
             <!-- Queues Tab -->
             <c-tab-panel itemKey="queues" class="p-3">
               <ng-container *ngIf="activeTab === 'queues'">
-                <app-queues [tenantId]="tenantId"></app-queues>
+                <app-queues [tenantCode]="tenantCode"></app-queues>
+              </ng-container>
+            </c-tab-panel>
+
+            <!-- Bindings Tab -->
+            <c-tab-panel itemKey="bindings" class="p-3">
+              <ng-container *ngIf="activeTab === 'bindings'">
+                <app-bindings [tenantCode]="tenantCode"></app-bindings>
               </ng-container>
             </c-tab-panel>
           </c-tabs-content>

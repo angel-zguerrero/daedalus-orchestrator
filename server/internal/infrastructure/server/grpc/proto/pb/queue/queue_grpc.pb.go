@@ -24,6 +24,7 @@ const (
 	QueueService_GetQueue_FullMethodName        = "/queue.QueueService/GetQueue"
 	QueueService_GetQueues_FullMethodName       = "/queue.QueueService/GetQueues"
 	QueueService_DeleteQueue_FullMethodName     = "/queue.QueueService/DeleteQueue"
+	QueueService_EnqueueMessage_FullMethodName  = "/queue.QueueService/EnqueueMessage"
 )
 
 // QueueServiceClient is the client API for QueueService service.
@@ -35,6 +36,7 @@ type QueueServiceClient interface {
 	GetQueue(ctx context.Context, in *GetQueueRequest, opts ...grpc.CallOption) (*GetQueueResponse, error)
 	GetQueues(ctx context.Context, in *GetQueuesRequest, opts ...grpc.CallOption) (*GetQueuesResponse, error)
 	DeleteQueue(ctx context.Context, in *DeleteQueueRequest, opts ...grpc.CallOption) (*DeleteQueueResponse, error)
+	EnqueueMessage(ctx context.Context, in *EnqueueMessageRequest, opts ...grpc.CallOption) (*EnqueueMessageResponse, error)
 }
 
 type queueServiceClient struct {
@@ -95,6 +97,16 @@ func (c *queueServiceClient) DeleteQueue(ctx context.Context, in *DeleteQueueReq
 	return out, nil
 }
 
+func (c *queueServiceClient) EnqueueMessage(ctx context.Context, in *EnqueueMessageRequest, opts ...grpc.CallOption) (*EnqueueMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnqueueMessageResponse)
+	err := c.cc.Invoke(ctx, QueueService_EnqueueMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QueueServiceServer is the server API for QueueService service.
 // All implementations must embed UnimplementedQueueServiceServer
 // for forward compatibility.
@@ -104,6 +116,7 @@ type QueueServiceServer interface {
 	GetQueue(context.Context, *GetQueueRequest) (*GetQueueResponse, error)
 	GetQueues(context.Context, *GetQueuesRequest) (*GetQueuesResponse, error)
 	DeleteQueue(context.Context, *DeleteQueueRequest) (*DeleteQueueResponse, error)
+	EnqueueMessage(context.Context, *EnqueueMessageRequest) (*EnqueueMessageResponse, error)
 	mustEmbedUnimplementedQueueServiceServer()
 }
 
@@ -128,6 +141,9 @@ func (UnimplementedQueueServiceServer) GetQueues(context.Context, *GetQueuesRequ
 }
 func (UnimplementedQueueServiceServer) DeleteQueue(context.Context, *DeleteQueueRequest) (*DeleteQueueResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteQueue not implemented")
+}
+func (UnimplementedQueueServiceServer) EnqueueMessage(context.Context, *EnqueueMessageRequest) (*EnqueueMessageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EnqueueMessage not implemented")
 }
 func (UnimplementedQueueServiceServer) mustEmbedUnimplementedQueueServiceServer() {}
 func (UnimplementedQueueServiceServer) testEmbeddedByValue()                      {}
@@ -240,6 +256,24 @@ func _QueueService_DeleteQueue_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _QueueService_EnqueueMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnqueueMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueueServiceServer).EnqueueMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QueueService_EnqueueMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueueServiceServer).EnqueueMessage(ctx, req.(*EnqueueMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // QueueService_ServiceDesc is the grpc.ServiceDesc for QueueService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +300,10 @@ var QueueService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteQueue",
 			Handler:    _QueueService_DeleteQueue_Handler,
+		},
+		{
+			MethodName: "EnqueueMessage",
+			Handler:    _QueueService_EnqueueMessage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

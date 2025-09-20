@@ -77,6 +77,9 @@ const ConfigNodeSchedulerTTLKey = "node_scheduler_ttl"
 // ConfigTenantSummaryWorkerIntervalKey is the key for the tenant summary worker interval setting in the configuration file (in seconds).
 const ConfigTenantSummaryWorkerIntervalKey = "tenant_summary_worker_interval"
 
+// ConfigMaxHeadersKey is the key for the maximum number of headers setting in the configuration file.
+const ConfigMaxHeadersKey = "max_headers"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -161,6 +164,9 @@ const EnvVarNodeSchedulerTTL = "NODE_SCHEDULER_TTL"
 // EnvVarTenantSummaryWorkerInterval is the environment variable name for the tenant summary worker interval (in seconds).
 const EnvVarTenantSummaryWorkerInterval = "TENANT_SUMMARY_WORKER_INTERVAL"
 
+// EnvVarMaxHeaders is the environment variable name for the maximum number of headers.
+const EnvVarMaxHeaders = "MAX_HEADERS"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -235,3 +241,6 @@ const NodeSchedulerTTLFlagName = "node-scheduler-ttl"
 
 // TenantSummaryWorkerIntervalFlagName is the command-line flag name for the tenant summary worker interval (in seconds).
 const TenantSummaryWorkerIntervalFlagName = "tenant-summary-worker-interval"
+
+// MaxHeadersFlagName is the command-line flag name for the maximum number of headers.
+const MaxHeadersFlagName = "max-headers"

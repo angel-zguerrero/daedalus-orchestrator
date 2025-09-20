@@ -23,7 +23,7 @@ const (
 
 type TenantInfoRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Code          string                 `protobuf:"bytes,1,opt,name=Code,proto3" json:"Code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -58,16 +58,16 @@ func (*TenantInfoRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *TenantInfoRequest) GetID() string {
+func (x *TenantInfoRequest) GetCode() string {
 	if x != nil {
-		return x.ID
+		return x.Code
 	}
 	return ""
 }
 
 type TenantSummaryRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Code          string                 `protobuf:"bytes,1,opt,name=Code,proto3" json:"Code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -102,9 +102,9 @@ func (*TenantSummaryRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *TenantSummaryRequest) GetID() string {
+func (x *TenantSummaryRequest) GetCode() string {
 	if x != nil {
-		return x.ID
+		return x.Code
 	}
 	return ""
 }
@@ -435,7 +435,7 @@ func (x *TenantInfoResponse) GetNode() *Node {
 
 type DeleteTenantRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Code          string                 `protobuf:"bytes,1,opt,name=Code,proto3" json:"Code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -470,9 +470,9 @@ func (*DeleteTenantRequest) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *DeleteTenantRequest) GetID() string {
+func (x *DeleteTenantRequest) GetCode() string {
 	if x != nil {
-		return x.ID
+		return x.Code
 	}
 	return ""
 }
@@ -1005,11 +1005,11 @@ var File_internal_infrastructure_server_grpc_proto_definitions_tenant_proto prot
 
 const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_rawDesc = "" +
 	"\n" +
-	"Binternal/infrastructure/server/grpc/proto/definitions/tenant.proto\x12\x06tenant\"#\n" +
-	"\x11TenantInfoRequest\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\tR\x02ID\"&\n" +
-	"\x14TenantSummaryRequest\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\tR\x02ID\"\xfb\x01\n" +
+	"Binternal/infrastructure/server/grpc/proto/definitions/tenant.proto\x12\x06tenant\"'\n" +
+	"\x11TenantInfoRequest\x12\x12\n" +
+	"\x04Code\x18\x01 \x01(\tR\x04Code\"*\n" +
+	"\x14TenantSummaryRequest\x12\x12\n" +
+	"\x04Code\x18\x01 \x01(\tR\x04Code\"\xfb\x01\n" +
 	"\rTenantSummary\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x1a\n" +
 	"\bTenantId\x18\x02 \x01(\tR\bTenantId\x12\x12\n" +
@@ -1035,9 +1035,9 @@ const file_internal_infrastructure_server_grpc_proto_definitions_tenant_proto_ra
 	"\x12TenantInfoResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12&\n" +
 	"\x06result\x18\x02 \x01(\v2\x0e.tenant.TenantR\x06result\x12 \n" +
-	"\x04node\x18\x03 \x01(\v2\f.tenant.NodeR\x04node\"%\n" +
-	"\x13DeleteTenantRequest\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\tR\x02ID\"0\n" +
+	"\x04node\x18\x03 \x01(\v2\f.tenant.NodeR\x04node\")\n" +
+	"\x13DeleteTenantRequest\x12\x12\n" +
+	"\x04Code\x18\x01 \x01(\tR\x04Code\"0\n" +
 	"\x14DeleteTenantResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"U\n" +
 	"\x11GetTenantsRequest\x12\f\n" +
