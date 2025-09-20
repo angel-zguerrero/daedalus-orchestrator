@@ -109,6 +109,45 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		}
 	}
 
+	// Delete all messages in the queue before deleting the queue itself
+	queueMessageRepo, err := db.NewQueueMessageRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	// Find and delete all messages in this queue (with pagination)
+	messageCount := 0
+	messageCursor := ""
+
+	for {
+		messagesResult, err := queueMessageRepo.Find("QueueID = "+queue.ID, 100, messageCursor, now)
+		if err != nil {
+			commandResult.Error = "error retrieving queue messages: " + err.Error()
+			return *commandResult
+		}
+
+		if messagesResult == nil || len(messagesResult.Entities) == 0 {
+			break
+		}
+
+		for _, message := range messagesResult.Entities {
+			// Delete the message
+			_, err = queueMessageRepo.Delete(message.ID, now)
+			if err != nil {
+				commandResult.Error = "error deleting queue message: " + err.Error()
+				return *commandResult
+			}
+			messageCount++
+		}
+
+		// Update cursor for next page
+		messageCursor = messagesResult.Cursor
+		if messageCursor == "" {
+			break
+		}
+	}
+
 	// Delete all routing headers associated directly with this queue
 	headersResult, err := routingHeadersRepo.GetRoutingHeadersByQueue(queue.ID, now)
 	if err != nil {
@@ -139,8 +178,8 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 	}
 
 	// Update tenant summary with a single operation
-	// Decrease queue count by 1 and binding count by bindingCount
-	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, 0, 0, -1, -bindingCount, now)
+	// Decrease queue count by 1, binding count by bindingCount, and message count by messageCount
+	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, -messageCount, 0, -1, -bindingCount, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
