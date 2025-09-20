@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
@@ -85,34 +84,19 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 		createTenantInMasterCommand.Tenants[i] = *t
 	}
 
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(tenants)))
-	defer writeCancel()
-
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  createTenantInMasterCommand,
-	}
-
-	result, err := bo.Config.MasterNode.Write(writeCtx, fsmCmd)
+	// Using the new generic function instead of repetitive code
+	timeout := config.GlobalConfiguration.ApiRaftTimeout * time.Duration(len(tenants))
+	created, err := dragonboat.ExecuteRepositoryCommand[[]models.TenantInMaster](
+		bo.Config.MasterNode,
+		ctx,
+		createTenantInMasterCommand,
+		timeout,
+		bo.Config.Logger,
+		"bulk tenant creation",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Failed to create tenants (bulk)")
-		return nil, fmt.Errorf("failed to create tenants (bulk): %w", err)
+		return nil, err
 	}
-
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Bulk tenant creation command returned unexpected result type")
-		return nil, fmt.Errorf("bulk tenant creation command returned decode error: %w", err)
-	}
-
-	if parsedResult.Error != "" {
-		return nil, fmt.Errorf("bulk tenant creation failed: %s", parsedResult.Error)
-	}
-
-	created := parsedResult.Result.([]models.TenantInMaster)
 
 	// Crear ColumnFamilies y recolectar códigos
 	var tenantCodes []string
@@ -127,24 +111,21 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 
 	// Asignar todos los tenants a shard en un solo comando
 	assignCmd := &tenant_command.AssignToShardTenantInMasterCommand{TenantCodes: tenantCodes}
-	atstCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  assignCmd,
-	}
 
-	result, err = bo.Config.MasterNode.Write(writeCtx, atstCmd)
+	// Using the new generic function for the assignment command
+	assigned, err := dragonboat.ExecuteRepositoryCommand[bool](
+		bo.Config.MasterNode,
+		ctx,
+		assignCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"shard assignment for tenants",
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to assign tenants to shard: %w", err)
+		return nil, err
 	}
 
-	buf = bytes.NewBuffer(result.Data)
-	dec = gob.NewDecoder(buf)
-	if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
-		return nil, fmt.Errorf("error during shard assignment for tenants: %v %s", err, parsedResult.Error)
-	}
-
-	if parsedResult.Result.(bool) {
+	if assigned {
 		for i := range created {
 			created[i].Status = models.Assigned
 			bo.Config.Logger.Info().Str("code", created[i].Code).Msg("tenant asserted successfully")
@@ -208,39 +189,21 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantCode string) (models.Te
 }
 
 func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantCode string) error {
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
 	markToDeletionTenantInMasterCommand := &tenant_command.MarkToDeletionTenantInMasterCommand{
 		TenantCode: tenantCode,
 	}
 
-	atstCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  markToDeletionTenantInMasterCommand,
-	}
-
-	result, err := bo.Config.MasterNode.Write(writeCtx, atstCmd)
+	// Using the new generic function instead of repetitive code
+	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
+		bo.Config.MasterNode,
+		ctx,
+		markToDeletionTenantInMasterCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"tenant deletion",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("TenantCode", tenantCode).Msg("Failed to delete tenant")
-		return errors.New("Failed to delete tenant: " + err.Error())
-	}
-
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("TenantCode", tenantCode).Msg("Tenant deletion command returned unexpected result type")
-		return errors.New("Tenant deletion command returned unexpected error")
-	}
-
-	if parsedResult.Error != "" {
-		return errors.New("Failed to delete tenant error: " + parsedResult.Error)
-	}
-
-	if err != nil {
-		return errors.New("Failed to delete tenant error: " + err.Error())
+		return fmt.Errorf("failed to delete tenant: %w", err)
 	}
 
 	return nil
