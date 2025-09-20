@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
-	"fmt"
 
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
@@ -50,34 +49,18 @@ func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchang
 		CFS:                   cfs,
 	}
 
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  assertBindingCommand,
-	}
-
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
+	created, err := dragonboat.ExecuteRepositoryCommand[models.Binding](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		assertBindingCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"create binding",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Failed to create binding")
-		return models.Binding{}, fmt.Errorf("failed to create binding: %w", err)
+		return models.Binding{}, err
 	}
 
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Binding creation command returned unexpected result type")
-		return models.Binding{}, fmt.Errorf("binding creation command returned decode error: %w", err)
-	}
-
-	if parsedResult.Error != "" {
-		return models.Binding{}, fmt.Errorf("binding creation failed: %s", parsedResult.Error)
-	}
-
-	created := parsedResult.Result.(models.Binding)
 	return created, nil
 }
 
@@ -131,9 +114,6 @@ func (bo *BindingBO) GetBinding(ctx context.Context, exchangeCode, queueCode, vn
 }
 
 func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cfs string) error {
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
 	deleteBindingCommand := &binding_command.DeleteBindingCommand{
 		Code:       code,
 		VNamespace: vnamespace,
@@ -141,31 +121,15 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cf
 		CFS:        cfs,
 	}
 
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  deleteBindingCommand,
-	}
-
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
-	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Str("VNamespace", vnamespace).Msg("Failed to delete binding")
-		return errors.New("Failed to delete binding: " + err.Error())
-	}
-
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("Code", code).Str("VNamespace", vnamespace).Msg("Binding deletion command returned unexpected result type")
-		return errors.New("Binding deletion command returned unexpected error")
-	}
-
-	if parsedResult.Error != "" {
-		return errors.New("Failed to delete binding error: " + parsedResult.Error)
-	}
-
-	return nil
+	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		deleteBindingCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"delete binding",
+	)
+	return err
 }
 
 func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeObjects bool, cf, cfs string) (db.FindResult[models.Binding], error) {

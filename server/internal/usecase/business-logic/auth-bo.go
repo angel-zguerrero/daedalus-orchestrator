@@ -10,7 +10,6 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
@@ -91,16 +90,14 @@ func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (
 		JWTKey:   bo.JwtKey,
 	}
 
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  registerSessionCmd,
-	}
-
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
-	_, err = bo.MasterNode.Write(writeCtx, fsmCmd)
+	_, err = dragonboat.ExecuteRepositoryCommand[interface{}](
+		bo.MasterNode,
+		ctx,
+		registerSessionCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"register session after login",
+	)
 	if err != nil {
 		bo.Logger.Error().Err(err).Str("username", usernameOrEmail).Msg("Failed to register session after login")
 		return "", err
@@ -121,16 +118,14 @@ func (bo *AuthBO) Logout(ctx context.Context, token string) error {
 		JWTKey:   bo.JwtKey,
 	}
 
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  removeSessionCmd,
-	}
-
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
-	_, err := bo.MasterNode.Write(writeCtx, fsmCmd)
+	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
+		bo.MasterNode,
+		ctx,
+		removeSessionCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"remove session during logout",
+	)
 	if err != nil {
 		bo.Logger.Error().Err(err).Msg("Failed removing current session during logout")
 		return err

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"fmt"
 
@@ -72,34 +73,17 @@ func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*model
 		asseertExchangeCommand.Exchanges[i] = *t
 	}
 
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(exchanges)))
-	defer writeCancel()
-
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  asseertExchangeCommand,
-	}
-
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
+	created, err := dragonboat.ExecuteRepositoryCommand[[]models.Exchange](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		asseertExchangeCommand,
+		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(exchanges)),
+		bo.Config.Logger,
+		"bulk create exchanges",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Failed to assert exchanges (bulk)")
-		return nil, fmt.Errorf("failed to assert exchanges (bulk): %w", err)
+		return nil, err
 	}
-
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Bulk exchange creation command returned unexpected result type")
-		return nil, fmt.Errorf("bulk exchange creation command returned decode error: %w", err)
-	}
-
-	if parsedResult.Error != "" {
-		return nil, fmt.Errorf("bulk exchange creation failed: %s", parsedResult.Error)
-	}
-
-	created := parsedResult.Result.([]models.Exchange)
 
 	return created, nil
 }
@@ -285,35 +269,18 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	}
 	copy(enqueueCommand.Messages, queueMessages)
 
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queueMessages)))
-	defer writeCancel()
-
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  enqueueCommand,
-	}
-
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
+	createdMessages, err := dragonboat.ExecuteRepositoryCommand[[]models.QueueMessage](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		enqueueCommand,
+		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queueMessages)),
+		bo.Config.Logger,
+		"enqueue messages",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Failed to enqueue messages to queues")
-		return nil, fmt.Errorf("failed to enqueue messages to queues: %w", err)
+		return nil, err
 	}
 
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Enqueue command returned unexpected result type")
-		return nil, fmt.Errorf("enqueue command returned decode error: %w", err)
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(errors.New(parsedResult.Error)).Msg("Enqueue command failed")
-		return nil, fmt.Errorf("enqueue command failed: %s", parsedResult.Error)
-	}
-
-	createdMessages := parsedResult.Result.([]models.QueueMessage)
 	resultingMessages := make(map[string]string, len(createdMessages))
 	for _, msg := range createdMessages {
 		queueCode := queueCodeMap[msg.QueueID]
