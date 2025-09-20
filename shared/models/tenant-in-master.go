@@ -20,6 +20,7 @@ type TenantInMaster struct {
 
 	ExchangesCount int
 	QueuesCount    int
+	BindingsCount  int
 	MessagesCount  int
 
 	Status TenantInMasterStatus

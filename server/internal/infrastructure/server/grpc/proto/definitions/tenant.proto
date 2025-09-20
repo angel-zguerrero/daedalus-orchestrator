@@ -78,7 +78,8 @@ message Tenant {
   string UpdatedAt = 7;
   int32 ExchangesCount = 8;
   int32 QueuesCount = 9;
-  int32 MessagesCount = 10;
+  int32 BindingsCount = 10;
+  int32 MessagesCount = 11;
 }
 
 message FindResult {
