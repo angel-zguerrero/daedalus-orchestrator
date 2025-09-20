@@ -205,6 +205,12 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 		return "", fmt.Errorf("failed to get queue: %w", err)
 	}
 
+	// Check if queue is in active state
+	if queue.State != models.QueueActive {
+		bo.Config.Logger.Info().Str("queueCode", queueCode).Str("queueState", string(queue.State)).Msg("Queue is not in active state - skipping message enqueue")
+		return "", fmt.Errorf("queue '%s' is not in active state (current state: %s)", queueCode, queue.State)
+	}
+
 	// Generate message ID if not provided
 	if message.MessageID == "" {
 		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")

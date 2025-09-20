@@ -195,8 +195,19 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 		return nil, fmt.Errorf("failed to get queues from exchange: %w", err)
 	}
 
+	// Filter out queues that are not in active state
+	activeQueues := make([]models.Queue, 0, len(queues))
+	for _, queue := range queues {
+		if queue.State == models.QueueActive {
+			activeQueues = append(activeQueues, queue)
+		} else {
+			bo.Config.Logger.Info().Str("queueCode", queue.Code).Str("queueState", string(queue.State)).Msg("Skipping queue - not in active state")
+		}
+	}
+	queues = activeQueues
+
 	if len(queues) == 0 {
-		bo.Config.Logger.Info().Str("exchangeCode", exchangeCode).Str("routingKeyOrPatternOrQueueCode", routingKeyOrPatternOrQueueCode).Msg("No queues matched for the given routing key or pattern")
+		bo.Config.Logger.Info().Str("exchangeCode", exchangeCode).Str("routingKeyOrPatternOrQueueCode", routingKeyOrPatternOrQueueCode).Msg("No active queues matched for the given routing key or pattern")
 		return nil, nil
 	}
 

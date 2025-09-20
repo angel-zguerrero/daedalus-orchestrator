@@ -211,8 +211,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantCode string) error {
 	}
 
 	// Mark all queues as draining before deleting the tenant
-	fmt.Println("Marking", len(allQueueIDs), "queues as draining for tenant", tenantCode)
-	fmt.Println("Queue IDs:", allQueueIDs)
+
 	if len(allQueueIDs) > 0 {
 		markQueuesAsDrainCommand := &queue_command.MarkQueuesAsDrainCommand{
 			QueueIDs: allQueueIDs,
