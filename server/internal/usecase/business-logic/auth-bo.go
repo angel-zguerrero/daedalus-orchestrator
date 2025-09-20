@@ -1,19 +1,15 @@
 package business_logic
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
-	"deadalus-orch/server/internal/pkg/utils"
-	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
-	general_command "deadalus-orch/server/internal/usecase/command/general"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog"
@@ -41,38 +37,16 @@ func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (
 		Password:        password,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: loginCmd,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	raftCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.MasterNode.Read(raftCtx, *queryCommand)
+	loggedIn, err := dragonboat.ExecuteRepositoryQuery[bool](
+		bo.MasterNode,
+		ctx,
+		loginCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"login",
+	)
 	if err != nil {
-		bo.Logger.Error().Err(err).Str("username", usernameOrEmail).Msg("Login command execution failed")
-		return "", err
-	}
-
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Logger.Error().Err(err).Str("username", usernameOrEmail).Msg("Login command returned unexpected result type (decode)")
-		return "", err
-	}
-
-	if parsedResult.Error != "" {
-		bo.Logger.Error().Str("username", usernameOrEmail).Str("error", parsedResult.Error).Msg("Login command returned an error")
-		return "", errors.New(parsedResult.Error)
-	}
-
-	loggedIn, ok := parsedResult.Result.(bool)
-	if !ok {
-		bo.Logger.Error().Str("username", usernameOrEmail).Msg("Login command returned unexpected result type (bool assertion)")
-		return "", errors.New("Login command returned unexpected result type (bool assertion)")
+		return "", fmt.Errorf("login command execution failed: %w", err)
 	}
 
 	if !loggedIn {
@@ -91,16 +65,14 @@ func (bo *AuthBO) Login(ctx context.Context, usernameOrEmail, password string) (
 		JWTKey:   bo.JwtKey,
 	}
 
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  registerSessionCmd,
-	}
-
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
-	_, err = bo.MasterNode.Write(writeCtx, fsmCmd)
+	_, err = dragonboat.ExecuteRepositoryCommand[interface{}](
+		bo.MasterNode,
+		ctx,
+		registerSessionCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"register session after login",
+	)
 	if err != nil {
 		bo.Logger.Error().Err(err).Str("username", usernameOrEmail).Msg("Failed to register session after login")
 		return "", err
@@ -121,16 +93,14 @@ func (bo *AuthBO) Logout(ctx context.Context, token string) error {
 		JWTKey:   bo.JwtKey,
 	}
 
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  removeSessionCmd,
-	}
-
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer writeCancel()
-
-	_, err := bo.MasterNode.Write(writeCtx, fsmCmd)
+	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
+		bo.MasterNode,
+		ctx,
+		removeSessionCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"remove session during logout",
+	)
 	if err != nil {
 		bo.Logger.Error().Err(err).Msg("Failed removing current session during logout")
 		return err

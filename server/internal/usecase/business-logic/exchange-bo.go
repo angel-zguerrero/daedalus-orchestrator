@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
+	"encoding/gob"
 	"fmt"
 
 	"deadalus-orch/server/internal/pkg/config"
@@ -16,7 +18,6 @@ import (
 	header_command "deadalus-orch/server/internal/usecase/command/header"
 	"deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"errors"
 	"strings"
 	"time"
@@ -72,34 +73,17 @@ func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*model
 		asseertExchangeCommand.Exchanges[i] = *t
 	}
 
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(exchanges)))
-	defer writeCancel()
-
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  asseertExchangeCommand,
-	}
-
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
+	created, err := dragonboat.ExecuteRepositoryCommand[[]models.Exchange](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		asseertExchangeCommand,
+		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(exchanges)),
+		bo.Config.Logger,
+		"bulk create exchanges",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Failed to assert exchanges (bulk)")
-		return nil, fmt.Errorf("failed to assert exchanges (bulk): %w", err)
+		return nil, err
 	}
-
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Bulk exchange creation command returned unexpected result type")
-		return nil, fmt.Errorf("bulk exchange creation command returned decode error: %w", err)
-	}
-
-	if parsedResult.Error != "" {
-		return nil, fmt.Errorf("bulk exchange creation failed: %s", parsedResult.Error)
-	}
-
-	created := parsedResult.Result.([]models.Exchange)
 
 	return created, nil
 }
@@ -112,43 +96,20 @@ func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeCode, vnamespace,
 		CFS:        cfs,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: findExchangeCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+	exchange, err := dragonboat.ExecuteRepositoryQuery[models.Exchange](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		findExchangeCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"find exchange",
+	)
 	if err != nil {
-		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
+		if strings.Contains(err.Error(), "entity not found") {
 			return models.Exchange{}, errors.New("Exchange not found")
 		}
-		bo.Config.Logger.Error().Err(err).Msg("Find exchange command failed")
-		return models.Exchange{}, errors.New("Find exchange command failed: " + err.Error())
+		return models.Exchange{}, fmt.Errorf("find exchange failed: %w", err)
 	}
-
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Find exchange command failed")
-		return models.Exchange{}, errors.New("Find exchange command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find exchange command failed")
-		return models.Exchange{}, errors.New("Find exchange command failed")
-	}
-
-	if parsedResult.Result == nil {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find exchange command failed")
-		return models.Exchange{}, errors.New("Exchange not found")
-	}
-
-	exchange := parsedResult.Result.(models.Exchange)
 
 	// Para exchanges globales no hay nodo específico
 	return exchange, nil
@@ -203,35 +164,18 @@ func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string,
 		CFS:        cfs,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: paginateExchangesCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Exchange]](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		paginateExchangesCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate exchanges",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate exchanges command failed")
-		return db.FindResult[models.Exchange]{}, errors.New("Paginate exchanges failed: " + err.Error())
+		return db.FindResult[models.Exchange]{}, fmt.Errorf("paginate exchanges failed: %w", err)
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate exchanges command failed")
-		return db.FindResult[models.Exchange]{}, errors.New("Paginate exchanges command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate exchanges command failed")
-		return db.FindResult[models.Exchange]{}, errors.New("Paginate exchanges command failed")
-	}
-
-	findResult := parsedResult.Result.(db.FindResult[models.Exchange])
 	if findResult.Entities == nil {
 		findResult.Entities = []models.Exchange{}
 	}
@@ -285,35 +229,18 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	}
 	copy(enqueueCommand.Messages, queueMessages)
 
-	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queueMessages)))
-	defer writeCancel()
-
-	fsmCmd := general_command.FSM_Command{
-		Now:  utils.GetNowInInt(),
-		Type: general_command.REPOSITORY_COMMAND,
-		CMD:  enqueueCommand,
-	}
-
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, fsmCmd)
+	createdMessages, err := dragonboat.ExecuteRepositoryCommand[[]models.QueueMessage](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		enqueueCommand,
+		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queueMessages)),
+		bo.Config.Logger,
+		"enqueue messages",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Failed to enqueue messages to queues")
-		return nil, fmt.Errorf("failed to enqueue messages to queues: %w", err)
+		return nil, err
 	}
 
-	buf := bytes.NewBuffer(result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Enqueue command returned unexpected result type")
-		return nil, fmt.Errorf("enqueue command returned decode error: %w", err)
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(errors.New(parsedResult.Error)).Msg("Enqueue command failed")
-		return nil, fmt.Errorf("enqueue command failed: %s", parsedResult.Error)
-	}
-
-	createdMessages := parsedResult.Result.([]models.QueueMessage)
 	resultingMessages := make(map[string]string, len(createdMessages))
 	for _, msg := range createdMessages {
 		queueCode := queueCodeMap[msg.QueueID]
@@ -368,33 +295,17 @@ func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, vna
 			CFS:            cfs,
 		}
 
-		queryCommand := &general_command.Query_Command{
-			Command: &general_command.Repository_Command{
-				CMD: paginateBindingsCommand,
-			},
-			Now: time.Now().UnixNano(),
-		}
-
-		readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-		result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
-		cancel()
-
+		findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Binding]](
+			bo.Config.TenantNodesDictionary[cfs],
+			ctx,
+			paginateBindingsCommand,
+			config.GlobalConfiguration.ApiRaftTimeout,
+			bo.Config.Logger,
+			"get bindings by exchange",
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get bindings: %w", err)
 		}
-
-		buf := bytes.NewBuffer(result.([]byte))
-		dec := gob.NewDecoder(buf)
-		parsedResult := &commands.CommandResult{}
-		if err := dec.Decode(parsedResult); err != nil {
-			return nil, fmt.Errorf("failed to decode bindings result: %w", err)
-		}
-
-		if parsedResult.Error != "" {
-			return nil, fmt.Errorf("bindings query failed: %s", parsedResult.Error)
-		}
-
-		findResult := parsedResult.Result.(db.FindResult[models.Binding])
 
 		// Filter bindings for this specific exchange and add to collection
 		allBindings = append(allBindings, findResult.Entities...)
@@ -501,37 +412,21 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				CFS:            cfs,
 			}
 
-			queryCommand := &general_command.Query_Command{
-				Command: &general_command.Repository_Command{
-					CMD: findQueueCommand,
-				},
-				Now: time.Now().UnixNano(),
-			}
-
-			readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-			defer cancel()
-
-			result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+			foundQueue, err := dragonboat.ExecuteRepositoryQuery[models.Queue](
+				bo.Config.TenantNodesDictionary[cfs],
+				ctx,
+				findQueueCommand,
+				config.GlobalConfiguration.ApiRaftTimeout,
+				bo.Config.Logger,
+				"find queue by code",
+			)
 			if err != nil {
-				return resultQueues, fmt.Errorf("failed to execute find queue command: %w", err)
-			}
-
-			buf := bytes.NewBuffer(result.([]byte))
-			dec := gob.NewDecoder(buf)
-			parsedResult := &commands.CommandResult{}
-			if err := dec.Decode(parsedResult); err != nil {
-				return resultQueues, fmt.Errorf("failed to decode cluster response: %w", err)
-			}
-
-			if parsedResult.Error != "" {
-				return nil, fmt.Errorf("find queue command failed: %s", parsedResult.Error)
-			}
-
-			if parsedResult.Result != nil {
-				foundQueue, ok := parsedResult.Result.(models.Queue)
-				if ok {
-					resultQueues = append(resultQueues, foundQueue)
+				if !strings.Contains(err.Error(), "entity not found") {
+					return resultQueues, fmt.Errorf("failed to execute find queue command: %w", err)
 				}
+				// Queue not found, continue with empty result
+			} else {
+				resultQueues = append(resultQueues, foundQueue)
 			}
 		}
 
@@ -549,36 +444,19 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 					CFS:               cfs,
 				}
 
-				queryCommand := &general_command.Query_Command{
-					Command: &general_command.Repository_Command{
-						CMD: listHeadersCommand,
-					},
-					Now: time.Now().UnixNano(),
-				}
-
-				readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-				result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
-				cancel()
-
+				allQueueHeaders, err := dragonboat.ExecuteRepositoryQuery[[]models.RoutingHeader](
+					bo.Config.TenantNodesDictionary[cfs],
+					ctx,
+					listHeadersCommand,
+					config.GlobalConfiguration.ApiRaftTimeout,
+					bo.Config.Logger,
+					"list routing headers",
+				)
 				if err != nil {
 					return resultQueues, fmt.Errorf("failed to get routing headers for key %s: %w", key, err)
 				}
 
-				buf := bytes.NewBuffer(result.([]byte))
-				dec := gob.NewDecoder(buf)
-				parsedResult := &commands.CommandResult{}
-				if err := dec.Decode(parsedResult); err != nil {
-					return resultQueues, fmt.Errorf("failed to decode routing headers result for key %s: %w", key, err)
-				}
-
-				if parsedResult.Error != "" {
-					return resultQueues, fmt.Errorf("routing headers query failed for key %s: %s", key, parsedResult.Error)
-				}
-
-				if parsedResult.Result != nil {
-					allQueueHeaders := parsedResult.Result.([]models.RoutingHeader)
-					listQueueHeaders = append(listQueueHeaders, allQueueHeaders...)
-				}
+				listQueueHeaders = append(listQueueHeaders, allQueueHeaders...)
 			}
 
 			// Cross information with binding.XMatch to get queue IDs
@@ -650,63 +528,41 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 					CFS:            cfs,
 				}
 
-				queueQueryCommand := &general_command.Query_Command{
-					Command: &general_command.Repository_Command{
-						CMD: findQueuesByIDsCommand,
-					},
-					Now: time.Now().UnixNano(),
-				}
-
-				queueReadCtx, queueCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-				queueResult, err := bo.Config.TenantNodesDictionary[cfs].Read(queueReadCtx, *queueQueryCommand)
-				queueCancel()
-
+				foundQueues, err := dragonboat.ExecuteRepositoryQuery[[]models.Queue](
+					bo.Config.TenantNodesDictionary[cfs],
+					ctx,
+					findQueuesByIDsCommand,
+					config.GlobalConfiguration.ApiRaftTimeout,
+					bo.Config.Logger,
+					"find queues by IDs",
+				)
 				if err != nil {
 					return resultQueues, fmt.Errorf("failed to find queues by IDs: %w", err)
 				}
 
-				queueBuf := bytes.NewBuffer(queueResult.([]byte))
-				queueDec := gob.NewDecoder(queueBuf)
-				queueParsedResult := &commands.CommandResult{}
-				if err := queueDec.Decode(queueParsedResult); err != nil {
-					return resultQueues, fmt.Errorf("failed to decode queues result: %w", err)
-				}
-
-				if queueParsedResult.Error != "" {
-					return resultQueues, fmt.Errorf("queues query failed: %s", queueParsedResult.Error)
-				}
-
-				if queueParsedResult.Result != nil {
-					foundQueues, ok := queueParsedResult.Result.([]models.Queue)
-					if ok {
-						// Si XMatch=All, filtrar los queues para que todos los headers del mensaje hagan match exacto con los headers del queue
-						if binding.XMatch == models.XMatchTypeAll {
-							filteredQueues := make([]models.Queue, 0, len(foundQueues))
-							for _, q := range foundQueues {
-								queueHeaders := q.Headers // map[string]string
-								allMatch := true
-								for qhKey, qhValue := range queueHeaders {
-									messageValue, exists := messageHeaders[qhKey]
-									if !exists || messageValue != qhValue {
-										allMatch = false
-										break
-									}
-								}
-								if allMatch {
-									filteredQueues = append(filteredQueues, q)
-								}
+				// Si XMatch=All, filtrar los queues para que todos los headers del mensaje hagan match exacto con los headers del queue
+				if binding.XMatch == models.XMatchTypeAll {
+					filteredQueues := make([]models.Queue, 0, len(foundQueues))
+					for _, q := range foundQueues {
+						queueHeaders := q.Headers // map[string]string
+						allMatch := true
+						for qhKey, qhValue := range queueHeaders {
+							messageValue, exists := messageHeaders[qhKey]
+							if !exists || messageValue != qhValue {
+								allMatch = false
+								break
 							}
-							resultQueues = append(resultQueues, filteredQueues...)
-						} else {
-							// Si XMatch=Any o cualquier otro, incluir todos los queues encontrados
-							resultQueues = append(resultQueues, foundQueues...)
 						}
-					} else {
-						return resultQueues, fmt.Errorf("unexpected result type for queues query")
+						if allMatch {
+							filteredQueues = append(filteredQueues, q)
+						}
 					}
+					resultQueues = append(resultQueues, filteredQueues...)
+				} else {
+					// Si XMatch=Any o cualquier otro, incluir todos los queues encontrados
+					resultQueues = append(resultQueues, foundQueues...)
 				}
 			}
-
 		}
 	}
 
@@ -725,36 +581,19 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				CFS:               cfs,
 			}
 
-			queryCommand := &general_command.Query_Command{
-				Command: &general_command.Repository_Command{
-					CMD: listHeadersCommand,
-				},
-				Now: time.Now().UnixNano(),
-			}
-
-			readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-			result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
-			cancel()
-
+			allExchangeHeaders, err := dragonboat.ExecuteRepositoryQuery[[]models.RoutingHeader](
+				bo.Config.TenantNodesDictionary[cfs],
+				ctx,
+				listHeadersCommand,
+				config.GlobalConfiguration.ApiRaftTimeout,
+				bo.Config.Logger,
+				"list exchange routing headers",
+			)
 			if err != nil {
 				return resultQueues, fmt.Errorf("failed to get exchange routing headers for key %s: %w", key, err)
 			}
 
-			buf := bytes.NewBuffer(result.([]byte))
-			dec := gob.NewDecoder(buf)
-			parsedResult := &commands.CommandResult{}
-			if err := dec.Decode(parsedResult); err != nil {
-				return resultQueues, fmt.Errorf("failed to decode exchange routing headers result for key %s: %w", key, err)
-			}
-
-			if parsedResult.Error != "" {
-				return resultQueues, fmt.Errorf("exchange routing headers query failed for key %s: %s", key, parsedResult.Error)
-			}
-
-			if parsedResult.Result != nil {
-				allExchangeHeaders := parsedResult.Result.([]models.RoutingHeader)
-				listExchangeHeaders = append(listExchangeHeaders, allExchangeHeaders...)
-			}
+			listExchangeHeaders = append(listExchangeHeaders, allExchangeHeaders...)
 		}
 
 		// Cross information with binding.XMatch to get exchange IDs
@@ -834,38 +673,19 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				CFS:        cfs,
 			}
 
-			exchangeQueryCommand := &general_command.Query_Command{
-				Command: &general_command.Repository_Command{
-					CMD: findExchangeByIDCommand,
-				},
-				Now: time.Now().UnixNano(),
-			}
-
-			exchangeReadCtx, exchangeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-			exchangeResult, err := bo.Config.TenantNodesDictionary[cfs].Read(exchangeReadCtx, *exchangeQueryCommand)
-			exchangeCancel()
-
+			foundExchange, err := dragonboat.ExecuteRepositoryQuery[models.Exchange](
+				bo.Config.TenantNodesDictionary[cfs],
+				ctx,
+				findExchangeByIDCommand,
+				config.GlobalConfiguration.ApiRaftTimeout,
+				bo.Config.Logger,
+				"find exchange by ID",
+			)
 			if err != nil {
 				return resultQueues, fmt.Errorf("failed to find exchange by ID %s: %w", exchangeID, err)
 			}
 
-			exchangeBuf := bytes.NewBuffer(exchangeResult.([]byte))
-			exchangeDec := gob.NewDecoder(exchangeBuf)
-			exchangeParsedResult := &commands.CommandResult{}
-			if err := exchangeDec.Decode(exchangeParsedResult); err != nil {
-				return resultQueues, fmt.Errorf("failed to decode exchange result for ID %s: %w", exchangeID, err)
-			}
-
-			if exchangeParsedResult.Error != "" {
-				return resultQueues, fmt.Errorf("exchange query failed for ID %s: %s", exchangeID, exchangeParsedResult.Error)
-			}
-
-			if exchangeParsedResult.Result != nil {
-				foundExchange, ok := exchangeParsedResult.Result.(models.Exchange)
-				if ok {
-					foundExchanges = append(foundExchanges, foundExchange)
-				}
-			}
+			foundExchanges = append(foundExchanges, foundExchange)
 		}
 
 		// Apply additional filtering for XMatch=All - verify all message headers match exactly with exchange headers
