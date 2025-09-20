@@ -1,19 +1,15 @@
 package business_logic
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"fmt"
 
 	"deadalus-orch/server/internal/pkg/config"
-	commands "deadalus-orch/server/internal/usecase/command"
-	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"errors"
 	"strings"
 	"time"
@@ -140,43 +136,21 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantCode string) (models.Te
 		TenantCode: tenantCode,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: findTenantCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.MasterNode.Read(readCtx, *queryCommand)
+	tenantInMaster, err := dragonboat.ExecuteRepositoryQuery[models.TenantInMaster](
+		bo.Config.MasterNode,
+		ctx,
+		findTenantCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"find tenant",
+	)
 	if err != nil {
-		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
+		if strings.Contains(err.Error(), "entity not found") {
 			return models.TenantInMaster{}, nil, nil, errors.New("Tenant not found")
 		}
-		bo.Config.Logger.Error().Err(err).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, nil, errors.New("Find tenants command failed: " + err.Error())
+		return models.TenantInMaster{}, nil, nil, fmt.Errorf("find tenant failed: %w", err)
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, nil, errors.New("Find tenants command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, nil, errors.New("Find tenants command failed")
-	}
-
-	if parsedResult.Result == nil {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find tenants command failed")
-		return models.TenantInMaster{}, nil, nil, errors.New("Tenant not found")
-	}
-
-	tenantInMaster := parsedResult.Result.(models.TenantInMaster)
 	node := bo.Config.TenantNodesDictionary[tenantInMaster.ID]
 
 	if node == nil {
@@ -216,35 +190,18 @@ func (bo *TenantBO) GetTenants(ctx context.Context, q string, cursor string, pag
 		Q:        q,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: paginateTenantsCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.MasterNode.Read(readCtx, *queryCommand)
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.TenantInMaster]](
+		bo.Config.MasterNode,
+		ctx,
+		paginateTenantsCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate tenants",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate tenants command failed")
-		return db.FindResult[models.TenantInMaster]{}, errors.New("Login failed: " + err.Error())
+		return db.FindResult[models.TenantInMaster]{}, fmt.Errorf("paginate tenants failed: %w", err)
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate tenants command failed")
-		return db.FindResult[models.TenantInMaster]{}, errors.New("Paginate tenants command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate tenants command failed")
-		return db.FindResult[models.TenantInMaster]{}, errors.New("Paginate tenants command failed")
-	}
-
-	findResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
 	if findResult.Entities == nil {
 		findResult.Entities = []models.TenantInMaster{}
 	}
@@ -253,9 +210,7 @@ func (bo *TenantBO) GetTenants(ctx context.Context, q string, cursor string, pag
 }
 
 func (bo *TenantBO) GetTenantSummary(ctx context.Context, tenantCode string) (models.TenantSummary, error) {
-
 	tenant, _, _, err := bo.GetTenant(ctx, tenantCode)
-
 	if err != nil {
 		bo.Config.Logger.Error().Str("error", err.Error()).Msg("Get tenant summary command failed")
 		return models.TenantSummary{}, err
@@ -265,42 +220,20 @@ func (bo *TenantBO) GetTenantSummary(ctx context.Context, tenantCode string) (mo
 		TenantId: tenant.ID,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: getTenantSummaryCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.MasterNode.Read(readCtx, *queryCommand)
+	tenantSummary, err := dragonboat.ExecuteRepositoryQuery[models.TenantSummary](
+		bo.Config.MasterNode,
+		ctx,
+		getTenantSummaryCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"get tenant summary",
+	)
 	if err != nil {
-		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
+		if strings.Contains(err.Error(), "entity not found") {
 			return models.TenantSummary{}, errors.New("Tenant summary not found")
 		}
-		bo.Config.Logger.Error().Err(err).Msg("Get tenant summary command failed")
-		return models.TenantSummary{}, errors.New("Get tenant summary command failed: " + err.Error())
+		return models.TenantSummary{}, fmt.Errorf("get tenant summary failed: %w", err)
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Get tenant summary command failed")
-		return models.TenantSummary{}, errors.New("Get tenant summary command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Str("error", parsedResult.Error).Msg("Get tenant summary command failed")
-		return models.TenantSummary{}, errors.New("Get tenant summary command failed: " + parsedResult.Error)
-	}
-
-	if parsedResult.Result == nil {
-		bo.Config.Logger.Error().Str("error", parsedResult.Error).Msg("Get tenant summary command failed")
-		return models.TenantSummary{}, errors.New("Tenant summary not found")
-	}
-
-	tenantSummary := parsedResult.Result.(models.TenantSummary)
 	return tenantSummary, nil
 }
