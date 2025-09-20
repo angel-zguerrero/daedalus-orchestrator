@@ -109,43 +109,20 @@ func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, i
 		CFS:            cfs,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: findQueueCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+	queue, err := dragonboat.ExecuteRepositoryQuery[models.Queue](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		findQueueCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"find queue",
+	)
 	if err != nil {
-		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
+		if strings.Contains(err.Error(), "entity not found") {
 			return models.Queue{}, errors.New("Queue not found")
 		}
-		bo.Config.Logger.Error().Err(err).Msg("Find queue command failed")
-		return models.Queue{}, errors.New("Find queue command failed: " + err.Error())
+		return models.Queue{}, fmt.Errorf("find queue command failed: %w", err)
 	}
-
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Find queue command failed")
-		return models.Queue{}, errors.New("Find queue command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find queue command failed")
-		return models.Queue{}, errors.New("Find queue command failed")
-	}
-
-	if parsedResult.Result == nil {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find queue command failed")
-		return models.Queue{}, errors.New("Queue not found")
-	}
-
-	queue := parsedResult.Result.(models.Queue)
 
 	// Para queues globales no hay nodo específico
 	return queue, nil
@@ -201,35 +178,18 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 		CFS:            cfs,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: paginateQueuesCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.TenantNodesDictionary[cfs].Read(readCtx, *queryCommand)
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Queue]](
+		bo.Config.TenantNodesDictionary[cfs],
+		ctx,
+		paginateQueuesCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate queues",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate queues command failed")
-		return db.FindResult[models.Queue]{}, errors.New("Paginate queues failed: " + err.Error())
+		return db.FindResult[models.Queue]{}, fmt.Errorf("paginate queues failed: %w", err)
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate queues command failed")
-		return db.FindResult[models.Queue]{}, errors.New("Paginate queues command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate queues command failed")
-		return db.FindResult[models.Queue]{}, errors.New("Paginate queues command failed")
-	}
-
-	findResult := parsedResult.Result.(db.FindResult[models.Queue])
 	if findResult.Entities == nil {
 		findResult.Entities = []models.Queue{}
 	}

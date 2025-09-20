@@ -74,6 +74,11 @@ func ExecuteRepositoryCommand[T any](
 		return zero, fmt.Errorf("%s failed: %s", operationName, parsedResult.Error)
 	}
 
+	// Check for nil results
+	if parsedResult.Result == nil {
+		return zero, nil
+	}
+
 	// Parse to expected type
 	typedResult, ok := parsedResult.Result.(T)
 	if !ok {
@@ -151,8 +156,7 @@ func ExecuteRepositoryQuery[T any](
 
 	// Check for nil results (entity not found)
 	if parsedResult.Result == nil {
-		logger.Debug().Msgf("%s: entity not found (nil result)", operationName)
-		return zero, fmt.Errorf("%s: entity not found", operationName)
+		return zero, nil
 	}
 
 	// Parse to expected type

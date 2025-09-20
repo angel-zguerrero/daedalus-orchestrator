@@ -1,7 +1,6 @@
 package business_logic
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -12,11 +11,8 @@ import (
 	"time"
 
 	"deadalus-orch/server/internal/pkg/config"
-	commands "deadalus-orch/server/internal/usecase/command"
-	general_command "deadalus-orch/server/internal/usecase/command/general"
 	node_scheduler "deadalus-orch/server/internal/usecase/command/node-scheduler"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"errors"
 
 	"github.com/google/uuid"
@@ -98,43 +94,20 @@ func (bo *NodeSchedulerBO) GetNodeScheduler(ctx context.Context, nodeSchedulerID
 		NodeSchedulerID: nodeSchedulerID,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: findNodeSchedulerCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.MasterNode.Read(readCtx, *queryCommand)
+	nodeScheduler, err := dragonboat.ExecuteRepositoryQuery[models.NodeScheduler](
+		bo.Config.MasterNode,
+		ctx,
+		findNodeSchedulerCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"find nodeScheduler",
+	)
 	if err != nil {
-		if strings.Contains(err.Error(), "cannot encode nil pointer of type") {
+		if strings.Contains(err.Error(), "entity not found") {
 			return models.NodeScheduler{}, errors.New("NodeScheduler not found")
 		}
-		bo.Config.Logger.Error().Err(err).Msg("Find nodeSchedulers command failed")
-		return models.NodeScheduler{}, errors.New("Find nodeSchedulers command failed: " + err.Error())
+		return models.NodeScheduler{}, fmt.Errorf("find nodeSchedulers command failed: %w", err)
 	}
-
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Find nodeSchedulers command failed")
-		return models.NodeScheduler{}, errors.New("Find nodeSchedulers command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find nodeSchedulers command failed")
-		return models.NodeScheduler{}, errors.New("Find nodeSchedulers command failed")
-	}
-
-	if parsedResult.Result == nil {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Find nodeSchedulers command failed")
-		return models.NodeScheduler{}, errors.New("NodeScheduler not found")
-	}
-
-	nodeScheduler := parsedResult.Result.(models.NodeScheduler)
 
 	return nodeScheduler, nil
 }
@@ -146,35 +119,18 @@ func (bo *NodeSchedulerBO) GetNodeSchedulers(ctx context.Context, q string, curs
 		Q:        q,
 	}
 
-	queryCommand := &general_command.Query_Command{
-		Command: &general_command.Repository_Command{
-			CMD: paginateNodeSchedulersCommand,
-		},
-		Now: time.Now().UnixNano(),
-	}
-
-	readCtx, cancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
-	defer cancel()
-	result, err := bo.Config.MasterNode.Read(readCtx, *queryCommand)
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.NodeScheduler]](
+		bo.Config.MasterNode,
+		ctx,
+		paginateNodeSchedulersCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate nodeSchedulers",
+	)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate nodeSchedulers command failed")
-		return db.FindResult[models.NodeScheduler]{}, errors.New("Login failed: " + err.Error())
+		return db.FindResult[models.NodeScheduler]{}, fmt.Errorf("paginate nodeSchedulers failed: %w", err)
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Msg("Paginate nodeSchedulers command failed")
-		return db.FindResult[models.NodeScheduler]{}, errors.New("Paginate nodeSchedulers command failed")
-	}
-
-	if parsedResult.Error != "" {
-		bo.Config.Logger.Error().Err(err).Str("error", parsedResult.Error).Msg("Paginate nodeSchedulers command failed")
-		return db.FindResult[models.NodeScheduler]{}, errors.New("Paginate nodeSchedulers command failed")
-	}
-
-	findResult := parsedResult.Result.(db.FindResult[models.NodeScheduler])
 	if findResult.Entities == nil {
 		findResult.Entities = []models.NodeScheduler{}
 	}
