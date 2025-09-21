@@ -1,7 +1,6 @@
 package binding
 
 import (
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
@@ -15,14 +14,12 @@ import (
 type BindingController struct {
 	Config    *common.ServerConfing
 	BindingBO *bo.BindingBO
-	TenantBO  *bo.TenantBO
 }
 
 func NewBindingController(Config *common.ServerConfing) *BindingController {
 	api := &BindingController{
 		Config:    Config,
 		BindingBO: bo.NewBindingBO(Config),
-		TenantBO:  bo.NewTenantBO(Config),
 	}
 	return api
 }
@@ -108,12 +105,7 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		return
 	}
 
-	tenantCode := c.Param("code")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	// Set default binding type if not provided
 	bindingType := models.BindingTypeClassic
@@ -141,8 +133,10 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		bindingType,
 		targetExchangeType,
 		req.Headers,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -160,21 +154,18 @@ func (ctrl *BindingController) GetBindingHandler(c *gin.Context) {
 	exchangeCode := c.Param("exchangeCode")
 	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	binding, err := ctrl.BindingBO.GetBinding(
 		c.Request.Context(),
 		exchangeCode,
 		queueCode,
 		vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -191,20 +182,17 @@ func (ctrl *BindingController) GetBindingHandler(c *gin.Context) {
 func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 	bindingCode := c.Param("bindingCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	err = ctrl.BindingBO.DeleteBinding(
+	err := ctrl.BindingBO.DeleteBinding(
 		c.Request.Context(),
 		bindingCode,
 		vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -219,13 +207,8 @@ func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 // GetBindingsHandler handles GET /rest-api/tenants/:id/bindings
 func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {
@@ -247,8 +230,10 @@ func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 		page,
 		c.Query("vnamespace"),
 		includeObjects,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

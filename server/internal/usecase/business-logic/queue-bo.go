@@ -32,7 +32,7 @@ func NewQueueBO(Config *common.ServerConfing) *QueueBO {
 	}
 }
 
-func (bo *QueueBO) CreateQueue(ctx context.Context, code, vnamespace, name string, queueType models.QueueType, headers map[string]string, cf, cfs string) (models.Queue, error) {
+func (bo *QueueBO) CreateQueue(ctx context.Context, code, vnamespace, name string, queueType models.QueueType, headers map[string]string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Queue, error) {
 	queue := &models.Queue{
 		ID:              strings.ReplaceAll(uuid.New().String(), "-", ""),
 		Code:            code,
@@ -46,14 +46,14 @@ func (bo *QueueBO) CreateQueue(ctx context.Context, code, vnamespace, name strin
 		Headers:         headers,            // Add headers support
 	}
 
-	createdList, err := bo.BulkCreateQueue(ctx, []*models.Queue{queue}, cf, cfs)
+	createdList, err := bo.BulkCreateQueue(ctx, []*models.Queue{queue}, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return models.Queue{}, err
 	}
 	return createdList[0], nil
 }
 
-func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, cf, cfs string) ([]models.Queue, error) {
+func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
 	if len(queues) == 0 {
 		return nil, errors.New("no queues provided")
 	}
@@ -86,7 +86,7 @@ func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, 
 	}
 
 	created, err := dragonboat.ExecuteRepositoryCommand[[]models.Queue](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		assertQueueCommand,
 		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queues)),
@@ -100,7 +100,7 @@ func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, 
 	return created, nil
 }
 
-func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, includeHeaders bool, cf, cfs string) (models.Queue, error) {
+func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Queue, error) {
 	findQueueCommand := &queue_command.FindQueueCommand{
 		Code:           queueCode,
 		VNamespace:     vnamespace,
@@ -110,7 +110,7 @@ func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, i
 	}
 
 	queue, err := dragonboat.ExecuteRepositoryQuery[models.Queue](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		findQueueCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,
@@ -128,7 +128,7 @@ func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, i
 	return queue, nil
 }
 
-func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, cfs string) error {
+func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
 	defer writeCancel()
 
@@ -145,7 +145,7 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, c
 		CMD:  deleteQueueCommand,
 	}
 
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, atstCmd)
+	result, err := tenantNode.Write(writeCtx, atstCmd)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Failed to delete queue")
 		return errors.New("Failed to delete queue: " + err.Error())
@@ -167,7 +167,7 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, c
 	return nil
 }
 
-func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeHeaders bool, cf, cfs string) (db.FindResult[models.Queue], error) {
+func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Queue], error) {
 	paginateQueuesCommand := &queue_command.PaginateQueuesCommand{
 		Query:          q,
 		Cursor:         cursor,
@@ -179,7 +179,7 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 	}
 
 	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Queue]](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		paginateQueuesCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,
@@ -197,9 +197,9 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 	return findResult, nil
 }
 
-func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) (string, error) {
+func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message models.QueueMessage, vnamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (string, error) {
 	// First, get the queue to ensure it exists
-	queue, err := bo.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs)
+	queue, err := bo.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Msg("Failed to get queue")
 		return "", fmt.Errorf("failed to get queue: %w", err)
@@ -238,7 +238,7 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 	}
 
 	createdMessages, err := dragonboat.ExecuteRepositoryCommand[[]models.QueueMessage](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		enqueueCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,

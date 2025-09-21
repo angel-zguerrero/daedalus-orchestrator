@@ -26,7 +26,7 @@ func NewBindingBO(Config *common.ServerConfing) *BindingBO {
 	}
 }
 
-func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchangeCode, targetExchangeCode, alternateExchangeCode, vnamespace, routingKey, pattern string, xMatch models.XMatchType, bindingType models.BindingType, targetExchangeType models.TargetExchangeType, headers map[string]string, cf, cfs string) (models.Binding, error) {
+func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchangeCode, targetExchangeCode, alternateExchangeCode, vnamespace, routingKey, pattern string, xMatch models.XMatchType, bindingType models.BindingType, targetExchangeType models.TargetExchangeType, headers map[string]string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Binding, error) {
 	assertBindingCommand := &binding_command.AssertBindingCommand{
 		NewBindingID:          strings.ReplaceAll(uuid.New().String(), "-", ""),
 		Code:                  code,
@@ -46,7 +46,7 @@ func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchang
 	}
 
 	created, err := dragonboat.ExecuteRepositoryCommand[models.Binding](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		assertBindingCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,
@@ -60,7 +60,7 @@ func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchang
 	return created, nil
 }
 
-func (bo *BindingBO) GetBinding(ctx context.Context, exchangeCode, queueCode, vnamespace, cf, cfs string) (models.Binding, error) {
+func (bo *BindingBO) GetBinding(ctx context.Context, exchangeCode, queueCode, vnamespace, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Binding, error) {
 	findBindingCommand := &binding_command.FindBindingCommand{
 		ExchangeCode: exchangeCode,
 		QueueCode:    queueCode,
@@ -70,7 +70,7 @@ func (bo *BindingBO) GetBinding(ctx context.Context, exchangeCode, queueCode, vn
 	}
 
 	binding, err := dragonboat.ExecuteRepositoryQuery[models.Binding](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		findBindingCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,
@@ -87,7 +87,7 @@ func (bo *BindingBO) GetBinding(ctx context.Context, exchangeCode, queueCode, vn
 	return binding, nil
 }
 
-func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cfs string) error {
+func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) error {
 	deleteBindingCommand := &binding_command.DeleteBindingCommand{
 		Code:       code,
 		VNamespace: vnamespace,
@@ -96,7 +96,7 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cf
 	}
 
 	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		deleteBindingCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,
@@ -106,7 +106,7 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cf
 	return err
 }
 
-func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeObjects bool, cf, cfs string) (db.FindResult[models.Binding], error) {
+func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeObjects bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Binding], error) {
 	paginateBindingsCommand := &binding_command.PaginateBindingsCommand{
 		Query:          q,
 		Cursor:         cursor,
@@ -118,7 +118,7 @@ func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, p
 	}
 
 	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Binding]](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		paginateBindingsCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,

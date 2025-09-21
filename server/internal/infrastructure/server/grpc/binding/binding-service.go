@@ -3,10 +3,8 @@ package binding
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/binding"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -18,22 +16,17 @@ type BindingService struct {
 	startTime time.Time
 	Config    *common.ServerConfing
 	BindingBO *bo.BindingBO
-	TenantBO  *bo.TenantBO
 }
 
 func NewBindingService(config *common.ServerConfing) *BindingService {
 	return &BindingService{
 		Config:    config,
 		BindingBO: bo.NewBindingBO(config),
-		TenantBO:  bo.NewTenantBO(config),
 	}
 }
 
 func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingRequest) (*pb.CreateBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	// Validate that Code is provided
 	if r.Code == "" {
@@ -113,8 +106,10 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 		bindingType,
 		targetExchangeType,
 		r.Headers,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err
@@ -142,18 +137,17 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 }
 
 func (s *BindingService) GetBinding(ctx context.Context, r *pb.GetBindingRequest) (*pb.GetBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	binding, err := s.BindingBO.GetBinding(
 		ctx,
 		r.ExchangeCode,
 		r.QueueCode,
 		r.Vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err
@@ -182,10 +176,7 @@ func (s *BindingService) GetBinding(ctx context.Context, r *pb.GetBindingRequest
 }
 
 func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsRequest) (*pb.GetBindingsResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	findResult, err := s.BindingBO.GetBindings(
 		ctx,
@@ -194,8 +185,10 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 		int(r.PageSize),
 		r.Vnamespace,
 		r.IncludeObjects,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err
@@ -294,17 +287,16 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 }
 
 func (s *BindingService) DeleteBinding(ctx context.Context, r *pb.DeleteBindingRequest) (*pb.DeleteBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	err = s.BindingBO.DeleteBinding(
+	err := s.BindingBO.DeleteBinding(
 		ctx,
 		r.Code,
 		r.Vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err

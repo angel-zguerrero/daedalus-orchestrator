@@ -3,10 +3,8 @@ package queue
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -18,14 +16,12 @@ type QueueService struct {
 	startTime time.Time
 	Config    *common.ServerConfing
 	QueueBO   *bo.QueueBO
-	TenantBO  *bo.TenantBO
 }
 
 func NewQueueService(config *common.ServerConfing) *QueueService {
 	return &QueueService{
-		Config:   config,
-		QueueBO:  bo.NewQueueBO(config),
-		TenantBO: bo.NewTenantBO(config),
+		Config:  config,
+		QueueBO: bo.NewQueueBO(config),
 	}
 }
 
@@ -53,10 +49,7 @@ func convertPriorityThresholdsToProto(modelMap map[int]int) map[int32]int32 {
 }
 
 func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest) (*pb.CreateQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	// Validate queue type
 	if !isValidQueueType(r.Type) {
@@ -82,7 +75,7 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 		queue.MaxAttempts = 1
 	}
 
-	queuesResult, err := s.QueueBO.BulkCreateQueue(ctx, []*models.Queue{queue}, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queuesResult, err := s.QueueBO.BulkCreateQueue(ctx, []*models.Queue{queue}, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -111,10 +104,7 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 }
 
 func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueueRequest) (*pb.BulkCreateQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	queues := []*models.Queue{}
 	for _, t := range r.Queues {
@@ -142,7 +132,7 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 		queues = append(queues, queue)
 	}
 
-	queuesResult, err := s.QueueBO.BulkCreateQueue(ctx, queues, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queuesResult, err := s.QueueBO.BulkCreateQueue(ctx, queues, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -175,12 +165,9 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 }
 
 func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb.GetQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	queue, err := s.QueueBO.GetQueue(ctx, r.Code, r.Vnamespace, false, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queue, err := s.QueueBO.GetQueue(ctx, r.Code, r.Vnamespace, false, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -207,12 +194,9 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 }
 
 func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*pb.GetQueuesResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, r.IncludeHeaders, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, r.IncludeHeaders, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -254,9 +238,9 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 
 func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest) (*pb.DeleteQueueResponse, error) {
 	// Usar el tenant context inyectado por el interceptor en lugar de obtenerlo manualmente
-	_, _, cf, cfs := common.MustGetTenantData(ctx)
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	err := s.QueueBO.DeleteQueue(ctx, r.Code, r.Vnamespace, cf, cfs)
+	err := s.QueueBO.DeleteQueue(ctx, r.Code, r.Vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -267,10 +251,7 @@ func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest
 }
 
 func (s *QueueService) EnqueueMessage(ctx context.Context, r *pb.EnqueueMessageRequest) (*pb.EnqueueMessageResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	// Create the message
 	message := models.QueueMessage{
@@ -284,7 +265,7 @@ func (s *QueueService) EnqueueMessage(ctx context.Context, r *pb.EnqueueMessageR
 	}
 
 	// Enqueue the message
-	messageID, err := s.QueueBO.EnqueueMessage(ctx, r.QueueCode, message, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	messageID, err := s.QueueBO.EnqueueMessage(ctx, r.QueueCode, message, r.Vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}

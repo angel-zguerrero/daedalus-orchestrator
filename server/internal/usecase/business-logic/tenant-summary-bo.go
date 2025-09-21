@@ -23,13 +23,13 @@ func NewTenantSummaryBO(Config *common.ServerConfing) *TenantSummaryBO {
 	}
 }
 
-func (bo *TenantSummaryBO) GetTenantSummary(ctx context.Context, tenantId, cf, cfs string) (models.TenantSummary, error) {
+func (bo *TenantSummaryBO) GetTenantSummary(ctx context.Context, tenantId, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.TenantSummary, error) {
 	getTenantSummaryCommand := &tenant_summary_command.GetTenantSummaryCommand{
 		TenantId: tenantId,
 	}
 
 	tenantSummary, err := dragonboat.ExecuteRepositoryQuery[models.TenantSummary](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		getTenantSummaryCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,

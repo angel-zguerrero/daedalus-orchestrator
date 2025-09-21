@@ -35,7 +35,7 @@ func NewExchangeBO(Config *common.ServerConfing) *ExchangeBO {
 	}
 }
 
-func (bo *ExchangeBO) CreateExchange(ctx context.Context, code, vnamespace, name string, exchangeType models.ExchangeType, headers map[string]string, cf, cfs string) (models.Exchange, error) {
+func (bo *ExchangeBO) CreateExchange(ctx context.Context, code, vnamespace, name string, exchangeType models.ExchangeType, headers map[string]string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Exchange, error) {
 	exchange := &models.Exchange{
 		ID:         strings.ReplaceAll(uuid.New().String(), "-", ""),
 		Code:       code,
@@ -45,14 +45,14 @@ func (bo *ExchangeBO) CreateExchange(ctx context.Context, code, vnamespace, name
 		Headers:    headers,
 	}
 
-	createdList, err := bo.BulkCreateExchange(ctx, []*models.Exchange{exchange}, cf, cfs)
+	createdList, err := bo.BulkCreateExchange(ctx, []*models.Exchange{exchange}, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return models.Exchange{}, err
 	}
 	return createdList[0], nil
 }
 
-func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*models.Exchange, cf, cfs string) ([]models.Exchange, error) {
+func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*models.Exchange, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Exchange, error) {
 	if len(exchanges) == 0 {
 		return nil, errors.New("no exchanges provided")
 	}
@@ -74,7 +74,7 @@ func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*model
 	}
 
 	created, err := dragonboat.ExecuteRepositoryCommand[[]models.Exchange](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		asseertExchangeCommand,
 		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(exchanges)),
@@ -88,7 +88,7 @@ func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*model
 	return created, nil
 }
 
-func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeCode, vnamespace, cf, cfs string) (models.Exchange, error) {
+func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeCode, vnamespace, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Exchange, error) {
 	findExchangeCommand := &exchange_command.FindExchangeCommand{
 		Code:       exchangeCode,
 		VNamespace: vnamespace,
@@ -97,7 +97,7 @@ func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeCode, vnamespace,
 	}
 
 	exchange, err := dragonboat.ExecuteRepositoryQuery[models.Exchange](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		findExchangeCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,
@@ -115,7 +115,7 @@ func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeCode, vnamespace,
 	return exchange, nil
 }
 
-func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespace, cf, cfs string) error {
+func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespace, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, config.GlobalConfiguration.ApiRaftTimeout)
 	defer writeCancel()
 
@@ -132,7 +132,7 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespa
 		CMD:  deleteExchangeCommand,
 	}
 
-	result, err := bo.Config.TenantNodesDictionary[cfs].Write(writeCtx, atstCmd)
+	result, err := tenantNode.Write(writeCtx, atstCmd)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Failed to delete exchange")
 		return errors.New("Failed to delete exchange: " + err.Error())
@@ -154,7 +154,7 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespa
 	return nil
 }
 
-func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, cf, cfs string) (db.FindResult[models.Exchange], error) {
+func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Exchange], error) {
 	paginateExchangesCommand := &exchange_command.PaginateExchangesCommand{
 		Query:      q,
 		Cursor:     cursor,
@@ -165,7 +165,7 @@ func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string,
 	}
 
 	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Exchange]](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		paginateExchangesCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,
@@ -183,13 +183,13 @@ func (bo *ExchangeBO) GetExchanges(ctx context.Context, q string, cursor string,
 	return findResult, nil
 }
 
-func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) (map[string]string, error) {
+func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (map[string]string, error) {
 
 	if message.MessageID == "" {
 		message.MessageID = strings.ReplaceAll(uuid.New().String(), "-", "")
 	}
 
-	queues, err := bo.GetQueuesFromExchange(ctx, exchangeCode, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs)
+	queues, err := bo.GetQueuesFromExchange(ctx, exchangeCode, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Msg("Failed to get queues from exchange")
 		return nil, fmt.Errorf("failed to get queues from exchange: %w", err)
@@ -241,7 +241,7 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	copy(enqueueCommand.Messages, queueMessages)
 
 	createdMessages, err := dragonboat.ExecuteRepositoryCommand[[]models.QueueMessage](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		enqueueCommand,
 		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queueMessages)),
@@ -261,15 +261,15 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	return resultingMessages, nil
 }
 
-func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string) ([]models.Queue, error) {
+func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
 	// First, get the exchange
-	exchange, err := bo.GetExchange(ctx, exchangeCode, vnamespace, cf, cfs)
+	exchange, err := bo.GetExchange(ctx, exchangeCode, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get exchange: %w", err)
 	}
 
 	// Get bindings for this exchange
-	bindings, err := bo.getBindingsByExchange(ctx, exchange.ID, vnamespace, cf, cfs)
+	bindings, err := bo.getBindingsByExchange(ctx, exchange.ID, vnamespace, cf, cfs, tenantNode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bindings for exchange: %w", err)
 	}
@@ -279,7 +279,7 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 
 	// Process each binding
 	for _, binding := range bindings {
-		queues, err := bo.processBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges)
+		queues, err := bo.processBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges, tenant, tenantNode)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process binding: %w", err)
 		}
@@ -290,7 +290,7 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 }
 
 // Helper method to get bindings by exchange ID
-func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, vnamespace, cf, cfs string) ([]models.Binding, error) {
+func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, vnamespace, cf, cfs string, tenantNode *dragonboat.RaftNode) ([]models.Binding, error) {
 	var allBindings []models.Binding
 	cursor := ""
 	pageSize := 100
@@ -307,7 +307,7 @@ func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, vna
 		}
 
 		findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Binding]](
-			bo.Config.TenantNodesDictionary[cfs],
+			tenantNode,
 			ctx,
 			paginateBindingsCommand,
 			config.GlobalConfiguration.ApiRaftTimeout,
@@ -332,7 +332,7 @@ func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, vna
 }
 
 // Process a single binding to determine if it matches and return queues
-func (bo *ExchangeBO) processBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool) ([]models.Queue, error) {
+func (bo *ExchangeBO) processBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
 	var resultQueues []models.Queue
 
 	// Prevent infinite recursion
@@ -342,16 +342,16 @@ func (bo *ExchangeBO) processBinding(ctx context.Context, binding models.Binding
 
 	switch binding.BindingType {
 	case models.BindingTypeClassic:
-		return bo.processClassicBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges)
+		return bo.processClassicBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges, tenant, tenantNode)
 	case models.BindingTypeDynamic:
-		return bo.processDynamicBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges)
+		return bo.processDynamicBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges, tenant, tenantNode)
 	default:
 		return resultQueues, fmt.Errorf("unknown binding type: %s", binding.BindingType)
 	}
 }
 
 // Process classic binding (static routing)
-func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool) ([]models.Queue, error) {
+func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
 	var resultQueues []models.Queue
 
 	// Check if binding matches routing criteria
@@ -362,7 +362,7 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 				// Mark this alternate exchange as visited
 				visitedExchanges[binding.AlternateExchange.ID] = true
 
-				queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+				queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs, tenant, tenantNode)
 				if err != nil {
 					return resultQueues, fmt.Errorf("failed to get queues from alternate exchange: %w", err)
 				} else {
@@ -385,7 +385,7 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 			// Mark this target exchange as visited
 			visitedExchanges[binding.TargetExchange.ID] = true
 
-			queues, err := bo.GetQueuesFromExchange(ctx, binding.TargetExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+			queues, err := bo.GetQueuesFromExchange(ctx, binding.TargetExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs, tenant, tenantNode)
 			if err != nil {
 				return resultQueues, fmt.Errorf("failed to get queues from target exchange: %w", err)
 			} else {
@@ -398,7 +398,7 @@ func (bo *ExchangeBO) processClassicBinding(ctx context.Context, binding models.
 }
 
 // Process dynamic binding (pattern-based routing)
-func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool) ([]models.Queue, error) {
+func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
 	var resultQueues []models.Queue
 
 	// Prevent infinite recursion by checking if we've already visited this exchange
@@ -424,7 +424,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 			}
 
 			foundQueue, err := dragonboat.ExecuteRepositoryQuery[models.Queue](
-				bo.Config.TenantNodesDictionary[cfs],
+				tenantNode,
 				ctx,
 				findQueueCommand,
 				config.GlobalConfiguration.ApiRaftTimeout,
@@ -456,7 +456,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				}
 
 				allQueueHeaders, err := dragonboat.ExecuteRepositoryQuery[[]models.RoutingHeader](
-					bo.Config.TenantNodesDictionary[cfs],
+					tenantNode,
 					ctx,
 					listHeadersCommand,
 					config.GlobalConfiguration.ApiRaftTimeout,
@@ -540,7 +540,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				}
 
 				foundQueues, err := dragonboat.ExecuteRepositoryQuery[[]models.Queue](
-					bo.Config.TenantNodesDictionary[cfs],
+					tenantNode,
 					ctx,
 					findQueuesByIDsCommand,
 					config.GlobalConfiguration.ApiRaftTimeout,
@@ -593,7 +593,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 			}
 
 			allExchangeHeaders, err := dragonboat.ExecuteRepositoryQuery[[]models.RoutingHeader](
-				bo.Config.TenantNodesDictionary[cfs],
+				tenantNode,
 				ctx,
 				listHeadersCommand,
 				config.GlobalConfiguration.ApiRaftTimeout,
@@ -685,7 +685,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 			}
 
 			foundExchange, err := dragonboat.ExecuteRepositoryQuery[models.Exchange](
-				bo.Config.TenantNodesDictionary[cfs],
+				tenantNode,
 				ctx,
 				findExchangeByIDCommand,
 				config.GlobalConfiguration.ApiRaftTimeout,
@@ -727,7 +727,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 			visitedExchanges[exchange.ID] = true
 
 			// Call GetQueuesFromExchange for this exchange
-			queues, err := bo.GetQueuesFromExchange(ctx, exchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+			queues, err := bo.GetQueuesFromExchange(ctx, exchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs, tenant, tenantNode)
 			if err != nil {
 				return resultQueues, fmt.Errorf("failed to get queues from matched exchange %s: %w", exchange.Code, err)
 			}
@@ -742,7 +742,7 @@ func (bo *ExchangeBO) processDynamicBinding(ctx context.Context, binding models.
 				// Mark this alternate exchange as visited
 				visitedExchanges[binding.AlternateExchange.ID] = true
 
-				queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs)
+				queues, err := bo.GetQueuesFromExchange(ctx, binding.AlternateExchange.Code, routingKeyOrPatternOrQueueCode, message, binding.VNamespace, cf, cfs, tenant, tenantNode)
 				if err != nil {
 					return resultQueues, fmt.Errorf("failed to get queues from alternate exchange: %w", err)
 				} else {
