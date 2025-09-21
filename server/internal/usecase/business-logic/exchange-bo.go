@@ -53,6 +53,10 @@ func (bo *ExchangeBO) CreateExchange(ctx context.Context, code, vnamespace, name
 }
 
 func (bo *ExchangeBO) BulkCreateExchange(ctx context.Context, exchanges []*models.Exchange, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Exchange, error) {
+	if tenant.Status == models.PendingForDeletion {
+		return nil, errors.New("cannot create exchange when tenant is pending for deletion")
+	}
+
 	if len(exchanges) == 0 {
 		return nil, errors.New("no exchanges provided")
 	}

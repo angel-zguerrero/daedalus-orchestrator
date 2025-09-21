@@ -27,6 +27,10 @@ func NewBindingBO(Config *common.ServerConfing) *BindingBO {
 }
 
 func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchangeCode, targetExchangeCode, alternateExchangeCode, vnamespace, routingKey, pattern string, xMatch models.XMatchType, bindingType models.BindingType, targetExchangeType models.TargetExchangeType, headers map[string]string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Binding, error) {
+	if tenant.Status == models.PendingForDeletion {
+		return models.Binding{}, errors.New("cannot create binding when tenant is pending for deletion")
+	}
+
 	// Validate that Code is provided
 	if code == "" {
 		return models.Binding{}, errors.New("code is required")
