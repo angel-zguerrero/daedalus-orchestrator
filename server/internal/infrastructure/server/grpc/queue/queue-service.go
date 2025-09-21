@@ -253,12 +253,10 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 }
 
 func (s *QueueService) DeleteQueue(ctx context.Context, r *pb.DeleteQueueRequest) (*pb.DeleteQueueResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	// Usar el tenant context inyectado por el interceptor en lugar de obtenerlo manualmente
+	_, _, cf, cfs := common.MustGetTenantData(ctx)
 
-	err = s.QueueBO.DeleteQueue(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err := s.QueueBO.DeleteQueue(ctx, r.Code, r.Vnamespace, cf, cfs)
 	if err != nil {
 		return nil, err
 	}

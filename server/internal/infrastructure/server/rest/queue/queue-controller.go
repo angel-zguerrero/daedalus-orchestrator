@@ -201,15 +201,16 @@ func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
 	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Usar el tenant context inyectado por el interceptor en lugar de obtenerlo manualmente
+	_, _, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	err = ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	// También se puede acceder a toda la información del tenant si es necesario:
+	// tenantCtx := common.MustGetTenantContext(c.Request.Context())
+	// tenant := tenantCtx.Tenant
+	// node := tenantCtx.Node  // El nodo de dragonboat correspondiente al tenant
+
+	err := ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueCode, vnamespace, cf, cfs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
