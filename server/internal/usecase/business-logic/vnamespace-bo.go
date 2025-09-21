@@ -21,7 +21,7 @@ func NewVNamespaceBO(config *common.ServerConfing) *VNamespaceBO {
 	}
 }
 
-func (bo *VNamespaceBO) GetVNamespaces(ctx context.Context, q string, cursor string, pageSize int, cf, cfs string) (db.FindResult[models.VNamespace], error) {
+func (bo *VNamespaceBO) GetVNamespaces(ctx context.Context, q string, cursor string, pageSize int, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.VNamespace], error) {
 	paginateVNamespacesCommand := &vnamespace_command.PaginateVNamespacesCommand{
 		Query:    q,
 		Cursor:   cursor,
@@ -31,7 +31,7 @@ func (bo *VNamespaceBO) GetVNamespaces(ctx context.Context, q string, cursor str
 	}
 
 	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.VNamespace]](
-		bo.Config.TenantNodesDictionary[cfs],
+		tenantNode,
 		ctx,
 		paginateVNamespacesCommand,
 		config.GlobalConfiguration.ApiRaftTimeout,

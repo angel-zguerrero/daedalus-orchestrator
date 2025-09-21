@@ -1,7 +1,6 @@
 package vnamespace
 
 import (
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"net/http"
@@ -13,22 +12,18 @@ import (
 type VNamespaceController struct {
 	Config       *common.ServerConfing
 	VNamespaceBO *bo.VNamespaceBO
-	TenantBO     *bo.TenantBO
 }
 
 func NewVNamespaceController(Config *common.ServerConfing) *VNamespaceController {
 	api := &VNamespaceController{
 		Config:       Config,
 		VNamespaceBO: bo.NewVNamespaceBO(Config),
-		TenantBO:     bo.NewTenantBO(Config),
 	}
 	return api
 }
 
 // GetVNamespacesHandler handles GET /rest-api/tenants/:code/vnamespaces
 func (ctrl *VNamespaceController) GetVNamespacesHandler(c *gin.Context) {
-	tenantCode := c.Param("code")
-
 	// Get query parameters
 	query := c.DefaultQuery("q", "")
 	cursor := c.DefaultQuery("cursor", "")
@@ -44,16 +39,9 @@ func (ctrl *VNamespaceController) GetVNamespacesHandler(c *gin.Context) {
 		pageSize = 100
 	}
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
-	cfs := tenant.ID
-
-	result, err := ctrl.VNamespaceBO.GetVNamespaces(c.Request.Context(), query, cursor, pageSize, cf, cfs)
+	result, err := ctrl.VNamespaceBO.GetVNamespaces(c.Request.Context(), query, cursor, pageSize, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

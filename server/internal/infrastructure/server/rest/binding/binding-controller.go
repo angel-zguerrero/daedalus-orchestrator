@@ -1,7 +1,6 @@
 package binding
 
 import (
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
@@ -15,14 +14,12 @@ import (
 type BindingController struct {
 	Config    *common.ServerConfing
 	BindingBO *bo.BindingBO
-	TenantBO  *bo.TenantBO
 }
 
 func NewBindingController(Config *common.ServerConfing) *BindingController {
 	api := &BindingController{
 		Config:    Config,
 		BindingBO: bo.NewBindingBO(Config),
-		TenantBO:  bo.NewTenantBO(Config),
 	}
 	return api
 }
@@ -51,68 +48,12 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		return
 	}
 
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
 	// Set default target exchange type if not provided
 	targetExchangeType := models.TargetExchangeTypeQueue
 	if req.TargetExchangeType != "" {
-		if !isValidTargetExchangeType(req.TargetExchangeType) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid target exchange type: %s. Valid types are: queue, exchange", req.TargetExchangeType)})
-			return
-		}
 		targetExchangeType = models.TargetExchangeType(req.TargetExchangeType)
-	}
-
-	// Validate target exchange type specific requirements
-	if targetExchangeType == models.TargetExchangeTypeQueue {
-		if req.BindingType == "classic" && req.QueueCode == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required for classic bindings when targetExchangeType is queue"})
-			return
-		}
-		if req.TargetExchangeCode != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "targetExchangeCode should not be specified when targetExchangeType is queue"})
-			return
-		}
-	} else if targetExchangeType == models.TargetExchangeTypeExchange {
-		if req.TargetExchangeCode == "" && req.BindingType == "classic" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "targetExchangeCode is required when targetExchangeType is exchange"})
-			return
-		}
-		if req.QueueCode != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode should not be specified when targetExchangeType is exchange"})
-			return
-		}
-		if req.BindingType == "dynamic" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "exchange targets are not supported for dynamic bindings"})
-			return
-		}
-	}
-
-	// Legacy validation for backward compatibility
-	if req.BindingType == "classic" && targetExchangeType == models.TargetExchangeTypeQueue && req.QueueCode == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required for classic bindings"})
-		return
-	}
-	if req.BindingType == "dynamic" && req.QueueCode != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode should not be specified for dynamic bindings"})
-		return
-	}
-
-	// Validate binding type
-	if req.BindingType != "" && !isValidBindingType(req.BindingType) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid binding type: %s. Valid types are: classic, dynamic", req.BindingType)})
-		return
-	}
-
-	// Validate XMatch type
-	if req.XMatch != "" && !isValidXMatchType(req.XMatch) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid xMatch type: %s. Valid types are: all, any", req.XMatch)})
-		return
-	}
-
-	tenantCode := c.Param("code")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
 	}
 
 	// Set default binding type if not provided
@@ -141,8 +82,10 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		bindingType,
 		targetExchangeType,
 		req.Headers,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -160,21 +103,18 @@ func (ctrl *BindingController) GetBindingHandler(c *gin.Context) {
 	exchangeCode := c.Param("exchangeCode")
 	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	binding, err := ctrl.BindingBO.GetBinding(
 		c.Request.Context(),
 		exchangeCode,
 		queueCode,
 		vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -191,20 +131,17 @@ func (ctrl *BindingController) GetBindingHandler(c *gin.Context) {
 func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 	bindingCode := c.Param("bindingCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	err = ctrl.BindingBO.DeleteBinding(
+	err := ctrl.BindingBO.DeleteBinding(
 		c.Request.Context(),
 		bindingCode,
 		vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -219,13 +156,8 @@ func (ctrl *BindingController) DeleteBindingHandler(c *gin.Context) {
 // GetBindingsHandler handles GET /rest-api/tenants/:id/bindings
 func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {
@@ -247,8 +179,10 @@ func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 		page,
 		c.Query("vnamespace"),
 		includeObjects,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -259,34 +193,4 @@ func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 		"message": "Binding list",
 		"result":  findResult,
 	})
-}
-
-// isValidBindingType validates if the binding type is one of the allowed types
-func isValidBindingType(bindingType string) bool {
-	switch bindingType {
-	case "classic", "dynamic":
-		return true
-	default:
-		return false
-	}
-}
-
-// isValidXMatchType validates if the XMatch type is one of the allowed types
-func isValidXMatchType(xMatch string) bool {
-	switch xMatch {
-	case "all", "any":
-		return true
-	default:
-		return false
-	}
-}
-
-// isValidTargetExchangeType validates if the target exchange type is one of the allowed types
-func isValidTargetExchangeType(targetExchangeType string) bool {
-	switch targetExchangeType {
-	case "queue", "exchange":
-		return true
-	default:
-		return false
-	}
 }

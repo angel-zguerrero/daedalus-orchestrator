@@ -3,15 +3,19 @@ package rest_server
 import (
 	"bytes"
 	"context"
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/infrastructure/server/common"
 	ratelimit "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
+	bo "deadalus-orch/server/internal/usecase/business-logic"
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"encoding/gob"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +26,55 @@ import (
 	"github.com/ulule/limiter/v3"
 	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
 )
+
+// tenantContextMiddleware creates a middleware that extracts tenant information and injects it into the context
+func tenantContextMiddleware(tenantBO *bo.TenantBO, tenantNodesDictionary map[string]*dragonboat.RaftNode, logger zerolog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Solo aplica a rutas que tienen un parámetro :code de tenant
+		tenantCode := c.Param("code")
+		if tenantCode == "" {
+			// Si no hay código de tenant, continúa sin inyectar contexto
+			c.Next()
+			return
+		}
+
+		// Obtener información del tenant
+		tenant, _, _, err := tenantBO.GetTenant(c.Request.Context(), tenantCode)
+		if err != nil {
+			logger.Error().Err(err).Str("tenantCode", tenantCode).Msg("Failed to get tenant in middleware")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant: " + err.Error()})
+			c.Abort()
+			return
+		}
+
+		// Construir CF y CFS
+		cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
+		cfs := tenant.ID
+
+		// Obtener el nodo correspondiente al tenant
+		node, exists := tenantNodesDictionary[cfs]
+		if !exists {
+			logger.Error().Str("tenantCode", tenantCode).Str("cfs", cfs).Msg("No node found for tenant")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant node not available"})
+			c.Abort()
+			return
+		}
+
+		// Crear el contexto del tenant
+		tenantCtx := &common.TenantContext{
+			Tenant: &tenant,
+			Node:   node,
+			CF:     cf,
+			CFS:    cfs,
+		}
+
+		// Inyectar en el contexto de la request
+		newCtx := common.SetTenantContext(c.Request.Context(), tenantCtx)
+		c.Request = c.Request.WithContext(newCtx)
+
+		c.Next()
+	}
+}
 
 func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtKey []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -1,7 +1,6 @@
 package exchange
 
 import (
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
@@ -64,14 +63,10 @@ func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
 		return
 	}
 
-	tenantCode := c.Param("code")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Use tenant data from interceptor context
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), req.Code, req.VNamespace, req.Name, models.ExchangeType(req.Type), req.Headers, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), req.Code, req.VNamespace, req.Name, models.ExchangeType(req.Type), req.Headers, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -90,14 +85,9 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Use tenant data from interceptor context
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	exchanges := []*models.Exchange{}
 
@@ -111,7 +101,7 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 		}
 		exchanges = append(exchanges, exchange)
 	}
-	exchangesResult, err := ctrl.ExchangeBO.BulkCreateExchange(c.Request.Context(), exchanges, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchangesResult, err := ctrl.ExchangeBO.BulkCreateExchange(c.Request.Context(), exchanges, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -127,14 +117,11 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
 	exchangeCode := c.Param("exchangeCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	exchange, err := ctrl.ExchangeBO.GetExchange(c.Request.Context(), exchangeCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	// Use tenant data from interceptor context
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
+	exchange, err := ctrl.ExchangeBO.GetExchange(c.Request.Context(), exchangeCode, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -150,15 +137,11 @@ func (ctrl *ExchangeController) GetExchangeHandler(c *gin.Context) {
 func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
 	exchangeCode := c.Param("exchangeCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Use tenant data from interceptor context
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	err = ctrl.ExchangeBO.DeleteExchange(c.Request.Context(), exchangeCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err := ctrl.ExchangeBO.DeleteExchange(c.Request.Context(), exchangeCode, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -171,13 +154,10 @@ func (ctrl *ExchangeController) DeleteExchangeHandler(c *gin.Context) {
 
 func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Use tenant data from interceptor context
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {
 		page = 50
@@ -185,7 +165,7 @@ func (ctrl *ExchangeController) GetExchangesHandler(c *gin.Context) {
 		page = 1000
 	}
 
-	findResult, err := ctrl.ExchangeBO.GetExchanges(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	findResult, err := ctrl.ExchangeBO.GetExchanges(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -210,12 +190,8 @@ func (ctrl *ExchangeController) PublishMessageHandler(c *gin.Context) {
 		return
 	}
 
-	tenantCode := c.Param("code")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Use tenant data from interceptor context
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	// Convert request to models.QueueMessage
 	message := models.QueueMessage{
@@ -235,8 +211,10 @@ func (ctrl *ExchangeController) PublishMessageHandler(c *gin.Context) {
 		req.RoutingKeyOrPatternOrQueueCode,
 		message,
 		req.VNamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

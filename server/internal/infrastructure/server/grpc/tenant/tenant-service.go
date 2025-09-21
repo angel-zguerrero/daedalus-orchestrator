@@ -143,7 +143,10 @@ func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummar
 	cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
 	cfs := tenant.ID
 
-	tenantSummary, err := s.TenantSummaryBO.GetTenantSummary(ctx, tenant.ID, cf, cfs)
+	// For tenant summary, we still use the tenant node from the TenantBO result
+	_, tenantNode, _, _ := s.TenantBO.GetTenant(ctx, r.Code)
+
+	tenantSummary, err := s.TenantSummaryBO.GetTenantSummary(ctx, tenant.ID, cf, cfs, &tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}

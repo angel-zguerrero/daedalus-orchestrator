@@ -2,10 +2,8 @@ package exchange
 
 import (
 	"context"
-	"strconv"
 	"time"
 
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -17,7 +15,6 @@ type ExchangeService struct {
 	startTime  time.Time
 	Config     *common.ServerConfing
 	ExchangeBO *bo.ExchangeBO
-	TenantBO   *bo.TenantBO
 }
 
 func NewExchangeService(config *common.ServerConfing) *ExchangeService {
@@ -25,17 +22,13 @@ func NewExchangeService(config *common.ServerConfing) *ExchangeService {
 		startTime:  time.Now(),
 		Config:     config,
 		ExchangeBO: bo.NewExchangeBO(config),
-		TenantBO:   bo.NewTenantBO(config),
 	}
 }
 
 func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchangeRequest) (*pb.CreateExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	exchange, err := s.ExchangeBO.CreateExchange(ctx, r.Code, r.Vnamespace, r.Name, models.ExchangeType(r.Type), r.Headers, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := s.ExchangeBO.CreateExchange(ctx, r.Code, r.Vnamespace, r.Name, models.ExchangeType(r.Type), r.Headers, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -56,10 +49,7 @@ func (s *ExchangeService) CreateExchange(ctx context.Context, r *pb.CreateExchan
 }
 
 func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCreateExchangeRequest) (*pb.BulkCreateExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	exchanges := []*models.Exchange{}
 	for _, t := range r.Exchanges {
@@ -73,7 +63,7 @@ func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCrea
 		exchanges = append(exchanges, exchange)
 	}
 
-	exchangesResult, err := s.ExchangeBO.BulkCreateExchange(ctx, exchanges, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchangesResult, err := s.ExchangeBO.BulkCreateExchange(ctx, exchanges, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -100,12 +90,9 @@ func (s *ExchangeService) BulkCreateExchange(ctx context.Context, r *pb.BulkCrea
 }
 
 func (s *ExchangeService) GetExchange(ctx context.Context, r *pb.GetExchangeRequest) (*pb.GetExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	exchange, err := s.ExchangeBO.GetExchange(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	exchange, err := s.ExchangeBO.GetExchange(ctx, r.Code, r.Vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -126,10 +113,7 @@ func (s *ExchangeService) GetExchange(ctx context.Context, r *pb.GetExchangeRequ
 }
 
 func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRequest) (*pb.GetExchangesResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	page := int(r.PageSize)
 	if page < 2 {
@@ -138,7 +122,7 @@ func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRe
 		page = 1000
 	}
 
-	findResult, err := s.ExchangeBO.GetExchanges(ctx, r.Q, r.Cursor, page, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	findResult, err := s.ExchangeBO.GetExchanges(ctx, r.Q, r.Cursor, page, r.Vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +151,9 @@ func (s *ExchangeService) GetExchanges(ctx context.Context, r *pb.GetExchangesRe
 }
 
 func (s *ExchangeService) DeleteExchange(ctx context.Context, r *pb.DeleteExchangeRequest) (*pb.DeleteExchangeResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	err = s.ExchangeBO.DeleteExchange(ctx, r.Code, r.Vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err := s.ExchangeBO.DeleteExchange(ctx, r.Code, r.Vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
 	}
@@ -183,10 +164,7 @@ func (s *ExchangeService) DeleteExchange(ctx context.Context, r *pb.DeleteExchan
 }
 
 func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessageRequest) (*pb.PublishMessageResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	// Convert protobuf message to models.QueueMessage
 	message := models.QueueMessage{
@@ -206,8 +184,10 @@ func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessa
 		r.RoutingKeyOrPatternOrQueueCode,
 		message,
 		r.Vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err

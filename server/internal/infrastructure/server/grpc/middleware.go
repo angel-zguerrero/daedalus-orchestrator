@@ -4,9 +4,12 @@ import (
 	"context"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/infrastructure/server/common"
 	ratelimit_store "deadalus-orch/server/internal/infrastructure/server/limiter"
 	"deadalus-orch/server/internal/pkg/config"
+	bo "deadalus-orch/server/internal/usecase/business-logic"
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
@@ -14,6 +17,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 
 	"net"
@@ -28,6 +33,77 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
+
+// UnaryTenantInterceptor returns a new unary server interceptor that extracts tenant information and injects it into the context
+func UnaryTenantInterceptor(tenantBO *bo.TenantBO, tenantNodesDictionary map[string]*dragonboat.RaftNode, logger zerolog.Logger) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		// Extract tenant code from the request using reflection
+		tenantCode := extractTenantCodeFromRequest(req)
+		if tenantCode == "" {
+			// Si no hay tenant code en la request, continúa sin inyectar contexto
+			return handler(ctx, req)
+		}
+
+		// Obtener información del tenant
+		tenant, _, _, err := tenantBO.GetTenant(ctx, tenantCode)
+		if err != nil {
+			logger.Error().Err(err).Str("tenantCode", tenantCode).Msg("Failed to get tenant in gRPC interceptor")
+			return nil, status.Errorf(codes.InvalidArgument, "Invalid tenant: %v", err)
+		}
+
+		// Construir CF y CFS
+		cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
+		cfs := tenant.ID
+
+		// Obtener el nodo correspondiente al tenant
+		node, exists := tenantNodesDictionary[cfs]
+		if !exists {
+			logger.Error().Str("tenantCode", tenantCode).Str("cfs", cfs).Msg("No node found for tenant in gRPC interceptor")
+			return nil, status.Errorf(codes.Internal, "Tenant node not available")
+		}
+
+		// Crear el contexto del tenant
+		tenantCtx := &common.TenantContext{
+			Tenant: &tenant,
+			Node:   node,
+			CF:     cf,
+			CFS:    cfs,
+		}
+
+		// Inyectar en el contexto
+		newCtx := common.SetTenantContext(ctx, tenantCtx)
+
+		return handler(newCtx, req)
+	}
+}
+
+// extractTenantCodeFromRequest extrae el código de tenant de diferentes tipos de request usando reflexión
+func extractTenantCodeFromRequest(req interface{}) string {
+	if req == nil {
+		return ""
+	}
+
+	v := reflect.ValueOf(req)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return ""
+	}
+
+	// Buscar campos comunes que contengan el tenant code
+	tenantFields := []string{"TenantCode", "Code"}
+
+	for _, fieldName := range tenantFields {
+		field := v.FieldByName(fieldName)
+		if field.IsValid() && field.Kind() == reflect.String {
+			return field.String()
+		}
+	}
+
+	return ""
+}
 
 // UnaryAuthInterceptor returns a new unary server interceptor that authenticates requests.
 func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtKey []byte) grpc.UnaryServerInterceptor {

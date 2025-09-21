@@ -44,11 +44,13 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 
 	otelHandler := otelgrpc.NewServerHandler()
 	authInterceptor := UnaryAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
+	tenantBO := bo.NewTenantBO(cfg)
+	tenantInterceptor := UnaryTenantInterceptor(tenantBO, cfg.TenantNodesDictionary, cfg.Logger)
 	rateLimitInterceptor := UnaryRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Minute, 300)
 
 	server := grpc.NewServer(
 		grpc.StatsHandler(otelHandler),
-		grpc.ChainUnaryInterceptor(authInterceptor, rateLimitInterceptor),
+		grpc.ChainUnaryInterceptor(authInterceptor, tenantInterceptor, rateLimitInterceptor),
 	)
 
 	// Registrar servicios

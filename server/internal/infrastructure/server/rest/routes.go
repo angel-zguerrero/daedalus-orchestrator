@@ -9,6 +9,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
+	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,9 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 	nodeSchedulerController := nodescheduler.NewNodeSchedulerController(s.Config)
 
+	// Crear el TenantBO para el middleware
+	tenantBO := bo.NewTenantBO(s.Config)
+
 	restAPIGroup := engine.Group("/rest-api")
 	{
 
@@ -36,6 +40,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 		tenantsGroup := restAPIGroup.Group("/tenants")
 		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		tenantsGroup.Use(tenantContextMiddleware(tenantBO, s.Config.TenantNodesDictionary, s.Config.Logger))
 		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			tenantsGroup.GET("", tenantController.GetTenantsHandler)

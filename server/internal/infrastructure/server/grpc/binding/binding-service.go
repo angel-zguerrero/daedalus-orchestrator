@@ -3,10 +3,8 @@ package binding
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/binding"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -18,73 +16,22 @@ type BindingService struct {
 	startTime time.Time
 	Config    *common.ServerConfing
 	BindingBO *bo.BindingBO
-	TenantBO  *bo.TenantBO
 }
 
 func NewBindingService(config *common.ServerConfing) *BindingService {
 	return &BindingService{
 		Config:    config,
 		BindingBO: bo.NewBindingBO(config),
-		TenantBO:  bo.NewTenantBO(config),
 	}
 }
 
 func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingRequest) (*pb.CreateBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate that Code is provided
-	if r.Code == "" {
-		return nil, fmt.Errorf("code is required")
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	// Set default target exchange type if not provided
 	targetExchangeType := models.TargetExchangeTypeQueue
 	if r.TargetExchangeType != "" {
-		if !isValidTargetExchangeType(r.TargetExchangeType) {
-			return nil, fmt.Errorf("invalid target exchange type: %s. Valid types are: queue, exchange", r.TargetExchangeType)
-		}
 		targetExchangeType = models.TargetExchangeType(r.TargetExchangeType)
-	}
-
-	// Validate target exchange type specific requirements
-	if targetExchangeType == models.TargetExchangeTypeQueue {
-		if r.BindingType == "classic" && r.QueueCode == "" {
-			return nil, fmt.Errorf("queueCode is required for classic bindings when targetExchangeType is queue")
-		}
-		if r.TargetExchangeCode != "" {
-			return nil, fmt.Errorf("targetExchangeCode should not be specified when targetExchangeType is queue")
-		}
-	} else if targetExchangeType == models.TargetExchangeTypeExchange {
-		if r.TargetExchangeCode == "" && r.BindingType == "classic" {
-			return nil, fmt.Errorf("targetExchangeCode is required when targetExchangeType is exchange")
-		}
-		if r.QueueCode != "" {
-			return nil, fmt.Errorf("queueCode should not be specified when targetExchangeType is exchange")
-		}
-		if r.BindingType == "dynamic" {
-			return nil, fmt.Errorf("exchange targets are not supported for dynamic bindings")
-		}
-	}
-
-	// Legacy validation for backward compatibility
-	if r.BindingType == "classic" && targetExchangeType == models.TargetExchangeTypeQueue && r.QueueCode == "" {
-		return nil, fmt.Errorf("queueCode is required for classic bindings")
-	}
-	if r.BindingType == "dynamic" && r.QueueCode != "" {
-		return nil, fmt.Errorf("queueCode should not be specified for dynamic bindings")
-	}
-
-	// Validate binding type
-	if r.BindingType != "" && !isValidBindingType(r.BindingType) {
-		return nil, fmt.Errorf("invalid binding type: %s. Valid types are: classic, dynamic", r.BindingType)
-	}
-
-	// Validate XMatch type
-	if r.XMatch != "" && !isValidXMatchType(r.XMatch) {
-		return nil, fmt.Errorf("invalid xMatch type: %s. Valid types are: all, any", r.XMatch)
 	}
 
 	// Set default binding type if not provided
@@ -113,8 +60,10 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 		bindingType,
 		targetExchangeType,
 		r.Headers,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err
@@ -142,18 +91,17 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 }
 
 func (s *BindingService) GetBinding(ctx context.Context, r *pb.GetBindingRequest) (*pb.GetBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	binding, err := s.BindingBO.GetBinding(
 		ctx,
 		r.ExchangeCode,
 		r.QueueCode,
 		r.Vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err
@@ -182,10 +130,7 @@ func (s *BindingService) GetBinding(ctx context.Context, r *pb.GetBindingRequest
 }
 
 func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsRequest) (*pb.GetBindingsResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
 	findResult, err := s.BindingBO.GetBindings(
 		ctx,
@@ -194,8 +139,10 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 		int(r.PageSize),
 		r.Vnamespace,
 		r.IncludeObjects,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err
@@ -294,17 +241,16 @@ func (s *BindingService) GetBindings(ctx context.Context, r *pb.GetBindingsReque
 }
 
 func (s *BindingService) DeleteBinding(ctx context.Context, r *pb.DeleteBindingRequest) (*pb.DeleteBindingResponse, error) {
-	tenant, _, _, err := s.TenantBO.GetTenant(ctx, r.TenantCode)
-	if err != nil {
-		return nil, err
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	err = s.BindingBO.DeleteBinding(
+	err := s.BindingBO.DeleteBinding(
 		ctx,
 		r.Code,
 		r.Vnamespace,
-		db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex),
-		tenant.ID,
+		cf,
+		cfs,
+		tenant,
+		tenantNode,
 	)
 	if err != nil {
 		return nil, err
@@ -313,34 +259,4 @@ func (s *BindingService) DeleteBinding(ctx context.Context, r *pb.DeleteBindingR
 	return &pb.DeleteBindingResponse{
 		Message: fmt.Sprintf("Binding with code %s in namespace %s was deleted", r.Code, r.Vnamespace),
 	}, nil
-}
-
-// isValidBindingType validates if the binding type is one of the allowed types
-func isValidBindingType(bindingType string) bool {
-	switch bindingType {
-	case "classic", "dynamic":
-		return true
-	default:
-		return false
-	}
-}
-
-// isValidXMatchType validates if the XMatch type is one of the allowed types
-func isValidXMatchType(xMatch string) bool {
-	switch xMatch {
-	case "all", "any":
-		return true
-	default:
-		return false
-	}
-}
-
-// isValidTargetExchangeType validates if the target exchange type is one of the allowed types
-func isValidTargetExchangeType(targetExchangeType string) bool {
-	switch targetExchangeType {
-	case "queue", "exchange":
-		return true
-	default:
-		return false
-	}
 }

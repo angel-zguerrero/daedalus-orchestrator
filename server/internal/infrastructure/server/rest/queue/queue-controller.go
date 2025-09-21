@@ -1,7 +1,6 @@
 package queue
 
 import (
-	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
@@ -13,16 +12,14 @@ import (
 )
 
 type QueueController struct {
-	Config   *common.ServerConfing
-	QueueBO  *bo.QueueBO
-	TenantBO *bo.TenantBO
+	Config  *common.ServerConfing
+	QueueBO *bo.QueueBO
 }
 
 func NewQueueController(Config *common.ServerConfing) *QueueController {
 	api := &QueueController{
-		Config:   Config,
-		QueueBO:  bo.NewQueueBO(Config),
-		TenantBO: bo.NewTenantBO(Config),
+		Config:  Config,
+		QueueBO: bo.NewQueueBO(Config),
 	}
 	return api
 }
@@ -68,12 +65,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		return
 	}
 
-	tenantCode := c.Param("code")
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	// Set default state if not provided
 	if req.State == "" {
@@ -99,7 +91,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		Headers:                   req.Headers, // Add headers support
 	}
 
-	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), []*models.Queue{queue}, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), []*models.Queue{queue}, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -127,14 +119,7 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 		}
 	}
 
-	tenantCode := c.Param("code")
-
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	queues := []*models.Queue{}
 
@@ -162,7 +147,7 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 		queues = append(queues, queue)
 	}
 
-	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), queues, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), queues, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -178,14 +163,10 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueCode, vnamespace, false, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
+	queue, err := ctrl.QueueBO.GetQueue(c.Request.Context(), queueCode, vnamespace, false, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -201,15 +182,10 @@ func (ctrl *QueueController) GetQueueHandler(c *gin.Context) {
 func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
 	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	err = ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueCode, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	err := ctrl.QueueBO.DeleteQueue(c.Request.Context(), queueCode, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -222,13 +198,9 @@ func (ctrl *QueueController) DeleteQueueHandler(c *gin.Context) {
 
 func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 	pageParam := c.Query("pageSize")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
 	page, err := strconv.Atoi(pageParam)
 	if err != nil || page < 2 {
 		page = 50
@@ -239,7 +211,7 @@ func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 	// Check if headers should be included from query parameter
 	includeHeaders := c.Query("includeHeaders") == "true"
 
-	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), includeHeaders, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), includeHeaders, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -266,13 +238,8 @@ func (ctrl *QueueController) EnqueueMessageHandler(c *gin.Context) {
 
 	queueCode := c.Param("queueCode")
 	vnamespace := c.Param("vnamespace")
-	tenantCode := c.Param("code")
 
-	tenant, _, _, err := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	// Create the message
 	message := models.QueueMessage{
@@ -286,7 +253,7 @@ func (ctrl *QueueController) EnqueueMessageHandler(c *gin.Context) {
 	}
 
 	// Enqueue the message
-	messageID, err := ctrl.QueueBO.EnqueueMessage(c.Request.Context(), queueCode, message, vnamespace, db.ColumnFamilyPrefix+strconv.Itoa(tenant.ColumnFamilyIndex), tenant.ID)
+	messageID, err := ctrl.QueueBO.EnqueueMessage(c.Request.Context(), queueCode, message, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

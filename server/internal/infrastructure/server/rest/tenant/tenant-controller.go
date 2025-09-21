@@ -117,7 +117,10 @@ func (ctrl *TenantController) GetTenantSummaryHandler(c *gin.Context) {
 	cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
 	cfs := tenant.ID
 
-	tenantSummary, err := ctrl.TenantSummaryBO.GetTenantSummary(c.Request.Context(), tenant.ID, cf, cfs)
+	// For tenant summary, we still use the tenant node from the TenantBO result
+	_, tenantNode, _, _ := ctrl.TenantBO.GetTenant(c.Request.Context(), tenantCode)
+
+	tenantSummary, err := ctrl.TenantSummaryBO.GetTenantSummary(c.Request.Context(), tenant.ID, cf, cfs, &tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

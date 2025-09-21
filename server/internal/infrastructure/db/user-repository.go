@@ -65,9 +65,6 @@ func (r *UserRepository) DeleteUser(username string) (bool, error) {
 	if err != nil || rootUser == nil {
 		return false, err
 	}
-	if err != nil {
-		return false, err
-	}
 
 	if rootUser != nil && rootUser.IsRootUser {
 		return false, fmt.Errorf("cannot delete root user: %s", username)
