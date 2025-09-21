@@ -48,64 +48,13 @@ func (ctrl *BindingController) CreateBindingHandler(c *gin.Context) {
 		return
 	}
 
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
 	// Set default target exchange type if not provided
 	targetExchangeType := models.TargetExchangeTypeQueue
 	if req.TargetExchangeType != "" {
-		if !isValidTargetExchangeType(req.TargetExchangeType) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid target exchange type: %s. Valid types are: queue, exchange", req.TargetExchangeType)})
-			return
-		}
 		targetExchangeType = models.TargetExchangeType(req.TargetExchangeType)
 	}
-
-	// Validate target exchange type specific requirements
-	if targetExchangeType == models.TargetExchangeTypeQueue {
-		if req.BindingType == "classic" && req.QueueCode == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required for classic bindings when targetExchangeType is queue"})
-			return
-		}
-		if req.TargetExchangeCode != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "targetExchangeCode should not be specified when targetExchangeType is queue"})
-			return
-		}
-	} else if targetExchangeType == models.TargetExchangeTypeExchange {
-		if req.TargetExchangeCode == "" && req.BindingType == "classic" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "targetExchangeCode is required when targetExchangeType is exchange"})
-			return
-		}
-		if req.QueueCode != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode should not be specified when targetExchangeType is exchange"})
-			return
-		}
-		if req.BindingType == "dynamic" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "exchange targets are not supported for dynamic bindings"})
-			return
-		}
-	}
-
-	// Legacy validation for backward compatibility
-	if req.BindingType == "classic" && targetExchangeType == models.TargetExchangeTypeQueue && req.QueueCode == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required for classic bindings"})
-		return
-	}
-	if req.BindingType == "dynamic" && req.QueueCode != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode should not be specified for dynamic bindings"})
-		return
-	}
-
-	// Validate binding type
-	if req.BindingType != "" && !isValidBindingType(req.BindingType) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid binding type: %s. Valid types are: classic, dynamic", req.BindingType)})
-		return
-	}
-
-	// Validate XMatch type
-	if req.XMatch != "" && !isValidXMatchType(req.XMatch) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid xMatch type: %s. Valid types are: all, any", req.XMatch)})
-		return
-	}
-
-	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	// Set default binding type if not provided
 	bindingType := models.BindingTypeClassic
@@ -244,34 +193,4 @@ func (ctrl *BindingController) GetBindingsHandler(c *gin.Context) {
 		"message": "Binding list",
 		"result":  findResult,
 	})
-}
-
-// isValidBindingType validates if the binding type is one of the allowed types
-func isValidBindingType(bindingType string) bool {
-	switch bindingType {
-	case "classic", "dynamic":
-		return true
-	default:
-		return false
-	}
-}
-
-// isValidXMatchType validates if the XMatch type is one of the allowed types
-func isValidXMatchType(xMatch string) bool {
-	switch xMatch {
-	case "all", "any":
-		return true
-	default:
-		return false
-	}
-}
-
-// isValidTargetExchangeType validates if the target exchange type is one of the allowed types
-func isValidTargetExchangeType(targetExchangeType string) bool {
-	switch targetExchangeType {
-	case "queue", "exchange":
-		return true
-	default:
-		return false
-	}
 }
