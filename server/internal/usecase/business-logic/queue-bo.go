@@ -54,6 +54,10 @@ func (bo *QueueBO) CreateQueue(ctx context.Context, code, vnamespace, name strin
 }
 
 func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
+	if tenant.Status == models.PendingForDeletion {
+		return nil, errors.New("cannot create queue when tenant is pending for deletion")
+	}
+
 	if len(queues) == 0 {
 		return nil, errors.New("no queues provided")
 	}
