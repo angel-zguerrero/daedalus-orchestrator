@@ -32,18 +32,55 @@ func NewQueueBO(Config *common.ServerConfing) *QueueBO {
 	}
 }
 
+// ValidateQueueFields validates queue fields and their relationships
+func (bo *QueueBO) ValidateQueueFields(queue *models.Queue) error {
+	// Validate DefaultQueueMessageTTL >= 0
+	if queue.DefaultQueueMessageTTL < 0 {
+		return errors.New("DefaultQueueMessageTTL cannot be negative")
+	}
+
+	// Validate DefaultQueueMessageDelayTime >= 0
+	if queue.DefaultQueueMessageDelayTime < 0 {
+		return errors.New("DefaultQueueMessageDelayTime cannot be negative")
+	}
+
+	// Validate QueueExpires >= 0
+	if queue.QueueExpires < 0 {
+		return errors.New("QueueExpires cannot be negative")
+	}
+
+	// Validate ExpireAt usage: only use if DefaultQueueMessageDelayTime > 0
+	if queue.ExpireAt != nil && queue.DefaultQueueMessageDelayTime <= 0 {
+		return errors.New("ExpireAt can only be set when DefaultQueueMessageDelayTime is greater than 0")
+	}
+
+	// ExpireAt should only be set if DefaultQueueMessageDelayTime > 0
+	if queue.DefaultQueueMessageDelayTime > 0 && queue.ExpireAt == nil {
+		// Calculate ExpireAt based on current time + DefaultQueueMessageDelayTime
+		expireTime := time.Now().Add(time.Duration(queue.DefaultQueueMessageDelayTime) * time.Second)
+		queue.ExpireAt = &expireTime
+	} else if queue.DefaultQueueMessageDelayTime == 0 && queue.ExpireAt != nil {
+		return errors.New("ExpireAt should only be set when DefaultQueueMessageDelayTime is greater than 0")
+	}
+
+	return nil
+}
+
 func (bo *QueueBO) CreateQueue(ctx context.Context, code, vnamespace, name string, queueType models.QueueType, headers map[string]string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Queue, error) {
 	queue := &models.Queue{
-		ID:              strings.ReplaceAll(uuid.New().String(), "-", ""),
-		Code:            code,
-		Name:            name,
-		Type:            queueType,
-		VNamespace:      vnamespace,
-		State:           models.QueueActive, // Default state
-		TTLQueue:        0,                  // Default TTL
-		AllowDuplicated: true,               // Default allow duplicated
-		MaxAttempts:     1,                  // Default max attempts
-		Headers:         headers,            // Add headers support
+		ID:                           strings.ReplaceAll(uuid.New().String(), "-", ""),
+		Code:                         code,
+		Name:                         name,
+		Type:                         queueType,
+		VNamespace:                   vnamespace,
+		State:                        models.QueueActive, // Default state
+		DefaultQueueMessageTTL:       0,                  // Default TTL
+		DefaultQueueMessageDelayTime: 0,                  // Default delay time
+		QueueExpires:                 0,                  // Default queue expires
+		ExpireAt:                     nil,                // Default nil
+		AllowDuplicated:              true,               // Default allow duplicated
+		MaxAttempts:                  1,                  // Default max attempts
+		Headers:                      headers,            // Add headers support
 	}
 
 	createdList, err := bo.BulkCreateQueue(ctx, []*models.Queue{queue}, cf, cfs, tenant, tenantNode)
@@ -75,9 +112,11 @@ func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, 
 		if t.MaxAttempts == 0 {
 			t.MaxAttempts = 1
 		}
-		// TTLQueue defaults to 0, which is valid
-		// AllowDuplicated defaults to false (Go bool default), but we want true
-		// Note: In bulk creation, the caller should set these values explicitly
+
+		// Validate all required fields
+		if err := bo.ValidateQueueFields(t); err != nil {
+			return nil, fmt.Errorf("validation failed for queue %s: %w", t.Code, err)
+		}
 	}
 
 	assertQueueCommand := &queue_command.AssertQueueCommand{

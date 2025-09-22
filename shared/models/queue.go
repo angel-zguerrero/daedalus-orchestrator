@@ -31,13 +31,16 @@ type Queue struct {
 
 	MessagesCount int
 
-	TTLQueue                  int
-	AllowDuplicated           bool
-	MaxAttempts               int
-	DesiredPriorityThresholds map[int]int       `orm:"data-only"`
-	PriorityThresholds        map[int]int       `orm:"data-only"`
-	Headers                   map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
-	CreatedAt                 time.Time
+	DefaultQueueMessageTTL      int
+	DefaultQueueMessageDelayTime int
+	QueueExpires                 int
+	ExpireAt                     *time.Time
+	AllowDuplicated              bool
+	MaxAttempts                  int
+	DesiredPriorityThresholds    map[int]int       `orm:"data-only"`
+	PriorityThresholds           map[int]int       `orm:"data-only"`
+	Headers                      map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
+	CreatedAt                    time.Time
 	UpdatedAt                 time.Time
 }
 

@@ -29,9 +29,24 @@ func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (strin
 		return "", fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", input.Type)
 	}
 
-	// Validate TTLQueue
-	if input.TTLQueue < 0 {
-		return "", fmt.Errorf("TTLQueue cannot be negative, got: %d", input.TTLQueue)
+	// Validate DefaultQueueMessageTTL must be >= 0
+	if input.DefaultQueueMessageTTL < 0 {
+		return "", fmt.Errorf("DefaultQueueMessageTTL cannot be negative, got: %d", input.DefaultQueueMessageTTL)
+	}
+
+	// Validate DefaultQueueMessageDelayTime must be >= 0
+	if input.DefaultQueueMessageDelayTime < 0 {
+		return "", fmt.Errorf("DefaultQueueMessageDelayTime cannot be negative, got: %d", input.DefaultQueueMessageDelayTime)
+	}
+
+	// Validate QueueExpires must be >= 0
+	if input.QueueExpires < 0 {
+		return "", fmt.Errorf("QueueExpires cannot be negative, got: %d", input.QueueExpires)
+	}
+
+	// Validate ExpireAt usage: only use if DefaultQueueMessageDelayTime > 0
+	if input.ExpireAt != nil && input.DefaultQueueMessageDelayTime <= 0 {
+		return "", fmt.Errorf("ExpireAt can only be set when DefaultQueueMessageDelayTime is greater than 0")
 	}
 
 	// Validate MaxAttempts
@@ -55,9 +70,24 @@ func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool,
 		return false, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", input.Type)
 	}
 
-	// Validate TTLQueue
-	if input.TTLQueue < 0 {
-		return false, fmt.Errorf("TTLQueue cannot be negative, got: %d", input.TTLQueue)
+	// Validate DefaultQueueMessageTTL must be >= 0
+	if input.DefaultQueueMessageTTL < 0 {
+		return false, fmt.Errorf("DefaultQueueMessageTTL cannot be negative, got: %d", input.DefaultQueueMessageTTL)
+	}
+
+	// Validate DefaultQueueMessageDelayTime must be >= 0
+	if input.DefaultQueueMessageDelayTime < 0 {
+		return false, fmt.Errorf("DefaultQueueMessageDelayTime cannot be negative, got: %d", input.DefaultQueueMessageDelayTime)
+	}
+
+	// Validate QueueExpires must be >= 0
+	if input.QueueExpires < 0 {
+		return false, fmt.Errorf("QueueExpires cannot be negative, got: %d", input.QueueExpires)
+	}
+
+	// Validate ExpireAt usage: only use if DefaultQueueMessageDelayTime > 0
+	if input.ExpireAt != nil && input.DefaultQueueMessageDelayTime <= 0 {
+		return false, fmt.Errorf("ExpireAt can only be set when DefaultQueueMessageDelayTime is greater than 0")
 	}
 
 	// Validate MaxAttempts

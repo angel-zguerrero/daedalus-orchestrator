@@ -31,7 +31,10 @@ interface Queue {
   Type: string;
   State: string;
   VNamespace: string;
-  TTLQueue: number;
+  DefaultQueueMessageTTL: number;
+  DefaultQueueMessageDelayTime: number;
+  QueueExpires: number;
+  ExpireAt?: string;
   AllowDuplicated: boolean;
   MaxAttempts: number;
   DesiredPriorityThresholds: { [key: number]: number };
@@ -165,7 +168,9 @@ export class QueuesComponent implements OnInit {
       code: ['', Validators.required],
       type: ['standard', [Validators.required, this.queueTypeValidator]],
       vnamespace: this.vnamespaceCtrl,
-      ttlQueue: [0, [Validators.min(0)]],
+      defaultQueueMessageTTL: [0, [Validators.min(0)]],
+      defaultQueueMessageDelayTime: [0, [Validators.min(0)]],
+      queueExpires: [0, [Validators.min(0)]],
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
       priorityType: ['normal', Validators.required],
@@ -173,7 +178,9 @@ export class QueuesComponent implements OnInit {
     });
     this.queueFormUpdate = this.fb.group({
       name: ['', Validators.required],
-      ttlQueue: [0, [Validators.min(0)]],
+      defaultQueueMessageTTL: [0, [Validators.min(0)]],
+      defaultQueueMessageDelayTime: [0, [Validators.min(0)]],
+      queueExpires: [0, [Validators.min(0)]],
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
       priorityType: ['normal', Validators.required],
@@ -268,7 +275,9 @@ export class QueuesComponent implements OnInit {
     this.queueForm.reset();
     this.queueForm.patchValue({ 
       type: 'standard',
-      ttlQueue: 0,
+      defaultQueueMessageTTL: 0,
+      defaultQueueMessageDelayTime: 0,
+      queueExpires: 0,
       allowDuplicated: true,
       maxAttempts: 1,
       priorityType: 'normal',
@@ -296,7 +305,9 @@ export class QueuesComponent implements OnInit {
     // Set current values
     this.queueFormUpdate.patchValue({
       name: queue.Name,
-      ttlQueue: queue.TTLQueue || 0,
+      defaultQueueMessageTTL: queue.DefaultQueueMessageTTL || 0,
+      defaultQueueMessageDelayTime: queue.DefaultQueueMessageDelayTime || 0,
+      queueExpires: queue.QueueExpires || 0,
       allowDuplicated: queue.AllowDuplicated !== undefined ? queue.AllowDuplicated : true,
       maxAttempts: queue.MaxAttempts || 1,
       priorityType: calculatedPriorityType,
@@ -428,7 +439,9 @@ export class QueuesComponent implements OnInit {
         type: this.selectedQueue.Type, // Preserve original type
         vnamespace: this.selectedQueue.VNamespace, // Preserve original vnamespace
         id: this.selectedQueue.ID,
-        ttlQueue: formValue.ttlQueue,
+        defaultQueueMessageTTL: formValue.defaultQueueMessageTTL,
+        defaultQueueMessageDelayTime: formValue.defaultQueueMessageDelayTime,
+        queueExpires: formValue.queueExpires,
         allowDuplicated: formValue.allowDuplicated,
         maxAttempts: formValue.maxAttempts,
         priorityType: formValue.priorityType,
@@ -521,7 +534,7 @@ export class QueuesComponent implements OnInit {
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawQueues = XLSX.utils.sheet_to_json(worksheet, { 
-          header: ['Name', 'Code', 'Type', 'VNamespace', 'TTLQueue', 'AllowDuplicated', 'MaxAttempts', 'PriorityType', 'MaxPriority', 'PriorityThresholds'] 
+          header: ['Name', 'Code', 'Type', 'VNamespace', 'DefaultQueueMessageTTL', 'DefaultQueueMessageDelayTime', 'QueueExpires', 'AllowDuplicated', 'MaxAttempts', 'PriorityType', 'MaxPriority', 'PriorityThresholds'] 
         });
 
         // Remove header row
@@ -554,12 +567,30 @@ export class QueuesComponent implements OnInit {
             }
           }
 
-          // Process TTLQueue - ensure it's a number >= 0
-          let ttlQueue = 0; // default value
-          if (queue.TTLQueue !== undefined && queue.TTLQueue !== null && queue.TTLQueue !== '') {
-            ttlQueue = parseInt(queue.TTLQueue, 10);
-            if (isNaN(ttlQueue) || ttlQueue < 0) {
-              throw new Error(`Row ${index + 2}: Invalid TTLQueue value: ${queue.TTLQueue}. Must be a number >= 0`);
+          // Process DefaultQueueMessageTTL - ensure it's a number >= 0
+          let defaultQueueMessageTTL = 0; // default value
+          if (queue.DefaultQueueMessageTTL !== undefined && queue.DefaultQueueMessageTTL !== null && queue.DefaultQueueMessageTTL !== '') {
+            defaultQueueMessageTTL = parseInt(queue.DefaultQueueMessageTTL, 10);
+            if (isNaN(defaultQueueMessageTTL) || defaultQueueMessageTTL < 0) {
+              throw new Error(`Row ${index + 2}: Invalid DefaultQueueMessageTTL value: ${queue.DefaultQueueMessageTTL}. Must be a number >= 0`);
+            }
+          }
+
+          // Process DefaultQueueMessageDelayTime - ensure it's a number >= 0
+          let defaultQueueMessageDelayTime = 0; // default value
+          if (queue.DefaultQueueMessageDelayTime !== undefined && queue.DefaultQueueMessageDelayTime !== null && queue.DefaultQueueMessageDelayTime !== '') {
+            defaultQueueMessageDelayTime = parseInt(queue.DefaultQueueMessageDelayTime, 10);
+            if (isNaN(defaultQueueMessageDelayTime) || defaultQueueMessageDelayTime < 0) {
+              throw new Error(`Row ${index + 2}: Invalid DefaultQueueMessageDelayTime value: ${queue.DefaultQueueMessageDelayTime}. Must be a number >= 0`);
+            }
+          }
+
+          // Process QueueExpires - ensure it's a number >= 0
+          let queueExpires = 0; // default value
+          if (queue.QueueExpires !== undefined && queue.QueueExpires !== null && queue.QueueExpires !== '') {
+            queueExpires = parseInt(queue.QueueExpires, 10);
+            if (isNaN(queueExpires) || queueExpires < 0) {
+              throw new Error(`Row ${index + 2}: Invalid QueueExpires value: ${queue.QueueExpires}. Must be a number >= 0`);
             }
           }
 
@@ -630,7 +661,9 @@ export class QueuesComponent implements OnInit {
             code: queue.Code,
             type: queue.Type,
             vnamespace: queue.VNamespace,
-            ttlQueue: ttlQueue,
+            defaultQueueMessageTTL: defaultQueueMessageTTL,
+            defaultQueueMessageDelayTime: defaultQueueMessageDelayTime,
+            queueExpires: queueExpires,
             allowDuplicated: allowDuplicated,
             maxAttempts: maxAttempts,
             priorityType: priorityType,

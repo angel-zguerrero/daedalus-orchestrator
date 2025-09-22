@@ -66,7 +66,9 @@
             <th style="min-width: 100px;">Type</th>
             <th style="min-width: 100px;">State</th>
             <th style="min-width: 120px;">VNamespace</th>
-            <th style="min-width: 100px;">TTL (seconds)</th>
+            <th style="min-width: 100px;">Message TTL (s)</th>
+            <th style="min-width: 100px;">Delay Time (s)</th>
+            <th style="min-width: 100px;">Queue Expires (s)</th>
             <th style="min-width: 100px;">Max Attempts</th>
             <th style="min-width: 120px;">Allow Duplicated</th>
             <th style="min-width: 120px;">Priority Type</th>
@@ -95,7 +97,13 @@
               {{ queue.VNamespace || '-' }}
             </td>
             <td class="text-center">
-              {{ queue.TTLQueue || 0 }}{{ (queue.TTLQueue && queue.TTLQueue > 0) ? 's' : '' }}
+              {{ queue.DefaultQueueMessageTTL || 0 }}s
+            </td>
+            <td class="text-center">
+              {{ queue.DefaultQueueMessageDelayTime || 0 }}s
+            </td>
+            <td class="text-center">
+              {{ queue.QueueExpires || 0 }}s
             </td>
             <td class="text-center">{{ queue.MaxAttempts || 1 }}</td>
             <td class="text-center">
@@ -240,10 +248,22 @@
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4">
-          <label cLabel for="ttlQueue">TTL Queue (seconds)</label>
-          <input cFormControl id="ttlQueue" formControlName="ttlQueue" type="number" min="0" placeholder="0" />
+          <label cLabel for="defaultQueueMessageTTL">Default Message TTL (seconds)</label>
+          <input cFormControl id="defaultQueueMessageTTL" formControlName="defaultQueueMessageTTL" type="number" min="0" placeholder="0" />
           <small class="form-text text-muted">Time to live in seconds (must be >= 0)</small>
         </c-col>
+        <c-col [md]="4">
+          <label cLabel for="defaultQueueMessageDelayTime">Default Message Delay Time (seconds)</label>
+          <input cFormControl id="defaultQueueMessageDelayTime" formControlName="defaultQueueMessageDelayTime" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Default delay time in seconds (must be >= 0)</small>
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="queueExpires">Queue Expires (seconds)</label>
+          <input cFormControl id="queueExpires" formControlName="queueExpires" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Queue expiration time in seconds (must be >= 0)</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4">
           <label cLabel for="maxAttempts">Max Attempts *</label>
           <input cFormControl id="maxAttempts" formControlName="maxAttempts" type="number" min="1" placeholder="1" />
@@ -454,10 +474,22 @@
       <!-- Editable Fields -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4">
-          <label cLabel for="ttlQueue-update">TTL Queue (seconds)</label>
-          <input cFormControl id="ttlQueue-update" formControlName="ttlQueue" type="number" min="0" placeholder="0" />
+          <label cLabel for="defaultQueueMessageTTL-update">Default Message TTL (seconds)</label>
+          <input cFormControl id="defaultQueueMessageTTL-update" formControlName="defaultQueueMessageTTL" type="number" min="0" placeholder="0" />
           <small class="form-text text-muted">Time to live in seconds (must be >= 0)</small>
         </c-col>
+        <c-col [md]="4">
+          <label cLabel for="defaultQueueMessageDelayTime-update">Default Message Delay Time (seconds)</label>
+          <input cFormControl id="defaultQueueMessageDelayTime-update" formControlName="defaultQueueMessageDelayTime" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Default delay time in seconds (must be >= 0)</small>
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="queueExpires-update">Queue Expires (seconds)</label>
+          <input cFormControl id="queueExpires-update" formControlName="queueExpires" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Queue expiration time in seconds (must be >= 0)</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4">
           <label cLabel for="maxAttempts-update">Max Attempts *</label>
           <input cFormControl id="maxAttempts-update" formControlName="maxAttempts" type="number" min="1" placeholder="1" />
@@ -714,11 +746,25 @@
           <div class="form-text">Last modification timestamp</div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-bold">TTL Queue (seconds)</label>
+          <label class="form-label fw-bold">Default Message TTL (seconds)</label>
           <div class="p-2 bg-dark rounded">
-            {{ selectedQueue?.TTLQueue || selectedQueue?.ttlQueue || 0 }}{{ (selectedQueue?.TTLQueue && selectedQueue?.TTLQueue > 0) || (selectedQueue?.ttlQueue && selectedQueue?.ttlQueue > 0) ? 's' : '' }}
+            {{ selectedQueue?.DefaultQueueMessageTTL || selectedQueue?.defaultQueueMessageTTL || 0 }}s
           </div>
-          <div class="form-text">Time to live in seconds for queue processing</div>
+          <div class="form-text">Default time to live for messages in seconds</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Default Message Delay Time (seconds)</label>
+          <div class="p-2 bg-dark rounded">
+            {{ selectedQueue?.DefaultQueueMessageDelayTime || selectedQueue?.defaultQueueMessageDelayTime || 0 }}s
+          </div>
+          <div class="form-text">Default delay time for messages in seconds</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Queue Expires (seconds)</label>
+          <div class="p-2 bg-dark rounded">
+            {{ selectedQueue?.QueueExpires || selectedQueue?.queueExpires || 0 }}s
+          </div>
+          <div class="form-text">Queue expiration time in seconds</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Max Attempts</label>
@@ -913,14 +959,16 @@
         <li><strong>Code</strong>: Unique identifier for the queue</li>
         <li><strong>Type</strong>: Queue type (standard, delayed, dead-letter)</li>
         <li><strong>VNamespace</strong>: Virtual namespace for logical grouping</li>
-        <li><strong>TTLQueue</strong>: Time to live in seconds (number >= 0, optional, default: 0)</li>
+        <li><strong>DefaultQueueMessageTTL</strong>: Default message time to live in seconds (number >= 0, optional, default: 0)</li>
+        <li><strong>DefaultQueueMessageDelayTime</strong>: Default message delay time in seconds (number >= 0, optional, default: 0)</li>
+        <li><strong>QueueExpires</strong>: Queue expiration time in seconds (number >= 0, optional, default: 0)</li>
         <li><strong>AllowDuplicated</strong>: Allow duplicates (true/false, yes/no, 1/0, optional, default: true)</li>
         <li><strong>MaxAttempts</strong>: Maximum attempts (number > 0, optional, default: 1)</li>
         <li><strong>PriorityType</strong>: Priority type (normal/fair, optional, default: normal)</li>
         <li><strong>MaxPriority</strong>: Maximum priority level (1-100, optional, default: 1)</li>
         <li><strong>PriorityThresholds</strong>: For fair priority, comma-separated values per priority (e.g., "10,20,30", optional, default: 0 for each priority)</li>
       </ul>
-      <div class="form-text">First 4 fields are required. Code must be unique within the tenant. File must include header row.</div>
+      <div class="form-text">First 4 fields are required. Code must be unique within the tenant. All time fields must be >= 0. File must include header row.</div>
     </div>
     <div class="mb-3">
       <label cLabel for="file-upload">Select File</label>
