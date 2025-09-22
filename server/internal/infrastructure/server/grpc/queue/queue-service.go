@@ -53,7 +53,7 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 
 	// Validate queue type
 	if !isValidQueueType(r.Type) {
-		return nil, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", r.Type)
+		return nil, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed", r.Type)
 	}
 
 	// Create queue with new properties
@@ -110,7 +110,7 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 	for _, t := range r.Queues {
 		// Validate queue type
 		if !isValidQueueType(t.Type) {
-			return nil, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", t.Type)
+			return nil, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed", t.Type)
 		}
 
 		queue := &models.Queue{
@@ -284,7 +284,7 @@ func (s *QueueService) EnqueueMessage(ctx context.Context, r *pb.EnqueueMessageR
 // isValidQueueType validates if the queue type is one of the allowed types
 func isValidQueueType(queueType string) bool {
 	switch queueType {
-	case "standard", "delayed", "dead-letter":
+	case "standard":
 		return true
 	default:
 		return false

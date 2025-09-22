@@ -63,7 +63,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 
 	// Validate queue type
 	if !isValidQueueType(req.Type) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", req.Type)})
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid queue type: %s. Valid types are: standard", req.Type)})
 		return
 	}
 
@@ -118,7 +118,7 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 	// Validate queue types
 	for _, queue := range req.Queues {
 		if !isValidQueueType(queue.Type) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", queue.Type)})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid queue type: %s. Valid types are: standard", queue.Type)})
 			return
 		}
 	}
@@ -277,7 +277,7 @@ func (ctrl *QueueController) EnqueueMessageHandler(c *gin.Context) {
 // isValidQueueType validates if the queue type is one of the allowed types
 func isValidQueueType(queueType string) bool {
 	switch queueType {
-	case "standard", "delayed", "dead-letter":
+	case "standard":
 		return true
 	default:
 		return false

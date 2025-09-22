@@ -104,9 +104,7 @@ export class QueuesComponent implements OnInit {
   selectedQueue: any;
 
   queueTypes = [
-    { value: 'standard', label: 'Standard' },
-    { value: 'delayed', label: 'Delayed' },
-    { value: 'dead-letter', label: 'Dead Letter' }
+    { value: 'standard', label: 'Standard' }
   ];
 
   // VNamespace properties
@@ -152,7 +150,7 @@ export class QueuesComponent implements OnInit {
   queueHeaderValue: string = '';
 
   // Valid queue types
-  private validQueueTypes = ['standard', 'delayed', 'dead-letter'];
+  private validQueueTypes = ['standard'];
 
   // Custom validator for queue type
   private queueTypeValidator = (control: any) => {
@@ -698,9 +696,7 @@ export class QueuesComponent implements OnInit {
 
   getQueueTypeColor(type: string): string {
     const typeColors: { [key: string]: string } = {
-      'standard': 'primary',
-      'delayed': 'warning',
-      'dead-letter': 'danger'
+      'standard': 'primary'
     };
     return typeColors[type] || 'secondary';
   }

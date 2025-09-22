@@ -5,9 +5,7 @@ import "time"
 type QueueType string
 
 const (
-	StandardQueue   QueueType = "standard"
-	DelayedQueue    QueueType = "delayed"
-	DeadLetterQueue QueueType = "dead-letter"
+	StandardQueue QueueType = "standard"
 )
 
 type QueueState string
@@ -31,7 +29,7 @@ type Queue struct {
 
 	MessagesCount int
 
-	DefaultQueueMessageTTL      int
+	DefaultQueueMessageTTL       int
 	DefaultQueueMessageDelayTime int
 	QueueExpires                 int
 	ExpireAt                     *time.Time
@@ -41,7 +39,7 @@ type Queue struct {
 	PriorityThresholds           map[int]int       `orm:"data-only"`
 	Headers                      map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
 	CreatedAt                    time.Time
-	UpdatedAt                 time.Time
+	UpdatedAt                    time.Time
 }
 
 func (Queue) TableName() string {

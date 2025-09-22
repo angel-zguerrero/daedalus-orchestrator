@@ -26,7 +26,7 @@ func NewQueueRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs str
 func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (string, error) {
 	// Validate QueueType
 	if !isValidQueueType(input.Type) {
-		return "", fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", input.Type)
+		return "", fmt.Errorf("invalid queue type: %s. Valid types are: standard", input.Type)
 	}
 
 	// Validate DefaultQueueMessageTTL must be >= 0
@@ -67,7 +67,7 @@ func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (strin
 func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool, error) {
 	// Validate QueueType
 	if !isValidQueueType(input.Type) {
-		return false, fmt.Errorf("invalid queue type: %s. Valid types are: standard, delayed, dead-letter", input.Type)
+		return false, fmt.Errorf("invalid queue type: %s. Valid types are: standard", input.Type)
 	}
 
 	// Validate DefaultQueueMessageTTL must be >= 0
@@ -151,7 +151,7 @@ func (r *QueueRepository) DeleteQueueById(id string, now time.Time) (bool, error
 // isValidQueueType validates if the queue type is one of the allowed types
 func isValidQueueType(queueType models.QueueType) bool {
 	switch queueType {
-	case models.StandardQueue, models.DelayedQueue, models.DeadLetterQueue:
+	case models.StandardQueue:
 		return true
 	default:
 		return false
