@@ -12,7 +12,8 @@ import {
   GridModule, 
   AlertComponent, 
   SpinnerComponent,
-  BadgeComponent
+  BadgeComponent,
+  ProgressModule
 } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
@@ -67,7 +68,8 @@ interface Queue {
     MatFormFieldModule,
     MatInputModule,
     MatAutocompleteModule,
-    AsyncPipe
+    AsyncPipe,
+    ProgressModule
   ]
 })
 export class QueuesComponent implements OnInit {
@@ -928,6 +930,12 @@ export class QueuesComponent implements OnInit {
 
   // Send Message Modal Methods
   openSendMessageModal(queue: any): void {
+    // Check if queue is expired before opening modal
+    if (this.isQueueExpired(queue)) {
+      alert('Cannot send messages to an expired queue. Please check the queue expiration status.');
+      return;
+    }
+
     this.selectedQueue = queue;
     this.sendMessageForm.reset({
       messageId: '',
@@ -1091,5 +1099,101 @@ export class QueuesComponent implements OnInit {
         this.showAlert = true;
       }
     });
+  }
+
+  getExpirationInfo(queue: any): {
+    show: boolean;
+    isExpired: boolean;
+    isNearExpiry: boolean;
+    text: string;
+    progressPercentage: number;
+  } {
+    if (!queue) {
+      return {
+        show: false,
+        isExpired: false,
+        isNearExpiry: false,
+        text: '',
+        progressPercentage: -1
+      };
+    }
+
+    const now = new Date();
+    
+    // Check if queue has explicit ExpireAt
+    if (queue.ExpireAt) {
+      const expireAt = new Date(queue.ExpireAt);
+      const isExpired = now > expireAt;
+      
+      if (isExpired) {
+        return {
+          show: true,
+          isExpired: true,
+          isNearExpiry: false,
+          text: `Expired on ${expireAt.toLocaleString()}`,
+          progressPercentage: 0
+        };
+      }
+      
+      const updatedAt = new Date(queue.UpdatedAt || queue.updatedAt);
+      const totalTime = expireAt.getTime() - updatedAt.getTime();
+      const remainingTime = expireAt.getTime() - now.getTime();
+      const progressPercentage = totalTime > 0 ? (remainingTime / totalTime) * 100 : 0;
+      const isNearExpiry = progressPercentage <= 20; // 20% or less remaining
+      
+      return {
+        show: true,
+        isExpired: false,
+        isNearExpiry: isNearExpiry,
+        text: `Expires on ${expireAt.toLocaleString()}`,
+        progressPercentage: Math.max(0, progressPercentage)
+      };
+    }
+    
+    // Check if queue has QueueExpires setting
+    const queueExpires = queue.QueueExpires || queue.queueExpires || 0;
+    if (queueExpires > 0) {
+      const updatedAt = new Date(queue.UpdatedAt || queue.updatedAt);
+      const expireAt = new Date(updatedAt.getTime() + (queueExpires * 1000));
+      const isExpired = now > expireAt;
+      
+      if (isExpired) {
+        return {
+          show: true,
+          isExpired: true,
+          isNearExpiry: false,
+          text: `Expired on ${expireAt.toLocaleString()}`,
+          progressPercentage: 0
+        };
+      }
+      
+      const totalTime = queueExpires * 1000; // Convert to milliseconds
+      const elapsedTime = now.getTime() - updatedAt.getTime();
+      const remainingTime = totalTime - elapsedTime;
+      const progressPercentage = totalTime > 0 ? (remainingTime / totalTime) * 100 : 0;
+      const isNearExpiry = progressPercentage <= 20; // 20% or less remaining
+      
+      return {
+        show: true,
+        isExpired: false,
+        isNearExpiry: isNearExpiry,
+        text: `Expires on ${expireAt.toLocaleString()}`,
+        progressPercentage: Math.max(0, progressPercentage)
+      };
+    }
+    
+    // No expiration configured
+    return {
+      show: false,
+      isExpired: false,
+      isNearExpiry: false,
+      text: '',
+      progressPercentage: -1
+    };
+  }
+
+  // Helper method to check if queue is expired (for other components)
+  isQueueExpired(queue: any): boolean {
+    return this.getExpirationInfo(queue).isExpired;
   }
 }

@@ -69,6 +69,7 @@
             <th style="min-width: 100px;">Message TTL (s)</th>
             <th style="min-width: 100px;">Delay Time (s)</th>
             <th style="min-width: 100px;">Queue Expires (s)</th>
+            <th style="min-width: 150px;">Expiration Status</th>
             <th style="min-width: 100px;">Max Attempts</th>
             <th style="min-width: 120px;">Allow Duplicated</th>
             <th style="min-width: 120px;">Priority Type</th>
@@ -78,7 +79,11 @@
         <tbody>
           <tr *ngFor="let queue of queues" class="align-middle">
             <td class="text-truncate" style="max-width: 150px;" title="{{ queue.Name }}">
-              <strong>{{ queue.Name }}</strong>
+              <div class="d-flex align-items-center">
+                <strong class="me-2">{{ queue.Name }}</strong>
+                <svg *ngIf="getExpirationInfo(queue).isExpired" cIcon name="cil-warning" class="text-danger" title="Queue Expired"></svg>
+                <svg *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).isNearExpiry" cIcon name="cil-clock" class="text-warning" title="Queue Expiring Soon"></svg>
+              </div>
             </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ queue.Code }}">
               <code>{{ queue.Code }}</code>
@@ -104,6 +109,25 @@
             </td>
             <td class="text-center">
               {{ queue.QueueExpires || 0 }}s
+            </td>
+            <td class="text-center">
+              <div *ngIf="getExpirationInfo(queue).show">
+                <div class="d-flex align-items-center mb-1">
+                  <small [class]="getExpirationInfo(queue).isExpired ? 'text-danger fw-bold' : getExpirationInfo(queue).isNearExpiry ? 'text-warning fw-bold' : 'text-muted'">
+                    {{ getExpirationInfo(queue).text }}
+                  </small>
+                </div>
+                <div *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).progressPercentage >= 0">
+                  <c-progress height="8" class="mb-1">
+                    <c-progress-bar 
+                      [value]="getExpirationInfo(queue).progressPercentage" 
+                      [color]="getExpirationInfo(queue).isNearExpiry ? 'warning' : 'success'">
+                    </c-progress-bar>
+                  </c-progress>
+                  <small class="text-muted">{{ getExpirationInfo(queue).progressPercentage.toFixed(1) }}% remaining</small>
+                </div>
+              </div>
+              <small *ngIf="!getExpirationInfo(queue).show" class="text-muted">No expiration</small>
             </td>
             <td class="text-center">{{ queue.MaxAttempts || 1 }}</td>
             <td class="text-center">
@@ -139,7 +163,8 @@
                   color="success" 
                   size="sm" 
                   (click)="openSendMessageModal(queue)"
-                  title="Send Message">
+                  [disabled]="isQueueExpired(queue)"
+                  [title]="isQueueExpired(queue) ? 'Cannot send messages to expired queue' : 'Send Message'">
                   <svg cIcon name="cil-envelope-closed"></svg>
                 </button>
                 <button 
@@ -689,6 +714,23 @@
   </c-modal-header>
   <c-modal-body *ngIf="selectedQueue">
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    
+    <!-- Expiration Alert -->
+    <c-alert 
+      *ngIf="getExpirationInfo(selectedQueue).isExpired" 
+      color="danger" 
+      class="mb-3">
+      <svg cIcon name="cil-warning" class="me-2"></svg>
+      <strong>Queue Expired!</strong> This queue expired {{ getExpirationInfo(selectedQueue).text.replace('Expired on ', 'on ') }}. No new messages can be sent to this queue.
+    </c-alert>
+    
+    <c-alert 
+      *ngIf="!getExpirationInfo(selectedQueue).isExpired && getExpirationInfo(selectedQueue).isNearExpiry" 
+      color="warning" 
+      class="mb-3">
+      <svg cIcon name="cil-clock" class="me-2"></svg>
+      <strong>Queue Expiring Soon!</strong> This queue will expire {{ getExpirationInfo(selectedQueue).text.replace('Expires on ', 'on ') }}. Only {{ getExpirationInfo(selectedQueue).progressPercentage.toFixed(1) }}% time remaining.
+    </c-alert>
 
     
     <div class="row">
@@ -765,6 +807,26 @@
             {{ selectedQueue?.QueueExpires || selectedQueue?.queueExpires || 0 }}s
           </div>
           <div class="form-text">Queue expiration time in seconds</div>
+        </div>
+        <div class="mb-3" *ngIf="getExpirationInfo(selectedQueue).show">
+          <label class="form-label fw-bold">Expiration Status</label>
+          <div class="p-2 bg-dark rounded">
+            <div class="d-flex align-items-center mb-2">
+              <c-badge [color]="getExpirationInfo(selectedQueue).isExpired ? 'danger' : getExpirationInfo(selectedQueue).isNearExpiry ? 'warning' : 'success'" shape="rounded-pill">
+                {{ getExpirationInfo(selectedQueue).text }}
+              </c-badge>
+            </div>
+            <div *ngIf="!getExpirationInfo(selectedQueue).isExpired && getExpirationInfo(selectedQueue).progressPercentage >= 0">
+              <c-progress height="12" class="mb-2">
+                <c-progress-bar 
+                  [value]="getExpirationInfo(selectedQueue).progressPercentage" 
+                  [color]="getExpirationInfo(selectedQueue).isNearExpiry ? 'warning' : 'success'">
+                </c-progress-bar>
+              </c-progress>
+              <small class="text-muted">{{ getExpirationInfo(selectedQueue).progressPercentage.toFixed(1) }}% time remaining</small>
+            </div>
+          </div>
+          <div class="form-text">Queue expiration status and progress</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Max Attempts</label>

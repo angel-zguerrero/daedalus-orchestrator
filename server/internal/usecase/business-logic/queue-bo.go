@@ -49,18 +49,13 @@ func (bo *QueueBO) ValidateQueueFields(queue *models.Queue) error {
 		return errors.New("QueueExpires cannot be negative")
 	}
 
-	// Validate ExpireAt usage: only use if DefaultQueueMessageDelayTime > 0
-	if queue.ExpireAt != nil && queue.DefaultQueueMessageDelayTime <= 0 {
-		return errors.New("ExpireAt can only be set when DefaultQueueMessageDelayTime is greater than 0")
-	}
-
 	// ExpireAt should only be set if DefaultQueueMessageDelayTime > 0
-	if queue.DefaultQueueMessageDelayTime > 0 && queue.ExpireAt == nil {
+	if queue.QueueExpires > 0 {
 		// Calculate ExpireAt based on current time + DefaultQueueMessageDelayTime
-		expireTime := time.Now().Add(time.Duration(queue.DefaultQueueMessageDelayTime) * time.Second)
+		expireTime := time.Now().Add(time.Duration(queue.QueueExpires) * time.Second)
+		fmt.Println("Calculated ExpireAt:", expireTime)
+		fmt.Println("Current time:", time.Now())
 		queue.ExpireAt = &expireTime
-	} else if queue.DefaultQueueMessageDelayTime == 0 && queue.ExpireAt != nil {
-		return errors.New("ExpireAt should only be set when DefaultQueueMessageDelayTime is greater than 0")
 	}
 
 	return nil

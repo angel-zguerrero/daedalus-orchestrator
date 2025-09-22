@@ -111,6 +111,12 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 			return *commandResult
 		}
 
+		// Check if queue has expired
+		if queue.ExpireAt != nil && now.After(*queue.ExpireAt) {
+			commandResult.Error = fmt.Sprintf("Queue %s has expired on %s", queue.Code, queue.ExpireAt.Format("2006-01-02 15:04:05"))
+			return *commandResult
+		}
+
 		if queue.DesiredPriorityThresholds == nil {
 			commandResult.Error = fmt.Sprintf("Queue %s has no priority thresholds configured", queueID)
 			return *commandResult
