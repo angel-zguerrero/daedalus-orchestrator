@@ -58,16 +58,20 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 
 	// Create queue with new properties
 	queue := &models.Queue{
-		Code:                      r.Code,
-		VNamespace:                r.Vnamespace,
-		Name:                      r.Name,
-		Type:                      models.QueueType(r.Type),
-		State:                     models.QueueActive, // Default state
-		DefaultQueueMessageTTL:    int(r.TtlQueue),
-		AllowDuplicated:           r.AllowDuplicated,
-		MaxAttempts:               int(r.MaxAttempts),
-		DesiredPriorityThresholds: convertDesiredPriorityThresholds(r.DesiredPriorityThresholds),
-		Headers:                   r.Headers, // Add headers support
+		Code:                                  r.Code,
+		VNamespace:                            r.Vnamespace,
+		Name:                                  r.Name,
+		Type:                                  models.QueueType(r.Type),
+		State:                                 models.QueueActive, // Default state
+		DefaultQueueMessageTTL:                int(r.DefaultQueueMessageTTL),
+		DefaultQueueMessageDelayTime:          int(r.DefaultQueueMessageDelayTime),
+		QueueExpires:                          int(r.QueueExpires),
+		AllowDuplicated:                       r.AllowDuplicated,
+		MaxAttempts:                           int(r.MaxAttempts),
+		DesiredPriorityThresholds:             convertDesiredPriorityThresholds(r.DesiredPriorityThresholds),
+		Headers:                               r.Headers,
+		DeadLetterExchangeId:                  r.DeadLetterExchangeId,
+		DeadLetterExchangeRoutingKeyOrPattern: r.DeadLetterExchangeRoutingKeyOrPattern,
 	}
 
 	// Set defaults if not provided
@@ -85,20 +89,24 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 	return &pb.CreateQueueResponse{
 		Message: "Queue was asserted",
 		Result: &pb.Queue{
-			Id:                        result.ID,
-			Code:                      result.Code,
-			Name:                      result.Name,
-			Type:                      string(result.Type),
-			State:                     string(result.State),
-			Vnamespace:                result.VNamespace,
-			CreatedAt:                 result.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:                 result.UpdatedAt.Format(time.RFC3339),
-			TtlQueue:                  int32(result.DefaultQueueMessageTTL),
-			AllowDuplicated:           result.AllowDuplicated,
-			MaxAttempts:               int32(result.MaxAttempts),
-			DesiredPriorityThresholds: convertPriorityThresholdsToProto(result.DesiredPriorityThresholds),
-			PriorityThresholds:        convertPriorityThresholdsToProto(result.PriorityThresholds),
-			Headers:                   result.Headers, // Include headers in response
+			Id:                                    result.ID,
+			Code:                                  result.Code,
+			Name:                                  result.Name,
+			Type:                                  string(result.Type),
+			State:                                 string(result.State),
+			Vnamespace:                            result.VNamespace,
+			CreatedAt:                             result.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:                             result.UpdatedAt.Format(time.RFC3339),
+			DefaultQueueMessageTTL:                int32(result.DefaultQueueMessageTTL),
+			DefaultQueueMessageDelayTime:          int32(result.DefaultQueueMessageDelayTime),
+			QueueExpires:                          int32(result.QueueExpires),
+			AllowDuplicated:                       result.AllowDuplicated,
+			MaxAttempts:                           int32(result.MaxAttempts),
+			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(result.DesiredPriorityThresholds),
+			PriorityThresholds:                    convertPriorityThresholdsToProto(result.PriorityThresholds),
+			Headers:                               result.Headers,
+			DeadLetterExchangeId:                  result.DeadLetterExchangeId,
+			DeadLetterExchangeRoutingKeyOrPattern: result.DeadLetterExchangeRoutingKeyOrPattern,
 		},
 	}, nil
 }
@@ -114,16 +122,20 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 		}
 
 		queue := &models.Queue{
-			Code:                      t.Code,
-			VNamespace:                t.Vnamespace,
-			Name:                      t.Name,
-			Type:                      models.QueueType(t.Type),
-			State:                     models.QueueState(t.State),
-			DefaultQueueMessageTTL:    int(t.TtlQueue),
-			AllowDuplicated:           t.AllowDuplicated,
-			MaxAttempts:               int(t.MaxAttempts),
-			DesiredPriorityThresholds: convertDesiredPriorityThresholds(t.DesiredPriorityThresholds),
-			Headers:                   t.Headers, // Add headers support
+			Code:                                  t.Code,
+			VNamespace:                            t.Vnamespace,
+			Name:                                  t.Name,
+			Type:                                  models.QueueType(t.Type),
+			State:                                 models.QueueState(t.State),
+			DefaultQueueMessageTTL:                int(t.DefaultQueueMessageTTL),
+			DefaultQueueMessageDelayTime:          int(t.DefaultQueueMessageDelayTime),
+			QueueExpires:                          int(t.QueueExpires),
+			AllowDuplicated:                       t.AllowDuplicated,
+			MaxAttempts:                           int(t.MaxAttempts),
+			DesiredPriorityThresholds:             convertDesiredPriorityThresholds(t.DesiredPriorityThresholds),
+			Headers:                               t.Headers,
+			DeadLetterExchangeId:                  t.DeadLetterExchangeId,
+			DeadLetterExchangeRoutingKeyOrPattern: t.DeadLetterExchangeRoutingKeyOrPattern,
 		}
 		// Set defaults if not provided
 		if queue.MaxAttempts == 0 {
@@ -140,20 +152,24 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 	rQueues := []*pb.Queue{}
 	for _, e := range queuesResult {
 		ex := &pb.Queue{
-			Id:                        e.ID,
-			Code:                      e.Code,
-			Name:                      e.Name,
-			Type:                      string(e.Type),
-			State:                     string(e.State),
-			Vnamespace:                e.VNamespace,
-			CreatedAt:                 e.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:                 e.UpdatedAt.Format(time.RFC3339),
-			TtlQueue:                  int32(e.DefaultQueueMessageTTL),
-			AllowDuplicated:           e.AllowDuplicated,
-			MaxAttempts:               int32(e.MaxAttempts),
-			DesiredPriorityThresholds: convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
-			PriorityThresholds:        convertPriorityThresholdsToProto(e.PriorityThresholds),
-			Headers:                   e.Headers, // Include headers in response
+			Id:                                    e.ID,
+			Code:                                  e.Code,
+			Name:                                  e.Name,
+			Type:                                  string(e.Type),
+			State:                                 string(e.State),
+			Vnamespace:                            e.VNamespace,
+			CreatedAt:                             e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:                             e.UpdatedAt.Format(time.RFC3339),
+			DefaultQueueMessageTTL:                int32(e.DefaultQueueMessageTTL),
+			DefaultQueueMessageDelayTime:          int32(e.DefaultQueueMessageDelayTime),
+			QueueExpires:                          int32(e.QueueExpires),
+			AllowDuplicated:                       e.AllowDuplicated,
+			MaxAttempts:                           int32(e.MaxAttempts),
+			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
+			PriorityThresholds:                    convertPriorityThresholdsToProto(e.PriorityThresholds),
+			Headers:                               e.Headers,
+			DeadLetterExchangeId:                  e.DeadLetterExchangeId,
+			DeadLetterExchangeRoutingKeyOrPattern: e.DeadLetterExchangeRoutingKeyOrPattern,
 		}
 		rQueues = append(rQueues, ex)
 	}
@@ -175,20 +191,24 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 	return &pb.GetQueueResponse{
 		Message: "Queue",
 		Result: &pb.Queue{
-			Id:                        queue.ID,
-			Code:                      queue.Code,
-			Name:                      queue.Name,
-			Type:                      string(queue.Type),
-			State:                     string(queue.State),
-			Vnamespace:                queue.VNamespace,
-			CreatedAt:                 queue.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:                 queue.UpdatedAt.Format(time.RFC3339),
-			TtlQueue:                  int32(queue.DefaultQueueMessageTTL),
-			AllowDuplicated:           queue.AllowDuplicated,
-			MaxAttempts:               int32(queue.MaxAttempts),
-			DesiredPriorityThresholds: convertPriorityThresholdsToProto(queue.DesiredPriorityThresholds),
-			PriorityThresholds:        convertPriorityThresholdsToProto(queue.PriorityThresholds),
-			Headers:                   queue.Headers, // Include headers in response
+			Id:                                    queue.ID,
+			Code:                                  queue.Code,
+			Name:                                  queue.Name,
+			Type:                                  string(queue.Type),
+			State:                                 string(queue.State),
+			Vnamespace:                            queue.VNamespace,
+			CreatedAt:                             queue.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:                             queue.UpdatedAt.Format(time.RFC3339),
+			DefaultQueueMessageTTL:                int32(queue.DefaultQueueMessageTTL),
+			DefaultQueueMessageDelayTime:          int32(queue.DefaultQueueMessageDelayTime),
+			QueueExpires:                          int32(queue.QueueExpires),
+			AllowDuplicated:                       queue.AllowDuplicated,
+			MaxAttempts:                           int32(queue.MaxAttempts),
+			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(queue.DesiredPriorityThresholds),
+			PriorityThresholds:                    convertPriorityThresholdsToProto(queue.PriorityThresholds),
+			Headers:                               queue.Headers,
+			DeadLetterExchangeId:                  queue.DeadLetterExchangeId,
+			DeadLetterExchangeRoutingKeyOrPattern: queue.DeadLetterExchangeRoutingKeyOrPattern,
 		},
 	}, nil
 }
@@ -204,19 +224,23 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 	rQueues := []*pb.Queue{}
 	for _, e := range findResult.Entities {
 		ex := &pb.Queue{
-			Id:                        e.ID,
-			Code:                      e.Code,
-			Name:                      e.Name,
-			Type:                      string(e.Type),
-			State:                     string(e.State),
-			Vnamespace:                e.VNamespace,
-			CreatedAt:                 e.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:                 e.UpdatedAt.Format(time.RFC3339),
-			TtlQueue:                  int32(e.DefaultQueueMessageTTL),
-			AllowDuplicated:           e.AllowDuplicated,
-			MaxAttempts:               int32(e.MaxAttempts),
-			DesiredPriorityThresholds: convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
-			PriorityThresholds:        convertPriorityThresholdsToProto(e.PriorityThresholds),
+			Id:                                    e.ID,
+			Code:                                  e.Code,
+			Name:                                  e.Name,
+			Type:                                  string(e.Type),
+			State:                                 string(e.State),
+			Vnamespace:                            e.VNamespace,
+			CreatedAt:                             e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:                             e.UpdatedAt.Format(time.RFC3339),
+			DefaultQueueMessageTTL:                int32(e.DefaultQueueMessageTTL),
+			DefaultQueueMessageDelayTime:          int32(e.DefaultQueueMessageDelayTime),
+			QueueExpires:                          int32(e.QueueExpires),
+			AllowDuplicated:                       e.AllowDuplicated,
+			MaxAttempts:                           int32(e.MaxAttempts),
+			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
+			PriorityThresholds:                    convertPriorityThresholdsToProto(e.PriorityThresholds),
+			DeadLetterExchangeId:                  e.DeadLetterExchangeId,
+			DeadLetterExchangeRoutingKeyOrPattern: e.DeadLetterExchangeRoutingKeyOrPattern,
 		}
 
 		// Add headers if requested and available

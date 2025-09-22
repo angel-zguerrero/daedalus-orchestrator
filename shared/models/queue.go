@@ -38,8 +38,12 @@ type Queue struct {
 	DesiredPriorityThresholds    map[int]int       `orm:"data-only"`
 	PriorityThresholds           map[int]int       `orm:"data-only"`
 	Headers                      map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
-	CreatedAt                    time.Time
-	UpdatedAt                    time.Time
+
+	DeadLetterExchangeId                  string
+	DeadLetterExchangeRoutingKeyOrPattern string
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (Queue) TableName() string {

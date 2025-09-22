@@ -33,6 +33,8 @@ message CreateQueueRequest {
   int32 maxAttempts = 11;
   map<int32, int32> desiredPriorityThresholds = 12;
   map<string, string> headers = 13;
+  string deadLetterExchangeId = 14;
+  string deadLetterExchangeRoutingKeyOrPattern = 15;
 }
 
 message CreateQueueResponse {
@@ -58,6 +60,8 @@ message CreateQueueItem {
   int32 maxAttempts = 10;
   map<int32, int32> desiredPriorityThresholds = 11;
   map<string, string> headers = 12;
+  string deadLetterExchangeId = 13;
+  string deadLetterExchangeRoutingKeyOrPattern = 14;
 }
 
 message BulkCreateQueueResponse {
@@ -103,6 +107,8 @@ message Queue {
   map<int32, int32> desiredPriorityThresholds = 15;
   map<int32, int32> priorityThresholds = 16;
   map<string, string> headers = 17;
+  string deadLetterExchangeId = 18;
+  string deadLetterExchangeRoutingKeyOrPattern = 19;
 }
 
 message QueueFindResult {

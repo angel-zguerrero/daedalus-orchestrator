@@ -1,6 +1,7 @@
 import { Component, OnInit, Input } from '@angular/core';
 import { CommonModule, AsyncPipe } from '@angular/common';
 import { QueuesService } from '../services/queues.service';
+import { ExchangesService } from '../services/exchanges.service';
 import { VNamespacesService } from '../services/vnamespaces.service';
 import { 
   TableModule, 
@@ -41,6 +42,18 @@ interface Queue {
   DesiredPriorityThresholds: { [key: number]: number };
   PriorityThresholds: { [key: number]: number };
   Headers?: { [key: string]: string };
+  DeadLetterExchangeId?: string;
+  DeadLetterExchangeRoutingKeyOrPattern?: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
+interface Exchange {
+  ID: string;
+  Name: string;
+  Code: string;
+  Type: string;
+  VNamespace: string;
   CreatedAt: string;
   UpdatedAt: string;
 }
@@ -76,6 +89,9 @@ export class QueuesComponent implements OnInit {
   @Input() tenantCode: string = '';
   
   queues: Queue[] = [];
+  exchanges: Exchange[] = [];
+  filteredExchanges: Exchange[] = [];
+  validExchangeTypes = ['direct', 'topic', 'fanout'];
   cursor = '';
   cursors: string[] = [];
   pageSize = 20;
@@ -160,6 +176,7 @@ export class QueuesComponent implements OnInit {
 
   constructor(
     private queuesService: QueuesService,
+    private exchangesService: ExchangesService,
     private vNamespacesService: VNamespacesService,
     private fb: FormBuilder
   ) {
@@ -174,7 +191,20 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
       priorityType: ['normal', Validators.required],
-      maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]]
+      maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]],
+      deadLetterExchangeId: [''],
+      deadLetterExchangeRoutingKeyOrPattern: ['']
+    });
+
+    // Add dynamic validation for routing key based on exchange type
+    this.queueForm.get('deadLetterExchangeId')?.valueChanges.subscribe(exchangeId => {
+      const routingKeyControl = this.queueForm.get('deadLetterExchangeRoutingKeyOrPattern');
+      if (this.isRoutingKeyRequired(exchangeId)) {
+        routingKeyControl?.setValidators([Validators.required]);
+      } else {
+        routingKeyControl?.clearValidators();
+      }
+      routingKeyControl?.updateValueAndValidity();
     });
     this.queueFormUpdate = this.fb.group({
       name: ['', Validators.required],
@@ -184,7 +214,20 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
       priorityType: ['normal', Validators.required],
-      maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]]
+      maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]],
+      deadLetterExchangeId: [''],
+      deadLetterExchangeRoutingKeyOrPattern: ['']
+    });
+
+    // Add dynamic validation for routing key based on exchange type in update form
+    this.queueFormUpdate.get('deadLetterExchangeId')?.valueChanges.subscribe(exchangeId => {
+      const routingKeyControl = this.queueFormUpdate.get('deadLetterExchangeRoutingKeyOrPattern');
+      if (this.isRoutingKeyRequired(exchangeId)) {
+        routingKeyControl?.setValidators([Validators.required]);
+      } else {
+        routingKeyControl?.clearValidators();
+      }
+      routingKeyControl?.updateValueAndValidity();
     });
 
     this.sendMessageForm = this.fb.group({
@@ -212,6 +255,10 @@ export class QueuesComponent implements OnInit {
     if (this.tenantCode) {
       this.cursors.push('');
       this.loadQueues();
+      // Load exchanges for Dead Letter configuration
+      setTimeout(() => {
+        this.loadValidExchanges();
+      }, 100); // Small delay to ensure tenant context is ready
     }
   }
 
@@ -250,6 +297,8 @@ export class QueuesComponent implements OnInit {
   onVNamespaceFilterChange(value: string): void {
     this.selectedVNamespaceFilter = value;
     this.applyFilters();
+    // Also reload exchanges when VNamespace filter changes
+    this.loadValidExchanges();
   }
 
   applyFilters(): void {
@@ -281,7 +330,9 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: true,
       maxAttempts: 1,
       priorityType: 'normal',
-      maxPriority: 1
+      maxPriority: 1,
+      deadLetterExchangeId: '',
+      deadLetterExchangeRoutingKeyOrPattern: ''
     });
     this.priorityType = 'normal';
     this.maxPriority = 1;
@@ -290,6 +341,9 @@ export class QueuesComponent implements OnInit {
     this.queueHeaderKey = '';
     this.queueHeaderValue = '';
     this.showAlert = false;
+    
+    // Reload exchanges to make sure they're available
+    this.loadValidExchanges();
   }
 
   openEditModal(queue: any): void {
@@ -311,7 +365,9 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: queue.AllowDuplicated !== undefined ? queue.AllowDuplicated : true,
       maxAttempts: queue.MaxAttempts || 1,
       priorityType: calculatedPriorityType,
-      maxPriority: actualMaxPriority
+      maxPriority: actualMaxPriority,
+      deadLetterExchangeId: queue.DeadLetterExchangeId || '',
+      deadLetterExchangeRoutingKeyOrPattern: queue.DeadLetterExchangeRoutingKeyOrPattern || ''
     });
     
     // Set update priority management state
@@ -346,6 +402,9 @@ export class QueuesComponent implements OnInit {
     
     this.editModalVisible = true;
     this.showAlert = false;
+    
+    // Reload exchanges to make sure they're available
+    this.loadValidExchanges();
   }
 
   openDeleteModal(queue: any): void {
@@ -354,7 +413,6 @@ export class QueuesComponent implements OnInit {
   }
 
   openDetailsModal(queue: any): void {
-    console.log('Selected queue from table:', queue);
     // Use the queue data directly from the table instead of making an API call
     this.selectedQueue = queue;
     this.detailsModalVisible = true;
@@ -447,7 +505,9 @@ export class QueuesComponent implements OnInit {
         priorityType: formValue.priorityType,
         maxPriority: this.updateMaxPriority,
         desiredPriorityThresholds,
-        headers: headersObj
+        headers: headersObj,
+        deadLetterExchangeId: formValue.deadLetterExchangeId,
+        deadLetterExchangeRoutingKeyOrPattern: formValue.deadLetterExchangeRoutingKeyOrPattern
       };
       
       this.queuesService.createQueue(this.tenantCode, queueData).subscribe({
@@ -1070,8 +1130,6 @@ export class QueuesComponent implements OnInit {
       parameters: this.getParametersAsMap()
     };
 
-    console.log('Sending message payload:', messageData);
-    console.log('Selected queue:', this.selectedQueue);
 
     this.queuesService.enqueueMessage(this.tenantCode, messageData).subscribe({
       next: (response) => {
@@ -1186,6 +1244,56 @@ export class QueuesComponent implements OnInit {
       text: '',
       progressPercentage: -1
     };
+  }
+
+  // Get selected exchange by ID
+  getSelectedExchange(exchangeId: string): Exchange | null {
+    const exchange = this.exchanges.find(exchange => exchange.ID === exchangeId) || null;
+    return exchange;
+  }
+
+  // Check if routing key/pattern is required for selected exchange
+  isRoutingKeyRequired(exchangeId: string): boolean {
+    const exchange = this.getSelectedExchange(exchangeId);
+    const required = exchange ? ['direct', 'topic'].includes(exchange.Type.toLowerCase()) : false;
+    return required;
+  }
+
+  // Get exchange type label
+  getExchangeTypeLabel(type: string): string {
+    switch (type.toLowerCase()) {
+      case 'direct': return 'Direct';
+      case 'topic': return 'Topic';
+      case 'fanout': return 'Fanout';
+      default: return type;
+    }
+  }
+
+  // Load valid exchanges for Dead Letter configuration
+  loadValidExchanges() {
+
+    // Use the same vnamespace filter as the queues, or empty string to get all
+    const vnamespace = this.selectedVNamespaceFilter || '';
+    
+    this.exchangesService.getExchanges(this.tenantCode, '', 100, '', vnamespace).subscribe({
+      next: (response) => {
+        if (response && response.result && response.result.Entities) {
+          // Filter only Direct, Topic, and Fanout exchanges
+          this.exchanges = response.result.Entities.filter((exchange: any) => 
+            this.validExchangeTypes.includes(exchange.Type.toLowerCase())
+          );
+          this.filteredExchanges = [...this.exchanges];
+        } else {
+          this.exchanges = [];
+          this.filteredExchanges = [];
+        }
+      },
+      error: (error) => {
+        console.error('Error loading exchanges:', error);
+        this.exchanges = [];
+        this.filteredExchanges = [];
+      }
+    });
   }
 
   // Helper method to check if queue is expired (for other components)

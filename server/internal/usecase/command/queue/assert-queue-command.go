@@ -48,6 +48,12 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	exchangeRepo, err := db.NewExchangeRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	var resultQueues []models.Queue
 	newQueuesCount := 0
 
@@ -62,6 +68,32 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		// Validate that VNamespace is not empty
 		if queue.VNamespace == "" {
 			queue.VNamespace = "default"
+		}
+
+		// Validate Dead Letter Exchange if provided
+		if queue.DeadLetterExchangeId != "" {
+			exchange, err := exchangeRepo.GetExchangeById(queue.DeadLetterExchangeId, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+
+			if exchange == nil {
+				commandResult.Error = "Dead Letter Exchange with ID " + queue.DeadLetterExchangeId + " not found"
+				return *commandResult
+			}
+
+			// Validate exchange type - only Direct, Topic, and Fanout are allowed
+			if exchange.Type != models.Direct && exchange.Type != models.Topic && exchange.Type != models.Fanout {
+				commandResult.Error = "Dead Letter Exchange must be of type Direct, Topic, or Fanout. Current type: " + string(exchange.Type)
+				return *commandResult
+			}
+
+			// Validate routing key/pattern is provided for Direct and Topic exchanges
+			if (exchange.Type == models.Direct || exchange.Type == models.Topic) && queue.DeadLetterExchangeRoutingKeyOrPattern == "" {
+				commandResult.Error = "Dead Letter Exchange routing key/pattern is required for Direct and Topic exchanges"
+				return *commandResult
+			}
 		}
 
 		// Look for existing queue by code (primary upsert strategy)

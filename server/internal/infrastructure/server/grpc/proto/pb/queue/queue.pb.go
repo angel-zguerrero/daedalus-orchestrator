@@ -71,20 +71,24 @@ func (QueueType) EnumDescriptor() ([]byte, []int) {
 }
 
 type CreateQueueRequest struct {
-	state                     protoimpl.MessageState `protogen:"open.v1"`
-	TenantCode                string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
-	Code                      string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name                      string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Type                      string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	State                     string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace                string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	TtlQueue                  int32                  `protobuf:"varint,7,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
-	AllowDuplicated           bool                   `protobuf:"varint,8,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts               int32                  `protobuf:"varint,9,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,10,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	Headers                   map[string]string      `protobuf:"bytes,11,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	state                                 protoimpl.MessageState `protogen:"open.v1"`
+	TenantCode                            string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	Code                                  string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name                                  string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type                                  string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	State                                 string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace                            string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	DefaultQueueMessageTTL                int32                  `protobuf:"varint,7,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
+	DefaultQueueMessageDelayTime          int32                  `protobuf:"varint,8,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
+	QueueExpires                          int32                  `protobuf:"varint,9,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
+	AllowDuplicated                       bool                   `protobuf:"varint,10,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts                           int32                  `protobuf:"varint,11,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	DesiredPriorityThresholds             map[int32]int32        `protobuf:"bytes,12,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                               map[string]string      `protobuf:"bytes,13,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	DeadLetterExchangeId                  string                 `protobuf:"bytes,14,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
+	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,15,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
+	unknownFields                         protoimpl.UnknownFields
+	sizeCache                             protoimpl.SizeCache
 }
 
 func (x *CreateQueueRequest) Reset() {
@@ -159,9 +163,23 @@ func (x *CreateQueueRequest) GetVnamespace() string {
 	return ""
 }
 
-func (x *CreateQueueRequest) GetTtlQueue() int32 {
+func (x *CreateQueueRequest) GetDefaultQueueMessageTTL() int32 {
 	if x != nil {
-		return x.TtlQueue
+		return x.DefaultQueueMessageTTL
+	}
+	return 0
+}
+
+func (x *CreateQueueRequest) GetDefaultQueueMessageDelayTime() int32 {
+	if x != nil {
+		return x.DefaultQueueMessageDelayTime
+	}
+	return 0
+}
+
+func (x *CreateQueueRequest) GetQueueExpires() int32 {
+	if x != nil {
+		return x.QueueExpires
 	}
 	return 0
 }
@@ -192,6 +210,20 @@ func (x *CreateQueueRequest) GetHeaders() map[string]string {
 		return x.Headers
 	}
 	return nil
+}
+
+func (x *CreateQueueRequest) GetDeadLetterExchangeId() string {
+	if x != nil {
+		return x.DeadLetterExchangeId
+	}
+	return ""
+}
+
+func (x *CreateQueueRequest) GetDeadLetterExchangeRoutingKeyOrPattern() string {
+	if x != nil {
+		return x.DeadLetterExchangeRoutingKeyOrPattern
+	}
+	return ""
 }
 
 type CreateQueueResponse struct {
@@ -299,19 +331,23 @@ func (x *BulkCreateQueueRequest) GetQueues() []*CreateQueueItem {
 }
 
 type CreateQueueItem struct {
-	state                     protoimpl.MessageState `protogen:"open.v1"`
-	Code                      string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Name                      string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Type                      string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	State                     string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace                string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	TtlQueue                  int32                  `protobuf:"varint,6,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
-	AllowDuplicated           bool                   `protobuf:"varint,7,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts               int32                  `protobuf:"varint,8,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,9,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	Headers                   map[string]string      `protobuf:"bytes,10,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	state                                 protoimpl.MessageState `protogen:"open.v1"`
+	Code                                  string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Name                                  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Type                                  string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	State                                 string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace                            string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	DefaultQueueMessageTTL                int32                  `protobuf:"varint,6,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
+	DefaultQueueMessageDelayTime          int32                  `protobuf:"varint,7,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
+	QueueExpires                          int32                  `protobuf:"varint,8,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
+	AllowDuplicated                       bool                   `protobuf:"varint,9,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts                           int32                  `protobuf:"varint,10,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	DesiredPriorityThresholds             map[int32]int32        `protobuf:"bytes,11,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                               map[string]string      `protobuf:"bytes,12,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	DeadLetterExchangeId                  string                 `protobuf:"bytes,13,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
+	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,14,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
+	unknownFields                         protoimpl.UnknownFields
+	sizeCache                             protoimpl.SizeCache
 }
 
 func (x *CreateQueueItem) Reset() {
@@ -379,9 +415,23 @@ func (x *CreateQueueItem) GetVnamespace() string {
 	return ""
 }
 
-func (x *CreateQueueItem) GetTtlQueue() int32 {
+func (x *CreateQueueItem) GetDefaultQueueMessageTTL() int32 {
 	if x != nil {
-		return x.TtlQueue
+		return x.DefaultQueueMessageTTL
+	}
+	return 0
+}
+
+func (x *CreateQueueItem) GetDefaultQueueMessageDelayTime() int32 {
+	if x != nil {
+		return x.DefaultQueueMessageDelayTime
+	}
+	return 0
+}
+
+func (x *CreateQueueItem) GetQueueExpires() int32 {
+	if x != nil {
+		return x.QueueExpires
 	}
 	return 0
 }
@@ -412,6 +462,20 @@ func (x *CreateQueueItem) GetHeaders() map[string]string {
 		return x.Headers
 	}
 	return nil
+}
+
+func (x *CreateQueueItem) GetDeadLetterExchangeId() string {
+	if x != nil {
+		return x.DeadLetterExchangeId
+	}
+	return ""
+}
+
+func (x *CreateQueueItem) GetDeadLetterExchangeRoutingKeyOrPattern() string {
+	if x != nil {
+		return x.DeadLetterExchangeRoutingKeyOrPattern
+	}
+	return ""
 }
 
 type BulkCreateQueueResponse struct {
@@ -663,23 +727,28 @@ func (x *GetQueuesRequest) GetIncludeHeaders() bool {
 }
 
 type Queue struct {
-	state                     protoimpl.MessageState `protogen:"open.v1"`
-	Id                        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Code                      string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name                      string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Type                      string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	State                     string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace                string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	CreatedAt                 string                 `protobuf:"bytes,7,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
-	UpdatedAt                 string                 `protobuf:"bytes,8,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
-	TtlQueue                  int32                  `protobuf:"varint,9,opt,name=ttlQueue,proto3" json:"ttlQueue,omitempty"`
-	AllowDuplicated           bool                   `protobuf:"varint,10,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts               int32                  `protobuf:"varint,11,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	DesiredPriorityThresholds map[int32]int32        `protobuf:"bytes,12,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	PriorityThresholds        map[int32]int32        `protobuf:"bytes,13,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	Headers                   map[string]string      `protobuf:"bytes,14,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	state                                 protoimpl.MessageState `protogen:"open.v1"`
+	Id                                    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Code                                  string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name                                  string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type                                  string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	State                                 string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace                            string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	CreatedAt                             string                 `protobuf:"bytes,7,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt                             string                 `protobuf:"bytes,8,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	DefaultQueueMessageTTL                int32                  `protobuf:"varint,9,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
+	DefaultQueueMessageDelayTime          int32                  `protobuf:"varint,10,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
+	QueueExpires                          int32                  `protobuf:"varint,11,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
+	ExpireAt                              string                 `protobuf:"bytes,12,opt,name=expireAt,proto3" json:"expireAt,omitempty"`
+	AllowDuplicated                       bool                   `protobuf:"varint,13,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts                           int32                  `protobuf:"varint,14,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	DesiredPriorityThresholds             map[int32]int32        `protobuf:"bytes,15,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	PriorityThresholds                    map[int32]int32        `protobuf:"bytes,16,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                               map[string]string      `protobuf:"bytes,17,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	DeadLetterExchangeId                  string                 `protobuf:"bytes,18,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
+	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,19,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
+	unknownFields                         protoimpl.UnknownFields
+	sizeCache                             protoimpl.SizeCache
 }
 
 func (x *Queue) Reset() {
@@ -768,11 +837,32 @@ func (x *Queue) GetUpdatedAt() string {
 	return ""
 }
 
-func (x *Queue) GetTtlQueue() int32 {
+func (x *Queue) GetDefaultQueueMessageTTL() int32 {
 	if x != nil {
-		return x.TtlQueue
+		return x.DefaultQueueMessageTTL
 	}
 	return 0
+}
+
+func (x *Queue) GetDefaultQueueMessageDelayTime() int32 {
+	if x != nil {
+		return x.DefaultQueueMessageDelayTime
+	}
+	return 0
+}
+
+func (x *Queue) GetQueueExpires() int32 {
+	if x != nil {
+		return x.QueueExpires
+	}
+	return 0
+}
+
+func (x *Queue) GetExpireAt() string {
+	if x != nil {
+		return x.ExpireAt
+	}
+	return ""
 }
 
 func (x *Queue) GetAllowDuplicated() bool {
@@ -808,6 +898,20 @@ func (x *Queue) GetHeaders() map[string]string {
 		return x.Headers
 	}
 	return nil
+}
+
+func (x *Queue) GetDeadLetterExchangeId() string {
+	if x != nil {
+		return x.DeadLetterExchangeId
+	}
+	return ""
+}
+
+func (x *Queue) GetDeadLetterExchangeRoutingKeyOrPattern() string {
+	if x != nil {
+		return x.DeadLetterExchangeRoutingKeyOrPattern
+	}
+	return ""
 }
 
 type QueueFindResult struct {
@@ -1190,7 +1294,7 @@ var File_internal_infrastructure_server_grpc_proto_definitions_queue_proto proto
 
 const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc = "" +
 	"\n" +
-	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xd2\x04\n" +
+	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xe0\x06\n" +
 	"\x12CreateQueueRequest\x12\x1e\n" +
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
@@ -1201,13 +1305,17 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x05state\x18\x05 \x01(\tR\x05state\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x06 \x01(\tR\n" +
-	"vnamespace\x12\x1a\n" +
-	"\bttlQueue\x18\a \x01(\x05R\bttlQueue\x12(\n" +
-	"\x0fallowDuplicated\x18\b \x01(\bR\x0fallowDuplicated\x12 \n" +
-	"\vmaxAttempts\x18\t \x01(\x05R\vmaxAttempts\x12v\n" +
-	"\x19desiredPriorityThresholds\x18\n" +
-	" \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12@\n" +
-	"\aheaders\x18\v \x03(\v2&.queue.CreateQueueRequest.HeadersEntryR\aheaders\x1aL\n" +
+	"vnamespace\x126\n" +
+	"\x16defaultQueueMessageTTL\x18\a \x01(\x05R\x16defaultQueueMessageTTL\x12B\n" +
+	"\x1cdefaultQueueMessageDelayTime\x18\b \x01(\x05R\x1cdefaultQueueMessageDelayTime\x12\"\n" +
+	"\fqueueExpires\x18\t \x01(\x05R\fqueueExpires\x12(\n" +
+	"\x0fallowDuplicated\x18\n" +
+	" \x01(\bR\x0fallowDuplicated\x12 \n" +
+	"\vmaxAttempts\x18\v \x01(\x05R\vmaxAttempts\x12v\n" +
+	"\x19desiredPriorityThresholds\x18\f \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12@\n" +
+	"\aheaders\x18\r \x03(\v2&.queue.CreateQueueRequest.HeadersEntryR\aheaders\x122\n" +
+	"\x14deadLetterExchangeId\x18\x0e \x01(\tR\x14deadLetterExchangeId\x12T\n" +
+	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0f \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1221,7 +1329,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
 	"tenantCode\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xa9\x04\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xb7\x06\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1229,13 +1337,17 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x05state\x18\x04 \x01(\tR\x05state\x12\x1e\n" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
-	"vnamespace\x12\x1a\n" +
-	"\bttlQueue\x18\x06 \x01(\x05R\bttlQueue\x12(\n" +
-	"\x0fallowDuplicated\x18\a \x01(\bR\x0fallowDuplicated\x12 \n" +
-	"\vmaxAttempts\x18\b \x01(\x05R\vmaxAttempts\x12s\n" +
-	"\x19desiredPriorityThresholds\x18\t \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12=\n" +
-	"\aheaders\x18\n" +
-	" \x03(\v2#.queue.CreateQueueItem.HeadersEntryR\aheaders\x1aL\n" +
+	"vnamespace\x126\n" +
+	"\x16defaultQueueMessageTTL\x18\x06 \x01(\x05R\x16defaultQueueMessageTTL\x12B\n" +
+	"\x1cdefaultQueueMessageDelayTime\x18\a \x01(\x05R\x1cdefaultQueueMessageDelayTime\x12\"\n" +
+	"\fqueueExpires\x18\b \x01(\x05R\fqueueExpires\x12(\n" +
+	"\x0fallowDuplicated\x18\t \x01(\bR\x0fallowDuplicated\x12 \n" +
+	"\vmaxAttempts\x18\n" +
+	" \x01(\x05R\vmaxAttempts\x12s\n" +
+	"\x19desiredPriorityThresholds\x18\v \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12=\n" +
+	"\aheaders\x18\f \x03(\v2#.queue.CreateQueueItem.HeadersEntryR\aheaders\x122\n" +
+	"\x14deadLetterExchangeId\x18\r \x01(\tR\x14deadLetterExchangeId\x12T\n" +
+	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0e \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1266,7 +1378,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
 	"vnamespace\x12&\n" +
-	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\xf4\x05\n" +
+	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\x9e\b\n" +
 	"\x05Queue\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -1277,14 +1389,19 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"vnamespace\x18\x06 \x01(\tR\n" +
 	"vnamespace\x12\x1c\n" +
 	"\tcreatedAt\x18\a \x01(\tR\tcreatedAt\x12\x1c\n" +
-	"\tupdatedAt\x18\b \x01(\tR\tupdatedAt\x12\x1a\n" +
-	"\bttlQueue\x18\t \x01(\x05R\bttlQueue\x12(\n" +
-	"\x0fallowDuplicated\x18\n" +
-	" \x01(\bR\x0fallowDuplicated\x12 \n" +
-	"\vmaxAttempts\x18\v \x01(\x05R\vmaxAttempts\x12i\n" +
-	"\x19desiredPriorityThresholds\x18\f \x03(\v2+.queue.Queue.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12T\n" +
-	"\x12priorityThresholds\x18\r \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x123\n" +
-	"\aheaders\x18\x0e \x03(\v2\x19.queue.Queue.HeadersEntryR\aheaders\x1aL\n" +
+	"\tupdatedAt\x18\b \x01(\tR\tupdatedAt\x126\n" +
+	"\x16defaultQueueMessageTTL\x18\t \x01(\x05R\x16defaultQueueMessageTTL\x12B\n" +
+	"\x1cdefaultQueueMessageDelayTime\x18\n" +
+	" \x01(\x05R\x1cdefaultQueueMessageDelayTime\x12\"\n" +
+	"\fqueueExpires\x18\v \x01(\x05R\fqueueExpires\x12\x1a\n" +
+	"\bexpireAt\x18\f \x01(\tR\bexpireAt\x12(\n" +
+	"\x0fallowDuplicated\x18\r \x01(\bR\x0fallowDuplicated\x12 \n" +
+	"\vmaxAttempts\x18\x0e \x01(\x05R\vmaxAttempts\x12i\n" +
+	"\x19desiredPriorityThresholds\x18\x0f \x03(\v2+.queue.Queue.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12T\n" +
+	"\x12priorityThresholds\x18\x10 \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x123\n" +
+	"\aheaders\x18\x11 \x03(\v2\x19.queue.Queue.HeadersEntryR\aheaders\x122\n" +
+	"\x14deadLetterExchangeId\x18\x12 \x01(\tR\x14deadLetterExchangeId\x12T\n" +
+	"%deadLetterExchangeRoutingKeyOrPattern\x18\x13 \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aE\n" +
