@@ -70,6 +70,12 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			queue.VNamespace = "default"
 		}
 
+		// Validate MaxQueueSize
+		if queue.MaxQueueSize < 0 {
+			commandResult.Error = "MaxQueueSize must be greater than or equal to 0"
+			return *commandResult
+		}
+
 		// Validate Dead Letter Exchange if provided
 		if queue.DeadLetterExchangeId != "" {
 			exchange, err := exchangeRepo.GetExchangeById(queue.DeadLetterExchangeId, now)
@@ -108,6 +114,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			queue.ID = existing.ID
 			queue.Code = existing.Code // Frontend cannot edit code
 			queue.Type = existing.Type
+			queue.MessagesCount = existing.MessagesCount
 			queue.VNamespace = existing.VNamespace
 			queue.CreatedAt = existing.CreatedAt
 			queue.PriorityThresholds = existing.PriorityThresholds

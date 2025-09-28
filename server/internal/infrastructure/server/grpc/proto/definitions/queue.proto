@@ -35,6 +35,7 @@ message CreateQueueRequest {
   map<string, string> headers = 13;
   string deadLetterExchangeId = 14;
   string deadLetterExchangeRoutingKeyOrPattern = 15;
+  int32 maxQueueSize = 16;
 }
 
 message CreateQueueResponse {
@@ -62,6 +63,7 @@ message CreateQueueItem {
   map<string, string> headers = 12;
   string deadLetterExchangeId = 13;
   string deadLetterExchangeRoutingKeyOrPattern = 14;
+  int32 maxQueueSize = 15;
 }
 
 message BulkCreateQueueResponse {
@@ -109,6 +111,8 @@ message Queue {
   map<string, string> headers = 17;
   string deadLetterExchangeId = 18;
   string deadLetterExchangeRoutingKeyOrPattern = 19;
+  int32 messagesCount = 20;
+  int32 maxQueueSize = 21;
 }
 
 message QueueFindResult {

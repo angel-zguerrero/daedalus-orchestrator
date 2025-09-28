@@ -39,6 +39,8 @@ type Queue struct {
 	PriorityThresholds           map[int]int       `orm:"data-only"`
 	Headers                      map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
 
+	MaxQueueSize int
+
 	DeadLetterExchangeId                  string
 	DeadLetterExchangeRoutingKeyOrPattern string
 

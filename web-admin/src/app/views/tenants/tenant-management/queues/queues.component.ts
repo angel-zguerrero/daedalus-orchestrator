@@ -39,6 +39,8 @@ interface Queue {
   ExpireAt?: string;
   AllowDuplicated: boolean;
   MaxAttempts: number;
+  MaxQueueSize: number;
+  MessagesCount?: number;
   DesiredPriorityThresholds: { [key: number]: number };
   PriorityThresholds: { [key: number]: number };
   Headers?: { [key: string]: string };
@@ -190,6 +192,7 @@ export class QueuesComponent implements OnInit {
       queueExpires: [0, [Validators.min(0)]],
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
+      maxQueueSize: [0, [Validators.min(0)]],
       priorityType: ['normal', Validators.required],
       maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]],
       deadLetterExchangeId: [''],
@@ -213,6 +216,7 @@ export class QueuesComponent implements OnInit {
       queueExpires: [0, [Validators.min(0)]],
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
+      maxQueueSize: [0, [Validators.min(0)]],
       priorityType: ['normal', Validators.required],
       maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]],
       deadLetterExchangeId: [''],
@@ -329,6 +333,7 @@ export class QueuesComponent implements OnInit {
       queueExpires: 0,
       allowDuplicated: true,
       maxAttempts: 1,
+      maxQueueSize: 0,
       priorityType: 'normal',
       maxPriority: 1,
       deadLetterExchangeId: '',
@@ -364,6 +369,7 @@ export class QueuesComponent implements OnInit {
       queueExpires: queue.QueueExpires || 0,
       allowDuplicated: queue.AllowDuplicated !== undefined ? queue.AllowDuplicated : true,
       maxAttempts: queue.MaxAttempts || 1,
+      maxQueueSize: queue.MaxQueueSize || 0,
       priorityType: calculatedPriorityType,
       maxPriority: actualMaxPriority,
       deadLetterExchangeId: queue.DeadLetterExchangeId || '',
@@ -502,6 +508,7 @@ export class QueuesComponent implements OnInit {
         queueExpires: formValue.queueExpires,
         allowDuplicated: formValue.allowDuplicated,
         maxAttempts: formValue.maxAttempts,
+        maxQueueSize: formValue.maxQueueSize,
         priorityType: formValue.priorityType,
         maxPriority: this.updateMaxPriority,
         desiredPriorityThresholds,
@@ -594,7 +601,7 @@ export class QueuesComponent implements OnInit {
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawQueues = XLSX.utils.sheet_to_json(worksheet, { 
-          header: ['Name', 'Code', 'Type', 'VNamespace', 'DefaultQueueMessageTTL', 'DefaultQueueMessageDelayTime', 'QueueExpires', 'AllowDuplicated', 'MaxAttempts', 'PriorityType', 'MaxPriority', 'PriorityThresholds'] 
+          header: ['Name', 'Code', 'Type', 'VNamespace', 'DefaultQueueMessageTTL', 'DefaultQueueMessageDelayTime', 'QueueExpires', 'AllowDuplicated', 'MaxAttempts', 'MaxQueueSize', 'PriorityType', 'MaxPriority', 'PriorityThresholds'] 
         });
 
         // Remove header row
@@ -663,6 +670,15 @@ export class QueuesComponent implements OnInit {
             }
           }
 
+          // Process MaxQueueSize - ensure it's a number >= 0
+          let maxQueueSize = 0; // default value
+          if (queue.MaxQueueSize !== undefined && queue.MaxQueueSize !== null && queue.MaxQueueSize !== '') {
+            maxQueueSize = parseInt(queue.MaxQueueSize, 10);
+            if (isNaN(maxQueueSize) || maxQueueSize < 0) {
+              throw new Error(`Row ${index + 2}: Invalid MaxQueueSize value: ${queue.MaxQueueSize}. Must be a number >= 0`);
+            }
+          }
+
           // Process PriorityType
           let priorityType = 'normal'; // default value
           if (queue.PriorityType !== undefined && queue.PriorityType !== null && queue.PriorityType !== '') {
@@ -726,6 +742,7 @@ export class QueuesComponent implements OnInit {
             queueExpires: queueExpires,
             allowDuplicated: allowDuplicated,
             maxAttempts: maxAttempts,
+            maxQueueSize: maxQueueSize,
             priorityType: priorityType,
             maxPriority: maxPriority,
             desiredPriorityThresholds: desiredPriorityThresholds
@@ -1299,5 +1316,37 @@ export class QueuesComponent implements OnInit {
   // Helper method to check if queue is expired (for other components)
   isQueueExpired(queue: any): boolean {
     return this.getExpirationInfo(queue).isExpired;
+  }
+
+  // Get color for messages count badge
+  getMessagesCountColor(queue: any): string {
+    const messagesCount = queue.MessagesCount || 0;
+    const maxQueueSize = queue.MaxQueueSize || 0;
+
+    if (messagesCount === 0) {
+      return 'secondary';
+    }
+
+    if (maxQueueSize > 0) {
+      const percentage = (messagesCount / maxQueueSize) * 100;
+      if (percentage >= 80) {
+        return 'danger';
+      } else if (percentage >= 60) {
+        return 'warning';
+      } else if (percentage >= 30) {
+        return 'info';
+      } else {
+        return 'success';
+      }
+    }
+
+    // For unlimited queues, use different thresholds
+    if (messagesCount >= 1000) {
+      return 'warning';
+    } else if (messagesCount >= 100) {
+      return 'info';
+    } else {
+      return 'success';
+    }
   }
 }

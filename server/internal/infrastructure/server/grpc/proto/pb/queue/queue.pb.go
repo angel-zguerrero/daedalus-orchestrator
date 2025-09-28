@@ -87,6 +87,7 @@ type CreateQueueRequest struct {
 	Headers                               map[string]string      `protobuf:"bytes,13,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	DeadLetterExchangeId                  string                 `protobuf:"bytes,14,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
 	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,15,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
+	MaxQueueSize                          int32                  `protobuf:"varint,16,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
 	unknownFields                         protoimpl.UnknownFields
 	sizeCache                             protoimpl.SizeCache
 }
@@ -226,6 +227,13 @@ func (x *CreateQueueRequest) GetDeadLetterExchangeRoutingKeyOrPattern() string {
 	return ""
 }
 
+func (x *CreateQueueRequest) GetMaxQueueSize() int32 {
+	if x != nil {
+		return x.MaxQueueSize
+	}
+	return 0
+}
+
 type CreateQueueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
@@ -346,6 +354,7 @@ type CreateQueueItem struct {
 	Headers                               map[string]string      `protobuf:"bytes,12,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	DeadLetterExchangeId                  string                 `protobuf:"bytes,13,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
 	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,14,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
+	MaxQueueSize                          int32                  `protobuf:"varint,15,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
 	unknownFields                         protoimpl.UnknownFields
 	sizeCache                             protoimpl.SizeCache
 }
@@ -476,6 +485,13 @@ func (x *CreateQueueItem) GetDeadLetterExchangeRoutingKeyOrPattern() string {
 		return x.DeadLetterExchangeRoutingKeyOrPattern
 	}
 	return ""
+}
+
+func (x *CreateQueueItem) GetMaxQueueSize() int32 {
+	if x != nil {
+		return x.MaxQueueSize
+	}
+	return 0
 }
 
 type BulkCreateQueueResponse struct {
@@ -747,6 +763,8 @@ type Queue struct {
 	Headers                               map[string]string      `protobuf:"bytes,17,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	DeadLetterExchangeId                  string                 `protobuf:"bytes,18,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
 	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,19,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
+	MessagesCount                         int32                  `protobuf:"varint,20,opt,name=messagesCount,proto3" json:"messagesCount,omitempty"`
+	MaxQueueSize                          int32                  `protobuf:"varint,21,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
 	unknownFields                         protoimpl.UnknownFields
 	sizeCache                             protoimpl.SizeCache
 }
@@ -912,6 +930,20 @@ func (x *Queue) GetDeadLetterExchangeRoutingKeyOrPattern() string {
 		return x.DeadLetterExchangeRoutingKeyOrPattern
 	}
 	return ""
+}
+
+func (x *Queue) GetMessagesCount() int32 {
+	if x != nil {
+		return x.MessagesCount
+	}
+	return 0
+}
+
+func (x *Queue) GetMaxQueueSize() int32 {
+	if x != nil {
+		return x.MaxQueueSize
+	}
+	return 0
 }
 
 type QueueFindResult struct {
@@ -1294,7 +1326,7 @@ var File_internal_infrastructure_server_grpc_proto_definitions_queue_proto proto
 
 const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_rawDesc = "" +
 	"\n" +
-	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\xe0\x06\n" +
+	"Ainternal/infrastructure/server/grpc/proto/definitions/queue.proto\x12\x05queue\"\x84\a\n" +
 	"\x12CreateQueueRequest\x12\x1e\n" +
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
@@ -1315,7 +1347,8 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x19desiredPriorityThresholds\x18\f \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12@\n" +
 	"\aheaders\x18\r \x03(\v2&.queue.CreateQueueRequest.HeadersEntryR\aheaders\x122\n" +
 	"\x14deadLetterExchangeId\x18\x0e \x01(\tR\x14deadLetterExchangeId\x12T\n" +
-	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0f \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x1aL\n" +
+	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0f \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12\"\n" +
+	"\fmaxQueueSize\x18\x10 \x01(\x05R\fmaxQueueSize\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1329,7 +1362,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
 	"tenantCode\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xb7\x06\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xdb\x06\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1347,7 +1380,8 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x19desiredPriorityThresholds\x18\v \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12=\n" +
 	"\aheaders\x18\f \x03(\v2#.queue.CreateQueueItem.HeadersEntryR\aheaders\x122\n" +
 	"\x14deadLetterExchangeId\x18\r \x01(\tR\x14deadLetterExchangeId\x12T\n" +
-	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0e \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x1aL\n" +
+	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0e \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12\"\n" +
+	"\fmaxQueueSize\x18\x0f \x01(\x05R\fmaxQueueSize\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1378,7 +1412,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
 	"vnamespace\x12&\n" +
-	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\x9e\b\n" +
+	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\xe8\b\n" +
 	"\x05Queue\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -1401,7 +1435,9 @@ const file_internal_infrastructure_server_grpc_proto_definitions_queue_proto_raw
 	"\x12priorityThresholds\x18\x10 \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x123\n" +
 	"\aheaders\x18\x11 \x03(\v2\x19.queue.Queue.HeadersEntryR\aheaders\x122\n" +
 	"\x14deadLetterExchangeId\x18\x12 \x01(\tR\x14deadLetterExchangeId\x12T\n" +
-	"%deadLetterExchangeRoutingKeyOrPattern\x18\x13 \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x1aL\n" +
+	"%deadLetterExchangeRoutingKeyOrPattern\x18\x13 \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12$\n" +
+	"\rmessagesCount\x18\x14 \x01(\x05R\rmessagesCount\x12\"\n" +
+	"\fmaxQueueSize\x18\x15 \x01(\x05R\fmaxQueueSize\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aE\n" +

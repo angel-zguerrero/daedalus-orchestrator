@@ -71,6 +71,8 @@
             <th style="min-width: 100px;">Queue Expires (s)</th>
             <th style="min-width: 150px;">Expiration Status</th>
             <th style="min-width: 100px;">Max Attempts</th>
+            <th style="min-width: 100px;">Messages</th>
+            <th style="min-width: 150px;">Queue Size</th>
             <th style="min-width: 120px;">Allow Duplicated</th>
             <th style="min-width: 120px;">Priority Type</th>
             <th style="min-width: 240px;">Actions</th>
@@ -130,6 +132,30 @@
               <small *ngIf="!getExpirationInfo(queue).show" class="text-muted">No expiration</small>
             </td>
             <td class="text-center">{{ queue.MaxAttempts || 1 }}</td>
+            <td class="text-center">
+              <c-badge [color]="getMessagesCountColor(queue)" shape="rounded-pill">
+                {{ queue.MessagesCount || 0 }}
+              </c-badge>
+            </td>
+            <td class="text-center">
+              <div *ngIf="queue.MaxQueueSize > 0; else unlimitedSize">
+                <div class="d-flex align-items-center justify-content-center">
+                  <span class="me-2">{{ queue.MessagesCount || 0 }} / {{ queue.MaxQueueSize }}</span>
+                </div>
+                <c-progress height="4" class="mt-1" style="width: 100px; margin: 0 auto;">
+                  <c-progress-bar 
+                    [value]="((queue.MessagesCount || 0) / queue.MaxQueueSize) * 100"
+                    [color]="((queue.MessagesCount || 0) / queue.MaxQueueSize) > 0.8 ? 'danger' : ((queue.MessagesCount || 0) / queue.MaxQueueSize) > 0.6 ? 'warning' : 'success'">
+                  </c-progress-bar>
+                </c-progress>
+              </div>
+              <ng-template #unlimitedSize>
+                <div class="text-center">
+                  <span class="text-muted">Max: ∞</span>
+                  <small class="d-block text-muted">Unlimited</small>
+                </div>
+              </ng-template>
+            </td>
             <td class="text-center">
               <c-badge [color]="queue.AllowDuplicated ? 'success' : 'danger'" shape="rounded-pill">
                 {{ queue.AllowDuplicated ? 'Yes' : 'No' }}
@@ -293,6 +319,11 @@
           <label cLabel for="maxAttempts">Max Attempts *</label>
           <input cFormControl id="maxAttempts" formControlName="maxAttempts" type="number" min="1" placeholder="1" />
           <small class="form-text text-muted">Maximum number of attempts (must be > 0)</small>
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="maxQueueSize">Max Queue Size</label>
+          <input cFormControl id="maxQueueSize" formControlName="maxQueueSize" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Maximum messages in queue (0 = unlimited)</small>
         </c-col>
         <c-col [md]="4" class="d-flex align-items-center">
           <div class="form-check">
@@ -554,6 +585,11 @@
           <label cLabel for="maxAttempts-update">Max Attempts *</label>
           <input cFormControl id="maxAttempts-update" formControlName="maxAttempts" type="number" min="1" placeholder="1" />
           <small class="form-text text-muted">Maximum number of attempts (must be > 0)</small>
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="maxQueueSize-update">Max Queue Size</label>
+          <input cFormControl id="maxQueueSize-update" formControlName="maxQueueSize" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Maximum messages in queue (0 = unlimited)</small>
         </c-col>
         <c-col [md]="4" class="d-flex align-items-center">
           <div class="form-check">
@@ -904,6 +940,36 @@
           <div class="form-text">Maximum number of processing attempts</div>
         </div>
         <div class="mb-3">
+          <label class="form-label fw-bold">Current Messages Count</label>
+          <div class="p-2 bg-dark rounded">
+            <span class="text-info fw-bold">{{ selectedQueue?.MessagesCount || 0 }}</span> messages
+          </div>
+          <div class="form-text">Current number of messages in the queue</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Max Queue Size</label>
+          <div class="p-2 bg-dark rounded">
+            <span *ngIf="selectedQueue?.MaxQueueSize > 0; else unlimited">
+              {{ selectedQueue.MaxQueueSize }} messages maximum
+              <div class="mt-2">
+                <small class="text-muted d-block">Current: {{ selectedQueue?.MessagesCount || 0 }} / {{ selectedQueue.MaxQueueSize }}</small>
+                <c-progress height="8" class="mt-1">
+                  <c-progress-bar 
+                    [value]="((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) * 100"
+                    [color]="((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) > 0.8 ? 'danger' : ((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) > 0.6 ? 'warning' : 'success'">
+                  </c-progress-bar>
+                </c-progress>
+                <small class="text-muted">{{ (((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) * 100).toFixed(1) }}% full</small>
+              </div>
+            </span>
+            <ng-template #unlimited>
+              <span class="text-muted">Unlimited</span>
+              <small class="text-muted d-block">Current: {{ selectedQueue?.MessagesCount || 0 }} messages</small>
+            </ng-template>
+          </div>
+          <div class="form-text">Maximum number of messages allowed in the queue</div>
+        </div>
+        <div class="mb-3">
           <label class="form-label fw-bold">Allow Duplicated</label>
           <div class="p-2 bg-dark rounded">
             <c-badge [color]="(selectedQueue?.AllowDuplicated || selectedQueue?.allowDuplicated) ? 'success' : 'danger'" shape="rounded-pill">
@@ -1125,6 +1191,7 @@
         <li><strong>QueueExpires</strong>: Queue expiration time in seconds (number >= 0, optional, default: 0)</li>
         <li><strong>AllowDuplicated</strong>: Allow duplicates (true/false, yes/no, 1/0, optional, default: true)</li>
         <li><strong>MaxAttempts</strong>: Maximum attempts (number > 0, optional, default: 1)</li>
+        <li><strong>MaxQueueSize</strong>: Maximum queue size (number >= 0, optional, default: 0 = unlimited)</li>
         <li><strong>PriorityType</strong>: Priority type (normal/fair, optional, default: normal)</li>
         <li><strong>MaxPriority</strong>: Maximum priority level (1-100, optional, default: 1)</li>
         <li><strong>PriorityThresholds</strong>: For fair priority, comma-separated values per priority (e.g., "10,20,30", optional, default: 0 for each priority)</li>

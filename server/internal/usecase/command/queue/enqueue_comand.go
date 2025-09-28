@@ -117,6 +117,12 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 			return *commandResult
 		}
 
+		// Check if queue has reached maximum size
+		if queue.MaxQueueSize > 0 && queue.MessagesCount >= queue.MaxQueueSize {
+			commandResult.Error = fmt.Sprintf("Queue '%s' has reached its maximum size (%d messages). Cannot enqueue new messages.", queue.Code, queue.MaxQueueSize)
+			return *commandResult
+		}
+
 		if queue.DesiredPriorityThresholds == nil {
 			commandResult.Error = fmt.Sprintf("Queue %s has no priority thresholds configured", queueID)
 			return *commandResult
