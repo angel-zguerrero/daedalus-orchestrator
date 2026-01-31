@@ -1,5 +1,10 @@
 # DaedalusOrchestrator 🧠⚙️
 
+
+# Install the necessary Angular and NX libraries
+
+npm install
+
 ## Building the Application
 
 The application uses Go modules for dependency management.
