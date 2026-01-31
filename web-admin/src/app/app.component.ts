@@ -9,9 +9,9 @@ import { IconSetService } from '@coreui/icons-angular';
 import { iconSubset } from './icons/icon-subset';
 
 @Component({
-    selector: 'app-root',
-    template: '<router-outlet />',
-    imports: [RouterOutlet]
+  selector: 'app-root',
+  template: '<router-outlet />',
+  imports: [RouterOutlet]
 })
 export class AppComponent implements OnInit {
   title = 'Daedalus Orchestrator';
@@ -30,6 +30,7 @@ export class AppComponent implements OnInit {
     this.#iconSetService.icons = { ...iconSubset };
     this.#colorModeService.localStorageItemName.set('daedalus-web-admin-theme-default');
     this.#colorModeService.eventName.set('ColorSchemeChange');
+    this.#colorModeService.colorMode.set('dark');
   }
 
   ngOnInit(): void {
@@ -49,17 +50,5 @@ export class AppComponent implements OnInit {
     ).subscribe((title: string) => {
       this.#titleService.setTitle(`Daedalus - ${title}`);
     });
-
-    this.#activatedRoute.queryParams
-      .pipe(
-        delay(1),
-        map(params => <string>params['theme']?.match(/^[A-Za-z0-9\s]+/)?.[0]),
-        filter(theme => ['dark', 'light', 'auto'].includes(theme)),
-        tap(theme => {
-          this.#colorModeService.colorMode.set(theme);
-        }),
-        takeUntilDestroyed(this.#destroyRef)
-      )
-      .subscribe();
   }
 }
