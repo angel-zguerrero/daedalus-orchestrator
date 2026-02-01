@@ -10,12 +10,12 @@ require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
-	github.com/linxGnu/grocksdb v1.9.9
+	github.com/linxGnu/grocksdb v1.10.7
 	github.com/lni/dragonboat/v4 v4.0.0-20240618143154-6a1623140f27
 	github.com/lni/goutils v1.4.0
 	github.com/rs/zerolog v1.34.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/ulule/limiter/v3 v3.11.2
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
 	go.opentelemetry.io/otel v1.35.0

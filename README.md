@@ -29,15 +29,18 @@ DaedalusOrchestrator can use RocksDB as an alternative storage backend. To enabl
 
 **Installation (macOS Example using Homebrew):**
 ```bash
+# Ensure you are installing a compatible version (tested with 10.9.1)
 brew install rocksdb
 ```
 For other operating systems, please refer to the official RocksDB installation documentation.
 
-Once RocksDB is installed, set the following environment variables (adjust paths if your installation differs):
+**Environment Configuration:**
+If you are running the application via `go run` or `go build` directly, you must set the following environment variables so CGO can find the RocksDB headers and libraries installed by Homebrew:
 ```bash
-export CGO_CFLAGS="-I/opt/homebrew/include"                # Or your RocksDB include path
-export CGO_LDFLAGS="-L/opt/homebrew/lib -lrocksdb"         # Or your RocksDB library path
+export CGO_CFLAGS="-I/opt/homebrew/include"
+export CGO_LDFLAGS="-L/opt/homebrew/lib -lrocksdb"
 ```
+*Note: If you use the NX commands (e.g., `nx run server:serve-rocksdb`), these variables are configured automatically.*
 
 Then, build the application with the `rocksdb` build tag:
 ```bash
@@ -200,6 +203,11 @@ nx run server:serve-admin
 * run only server:
 ```bash
 nx run server:serve
+```
+
+* run server with RocksDB engine:
+```bash
+nx run server:serve-rocksdb
 ```
 
 * build only web-admin:

@@ -3,7 +3,6 @@
   "name": "server",
   "projectType": "application",
   "sourceRoot": "server",
-  
   "targets": {
     "serve": {
       "executor": "nx:run-commands",
@@ -32,9 +31,13 @@
         "cwd": "server"
       }
     },
-     "serve-rocksdb": {
+    "serve-rocksdb": {
       "executor": "nx:run-commands",
       "options": {
+        "env": {
+          "CGO_CFLAGS": "-I/opt/homebrew/include",
+          "CGO_LDFLAGS": "-L/opt/homebrew/lib -lrocksdb"
+        },
         "commands": [
           {
             "command": "go run -tags rocksdb  cmd/main.go -master-db-engine=rocksdb -tenant-db-engine=rocksdb"
@@ -47,6 +50,10 @@
     "serve-rocksdb-admin": {
       "executor": "nx:run-commands",
       "options": {
+        "env": {
+          "CGO_CFLAGS": "-I/opt/homebrew/include",
+          "CGO_LDFLAGS": "-L/opt/homebrew/lib -lrocksdb"
+        },
         "commands": [
           {
             "command": "nx run daedalus-web-admin:build:development"
@@ -61,5 +68,3 @@
     }
   }
 }
-
-
