@@ -217,3 +217,30 @@ nx run daedalus-web-admin:build:development
 Tests:
 
 LOGGER_FORMAT=pretty go test -v  ./... 
+
+# Troubleshooting / Known Errors
+
+## "failed to lock data directory"
+
+**Error:**
+```
+FTL ❌ Staring node host error="failed to lock data directory" func=Run package=app
+exit status 1
+```
+
+**Cause:**
+This error occurs when a previous instance of the server did not shut down correctly and is still holding a lock on the data directory (e.g., `dragonboat-data-dir`).
+
+**Solution:**
+1.  **Find the zombie process:**
+    ```bash
+    ps aux | grep "go run"
+    # or
+    lsof | grep dragonboat
+    ```
+2.  **Kill the process:**
+    ```bash
+    kill -9 <PID>
+    ```
+    Replace `<PID>` with the process ID found in the previous step.
+3.  **Retry:** Run the start command again. 
