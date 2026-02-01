@@ -105,7 +105,7 @@ func resolveAngularDistPath(restServerConfing *common.ServerConfing) string {
 
 }
 
-// Start starts the Gin HTTP server for the Rest API.
+// Start starts the Gin HTTP server for the Rest API and the Web Admin.
 func (s *RestServer) Start() error {
 	if s.GinEngine == nil {
 		return fmt.Errorf("Rest API Gin engine not initialized")
@@ -113,6 +113,7 @@ func (s *RestServer) Start() error {
 
 	listenAddr := fmt.Sprintf("%s:%d", config.GlobalConfiguration.RestListenAddrHost, config.GlobalConfiguration.RestListenAddrPort)
 	s.Config.Logger.Info().Str("address", listenAddr).Msg("🚀 Starting Rest REST API server.")
+	s.Config.Logger.Info().Str("address", listenAddr+"/admin/").Msg("🚀 Starting Web Admin.")
 
 	s.Config.Server = &http.Server{
 		Addr:    listenAddr,
