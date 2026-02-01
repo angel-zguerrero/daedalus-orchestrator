@@ -27,6 +27,8 @@ func newTestPebbleStoreForEnqueue(t *testing.T, cfNames []string, ttlCfNames []s
 	require.NoError(t, err)
 	t.Logf("Creating Pebble store in: %s", tempDir)
 
+	// detailed fix for missing AdminFC in tests, some internal codes use it
+	cfNames = append(cfNames, db.AdminFC)
 	store, err := db.CreatePebbleStore(tempDir, cfNames, ttlCfNames)
 	require.NoError(t, err)
 	require.NotNil(t, store)
@@ -54,7 +56,7 @@ func setupTestQueueForEnqueue(t *testing.T, store db.KVStore, cf, cfs string, no
 		VNamespace:                "test-namespace",
 		State:                     models.QueueActive,
 		Type:                      models.StandardQueue,
-		DefaultQueueMessageTTL:                  3600,
+		DefaultQueueMessageTTL:    3600,
 		AllowDuplicated:           true,
 		MaxAttempts:               3,
 		MessagesCount:             0,
@@ -298,7 +300,7 @@ func testInactiveQueue_Pebble(t *testing.T) {
 		VNamespace:                "test-namespace",
 		State:                     models.QueueStopped, // Inactive
 		Type:                      models.StandardQueue,
-		DefaultQueueMessageTTL:                  3600,
+		DefaultQueueMessageTTL:    3600,
 		AllowDuplicated:           true,
 		MaxAttempts:               3,
 		MessagesCount:             0,
@@ -499,7 +501,7 @@ func testMultiQueueSupport_Pebble(t *testing.T) {
 		VNamespace:                "test-namespace",
 		State:                     models.QueueActive,
 		Type:                      models.StandardQueue,
-		DefaultQueueMessageTTL:                  3600,
+		DefaultQueueMessageTTL:    3600,
 		AllowDuplicated:           true,
 		MaxAttempts:               3,
 		MessagesCount:             0,
