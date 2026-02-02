@@ -90,6 +90,19 @@ func (app *Application) checkAndBalanceNodeSchedulers() {
 		return
 	}
 
+	// 3.1. If rebalancing is requested, transition to waiting
+	if state.Status == models.RequestForNewBalancing {
+		log.Info().Msg("🔄 Rebalancing requested. Transitioning to 'waiting-for-node-schedulers' to stabilize")
+
+		//check for node-schedulers to be stopped then:
+		// state.Status = models.WaitingForNodeSchedulers
+		// err = balancingBO.UpsertState(ctx, *state)
+		// if err != nil {
+		// 	log.Err(err).Msg("❌ Failed to update node scheduler balancing state to 'waiting-for-node-schedulers'")
+		// 	return
+		// }
+	}
+
 	// 4. If waiting, check node schedulers
 	if state.Status == models.WaitingForNodeSchedulers {
 		// Get all node schedulers to find the latest created one

@@ -10,6 +10,7 @@ type NodeSchedulerBalancingStatus string
 const (
 	WaitingForNodeSchedulers NodeSchedulerBalancingStatus = "waiting-for-node-schedulers"
 	Balanced                 NodeSchedulerBalancingStatus = "balanced"
+	RequestForNewBalancing   NodeSchedulerBalancingStatus = "request-for-new-balancing"
 )
 
 func init() {

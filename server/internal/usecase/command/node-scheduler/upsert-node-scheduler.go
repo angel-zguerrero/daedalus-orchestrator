@@ -48,6 +48,7 @@ func (cmd *UpsertNodeSchedulerCommand) Execute(uow *db.UnitOfWork, now time.Time
 
 		nodeScheduler.TTL = config.GlobalConfiguration.NodeSchedulerTTL * 60 // Convert minutes to seconds
 
+		var rebalanceNeeded bool
 		if existing != nil {
 			nodeScheduler.ID = existing.ID
 			nodeScheduler.Name = existing.Name
@@ -61,19 +62,37 @@ func (cmd *UpsertNodeSchedulerCommand) Execute(uow *db.UnitOfWork, now time.Time
 				nodeScheduler.ConnectionStatus = models.ConnectionStatusDisconnected
 			} else {
 				nodeScheduler.ConnectionStatus = models.ConnectionStatusConnected
+			}
 
+			// If status changed to disconnected, we need to rebalance
+			if existing.ConnectionStatus != models.ConnectionStatusDisconnected && nodeScheduler.ConnectionStatus == models.ConnectionStatusDisconnected {
+				rebalanceNeeded = true
 			}
 
 			_, err = exchangeRepo.UpdateNodeScheduler(&nodeScheduler, now)
 		} else {
 			nodeScheduler.ConnectionStatus = models.ConnectionStatusConnected
 			_, err = exchangeRepo.CreateNodeScheduler(&nodeScheduler, now)
+			// New node created, we need to rebalance
+			rebalanceNeeded = true
 		}
 
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
 		}
+
+		if rebalanceNeeded {
+			balancingRepo, err := db.NewNodeSchedulerBalancingRepository(uow, idFactory)
+			if err == nil {
+				state, err := balancingRepo.GetState(now)
+				if err == nil && state != nil && state.Status == models.Balanced {
+					state.Status = models.RequestForNewBalancing
+					_, _ = balancingRepo.UpsertState(state, now)
+				}
+			}
+		}
+
 		resultNodeSchedulers = append(resultNodeSchedulers, nodeScheduler)
 	}
 
