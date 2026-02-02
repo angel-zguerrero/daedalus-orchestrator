@@ -80,6 +80,9 @@ const ConfigTenantSummaryWorkerIntervalKey = "tenant_summary_worker_interval"
 // ConfigMaxHeadersKey is the key for the maximum number of headers setting in the configuration file.
 const ConfigMaxHeadersKey = "max_headers"
 
+// ConfigNodeSchedulerBalancingWaitTimeKey is the key for the node scheduler balancing wait time setting in the configuration file (in seconds).
+const ConfigNodeSchedulerBalancingWaitTimeKey = "node_scheduler_balancing_wait_time"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -167,6 +170,9 @@ const EnvVarTenantSummaryWorkerInterval = "TENANT_SUMMARY_WORKER_INTERVAL"
 // EnvVarMaxHeaders is the environment variable name for the maximum number of headers.
 const EnvVarMaxHeaders = "MAX_HEADERS"
 
+// EnvVarNodeSchedulerBalancingWaitTime is the environment variable name for the node scheduler balancing wait time (in seconds).
+const EnvVarNodeSchedulerBalancingWaitTime = "NODE_SCHEDULER_BALANCING_WAIT_TIME"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -244,3 +250,6 @@ const TenantSummaryWorkerIntervalFlagName = "tenant-summary-worker-interval"
 
 // MaxHeadersFlagName is the command-line flag name for the maximum number of headers.
 const MaxHeadersFlagName = "max-headers"
+
+// NodeSchedulerBalancingWaitTimeFlagName is the command-line flag name for the node scheduler balancing wait time (in seconds).
+const NodeSchedulerBalancingWaitTimeFlagName = "node-scheduler-balancing-wait-time"

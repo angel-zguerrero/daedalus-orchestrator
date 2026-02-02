@@ -60,6 +60,8 @@ type Config struct {
 	NodeSchedulerTTL int64
 	// TenantSummaryWorkerInterval specifies the interval for tenant summary worker in seconds. Minimum 10. Default 30.
 	TenantSummaryWorkerInterval int64
+	// NodeSchedulerBalancingWaitTime is the duration the system waits after the last node scheduler is created before balancing.
+	NodeSchedulerBalancingWaitTime time.Duration
 
 	// MaxHeaders specifies the maximum number of headers allowed. Minimum 5, maximum 1000. Default 100.
 	MaxHeaders int
@@ -74,29 +76,31 @@ type ConfigFromMap struct {
 	replica_id uint64
 	roles      string
 	// self_member_addr               string // Deprecated
-	self_member_host                 string
-	cluster_base_port                int
-	initial_members                  string
-	join                             bool
-	connector_port                   int
-	ttl_internal_error               uint64
-	default_root_user                string
-	default_root_password            string
-	master_db_engine                 string
-	tenant_db_engine                 string
-	rest_api_jwt_expiration_hours    int
-	rest_listen_addr_host            string
-	rest_listen_addr_port            int
-	rest_api_jwt_secret              string
-	api_raft_timeout                 int64 // Timeout in seconds
-	max_shards                       int
-	max_column_families              int
-	grpc_server_listen_addr_host     string
-	grpc_server_listen_addr_port     int
-	node_scheduler_heartbeat_timeout int64 // Timeout in seconds
-	node_scheduler_ttl               int64 // TTL in minutes
-	tenant_summary_worker_interval   int64 // Interval in seconds
-	max_headers                      int   // Maximum number of headers
+	self_member_host                   string
+	cluster_base_port                  int
+	initial_members                    string
+	join                               bool
+	connector_port                     int
+	ttl_internal_error                 uint64
+	default_root_user                  string
+	default_root_password              string
+	master_db_engine                   string
+	tenant_db_engine                   string
+	rest_api_jwt_expiration_hours      int
+	rest_listen_addr_host              string
+	rest_listen_addr_port              int
+	rest_api_jwt_secret                string
+	api_raft_timeout                   int64 // Timeout in seconds
+	max_shards                         int
+	max_column_families                int
+	grpc_server_listen_addr_host       string
+	grpc_server_listen_addr_port       int
+	node_scheduler_heartbeat_timeout   int64 // Timeout in seconds
+	node_scheduler_ttl                 int64 // TTL in minutes
+	tenant_summary_worker_interval     int64 // Interval in seconds
+	max_headers                        int   // Maximum number of headers
+	node_scheduler_balancing_wait_time int64 // Wait time in seconds
+
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -112,29 +116,31 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		ReplicaID: configFromMapInstance.replica_id,
 		Roles:     configFromMapInstance.roles,
 		// SelfMemberAddr:             configFromMapInstance.self_member_addr, // Deprecated
-		SelfMemberHost:                configFromMapInstance.self_member_host,
-		ClusterBasePort:               configFromMapInstance.cluster_base_port,
-		InitialMembers:                configFromMapInstance.initial_members,
-		Join:                          configFromMapInstance.join,
-		ConnectorPort:                 configFromMapInstance.connector_port,
-		TTLInternalError:              configFromMapInstance.ttl_internal_error,
-		DefaultRootUser:               configFromMapInstance.default_root_user,
-		DefaultRootPassword:           configFromMapInstance.default_root_password,
-		MasterDBEngine:                configFromMapInstance.master_db_engine,
-		TenantDBEngine:                configFromMapInstance.tenant_db_engine,
-		RestAPIJWTExpirationHours:     configFromMapInstance.rest_api_jwt_expiration_hours,
-		RestListenAddrHost:            configFromMapInstance.rest_listen_addr_host,
-		RestListenAddrPort:            configFromMapInstance.rest_listen_addr_port,
-		RestAPIJWTSecret:              configFromMapInstance.rest_api_jwt_secret,
-		ApiRaftTimeout:                time.Duration(configFromMapInstance.api_raft_timeout) * time.Second,
-		MaxShards:                     configFromMapInstance.max_shards,
-		MaxColumnFamilies:             configFromMapInstance.max_column_families,
-		GrpcServerListenAddrHost:      configFromMapInstance.grpc_server_listen_addr_host,
-		GrpcServerListenAddrPort:      configFromMapInstance.grpc_server_listen_addr_port,
-		NodeSchedulerHeartbeatTimeout: time.Duration(configFromMapInstance.node_scheduler_heartbeat_timeout) * time.Second,
-		NodeSchedulerTTL:              configFromMapInstance.node_scheduler_ttl,
-		TenantSummaryWorkerInterval:   configFromMapInstance.tenant_summary_worker_interval,
-		MaxHeaders:                    configFromMapInstance.max_headers,
+		SelfMemberHost:                 configFromMapInstance.self_member_host,
+		ClusterBasePort:                configFromMapInstance.cluster_base_port,
+		InitialMembers:                 configFromMapInstance.initial_members,
+		Join:                           configFromMapInstance.join,
+		ConnectorPort:                  configFromMapInstance.connector_port,
+		TTLInternalError:               configFromMapInstance.ttl_internal_error,
+		DefaultRootUser:                configFromMapInstance.default_root_user,
+		DefaultRootPassword:            configFromMapInstance.default_root_password,
+		MasterDBEngine:                 configFromMapInstance.master_db_engine,
+		TenantDBEngine:                 configFromMapInstance.tenant_db_engine,
+		RestAPIJWTExpirationHours:      configFromMapInstance.rest_api_jwt_expiration_hours,
+		RestListenAddrHost:             configFromMapInstance.rest_listen_addr_host,
+		RestListenAddrPort:             configFromMapInstance.rest_listen_addr_port,
+		RestAPIJWTSecret:               configFromMapInstance.rest_api_jwt_secret,
+		ApiRaftTimeout:                 time.Duration(configFromMapInstance.api_raft_timeout) * time.Second,
+		MaxShards:                      configFromMapInstance.max_shards,
+		MaxColumnFamilies:              configFromMapInstance.max_column_families,
+		GrpcServerListenAddrHost:       configFromMapInstance.grpc_server_listen_addr_host,
+		GrpcServerListenAddrPort:       configFromMapInstance.grpc_server_listen_addr_port,
+		NodeSchedulerHeartbeatTimeout:  time.Duration(configFromMapInstance.node_scheduler_heartbeat_timeout) * time.Second,
+		NodeSchedulerTTL:               configFromMapInstance.node_scheduler_ttl,
+		TenantSummaryWorkerInterval:    configFromMapInstance.tenant_summary_worker_interval,
+		MaxHeaders:                     configFromMapInstance.max_headers,
+		NodeSchedulerBalancingWaitTime: time.Duration(configFromMapInstance.node_scheduler_balancing_wait_time) * time.Second,
+
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
 		// after considering flags and env vars. We need to pass the raw string from the config file if present.
 		// However, the Config struct doesn't store the raw string.

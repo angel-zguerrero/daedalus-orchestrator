@@ -43,6 +43,8 @@ Available Flags:
   --node-scheduler-ttl         TTL for node scheduler entries in minutes. Minimum 60. Default 1440. Overrides config file and environment variable.
   --tenant-summary-worker-interval  Interval for tenant summary worker in seconds. Minimum 10. Default 30. Overrides config file and environment variable.
   --max-headers                Maximum number of headers. Default 100, minimum 5, maximum 1000. Overrides config file and environment variable.
+  --node-scheduler-balancing-wait-time  Wait time after the last node scheduler is created before balancing (in seconds). Minimum 10. Default 30. Overrides config file and environment variable.
+
 
 Environment Variables:
   CONFIG_PATH                  Path to the configuration file.
@@ -72,6 +74,8 @@ Environment Variables:
   NODE_SCHEDULER_TTL          TTL for node scheduler entries in minutes. (Corresponds to ` + constants.EnvVarNodeSchedulerTTL + `)
   TENANT_SUMMARY_WORKER_INTERVAL  Interval for tenant summary worker in seconds. (Corresponds to ` + constants.EnvVarTenantSummaryWorkerInterval + `)
   MAX_HEADERS                 Maximum number of headers. (Corresponds to ` + constants.EnvVarMaxHeaders + `)
+  NODE_SCHEDULER_BALANCING_WAIT_TIME Wait time after last node scheduler is created (in seconds). (Corresponds to ` + constants.EnvVarNodeSchedulerBalancingWaitTime + `)
+
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
   OTEL_TRACER_SERVICE_NAME     OpenTelemetry service name.
@@ -107,6 +111,8 @@ Configuration File:
     node_scheduler_ttl            TTL for node scheduler entries in minutes.
     tenant_summary_worker_interval  Interval for tenant summary worker in seconds.
     max_headers                   Maximum number of headers.
+    node_scheduler_balancing_wait_time Wait time after last node scheduler is created in seconds.
+
 
 Precedence of Configuration:
   The configuration is loaded in the following order of precedence (highest to lowest):
@@ -204,6 +210,9 @@ var TenantSummaryWorkerIntervalFlag = flag.Int64(constants.TenantSummaryWorkerIn
 
 // MaxHeadersFlag defines the --max-headers command-line flag for specifying the maximum number of headers.
 var MaxHeadersFlag = flag.Int(constants.MaxHeadersFlagName, 0, "Maximum number of headers (default 100, minimum 5, maximum 1000). Overrides config file and environment variable.")
+
+// NodeSchedulerBalancingWaitTimeFlag defines the --node-scheduler-balancing-wait-time command-line flag.
+var NodeSchedulerBalancingWaitTimeFlag = flag.Int64(constants.NodeSchedulerBalancingWaitTimeFlagName, 30, "Wait time after the last node scheduler is created before balancing (in seconds). Minimum 10. Overrides config file and environment variable.")
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -435,6 +444,13 @@ func LoadDefaultConfiguration() error {
 		}
 		config.MaxHeaders = maxHeaders
 	}
+	if envVal := os.Getenv(constants.EnvVarNodeSchedulerBalancingWaitTime); envVal != "" {
+		waitTime, err := strconv.ParseInt(envVal, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarNodeSchedulerBalancingWaitTime, err)
+		}
+		config.NodeSchedulerBalancingWaitTime = time.Duration(waitTime) * time.Second
+	}
 
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
@@ -521,6 +537,9 @@ func LoadDefaultConfiguration() error {
 	if *MaxHeadersFlag != 0 {
 		config.MaxHeaders = *MaxHeadersFlag
 	}
+	if *NodeSchedulerBalancingWaitTimeFlag != 30 { // Only override if different from default
+		config.NodeSchedulerBalancingWaitTime = time.Duration(*NodeSchedulerBalancingWaitTimeFlag) * time.Second
+	}
 
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
@@ -591,6 +610,13 @@ func LoadDefaultConfiguration() error {
 	if config.MaxHeaders > 1000 {
 		log.Warn().Msgf("MaxHeaders (%d) exceeds maximum 1000. Setting to 1000.", config.MaxHeaders)
 		config.MaxHeaders = 1000
+	}
+	if config.NodeSchedulerBalancingWaitTime == 0 {
+		config.NodeSchedulerBalancingWaitTime = 30 * time.Second // Default to 30 seconds
+	}
+	if config.NodeSchedulerBalancingWaitTime < 10*time.Second {
+		log.Warn().Msgf("NodeSchedulerBalancingWaitTime (%v) is less than minimum 10 seconds. Setting to 10 seconds.", config.NodeSchedulerBalancingWaitTime)
+		config.NodeSchedulerBalancingWaitTime = 10 * time.Second
 	}
 
 	// Default for ApiRaftTimeout if not set by file, env, or flag (flag itself has a default of 5s)
@@ -899,6 +925,13 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.max_headers = p
+		case constants.ConfigNodeSchedulerBalancingWaitTimeKey:
+			w, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.node_scheduler_balancing_wait_time = w
+
 		}
 	}
 

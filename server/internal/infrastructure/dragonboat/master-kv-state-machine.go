@@ -50,6 +50,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return findNodeSchedulerCommand.Execute(uow, now)
 	}
 
+	getNodeSchedulerBalancingStateCommand, ok := input.(node_scheduler_command.GetNodeSchedulerBalancingStateCommand)
+	if ok {
+		return getNodeSchedulerBalancingStateCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 
@@ -105,6 +110,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	deleteNodeSchedulerCommand, ok := cmd.(node_scheduler_command.DeleteNodeSchedulerCommand)
 	if ok {
 		return deleteNodeSchedulerCommand.Execute(uow, now)
+	}
+
+	upsertNodeSchedulerBalancingStateCommand, ok := cmd.(node_scheduler_command.UpsertNodeSchedulerBalancingStateCommand)
+	if ok {
+		return upsertNodeSchedulerBalancingStateCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
