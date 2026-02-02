@@ -64,7 +64,7 @@ type Application struct {
 	GrpcAPI                           *grpc_server.GrpcServer
 	NodeReadyWatcherStopper           *syncutil.Stopper
 	NodeClearExpiredTTLStopper        *syncutil.Stopper
-	NodeSchedulerHeartbeatStopper     *syncutil.Stopper
+	NodeSchedulerProcessStopper       *syncutil.Stopper
 	AssignTenantsStopper              *syncutil.Stopper
 	TenantSummaryWorkerStopper        *syncutil.Stopper
 	NodeSchedulerBalancingStopper     *syncutil.Stopper
@@ -233,7 +233,7 @@ func (app *Application) Run() {
 
 	app.StartNodeClearExpiredTTLWorker(1*time.Minute, 10)
 
-	app.StartNodeSchedulerHeartbeatWorker(10 * time.Second)
+	app.StartNodeSchedulerProcessWorkers(10 * time.Second)
 
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
@@ -318,12 +318,12 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ NodeClearExpiredTTLStopper stopped.")
 	}()
 
-	// Stop NodeSchedulerHeartbeat Worker
+	// Stop NodeSchedulerProcess Worker
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		app.NodeSchedulerHeartbeatStopper.Stop()
-		log.Info().Msg("✅ NodeSchedulerHeartbeatStopper stopped.")
+		app.NodeSchedulerProcessStopper.Stop()
+		log.Info().Msg("✅ NodeSchedulerProcessStopper stopped.")
 	}()
 
 	// Stop Assign Tenants Worker
@@ -385,7 +385,7 @@ func NewApplication() *Application {
 		RestAPI:                           nil,
 		NodeReadyWatcherStopper:           syncutil.NewStopper(),
 		NodeClearExpiredTTLStopper:        syncutil.NewStopper(),
-		NodeSchedulerHeartbeatStopper:     syncutil.NewStopper(),
+		NodeSchedulerProcessStopper:       syncutil.NewStopper(),
 		AssignTenantsStopper:              syncutil.NewStopper(),
 		TenantSummaryWorkerStopper:        syncutil.NewStopper(),
 		NodeSchedulerBalancingStopper:     syncutil.NewStopper(),

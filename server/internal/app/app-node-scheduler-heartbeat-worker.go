@@ -14,43 +14,55 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (app *Application) StartNodeSchedulerHeartbeatWorker(interval time.Duration) {
-	app.NodeSchedulerHeartbeatStopper.RunWorker(func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
+func (app *Application) StartNodeSchedulerProcessWorkers(interval time.Duration) {
+	for i := range app.TenantNodes {
+		index := i
+		app.NodeSchedulerProcessStopper.RunWorker(func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
 
-		for {
-			select {
-			case <-ticker.C:
-				if !app.MasterNodeIsReady {
-					log.Debug().Msg("⏳ NodeScheduler heartbeat is waiting for the master node to be ready")
-					continue
-				}
-
-				if !dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleScheduler) {
-					continue
-				}
-
+			for {
 				select {
-				case <-app.NodeSchedulerHeartbeatStopper.ShouldStop():
-					log.Info().Msg("🛑 NodeScheduler heartbeat received stop signal before execution")
+				case <-ticker.C:
+					if !app.MasterNodeIsReady {
+						log.Debug().Int("index", index).Msg("⏳ NodeScheduler process is waiting for the master node to be ready")
+						continue
+					}
+
+					if !dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleScheduler) {
+						continue
+					}
+
+					select {
+					case <-app.NodeSchedulerProcessStopper.ShouldStop():
+						log.Info().Int("index", index).Msg("🛑 NodeScheduler process received stop signal before execution")
+						return
+					default:
+					}
+
+					go func() {
+						app.sendNodeSchedulerHeartbeat(index)
+					}()
+
+					go func() {
+						app.processNodeSchedulerTasks(index)
+					}()
+
+				case <-app.NodeSchedulerProcessStopper.ShouldStop():
+					log.Info().Int("index", index).Msg("ℹ️  NodeScheduler process worker stopped gracefully")
 					return
-				default:
 				}
-
-				go func() {
-					app.sendNodeSchedulerHeartbeat()
-				}()
-
-			case <-app.NodeSchedulerHeartbeatStopper.ShouldStop():
-				log.Info().Msg("ℹ️  NodeScheduler heartbeat worker stopped gracefully")
-				return
 			}
-		}
-	})
+		})
+	}
 }
 
-func (app *Application) sendNodeSchedulerHeartbeat() {
+func (app *Application) processNodeSchedulerTasks(index int) {
+	// Placeholder for task review logic
+	log.Debug().Int("index", index).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
+}
+
+func (app *Application) sendNodeSchedulerHeartbeat(index int) {
 	// Get the hostname to use as the node scheduler name
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -61,8 +73,8 @@ func (app *Application) sendNodeSchedulerHeartbeat() {
 	// Get the process ID
 	pid := os.Getpid()
 
-	// Concatenate hostname with process ID
-	nodeSchedulerName := fmt.Sprintf("%s-%d", hostname, pid)
+	// Concatenate hostname with process ID and index
+	nodeSchedulerName := fmt.Sprintf("%s-%d-%d", hostname, pid, index)
 
 	// Create server configuration for the business logic
 	serverConfig := &common.ServerConfing{
