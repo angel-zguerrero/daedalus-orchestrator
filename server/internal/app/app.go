@@ -54,20 +54,19 @@ import (
 // These components might be integrated in future versions of the application.
 
 type Application struct {
-	MasterNodeIsReady                 bool
-	MasterNodeIsLeader                bool
-	NodeSchedulerBalancingInitialized bool
-	MasterNode                        *dragonboat.RaftNode
-	TenantNodes                       []*dragonboat.RaftNode
-	TenantNodesDictionary             map[string]*dragonboat.RaftNode
-	RestAPI                           *rest_server.RestServer
-	GrpcAPI                           *grpc_server.GrpcServer
-	NodeReadyWatcherStopper           *syncutil.Stopper
-	NodeClearExpiredTTLStopper        *syncutil.Stopper
-	NodeSchedulerProcessStopper       *syncutil.Stopper
-	AssignTenantsStopper              *syncutil.Stopper
-	TenantSummaryWorkerStopper        *syncutil.Stopper
-	NodeSchedulerBalancingStopper     *syncutil.Stopper
+	MasterNodeIsReady             bool
+	MasterNodeIsLeader            bool
+	MasterNode                    *dragonboat.RaftNode
+	TenantNodes                   []*dragonboat.RaftNode
+	TenantNodesDictionary         map[string]*dragonboat.RaftNode
+	RestAPI                       *rest_server.RestServer
+	GrpcAPI                       *grpc_server.GrpcServer
+	NodeReadyWatcherStopper       *syncutil.Stopper
+	NodeClearExpiredTTLStopper    *syncutil.Stopper
+	NodeSchedulerProcessStopper   *syncutil.Stopper
+	AssignTenantsStopper          *syncutil.Stopper
+	TenantSummaryWorkerStopper    *syncutil.Stopper
+	NodeSchedulerBalancingStopper *syncutil.Stopper
 
 	ApiLock  sync.Mutex
 	GrpcLock sync.Mutex
@@ -379,16 +378,15 @@ func (app *Application) Stop() {
 
 func NewApplication() *Application {
 	return &Application{
-		MasterNodeIsReady:                 false,
-		NodeSchedulerBalancingInitialized: false,
-		MasterNode:                        nil,
-		RestAPI:                           nil,
-		NodeReadyWatcherStopper:           syncutil.NewStopper(),
-		NodeClearExpiredTTLStopper:        syncutil.NewStopper(),
-		NodeSchedulerProcessStopper:       syncutil.NewStopper(),
-		AssignTenantsStopper:              syncutil.NewStopper(),
-		TenantSummaryWorkerStopper:        syncutil.NewStopper(),
-		NodeSchedulerBalancingStopper:     syncutil.NewStopper(),
+		MasterNodeIsReady:             false,
+		MasterNode:                    nil,
+		RestAPI:                       nil,
+		NodeReadyWatcherStopper:       syncutil.NewStopper(),
+		NodeClearExpiredTTLStopper:    syncutil.NewStopper(),
+		NodeSchedulerProcessStopper:   syncutil.NewStopper(),
+		AssignTenantsStopper:          syncutil.NewStopper(),
+		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
+		NodeSchedulerBalancingStopper: syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary: make(map[string]*dragonboat.RaftNode),

@@ -8,6 +8,9 @@ import (
 	"deadalus-orch/shared/models"
 	"time"
 
+	"strings"
+
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -46,6 +49,11 @@ func (app *Application) StartNodeSchedulerBalancingWorker(interval time.Duration
 	})
 }
 
+// generateUUID returns a new UUID string without dashes
+func generateUUID() string {
+	return strings.ReplaceAll(uuid.New().String(), "-", "")
+}
+
 func (app *Application) checkAndBalanceNodeSchedulers() {
 	serverConfig := &common.ServerConfing{
 		Logger:     log.Logger,
@@ -58,31 +66,27 @@ func (app *Application) checkAndBalanceNodeSchedulers() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// 1. One-time initialization per execution
-	if !app.NodeSchedulerBalancingInitialized {
-		log.Info().Msg("🆕 Initializing node scheduler balancing state as 'waiting-for-node-schedulers' for this execution")
-		initialState := models.NodeSchedulerBalancingState{
-			ID:     models.NodeSchedulerBalancingStateID,
-			Status: models.WaitingForNodeSchedulers,
-		}
-		err := balancingBO.UpsertState(ctx, initialState)
-		if err != nil {
-			log.Err(err).Msg("❌ Failed to initialize node scheduler balancing state")
-			return
-		}
-		app.NodeSchedulerBalancingInitialized = true
-	}
-
-	// 2. Get current state
+	// 1. Get current state
 	state, err := balancingBO.GetState(ctx)
 	if err != nil {
 		log.Err(err).Msg("❌ Failed to get node scheduler balancing state")
 		return
 	}
 
+	// 2. Initialize if it doesn't exist
 	if state == nil || state.ID == "" {
-		log.Warn().Msg("⚠️ Node scheduler balancing state is missing after initialization")
-		return
+		log.Info().Msg("🆕 Node scheduler balancing state not found, creating initial state 'waiting-for-node-schedulers'")
+		initialState := models.NodeSchedulerBalancingState{
+			ID:          models.NodeSchedulerBalancingStateID,
+			BalancingId: generateUUID(),
+			Status:      models.WaitingForNodeSchedulers,
+		}
+		err := balancingBO.UpsertState(ctx, initialState)
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to initialize node scheduler balancing state")
+			return
+		}
+		state = &initialState
 	}
 
 	// 3. If balanced, we are done

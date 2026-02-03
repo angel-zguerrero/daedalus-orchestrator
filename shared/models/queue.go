@@ -46,6 +46,8 @@ type Queue struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
+
+	NodeSchedulerSupervisorId string
 }
 
 func (Queue) TableName() string {

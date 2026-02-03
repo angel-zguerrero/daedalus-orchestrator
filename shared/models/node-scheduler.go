@@ -9,6 +9,13 @@ const (
 	ConnectionStatusDisconnected ConnectionStatus = "disconnected"
 )
 
+type NodeSchedulerRunningStatus string
+
+const (
+	NodeSchedulerRunningStatusRunning NodeSchedulerRunningStatus = "running"
+	NodeSchedulerRunningStatusStopped NodeSchedulerRunningStatus = "stopped"
+)
+
 type NodeScheduler struct {
 	ID   string `orm:"primary-key"`
 	Name string `orm:"unique"`
@@ -16,6 +23,8 @@ type NodeScheduler struct {
 	TTL int64 `orm:"ttl"`
 
 	LastHeartbeat time.Time
+	BalancingId   string
+	RunningStatus NodeSchedulerRunningStatus
 
 	Information map[string]string `orm:"data-only"`
 
