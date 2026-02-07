@@ -2,6 +2,7 @@ package business_logic
 
 import (
 	"context"
+	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"deadalus-orch/server/internal/pkg/config"
@@ -55,43 +56,181 @@ func (bo *NodeSchedulerBalancingBO) UpsertState(ctx context.Context, state model
 	return err
 }
 
-func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers() error {
+func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonboat.RaftNode) error {
 	nodeSchedulerBO := NewNodeSchedulerBO(bo.Config)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	queueBO := NewQueueBO(bo.Config)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-
-	pageSize := 100
-	cursor := ""
-	connectedCount := 0
-	totalCount := 0
 
 	bo.Config.Logger.Info().Msg("⚖️ Starting Node Scheduler balancing process...")
 
-	for {
-		findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", cursor, pageSize)
-		if err != nil {
-			return fmt.Errorf("failed to fetch node schedulers: %w", err)
-		}
+	// Iterate through each TenantNode
+	for tenantNodeIndex, tenantNode := range tenantNodes {
+		bo.Config.Logger.Info().
+			Int("tenantNodeIndex", tenantNodeIndex).
+			Uint64("shardID", tenantNode.ShardID).
+			Msg("⚖️ Processing TenantNode")
 
-		totalCount += len(findResult.Entities)
-		for _, ns := range findResult.Entities {
-			if ns.ConnectionStatus == models.ConnectionStatusConnected {
-				connectedCount++
+		// Get NodeSchedulers assigned to this TenantNode
+		query := fmt.Sprintf("AssignedTenantNodeIndex = %d", tenantNodeIndex)
+		nodeSchedulersCursor := ""
+		nodeSchedulersPageSize := 100
+		var assignedNodeSchedulers []models.NodeScheduler
+
+		for {
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, query, nodeSchedulersCursor, nodeSchedulersPageSize)
+			if err != nil {
+				return fmt.Errorf("failed to fetch node schedulers for TenantNode %d: %w", tenantNodeIndex, err)
 			}
+
+			assignedNodeSchedulers = append(assignedNodeSchedulers, findResult.Entities...)
+
+			if findResult.Cursor == "" || len(findResult.Entities) < nodeSchedulersPageSize {
+				break
+			}
+			nodeSchedulersCursor = findResult.Cursor
 		}
 
-		if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
-			break
+		nodeSchedulerCount := len(assignedNodeSchedulers)
+		if nodeSchedulerCount == 0 {
+			bo.Config.Logger.Warn().
+				Int("tenantNodeIndex", tenantNodeIndex).
+				Msg("⚠️ No NodeSchedulers assigned to this TenantNode, skipping")
+			continue
 		}
-		cursor = findResult.Cursor
+
+		bo.Config.Logger.Info().
+			Int("tenantNodeIndex", tenantNodeIndex).
+			Int("nodeSchedulerCount", nodeSchedulerCount).
+			Msg("⚖️ Found NodeSchedulers for TenantNode")
+
+		// Calculate dynamic page size for queues based on NodeScheduler count
+		// We want to distribute queues evenly, so we fetch in batches that are multiples of nodeSchedulerCount
+		queuesPageSize := nodeSchedulerCount * 10 // Fetch 10 queues per NodeScheduler at a time
+		if queuesPageSize > 1000 {
+			queuesPageSize = 1000 // Cap at reasonable limit
+		}
+
+		queuesCursor := ""
+		totalQueuesProcessed := 0
+		nodeSchedulerIndex := 0
+
+		// First, get all tenants to iterate through them
+		tenantBO := NewTenantBO(bo.Config)
+		tenantsCursor := ""
+		tenantsPageSize := 100
+
+		// Paginate through all tenants
+		for {
+			tenantsResult, err := tenantBO.GetTenants(ctx, "", tenantsCursor, tenantsPageSize)
+			if err != nil {
+				return fmt.Errorf("failed to fetch tenants for TenantNode %d: %w", tenantNodeIndex, err)
+			}
+
+			if len(tenantsResult.Entities) == 0 {
+				break
+			}
+
+			// For each tenant, fetch and distribute its queues
+			for _, tenant := range tenantsResult.Entities {
+				// Skip if tenant is not assigned to this TenantNode
+				if tenant.ShardId != int(tenantNode.ShardID) {
+					continue
+				}
+
+				// Calculate cf and cfs for this tenant
+				cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
+				cfs := tenant.ID
+
+				bo.Config.Logger.Debug().
+					Str("tenantId", tenant.ID).
+					Str("cf", cf).
+					Str("cfs", cfs).
+					Int("tenantNodeIndex", tenantNodeIndex).
+					Msg("⚖️ Processing tenant queues")
+
+				// Paginate through all queues for this tenant
+				queuesCursor = ""
+				for {
+					findResult, err := queueBO.GetQueues(ctx, "", queuesCursor, queuesPageSize, "", false, cf, cfs, &tenant, tenantNode)
+					if err != nil {
+						bo.Config.Logger.Warn().
+							Err(err).
+							Str("tenantId", tenant.ID).
+							Int("tenantNodeIndex", tenantNodeIndex).
+							Msg("⚠️ Failed to fetch queues for tenant, skipping")
+						break
+					}
+
+					if len(findResult.Entities) == 0 {
+						break
+					}
+
+					// Distribute queues among NodeSchedulers in round-robin fashion
+					var queuesToUpdate []models.Queue
+					for _, queue := range findResult.Entities {
+						// Assign NodeSchedulerSupervisorId in round-robin
+						assignedNodeScheduler := assignedNodeSchedulers[nodeSchedulerIndex%nodeSchedulerCount]
+						queue.NodeSchedulerSupervisorId = assignedNodeScheduler.ID
+						queuesToUpdate = append(queuesToUpdate, queue)
+
+						nodeSchedulerIndex++
+					}
+
+					// Bulk update the queues
+					if len(queuesToUpdate) > 0 {
+						_, err = queueBO.BulkUpdateQueues(ctx, queuesToUpdate, cf, cfs, tenantNode)
+						if err != nil {
+							bo.Config.Logger.Warn().
+								Err(err).
+								Str("tenantId", tenant.ID).
+								Int("tenantNodeIndex", tenantNodeIndex).
+								Msg("⚠️ Failed to update queues for tenant, skipping")
+							break
+						}
+						totalQueuesProcessed += len(queuesToUpdate)
+					}
+
+					if findResult.Cursor == "" || len(findResult.Entities) < queuesPageSize {
+						break
+					}
+					queuesCursor = findResult.Cursor
+				}
+			}
+
+			if tenantsResult.Cursor == "" || len(tenantsResult.Entities) < tenantsPageSize {
+				break
+			}
+			tenantsCursor = tenantsResult.Cursor
+		}
+
+		bo.Config.Logger.Info().
+			Int("tenantNodeIndex", tenantNodeIndex).
+			Int("totalQueuesProcessed", totalQueuesProcessed).
+			Int("nodeSchedulerCount", nodeSchedulerCount).
+			Msg("⚖️ Queues distributed among NodeSchedulers")
+
+		// Update all NodeSchedulers to running status
+		var nodeSchedulersToUpdate []*models.NodeScheduler
+		for i := range assignedNodeSchedulers {
+			ns := assignedNodeSchedulers[i]
+			ns.RunningStatus = models.NodeSchedulerRunningStatusRunning
+			nodeSchedulersToUpdate = append(nodeSchedulersToUpdate, &ns)
+		}
+
+		if len(nodeSchedulersToUpdate) > 0 {
+			_, err := nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, nodeSchedulersToUpdate)
+			if err != nil {
+				return fmt.Errorf("failed to update NodeSchedulers status for TenantNode %d: %w", tenantNodeIndex, err)
+			}
+
+			bo.Config.Logger.Info().
+				Int("tenantNodeIndex", tenantNodeIndex).
+				Int("count", len(nodeSchedulersToUpdate)).
+				Msg("✅ NodeSchedulers set to running status")
+		}
 	}
 
-	bo.Config.Logger.Info().
-		Int("connected", connectedCount).
-		Int("total", totalCount).
-		Msg("⚖️ Node Schedulers balancing summary")
-
-	fmt.Printf("Connected Node Schedulers: %d\n", connectedCount)
-
+	bo.Config.Logger.Info().Msg("✅ Node Scheduler balancing completed successfully")
 	return nil
 }

@@ -293,3 +293,29 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 
 	return "", fmt.Errorf("no message was created")
 }
+
+func (bo *QueueBO) BulkUpdateQueues(ctx context.Context, queues []models.Queue, cf, cfs string, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
+	if len(queues) == 0 {
+		return nil, errors.New("no queues provided")
+	}
+
+	assignNodeSchedulerToQueuesCommand := &queue_command.AssignNodeSchedulerToQueuesCommand{
+		Queues: queues,
+		CF:     cf,
+		CFS:    cfs,
+	}
+
+	updated, err := dragonboat.ExecuteRepositoryCommand[[]models.Queue](
+		tenantNode,
+		ctx,
+		assignNodeSchedulerToQueuesCommand,
+		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queues)),
+		bo.Config.Logger,
+		"bulk update queues",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return updated, nil
+}

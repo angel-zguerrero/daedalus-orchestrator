@@ -3,15 +3,15 @@ import { CommonModule, AsyncPipe } from '@angular/common';
 import { QueuesService } from '../services/queues.service';
 import { ExchangesService } from '../services/exchanges.service';
 import { VNamespacesService } from '../services/vnamespaces.service';
-import { 
-  TableModule, 
-  UtilitiesModule, 
-  ButtonModule, 
-  ModalModule, 
-  CardModule, 
-  FormModule, 
-  GridModule, 
-  AlertComponent, 
+import {
+  TableModule,
+  UtilitiesModule,
+  ButtonModule,
+  ModalModule,
+  CardModule,
+  FormModule,
+  GridModule,
+  AlertComponent,
   SpinnerComponent,
   BadgeComponent,
   ProgressModule
@@ -89,7 +89,7 @@ interface Exchange {
 })
 export class QueuesComponent implements OnInit {
   @Input() tenantCode: string = '';
-  
+
   queues: Queue[] = [];
   exchanges: Exchange[] = [];
   filteredExchanges: Exchange[] = [];
@@ -280,7 +280,7 @@ export class QueuesComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
-    
+
     this.queuesService.getQueues(this.tenantCode, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter, true).subscribe({
       next: (response) => {
         this.queues = response.result.Entities || [];
@@ -326,7 +326,7 @@ export class QueuesComponent implements OnInit {
   openCreateModal(): void {
     this.createModalVisible = true;
     this.queueForm.reset();
-    this.queueForm.patchValue({ 
+    this.queueForm.patchValue({
       type: 'standard',
       defaultQueueMessageTTL: 0,
       defaultQueueMessageDelayTime: 0,
@@ -346,7 +346,7 @@ export class QueuesComponent implements OnInit {
     this.queueHeaderKey = '';
     this.queueHeaderValue = '';
     this.showAlert = false;
-    
+
     // Reload exchanges to make sure they're available
     this.loadValidExchanges();
   }
@@ -354,13 +354,13 @@ export class QueuesComponent implements OnInit {
   openEditModal(queue: any): void {
     this.selectedQueue = queue;
     this.queueFormUpdate.reset();
-    
+
     // Calculate the correct priority type based on thresholds
     const calculatedPriorityType = this.getCalculatedPriorityType(queue);
-    
+
     // Calculate the actual max priority from the queue data
     const actualMaxPriority = this.getCalculatedMaxPriorityLevels(queue);
-    
+
     // Set current values
     this.queueFormUpdate.patchValue({
       name: queue.Name,
@@ -375,11 +375,11 @@ export class QueuesComponent implements OnInit {
       deadLetterExchangeId: queue.DeadLetterExchangeId || '',
       deadLetterExchangeRoutingKeyOrPattern: queue.DeadLetterExchangeRoutingKeyOrPattern || ''
     });
-    
+
     // Set update priority management state
     this.updatePriorityType = calculatedPriorityType;
     this.updateMaxPriority = actualMaxPriority;
-    
+
     // Set priority thresholds if they exist
     if (queue.DesiredPriorityThresholds && this.updatePriorityType === 'fair') {
       this.editDesiredPriorityThresholds = this.getPriorityThresholdsArray(queue.DesiredPriorityThresholds);
@@ -392,7 +392,7 @@ export class QueuesComponent implements OnInit {
     } else {
       this.editDesiredPriorityThresholds = [];
     }
-    
+
     // Load existing headers
     this.queueHeaders = [];
     if (queue.Headers) {
@@ -405,10 +405,10 @@ export class QueuesComponent implements OnInit {
     }
     this.queueHeaderKey = '';
     this.queueHeaderValue = '';
-    
+
     this.editModalVisible = true;
     this.showAlert = false;
-    
+
     // Reload exchanges to make sure they're available
     this.loadValidExchanges();
   }
@@ -428,7 +428,7 @@ export class QueuesComponent implements OnInit {
   createQueue(): void {
     if (this.queueForm.valid) {
       const formValue = this.queueForm.value;
-      
+
       // Build priority thresholds based on priority type
       let desiredPriorityThresholds: { [key: number]: number } = {};
       if (formValue.priorityType === 'normal') {
@@ -476,7 +476,7 @@ export class QueuesComponent implements OnInit {
   updateQueue(): void {
     if (this.queueFormUpdate.valid) {
       const formValue = this.queueFormUpdate.value;
-      
+
       // Build priority thresholds based on priority type
       let desiredPriorityThresholds: { [key: number]: number } = {};
       if (formValue.priorityType === 'normal') {
@@ -516,7 +516,7 @@ export class QueuesComponent implements OnInit {
         deadLetterExchangeId: formValue.deadLetterExchangeId,
         deadLetterExchangeRoutingKeyOrPattern: formValue.deadLetterExchangeRoutingKeyOrPattern
       };
-      
+
       this.queuesService.createQueue(this.tenantCode, queueData).subscribe({
         next: () => {
           this.editModalVisible = false;
@@ -600,8 +600,8 @@ export class QueuesComponent implements OnInit {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rawQueues = XLSX.utils.sheet_to_json(worksheet, { 
-          header: ['Name', 'Code', 'Type', 'VNamespace', 'DefaultQueueMessageTTL', 'DefaultQueueMessageDelayTime', 'QueueExpires', 'AllowDuplicated', 'MaxAttempts', 'MaxQueueSize', 'PriorityType', 'MaxPriority', 'PriorityThresholds'] 
+        const rawQueues = XLSX.utils.sheet_to_json(worksheet, {
+          header: ['Name', 'Code', 'Type', 'VNamespace', 'DefaultQueueMessageTTL', 'DefaultQueueMessageDelayTime', 'QueueExpires', 'AllowDuplicated', 'MaxAttempts', 'MaxQueueSize', 'PriorityType', 'MaxPriority', 'PriorityThresholds']
         });
 
         // Remove header row
@@ -701,7 +701,7 @@ export class QueuesComponent implements OnInit {
 
           // Process PriorityThresholds (legacy column name, but we use desiredPriorityThresholds)
           let desiredPriorityThresholds: { [key: number]: number } = {};
-          
+
           if (priorityType === 'normal') {
             // For normal priority, create object with 0-indexed keys: {0: 0, 1: 0, 2: 0, 3: 0}
             for (let i = 0; i < maxPriority; i++) {
@@ -710,12 +710,13 @@ export class QueuesComponent implements OnInit {
           } else if (priorityType === 'fair' && queue.PriorityThresholds !== undefined && queue.PriorityThresholds !== null && queue.PriorityThresholds !== '') {
             try {
               const thresholdStr = String(queue.PriorityThresholds).trim();
-              const thresholdValues = thresholdStr.split(',').map(v => parseInt(v.trim(), 10));
-              
+              const delimiter = thresholdStr.includes('|') ? '|' : ',';
+              const thresholdValues = thresholdStr.split(delimiter).map(v => parseInt(v.trim(), 10));
+
               if (thresholdValues.length !== maxPriority) {
                 throw new Error(`Row ${index + 2}: PriorityThresholds count (${thresholdValues.length}) must match MaxPriority (${maxPriority})`);
               }
-              
+
               thresholdValues.forEach((value, idx) => {
                 if (isNaN(value) || value < 0) {
                   throw new Error(`Row ${index + 2}: Invalid threshold value at position ${idx + 1}: ${value}. Must be >= 0`);
@@ -802,7 +803,7 @@ export class QueuesComponent implements OnInit {
   onPriorityTypeChange(): void {
     const formValue = this.queueForm.get('priorityType')?.value;
     this.priorityType = formValue || 'normal';
-    
+
     // Ensure the thresholds array is properly sized for the current maxPriority
     this.desiredPriorityThresholds = [];
     for (let i = 0; i < this.maxPriority; i++) {
@@ -813,11 +814,11 @@ export class QueuesComponent implements OnInit {
   onMaxPriorityChange(): void {
     const formValue = this.queueForm.get('maxPriority')?.value;
     this.maxPriority = Number(formValue) || 1;
-    
+
     // Resize the thresholds array to match the new maxPriority
     const currentLength = this.desiredPriorityThresholds.length;
     const targetLength = this.maxPriority;
-    
+
     if (targetLength > currentLength) {
       // Add new thresholds with default value of 0
       for (let i = currentLength; i < targetLength; i++) {
@@ -832,7 +833,7 @@ export class QueuesComponent implements OnInit {
   updateFairThresholds(): void {
     const currentLength = this.desiredPriorityThresholds.length;
     const targetLength = this.maxPriority;
-    
+
     if (targetLength > currentLength) {
       // Add new thresholds with default value of 0
       for (let i = currentLength; i < targetLength; i++) {
@@ -871,11 +872,11 @@ export class QueuesComponent implements OnInit {
 
   getPriorityThresholdsArray(thresholds: any): number[] {
     if (!thresholds) return [];
-    
+
     if (Array.isArray(thresholds)) {
       return thresholds;
     }
-    
+
     if (typeof thresholds === 'object') {
       // Convert object to array based on keys
       const result: number[] = [];
@@ -884,7 +885,7 @@ export class QueuesComponent implements OnInit {
       });
       return result;
     }
-    
+
     return [];
   }
 
@@ -892,7 +893,7 @@ export class QueuesComponent implements OnInit {
   onUpdatePriorityTypeChange(): void {
     const formValue = this.queueFormUpdate.get('priorityType')?.value;
     this.updatePriorityType = formValue || 'normal';
-    
+
     if (this.updatePriorityType === 'normal') {
       // For normal priority, auto-generate editDesiredPriorityThresholds based on updateMaxPriority
       // with all values set to 0 (0-indexed array)
@@ -908,7 +909,7 @@ export class QueuesComponent implements OnInit {
   onUpdateMaxPriorityChange(): void {
     const formValue = this.queueFormUpdate.get('maxPriority')?.value;
     this.updateMaxPriority = Number(formValue) || 1;
-    
+
     if (this.updatePriorityType === 'normal') {
       // For normal priority, regenerate editDesiredPriorityThresholds array based on new updateMaxPriority
       this.editDesiredPriorityThresholds = [];
@@ -923,7 +924,7 @@ export class QueuesComponent implements OnInit {
   updateUpdateFairThresholds(): void {
     const currentLength = this.editDesiredPriorityThresholds.length;
     const targetLength = this.updateMaxPriority;
-    
+
     if (targetLength > currentLength) {
       // Add new thresholds with default value of 0
       for (let i = currentLength; i < targetLength; i++) {
@@ -966,11 +967,11 @@ export class QueuesComponent implements OnInit {
   getCalculatedPriorityType(queue: any): string {
     // Check DesiredPriorityThresholds first, then fallback to PriorityThresholds for backward compatibility
     const thresholds = queue.DesiredPriorityThresholds || queue.PriorityThresholds || queue.desiredPriorityThresholds || queue.priorityThresholds;
-    
+
     if (thresholds && Object.keys(thresholds).length > 0) {
       // Check if all values in thresholds are 0
       const allValuesAreZero = Object.values(thresholds).every((value: any) => Number(value) === 0);
-      
+
       if (allValuesAreZero) {
         return 'normal';
       } else {
@@ -984,10 +985,10 @@ export class QueuesComponent implements OnInit {
     // Check both DesiredPriorityThresholds and PriorityThresholds
     const desiredThresholds = queue.DesiredPriorityThresholds || queue.desiredPriorityThresholds;
     const currentThresholds = queue.PriorityThresholds || queue.priorityThresholds;
-    
+
     // Use DesiredPriorityThresholds first, then fallback to PriorityThresholds
     const thresholds = desiredThresholds || currentThresholds;
-    
+
     if (thresholds) {
       if (typeof thresholds === 'object' && !Array.isArray(thresholds)) {
         // Count the number of keys in the object
@@ -996,7 +997,7 @@ export class QueuesComponent implements OnInit {
         return thresholds.length;
       }
     }
-    
+
     // Fallback to MaxPriority or maxPriority if available
     return queue?.MaxPriority || queue?.maxPriority || 1;
   }
@@ -1017,7 +1018,7 @@ export class QueuesComponent implements OnInit {
       contentType: '',
       content: ''
     });
-    
+
     this.messageParameters = [];
     this.messageHeaders = [];
     this.selectedFile = null;
@@ -1156,10 +1157,10 @@ export class QueuesComponent implements OnInit {
         this.messageParameters = [];
         this.messageHeaders = [];
         this.selectedFile = null;
-        
+
         // Prepare message results for display in modal
         this.messageResults = [{ queueCode: this.selectedQueue.Code, messageId: response.messageId }];
-        
+
         this.messageSentSuccessfully = true;
         this.messageResultModalVisible = true;
       },
@@ -1190,12 +1191,12 @@ export class QueuesComponent implements OnInit {
     }
 
     const now = new Date();
-    
+
     // Check if queue has explicit ExpireAt
     if (queue.ExpireAt) {
       const expireAt = new Date(queue.ExpireAt);
       const isExpired = now > expireAt;
-      
+
       if (isExpired) {
         return {
           show: true,
@@ -1205,13 +1206,13 @@ export class QueuesComponent implements OnInit {
           progressPercentage: 0
         };
       }
-      
+
       const updatedAt = new Date(queue.UpdatedAt || queue.updatedAt);
       const totalTime = expireAt.getTime() - updatedAt.getTime();
       const remainingTime = expireAt.getTime() - now.getTime();
       const progressPercentage = totalTime > 0 ? (remainingTime / totalTime) * 100 : 0;
       const isNearExpiry = progressPercentage <= 20; // 20% or less remaining
-      
+
       return {
         show: true,
         isExpired: false,
@@ -1220,14 +1221,14 @@ export class QueuesComponent implements OnInit {
         progressPercentage: Math.max(0, progressPercentage)
       };
     }
-    
+
     // Check if queue has QueueExpires setting
     const queueExpires = queue.QueueExpires || queue.queueExpires || 0;
     if (queueExpires > 0) {
       const updatedAt = new Date(queue.UpdatedAt || queue.updatedAt);
       const expireAt = new Date(updatedAt.getTime() + (queueExpires * 1000));
       const isExpired = now > expireAt;
-      
+
       if (isExpired) {
         return {
           show: true,
@@ -1237,13 +1238,13 @@ export class QueuesComponent implements OnInit {
           progressPercentage: 0
         };
       }
-      
+
       const totalTime = queueExpires * 1000; // Convert to milliseconds
       const elapsedTime = now.getTime() - updatedAt.getTime();
       const remainingTime = totalTime - elapsedTime;
       const progressPercentage = totalTime > 0 ? (remainingTime / totalTime) * 100 : 0;
       const isNearExpiry = progressPercentage <= 20; // 20% or less remaining
-      
+
       return {
         show: true,
         isExpired: false,
@@ -1252,7 +1253,7 @@ export class QueuesComponent implements OnInit {
         progressPercentage: Math.max(0, progressPercentage)
       };
     }
-    
+
     // No expiration configured
     return {
       show: false,
@@ -1291,12 +1292,12 @@ export class QueuesComponent implements OnInit {
 
     // Use the same vnamespace filter as the queues, or empty string to get all
     const vnamespace = this.selectedVNamespaceFilter || '';
-    
+
     this.exchangesService.getExchanges(this.tenantCode, '', 100, '', vnamespace).subscribe({
       next: (response) => {
         if (response && response.result && response.result.Entities) {
           // Filter only Direct, Topic, and Fanout exchanges
-          this.exchanges = response.result.Entities.filter((exchange: any) => 
+          this.exchanges = response.result.Entities.filter((exchange: any) =>
             this.validExchangeTypes.includes(exchange.Type.toLowerCase())
           );
           this.filteredExchanges = [...this.exchanges];

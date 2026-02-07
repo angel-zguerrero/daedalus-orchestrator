@@ -147,7 +147,7 @@ func (app *Application) checkAndBalanceNodeSchedulers() {
 		if time.Since(latestCreated) > waitTime {
 			log.Info().Msg("⚖️  Wait time passed since last node scheduler creation. Starting balancing...")
 
-			err = balancingBO.BalanceNodeSchedulers()
+			err = balancingBO.BalanceNodeSchedulers(app.TenantNodes)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to balance node schedulers")
 				return

@@ -7,23 +7,14 @@
   </c-card-header>
   <c-card-body>
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
-    
+
     <!-- Search and Actions Row -->
     <c-row class="mb-3">
       <c-col [md]="3">
         <div class="input-group">
-          <input 
-            type="text" 
-            cFormControl 
-            placeholder="Search by name" 
-            [(ngModel)]="searchQuery" 
-            (keydown.enter)="searchQueues()"/>
-          <button 
-            cButton 
-            type="button" 
-            color="secondary" 
-            variant="outline" 
-            (click)="searchQueues()">
+          <input type="text" cFormControl placeholder="Search by name" [(ngModel)]="searchQuery"
+            (keydown.enter)="searchQueues()" />
+          <button cButton type="button" color="secondary" variant="outline" (click)="searchQueues()">
             <svg cIcon name="cil-search"></svg>
           </button>
         </div>
@@ -31,11 +22,7 @@
       <c-col [md]="3">
         <mat-form-field class="w-100">
           <mat-label>Filter by VNamespace</mat-label>
-          <input 
-            type="text"
-            matInput
-            [formControl]="vnamespaceFilterCtrl"
-            [matAutocomplete]="autoFilter"
+          <input type="text" matInput [formControl]="vnamespaceFilterCtrl" [matAutocomplete]="autoFilter"
             (ngModelChange)="onVNamespaceFilterChange($event)">
           <mat-autocomplete #autoFilter="matAutocomplete">
             <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
@@ -83,8 +70,10 @@
             <td class="text-truncate" style="max-width: 150px;" title="{{ queue.Name }}">
               <div class="d-flex align-items-center">
                 <strong class="me-2">{{ queue.Name }}</strong>
-                <svg *ngIf="getExpirationInfo(queue).isExpired" cIcon name="cil-warning" class="text-danger" title="Queue Expired"></svg>
-                <svg *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).isNearExpiry" cIcon name="cil-clock" class="text-warning" title="Queue Expiring Soon"></svg>
+                <svg *ngIf="getExpirationInfo(queue).isExpired" cIcon name="cil-warning" class="text-danger"
+                  title="Queue Expired"></svg>
+                <svg *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).isNearExpiry" cIcon
+                  name="cil-clock" class="text-warning" title="Queue Expiring Soon"></svg>
               </div>
             </td>
             <td class="text-truncate" style="max-width: 120px;" title="{{ queue.Code }}">
@@ -115,18 +104,19 @@
             <td class="text-center">
               <div *ngIf="getExpirationInfo(queue).show">
                 <div class="d-flex align-items-center mb-1">
-                  <small [class]="getExpirationInfo(queue).isExpired ? 'text-danger fw-bold' : getExpirationInfo(queue).isNearExpiry ? 'text-warning fw-bold' : 'text-muted'">
+                  <small
+                    [class]="getExpirationInfo(queue).isExpired ? 'text-danger fw-bold' : getExpirationInfo(queue).isNearExpiry ? 'text-warning fw-bold' : 'text-muted'">
                     {{ getExpirationInfo(queue).text }}
                   </small>
                 </div>
                 <div *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).progressPercentage >= 0">
                   <c-progress height="8" class="mb-1">
-                    <c-progress-bar 
-                      [value]="getExpirationInfo(queue).progressPercentage" 
+                    <c-progress-bar [value]="getExpirationInfo(queue).progressPercentage"
                       [color]="getExpirationInfo(queue).isNearExpiry ? 'warning' : 'success'">
                     </c-progress-bar>
                   </c-progress>
-                  <small class="text-muted">{{ getExpirationInfo(queue).progressPercentage.toFixed(1) }}% remaining</small>
+                  <small class="text-muted">{{ getExpirationInfo(queue).progressPercentage.toFixed(1) }}%
+                    remaining</small>
                 </div>
               </div>
               <small *ngIf="!getExpirationInfo(queue).show" class="text-muted">No expiration</small>
@@ -143,8 +133,7 @@
                   <span class="me-2">{{ queue.MessagesCount || 0 }} / {{ queue.MaxQueueSize }}</span>
                 </div>
                 <c-progress height="4" class="mt-1" style="width: 100px; margin: 0 auto;">
-                  <c-progress-bar 
-                    [value]="((queue.MessagesCount || 0) / queue.MaxQueueSize) * 100"
+                  <c-progress-bar [value]="((queue.MessagesCount || 0) / queue.MaxQueueSize) * 100"
                     [color]="((queue.MessagesCount || 0) / queue.MaxQueueSize) > 0.8 ? 'danger' : ((queue.MessagesCount || 0) / queue.MaxQueueSize) > 0.6 ? 'warning' : 'success'">
                   </c-progress-bar>
                 </c-progress>
@@ -168,37 +157,18 @@
             </td>
             <td>
               <div class="btn-group" role="group" aria-label="Queue actions">
-                <button 
-                  cButton 
-                  color="info" 
-                  size="sm" 
-                  (click)="openDetailsModal(queue)"
-                  title="View Details">
+                <button cButton color="info" size="sm" (click)="openDetailsModal(queue)" title="View Details">
                   <svg cIcon name="cil-info"></svg>
                 </button>
-                <button 
-                  cButton 
-                  color="warning" 
-                  size="sm" 
-                  (click)="openEditModal(queue)"
-                  title="Edit">
+                <button cButton color="warning" size="sm" (click)="openEditModal(queue)" title="Edit">
                   <svg cIcon name="cil-pencil"></svg>
                 </button>
-                <button 
-                  cButton 
-                  color="success" 
-                  size="sm" 
-                  (click)="openSendMessageModal(queue)"
+                <button cButton color="success" size="sm" (click)="openSendMessageModal(queue)"
                   [disabled]="isQueueExpired(queue)"
                   [title]="isQueueExpired(queue) ? 'Cannot send messages to expired queue' : 'Send Message'">
                   <svg cIcon name="cil-envelope-closed"></svg>
                 </button>
-                <button 
-                  cButton 
-                  color="danger" 
-                  size="sm" 
-                  (click)="openDeleteModal(queue)"
-                  title="Delete">
+                <button cButton color="danger" size="sm" (click)="openDeleteModal(queue)" title="Delete">
                   <svg cIcon name="cil-trash"></svg>
                 </button>
               </div>
@@ -219,20 +189,11 @@
 
     <!-- Pagination -->
     <div class="d-flex justify-content-end mt-3" *ngIf="queues.length > 0">
-      <button 
-        cButton 
-        color="secondary" 
-        [disabled]="cursors.length === 1" 
-        (click)="previousPage()">
+      <button cButton color="secondary" [disabled]="cursors.length === 1" (click)="previousPage()">
         <svg cIcon name="cil-chevron-left" class="me-1"></svg>
         Previous
       </button>
-      <button 
-        cButton 
-        color="secondary" 
-        [disabled]="!cursor" 
-        (click)="nextPage()" 
-        class="ms-2">
+      <button cButton color="secondary" [disabled]="!cursor" (click)="nextPage()" class="ms-2">
         Next
         <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
       </button>
@@ -275,7 +236,8 @@
           <small class="form-text text-muted">Queue type determines message processing behavior</small>
           <div *ngIf="queueForm.get('type')?.invalid && queueForm.get('type')?.touched" class="text-danger mt-1">
             <small *ngIf="queueForm.get('type')?.errors?.['required']">Queue type is required</small>
-            <small *ngIf="queueForm.get('type')?.errors?.['invalidQueueType']">Invalid queue type. Valid types are: Standard, Delayed, Dead Letter</small>
+            <small *ngIf="queueForm.get('type')?.errors?.['invalidQueueType']">Invalid queue type. Valid types are:
+              Standard, Delayed, Dead Letter</small>
           </div>
         </c-col>
       </c-row>
@@ -283,11 +245,7 @@
         <c-col [md]="12">
           <mat-form-field class="w-100">
             <mat-label>Virtual Namespace *</mat-label>
-            <input 
-              type="text"
-              matInput
-              formControlName="vnamespace" 
-              [matAutocomplete]="auto">
+            <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="auto">
             <mat-autocomplete #auto="matAutocomplete">
               <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
                 {{vns.Name}}
@@ -300,12 +258,14 @@
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4">
           <label cLabel for="defaultQueueMessageTTL">Default Message TTL (seconds)</label>
-          <input cFormControl id="defaultQueueMessageTTL" formControlName="defaultQueueMessageTTL" type="number" min="0" placeholder="0" />
+          <input cFormControl id="defaultQueueMessageTTL" formControlName="defaultQueueMessageTTL" type="number" min="0"
+            placeholder="0" />
           <small class="form-text text-muted">Time to live in seconds (must be >= 0)</small>
         </c-col>
         <c-col [md]="4">
           <label cLabel for="defaultQueueMessageDelayTime">Default Message Delay Time (seconds)</label>
-          <input cFormControl id="defaultQueueMessageDelayTime" formControlName="defaultQueueMessageDelayTime" type="number" min="0" placeholder="0" />
+          <input cFormControl id="defaultQueueMessageDelayTime" formControlName="defaultQueueMessageDelayTime"
+            type="number" min="0" placeholder="0" />
           <small class="form-text text-muted">Default delay time in seconds (must be >= 0)</small>
         </c-col>
         <c-col [md]="4">
@@ -357,7 +317,8 @@
         </c-col>
         <c-col [md]="6">
           <label cLabel for="maxPriority">Max Priority Supported *</label>
-          <input cFormControl id="maxPriority" formControlName="maxPriority" type="number" min="1" max="100" placeholder="1" (change)="onMaxPriorityChange()" />
+          <input cFormControl id="maxPriority" formControlName="maxPriority" type="number" min="1" max="100"
+            placeholder="1" (change)="onMaxPriorityChange()" />
           <small class="form-text text-muted">Set the highest priority value allowed (1-100)</small>
         </c-col>
       </c-row>
@@ -377,26 +338,20 @@
           <c-col [md]="6" [lg]="4" *ngFor="let priority of getPriorityArray(); let i = index">
             <div class="border rounded p-3 mb-2">
               <label class="form-label">Priority {{i + 1}}</label>
-              <input 
-                cFormControl 
-                type="number" 
-                min="0" 
-                max="10000"
-                placeholder="0"
-                [(ngModel)]="desiredPriorityThresholds[i]" 
-                [ngModelOptions]="{standalone: true}"
-                (ngModelChange)="updateDesiredPriorityThresholds(i, $event)"
-                class="form-control" />
-              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this priority first)</small>
+              <input cFormControl type="number" min="0" max="10000" placeholder="0"
+                [(ngModel)]="desiredPriorityThresholds[i]" [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="updateDesiredPriorityThresholds(i, $event)" class="form-control" />
+              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this
+                priority first)</small>
             </div>
           </c-col>
         </c-row>
         <div *ngIf="priorityType === 'fair' && maxPriority > 0" class="mt-2">
           <c-alert color="info" class="mb-0">
-            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
-            Higher priorities (higher numbers) will be processed first, but after processing the specified number 
+            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds.
+            Higher priorities (higher numbers) will be processed first, but after processing the specified number
             of tasks, the system will move to the next priority level.
-            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
+            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed
             before moving to the next priority level.
           </c-alert>
         </div>
@@ -405,7 +360,7 @@
       <!-- Normal Priority Information -->
       <div *ngIf="priorityType === 'normal'" class="mb-3">
         <c-alert color="info" class="mb-0">
-          <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order. 
+          <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order.
           Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
@@ -430,17 +385,13 @@
               {{exchange.Name}} ({{getExchangeTypeLabel(exchange.Type)}})
             </option>
           </select>
-          <small class="form-text text-muted">Select an exchange for dead letter messages (Direct, Topic, or Fanout only)</small>
+          <small class="form-text text-muted">Select an exchange for dead letter messages (Direct, Topic, or Fanout
+            only)</small>
         </c-col>
         <c-col [md]="4" *ngIf="isRoutingKeyRequired(queueForm.get('deadLetterExchangeId')?.value)">
           <label cLabel for="deadLetterRoutingKey">Routing Key/Pattern *</label>
-          <input 
-            cFormControl 
-            id="deadLetterRoutingKey" 
-            formControlName="deadLetterExchangeRoutingKeyOrPattern" 
-            type="text" 
-            placeholder="Enter routing key or pattern"
-          />
+          <input cFormControl id="deadLetterRoutingKey" formControlName="deadLetterExchangeRoutingKeyOrPattern"
+            type="text" placeholder="Enter routing key or pattern" />
           <small class="form-text text-muted">Required for Direct and Topic exchanges</small>
         </c-col>
       </c-row>
@@ -460,14 +411,17 @@
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="5">
           <label cLabel for="headerKey">Header Key</label>
-          <input cFormControl id="headerKey" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}" placeholder="e.g., content-type" />
+          <input cFormControl id="headerKey" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}"
+            placeholder="e.g., content-type" />
         </c-col>
         <c-col [md]="5">
           <label cLabel for="headerValue">Header Value</label>
-          <input cFormControl id="headerValue" [(ngModel)]="queueHeaderValue" [ngModelOptions]="{standalone: true}" placeholder="e.g., application/json" />
+          <input cFormControl id="headerValue" [(ngModel)]="queueHeaderValue" [ngModelOptions]="{standalone: true}"
+            placeholder="e.g., application/json" />
         </c-col>
         <c-col [md]="2" class="d-flex align-items-end">
-          <button cButton color="success" variant="outline" (click)="addQueueHeader()" [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
+          <button cButton color="success" variant="outline" (click)="addQueueHeader()"
+            [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
             <svg cIcon name="cil-plus"></svg>
           </button>
         </c-col>
@@ -532,7 +486,7 @@
           <small class="form-text text-muted">Display name for the queue</small>
         </c-col>
       </c-row>
-      
+
       <!-- Read-only fields for context -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
@@ -566,29 +520,34 @@
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4">
           <label cLabel for="defaultQueueMessageTTL-update">Default Message TTL (seconds)</label>
-          <input cFormControl id="defaultQueueMessageTTL-update" formControlName="defaultQueueMessageTTL" type="number" min="0" placeholder="0" />
+          <input cFormControl id="defaultQueueMessageTTL-update" formControlName="defaultQueueMessageTTL" type="number"
+            min="0" placeholder="0" />
           <small class="form-text text-muted">Time to live in seconds (must be >= 0)</small>
         </c-col>
         <c-col [md]="4">
           <label cLabel for="defaultQueueMessageDelayTime-update">Default Message Delay Time (seconds)</label>
-          <input cFormControl id="defaultQueueMessageDelayTime-update" formControlName="defaultQueueMessageDelayTime" type="number" min="0" placeholder="0" />
+          <input cFormControl id="defaultQueueMessageDelayTime-update" formControlName="defaultQueueMessageDelayTime"
+            type="number" min="0" placeholder="0" />
           <small class="form-text text-muted">Default delay time in seconds (must be >= 0)</small>
         </c-col>
         <c-col [md]="4">
           <label cLabel for="queueExpires-update">Queue Expires (seconds)</label>
-          <input cFormControl id="queueExpires-update" formControlName="queueExpires" type="number" min="0" placeholder="0" />
+          <input cFormControl id="queueExpires-update" formControlName="queueExpires" type="number" min="0"
+            placeholder="0" />
           <small class="form-text text-muted">Queue expiration time in seconds (must be >= 0)</small>
         </c-col>
       </c-row>
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4">
           <label cLabel for="maxAttempts-update">Max Attempts *</label>
-          <input cFormControl id="maxAttempts-update" formControlName="maxAttempts" type="number" min="1" placeholder="1" />
+          <input cFormControl id="maxAttempts-update" formControlName="maxAttempts" type="number" min="1"
+            placeholder="1" />
           <small class="form-text text-muted">Maximum number of attempts (must be > 0)</small>
         </c-col>
         <c-col [md]="4">
           <label cLabel for="maxQueueSize-update">Max Queue Size</label>
-          <input cFormControl id="maxQueueSize-update" formControlName="maxQueueSize" type="number" min="0" placeholder="0" />
+          <input cFormControl id="maxQueueSize-update" formControlName="maxQueueSize" type="number" min="0"
+            placeholder="0" />
           <small class="form-text text-muted">Maximum messages in queue (0 = unlimited)</small>
         </c-col>
         <c-col [md]="4" class="d-flex align-items-center">
@@ -615,7 +574,8 @@
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="priorityType-update">Priority Type *</label>
-          <select cSelect id="priorityType-update" formControlName="priorityType" (change)="onUpdatePriorityTypeChange()">
+          <select cSelect id="priorityType-update" formControlName="priorityType"
+            (change)="onUpdatePriorityTypeChange()">
             <option value="normal">Normal</option>
             <option value="fair">Fair</option>
           </select>
@@ -623,7 +583,8 @@
         </c-col>
         <c-col [md]="6">
           <label cLabel for="maxPriority-update">Max Priority Supported *</label>
-          <input cFormControl id="maxPriority-update" formControlName="maxPriority" type="number" min="1" max="100" placeholder="1" (change)="onUpdateMaxPriorityChange()" />
+          <input cFormControl id="maxPriority-update" formControlName="maxPriority" type="number" min="1" max="100"
+            placeholder="1" (change)="onUpdateMaxPriorityChange()" />
           <small class="form-text text-muted">Set the highest priority value allowed (1-100)</small>
         </c-col>
       </c-row>
@@ -643,26 +604,20 @@
           <c-col [md]="6" [lg]="4" *ngFor="let priority of getUpdatePriorityArray(); let i = index">
             <div class="border rounded p-3 mb-2">
               <label class="form-label">Priority {{i + 1}}</label>
-              <input 
-                cFormControl 
-                type="number" 
-                min="0" 
-                max="10000"
-                placeholder="0"
-                [(ngModel)]="editDesiredPriorityThresholds[i]" 
-                [ngModelOptions]="{standalone: true}"
-                (ngModelChange)="updateEditDesiredPriorityThresholds(i, $event)"
-                class="form-control" />
-              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this priority first)</small>
+              <input cFormControl type="number" min="0" max="10000" placeholder="0"
+                [(ngModel)]="editDesiredPriorityThresholds[i]" [ngModelOptions]="{standalone: true}"
+                (ngModelChange)="updateEditDesiredPriorityThresholds(i, $event)" class="form-control" />
+              <small class="form-text text-muted">Tasks to process before next priority (0 = process all tasks of this
+                priority first)</small>
             </div>
           </c-col>
         </c-row>
         <div *ngIf="updatePriorityType === 'fair' && updateMaxPriority > 0" class="mt-2">
           <c-alert color="info" class="mb-0">
-            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds. 
-            Higher priorities (higher numbers) will be processed first, but after processing the specified number 
+            <strong>Fair Priority Mode:</strong> Tasks will be processed based on these thresholds.
+            Higher priorities (higher numbers) will be processed first, but after processing the specified number
             of tasks, the system will move to the next priority level.
-            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed 
+            <br><strong>Note:</strong> When threshold is set to 0, all tasks of the current priority will be processed
             before moving to the next priority level.
           </c-alert>
         </div>
@@ -671,7 +626,7 @@
       <!-- Normal Priority Information -->
       <div *ngIf="updatePriorityType === 'normal'" class="mb-3">
         <c-alert color="info" class="mb-0">
-          <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order. 
+          <strong>Normal Priority Mode:</strong> Tasks will be processed strictly by priority order.
           Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
@@ -696,17 +651,13 @@
               {{exchange.Name}} ({{getExchangeTypeLabel(exchange.Type)}})
             </option>
           </select>
-          <small class="form-text text-muted">Select an exchange for dead letter messages (Direct, Topic, or Fanout only)</small>
+          <small class="form-text text-muted">Select an exchange for dead letter messages (Direct, Topic, or Fanout
+            only)</small>
         </c-col>
         <c-col [md]="4" *ngIf="isRoutingKeyRequired(queueFormUpdate.get('deadLetterExchangeId')?.value)">
           <label cLabel for="updateDeadLetterRoutingKey">Routing Key/Pattern *</label>
-          <input 
-            cFormControl 
-            id="updateDeadLetterRoutingKey" 
-            formControlName="deadLetterExchangeRoutingKeyOrPattern" 
-            type="text" 
-            placeholder="Enter routing key or pattern"
-          />
+          <input cFormControl id="updateDeadLetterRoutingKey" formControlName="deadLetterExchangeRoutingKeyOrPattern"
+            type="text" placeholder="Enter routing key or pattern" />
           <small class="form-text text-muted">Required for Direct and Topic exchanges</small>
         </c-col>
       </c-row>
@@ -726,14 +677,17 @@
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="5">
           <label cLabel for="headerKey-update">Header Key</label>
-          <input cFormControl id="headerKey-update" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}" placeholder="e.g., content-type" />
+          <input cFormControl id="headerKey-update" [(ngModel)]="queueHeaderKey" [ngModelOptions]="{standalone: true}"
+            placeholder="e.g., content-type" />
         </c-col>
         <c-col [md]="5">
           <label cLabel for="headerValue-update">Header Value</label>
-          <input cFormControl id="headerValue-update" [(ngModel)]="queueHeaderValue" [ngModelOptions]="{standalone: true}" placeholder="e.g., application/json" />
+          <input cFormControl id="headerValue-update" [(ngModel)]="queueHeaderValue"
+            [ngModelOptions]="{standalone: true}" placeholder="e.g., application/json" />
         </c-col>
         <c-col [md]="2" class="d-flex align-items-end">
-          <button cButton color="success" variant="outline" (click)="addQueueHeader()" [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
+          <button cButton color="success" variant="outline" (click)="addQueueHeader()"
+            [disabled]="!queueHeaderKey.trim() || !queueHeaderValue.trim()">
             <svg cIcon name="cil-plus"></svg>
           </button>
         </c-col>
@@ -820,25 +774,23 @@
   </c-modal-header>
   <c-modal-body *ngIf="selectedQueue">
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
-    
+
     <!-- Expiration Alert -->
-    <c-alert 
-      *ngIf="getExpirationInfo(selectedQueue).isExpired" 
-      color="danger" 
-      class="mb-3">
+    <c-alert *ngIf="getExpirationInfo(selectedQueue).isExpired" color="danger" class="mb-3">
       <svg cIcon name="cil-warning" class="me-2"></svg>
-      <strong>Queue Expired!</strong> This queue expired {{ getExpirationInfo(selectedQueue).text.replace('Expired on ', 'on ') }}. No new messages can be sent to this queue.
-    </c-alert>
-    
-    <c-alert 
-      *ngIf="!getExpirationInfo(selectedQueue).isExpired && getExpirationInfo(selectedQueue).isNearExpiry" 
-      color="warning" 
-      class="mb-3">
-      <svg cIcon name="cil-clock" class="me-2"></svg>
-      <strong>Queue Expiring Soon!</strong> This queue will expire {{ getExpirationInfo(selectedQueue).text.replace('Expires on ', 'on ') }}. Only {{ getExpirationInfo(selectedQueue).progressPercentage.toFixed(1) }}% time remaining.
+      <strong>Queue Expired!</strong> This queue expired {{ getExpirationInfo(selectedQueue).text.replace('Expired on ',
+      'on ') }}. No new messages can be sent to this queue.
     </c-alert>
 
-    
+    <c-alert *ngIf="!getExpirationInfo(selectedQueue).isExpired && getExpirationInfo(selectedQueue).isNearExpiry"
+      color="warning" class="mb-3">
+      <svg cIcon name="cil-clock" class="me-2"></svg>
+      <strong>Queue Expiring Soon!</strong> This queue will expire {{
+      getExpirationInfo(selectedQueue).text.replace('Expires on ', 'on ') }}. Only {{
+      getExpirationInfo(selectedQueue).progressPercentage.toFixed(1) }}% time remaining.
+    </c-alert>
+
+
     <div class="row">
       <div class="col-md-6">
         <div class="mb-3">
@@ -878,19 +830,22 @@
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Virtual Namespace</label>
-          <div class="p-2 bg-dark rounded">{{ selectedQueue?.VNamespace || selectedQueue?.vNamespace || selectedQueue?.vnamespace || '-' }}</div>
+          <div class="p-2 bg-dark rounded">{{ selectedQueue?.VNamespace || selectedQueue?.vNamespace ||
+            selectedQueue?.vnamespace || '-' }}</div>
           <div class="form-text">Virtual namespace for logical grouping</div>
         </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label fw-bold">Created At</label>
-          <div class="p-2 bg-dark rounded">{{ (selectedQueue?.CreatedAt || selectedQueue?.createdAt) | date:'full' }}</div>
+          <div class="p-2 bg-dark rounded">{{ (selectedQueue?.CreatedAt || selectedQueue?.createdAt) | date:'full' }}
+          </div>
           <div class="form-text">Queue creation timestamp</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Updated At</label>
-          <div class="p-2 bg-dark rounded">{{ (selectedQueue?.UpdatedAt || selectedQueue?.updatedAt) | date:'full' }}</div>
+          <div class="p-2 bg-dark rounded">{{ (selectedQueue?.UpdatedAt || selectedQueue?.updatedAt) | date:'full' }}
+          </div>
           <div class="form-text">Last modification timestamp</div>
         </div>
         <div class="mb-3">
@@ -918,18 +873,21 @@
           <label class="form-label fw-bold">Expiration Status</label>
           <div class="p-2 bg-dark rounded">
             <div class="d-flex align-items-center mb-2">
-              <c-badge [color]="getExpirationInfo(selectedQueue).isExpired ? 'danger' : getExpirationInfo(selectedQueue).isNearExpiry ? 'warning' : 'success'" shape="rounded-pill">
+              <c-badge
+                [color]="getExpirationInfo(selectedQueue).isExpired ? 'danger' : getExpirationInfo(selectedQueue).isNearExpiry ? 'warning' : 'success'"
+                shape="rounded-pill">
                 {{ getExpirationInfo(selectedQueue).text }}
               </c-badge>
             </div>
-            <div *ngIf="!getExpirationInfo(selectedQueue).isExpired && getExpirationInfo(selectedQueue).progressPercentage >= 0">
+            <div
+              *ngIf="!getExpirationInfo(selectedQueue).isExpired && getExpirationInfo(selectedQueue).progressPercentage >= 0">
               <c-progress height="12" class="mb-2">
-                <c-progress-bar 
-                  [value]="getExpirationInfo(selectedQueue).progressPercentage" 
+                <c-progress-bar [value]="getExpirationInfo(selectedQueue).progressPercentage"
                   [color]="getExpirationInfo(selectedQueue).isNearExpiry ? 'warning' : 'success'">
                 </c-progress-bar>
               </c-progress>
-              <small class="text-muted">{{ getExpirationInfo(selectedQueue).progressPercentage.toFixed(1) }}% time remaining</small>
+              <small class="text-muted">{{ getExpirationInfo(selectedQueue).progressPercentage.toFixed(1) }}% time
+                remaining</small>
             </div>
           </div>
           <div class="form-text">Queue expiration status and progress</div>
@@ -952,14 +910,15 @@
             <span *ngIf="selectedQueue?.MaxQueueSize > 0; else unlimited">
               {{ selectedQueue.MaxQueueSize }} messages maximum
               <div class="mt-2">
-                <small class="text-muted d-block">Current: {{ selectedQueue?.MessagesCount || 0 }} / {{ selectedQueue.MaxQueueSize }}</small>
+                <small class="text-muted d-block">Current: {{ selectedQueue?.MessagesCount || 0 }} / {{
+                  selectedQueue.MaxQueueSize }}</small>
                 <c-progress height="8" class="mt-1">
-                  <c-progress-bar 
-                    [value]="((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) * 100"
+                  <c-progress-bar [value]="((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) * 100"
                     [color]="((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) > 0.8 ? 'danger' : ((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) > 0.6 ? 'warning' : 'success'">
                   </c-progress-bar>
                 </c-progress>
-                <small class="text-muted">{{ (((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) * 100).toFixed(1) }}% full</small>
+                <small class="text-muted">{{ (((selectedQueue?.MessagesCount || 0) / selectedQueue.MaxQueueSize) *
+                  100).toFixed(1) }}% full</small>
               </div>
             </span>
             <ng-template #unlimited>
@@ -972,7 +931,8 @@
         <div class="mb-3">
           <label class="form-label fw-bold">Allow Duplicated</label>
           <div class="p-2 bg-dark rounded">
-            <c-badge [color]="(selectedQueue?.AllowDuplicated || selectedQueue?.allowDuplicated) ? 'success' : 'danger'" shape="rounded-pill">
+            <c-badge [color]="(selectedQueue?.AllowDuplicated || selectedQueue?.allowDuplicated) ? 'success' : 'danger'"
+              shape="rounded-pill">
               {{ (selectedQueue?.AllowDuplicated || selectedQueue?.allowDuplicated) ? 'Yes' : 'No' }}
             </c-badge>
           </div>
@@ -996,13 +956,15 @@
           </div>
           <div class="form-text">Priority management type and maximum priority level</div>
         </div>
-        
+
         <!-- Fair Priority Thresholds -->
-        <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'fair' && (selectedQueue?.DesiredPriorityThresholds || selectedQueue?.desiredPriorityThresholds)">
+        <div class="mb-3"
+          *ngIf="getCalculatedPriorityType(selectedQueue) === 'fair' && (selectedQueue?.DesiredPriorityThresholds || selectedQueue?.desiredPriorityThresholds)">
           <label class="form-label fw-bold">Desired Priority Thresholds</label>
           <div class="p-3 bg-dark rounded">
             <div class="row g-3">
-              <div class="col-6 col-md-4 col-lg-3" *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.DesiredPriorityThresholds || selectedQueue?.desiredPriorityThresholds); let i = index">
+              <div class="col-6 col-md-4 col-lg-3"
+                *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.DesiredPriorityThresholds || selectedQueue?.desiredPriorityThresholds); let i = index">
                 <div class="card bg-warning bg-opacity-75 border-0 h-100">
                   <div class="card-body text-center p-4">
                     <div class="text-dark fw-bold mb-3">Priority {{i + 1}}</div>
@@ -1019,7 +981,7 @@
             <div class="mt-3 p-2 bg-warning bg-opacity-10 border border-warning rounded">
               <small class="text-warning">
                 <svg cIcon name="cil-settings" class="me-1"></svg>
-                <strong>Desired Configuration:</strong> 
+                <strong>Desired Configuration:</strong>
                 These are the values you want to apply. The system will transition to these values when appropriate.
               </small>
             </div>
@@ -1030,11 +992,13 @@
         </div>
 
         <!-- Current Priority Thresholds -->
-        <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'fair' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
+        <div class="mb-3"
+          *ngIf="getCalculatedPriorityType(selectedQueue) === 'fair' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
           <label class="form-label fw-bold">Current Priority Thresholds</label>
           <div class="p-3 bg-dark rounded">
             <div class="row g-3">
-              <div class="col-6 col-md-4 col-lg-3" *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds); let i = index">
+              <div class="col-6 col-md-4 col-lg-3"
+                *ngFor="let threshold of getPriorityThresholdsArray(selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds); let i = index">
                 <div class="card bg-primary bg-opacity-75 border-0 h-100">
                   <div class="card-body text-center p-4">
                     <div class="text-white fw-bold mb-3">Priority {{i + 1}}</div>
@@ -1051,7 +1015,7 @@
             <div class="mt-3 p-2 bg-info bg-opacity-10 border border-info rounded">
               <small class="text-info">
                 <svg cIcon name="cil-info" class="me-1"></svg>
-                <strong>Current Active Configuration:</strong> 
+                <strong>Current Active Configuration:</strong>
                 These are the values currently being used by the system for task processing.
               </small>
             </div>
@@ -1060,16 +1024,18 @@
             Currently active task processing thresholds per priority level
           </div>
         </div>
-        
+
         <!-- Desired Priority Thresholds for Normal Priority -->
-        <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'normal' && (selectedQueue?.DesiredPriorityThresholds || selectedQueue?.desiredPriorityThresholds)">
+        <div class="mb-3"
+          *ngIf="getCalculatedPriorityType(selectedQueue) === 'normal' && (selectedQueue?.DesiredPriorityThresholds || selectedQueue?.desiredPriorityThresholds)">
           <label class="form-label fw-bold">Desired Priority Thresholds</label>
           <div class="p-3 bg-dark rounded">
             <div class="mt-3 p-2 bg-warning bg-opacity-10 border border-warning rounded">
               <small class="text-warning">
                 <svg cIcon name="cil-settings" class="me-1"></svg>
-                <strong>Desired Configuration:</strong> 
-                Normal priority mode - tasks are processed strictly by priority order (highest priority first). The system will transition to these values when appropriate.
+                <strong>Desired Configuration:</strong>
+                Normal priority mode - tasks are processed strictly by priority order (highest priority first). The
+                system will transition to these values when appropriate.
               </small>
             </div>
           </div>
@@ -1079,13 +1045,14 @@
         </div>
 
         <!-- Current Priority Thresholds for Normal Priority -->
-        <div class="mb-3" *ngIf="getCalculatedPriorityType(selectedQueue) === 'normal' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
+        <div class="mb-3"
+          *ngIf="getCalculatedPriorityType(selectedQueue) === 'normal' && (selectedQueue?.PriorityThresholds || selectedQueue?.priorityThresholds)">
           <label class="form-label fw-bold">Current Priority Thresholds</label>
           <div class="p-3 bg-dark rounded">
             <div class="mt-3 p-2 bg-info bg-opacity-10 border border-info rounded">
               <small class="text-info">
                 <svg cIcon name="cil-info" class="me-1"></svg>
-                <strong>Current Active Configuration:</strong> 
+                <strong>Current Active Configuration:</strong>
                 Normal priority mode currently active - processing tasks by strict priority order.
               </small>
             </div>
@@ -1102,7 +1069,7 @@
             Dead Letter Exchange
           </label>
           <div class="form-text mb-2">Configuration for handling failed message processing</div>
-          
+
           <div *ngIf="selectedQueue?.DeadLetterExchangeId; else noDeadLetterExchange" class="border rounded p-3">
             <div class="row">
               <div class="col-md-8">
@@ -1115,7 +1082,7 @@
               </div>
             </div>
           </div>
-          
+
           <ng-template #noDeadLetterExchange>
             <div class="p-3 text-muted border rounded bg-light">
               <svg cIcon name="cil-info" class="me-1"></svg>
@@ -1131,12 +1098,13 @@
             Queue Headers
           </label>
           <div class="form-text mb-2">Headers associated with this queue for routing and metadata</div>
-          
-          <div *ngIf="selectedQueue?.Headers && getHeadersArray(selectedQueue.Headers).length > 0; else noQueueHeaders" class="border rounded p-3">
+
+          <div *ngIf="selectedQueue?.Headers && getHeadersArray(selectedQueue.Headers).length > 0; else noQueueHeaders"
+            class="border rounded p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <h6 class="mb-0">Queue Headers ({{ getHeadersArray(selectedQueue.Headers).length }})</h6>
             </div>
-            
+
             <div class="row">
               <div *ngFor="let header of getHeadersArray(selectedQueue.Headers)" class="col-md-6 mb-2">
                 <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
@@ -1148,7 +1116,7 @@
               </div>
             </div>
           </div>
-          
+
           <ng-template #noQueueHeaders>
             <div class="border rounded p-3 text-center text-muted">
               <svg cIcon name="cil-tags" size="2xl" class="mb-2 opacity-50"></svg>
@@ -1168,7 +1136,8 @@
 </c-modal>
 
 <!-- Bulk Upload Modal -->
-<c-modal id="bulkUploadModal" [visible]="bulkUploadModalVisible" (visibleChange)="bulkUploadModalVisible = $event" size="lg">
+<c-modal id="bulkUploadModal" [visible]="bulkUploadModalVisible" (visibleChange)="bulkUploadModalVisible = $event"
+  size="lg">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-cloud-upload" class="me-2"></svg>
@@ -1186,26 +1155,25 @@
         <li><strong>Code</strong>: Unique identifier for the queue</li>
         <li><strong>Type</strong>: Queue type (standard)</li>
         <li><strong>VNamespace</strong>: Virtual namespace for logical grouping</li>
-        <li><strong>DefaultQueueMessageTTL</strong>: Default message time to live in seconds (number >= 0, optional, default: 0)</li>
-        <li><strong>DefaultQueueMessageDelayTime</strong>: Default message delay time in seconds (number >= 0, optional, default: 0)</li>
+        <li><strong>DefaultQueueMessageTTL</strong>: Default message time to live in seconds (number >= 0, optional,
+          default: 0)</li>
+        <li><strong>DefaultQueueMessageDelayTime</strong>: Default message delay time in seconds (number >= 0, optional,
+          default: 0)</li>
         <li><strong>QueueExpires</strong>: Queue expiration time in seconds (number >= 0, optional, default: 0)</li>
         <li><strong>AllowDuplicated</strong>: Allow duplicates (true/false, yes/no, 1/0, optional, default: true)</li>
         <li><strong>MaxAttempts</strong>: Maximum attempts (number > 0, optional, default: 1)</li>
         <li><strong>MaxQueueSize</strong>: Maximum queue size (number >= 0, optional, default: 0 = unlimited)</li>
         <li><strong>PriorityType</strong>: Priority type (normal/fair, optional, default: normal)</li>
         <li><strong>MaxPriority</strong>: Maximum priority level (1-100, optional, default: 1)</li>
-        <li><strong>PriorityThresholds</strong>: For fair priority, comma-separated values per priority (e.g., "10,20,30", optional, default: 0 for each priority)</li>
+        <li><strong>PriorityThresholds</strong>: For fair priority, comma-separated values per priority (e.g.,
+          "10|20|30", optional, default: 0 for each priority)</li>
       </ul>
-      <div class="form-text">First 4 fields are required. Code must be unique within the tenant. All time fields must be >= 0. File must include header row.</div>
+      <div class="form-text">First 4 fields are required. Code must be unique within the tenant. All time fields must be
+        >= 0. File must include header row.</div>
     </div>
     <div class="mb-3">
       <label cLabel for="file-upload">Select File</label>
-      <input 
-        type="file" 
-        id="file-upload"
-        class="form-control"
-        (change)="onFileChange($event)" 
-        accept=".xlsx, .csv" 
+      <input type="file" id="file-upload" class="form-control" (change)="onFileChange($event)" accept=".xlsx, .csv"
         [disabled]="loading" />
     </div>
   </c-modal-body>
@@ -1221,7 +1189,8 @@
 </c-modal>
 
 <!-- Send Message Modal -->
-<c-modal id="sendMessageModal" [visible]="sendMessageModalVisible" (visibleChange)="sendMessageModalVisible = $event" size="lg">
+<c-modal id="sendMessageModal" [visible]="sendMessageModalVisible" (visibleChange)="sendMessageModalVisible = $event"
+  size="lg">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-envelope-closed" class="me-2"></svg>
@@ -1233,15 +1202,11 @@
     <c-alert color="danger" *ngIf="showAlert && errorMessage" [innerHTML]="errorMessage"></c-alert>
     <c-alert color="success" *ngIf="showAlert && successMessage" [innerHTML]="successMessage"></c-alert>
     <form [formGroup]="sendMessageForm" (ngSubmit)="sendMessage()">
-      
+
       <!-- Message ID Field (Optional) -->
       <div class="mb-3">
         <label cLabel for="messageId">Message ID (Optional)</label>
-        <input 
-          type="text" 
-          id="messageId"
-          cFormControl 
-          formControlName="messageId"
+        <input type="text" id="messageId" cFormControl formControlName="messageId"
           placeholder="Enter custom message ID (auto-generated if empty)">
         <div class="form-text">Leave empty to auto-generate a unique message ID</div>
       </div>
@@ -1249,25 +1214,16 @@
       <!-- Handler Field -->
       <div class="mb-3">
         <label cLabel for="handler">Handler</label>
-        <input 
-          type="text" 
-          id="handler"
-          cFormControl 
-          formControlName="handler"
-          placeholder="Enter handler name">
+        <input type="text" id="handler" cFormControl formControlName="handler" placeholder="Enter handler name">
       </div>
 
       <!-- Priority Field -->
       <div class="mb-3">
         <label cLabel for="priority">Priority (Optional)</label>
-        <input 
-          type="number" 
-          id="priority"
-          cFormControl 
-          formControlName="priority"
-          min="0"
+        <input type="number" id="priority" cFormControl formControlName="priority" min="0"
           placeholder="Enter priority (0 or higher, default: 0)">
-        <div *ngIf="sendMessageForm.get('priority')?.invalid && sendMessageForm.get('priority')?.touched" class="text-danger small">
+        <div *ngIf="sendMessageForm.get('priority')?.invalid && sendMessageForm.get('priority')?.touched"
+          class="text-danger small">
           Priority must be 0 or higher
         </div>
       </div>
@@ -1278,25 +1234,11 @@
           <label cLabel>Parameters</label>
         </div>
         <div class="d-flex mb-2">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Parameter Name"
-            [(ngModel)]="messageParameterKey"
+          <input type="text" class="form-control me-2" placeholder="Parameter Name" [(ngModel)]="messageParameterKey"
             [ngModelOptions]="{standalone: true}">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Parameter Value"
-            [(ngModel)]="messageParameterValue"
+          <input type="text" class="form-control me-2" placeholder="Parameter Value" [(ngModel)]="messageParameterValue"
             [ngModelOptions]="{standalone: true}">
-          <button 
-            type="button" 
-            cButton 
-            size="sm" 
-            color="success" 
-            variant="outline"
-            (click)="addParameter()"
+          <button type="button" cButton size="sm" color="success" variant="outline" (click)="addParameter()"
             title="Add Parameter">
             <svg cIcon name="cil-plus"></svg>
           </button>
@@ -1305,25 +1247,11 @@
           No parameters added yet
         </div>
         <div *ngFor="let param of messageParameters; let i = index" class="d-flex mb-2">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Parameter Name"
-            [(ngModel)]="param.key"
+          <input type="text" class="form-control me-2" placeholder="Parameter Name" [(ngModel)]="param.key"
             [ngModelOptions]="{standalone: true}">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Parameter Value"
-            [(ngModel)]="param.value"
+          <input type="text" class="form-control me-2" placeholder="Parameter Value" [(ngModel)]="param.value"
             [ngModelOptions]="{standalone: true}">
-          <button 
-            type="button" 
-            cButton 
-            size="sm" 
-            color="danger" 
-            variant="outline"
-            (click)="removeParameter(i)"
+          <button type="button" cButton size="sm" color="danger" variant="outline" (click)="removeParameter(i)"
             title="Remove Parameter">
             <svg cIcon name="cil-trash"></svg>
           </button>
@@ -1338,30 +1266,16 @@
         <div class="mb-2 p-2 bg-info bg-opacity-10 border border-info rounded">
           <small class="text-info">
             <svg cIcon name="cil-info" class="me-1"></svg>
-            <strong>Message Headers:</strong> 
+            <strong>Message Headers:</strong>
             Headers that will be attached to the message for routing and metadata purposes.
           </small>
         </div>
         <div class="d-flex mb-2">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Header Name (e.g., content-type)"
-            [(ngModel)]="messageHeaderKey"
-            [ngModelOptions]="{standalone: true}">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Header Value (e.g., application/json)"
-            [(ngModel)]="messageHeaderValue"
-            [ngModelOptions]="{standalone: true}">
-          <button 
-            type="button" 
-            cButton 
-            size="sm" 
-            color="success" 
-            variant="outline"
-            (click)="addMessageHeader()"
+          <input type="text" class="form-control me-2" placeholder="Header Name (e.g., content-type)"
+            [(ngModel)]="messageHeaderKey" [ngModelOptions]="{standalone: true}">
+          <input type="text" class="form-control me-2" placeholder="Header Value (e.g., application/json)"
+            [(ngModel)]="messageHeaderValue" [ngModelOptions]="{standalone: true}">
+          <button type="button" cButton size="sm" color="success" variant="outline" (click)="addMessageHeader()"
             title="Add Header">
             <svg cIcon name="cil-plus"></svg>
           </button>
@@ -1370,25 +1284,11 @@
           No headers added yet
         </div>
         <div *ngFor="let header of messageHeaders; let i = index" class="d-flex mb-2">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Header Name (e.g., content-type)"
-            [(ngModel)]="header.key"
-            [ngModelOptions]="{standalone: true}">
-          <input 
-            type="text" 
-            class="form-control me-2" 
-            placeholder="Header Value (e.g., application/json)"
-            [(ngModel)]="header.value"
-            [ngModelOptions]="{standalone: true}">
-          <button 
-            type="button" 
-            cButton 
-            size="sm" 
-            color="danger" 
-            variant="outline"
-            (click)="removeMessageHeader(i)"
+          <input type="text" class="form-control me-2" placeholder="Header Name (e.g., content-type)"
+            [(ngModel)]="header.key" [ngModelOptions]="{standalone: true}">
+          <input type="text" class="form-control me-2" placeholder="Header Value (e.g., application/json)"
+            [(ngModel)]="header.value" [ngModelOptions]="{standalone: true}">
+          <button type="button" cButton size="sm" color="danger" variant="outline" (click)="removeMessageHeader(i)"
             title="Remove Header">
             <svg cIcon name="cil-trash"></svg>
           </button>
@@ -1409,35 +1309,22 @@
       <!-- Content Field -->
       <div class="mb-3">
         <label cLabel for="content">Content (Optional)</label>
-        
+
         <!-- JSON Content -->
         <div *ngIf="sendMessageForm.get('contentType')?.value === 'application/json'">
-          <textarea 
-            id="content"
-            cFormControl 
-            formControlName="content"
-            rows="8"
+          <textarea id="content" cFormControl formControlName="content" rows="8"
             placeholder='Enter valid JSON content (e.g., {"message": "Hello World"})'></textarea>
         </div>
 
         <!-- Text Content -->
         <div *ngIf="sendMessageForm.get('contentType')?.value === 'text/plain'">
-          <textarea 
-            id="content"
-            cFormControl 
-            formControlName="content"
-            rows="8"
+          <textarea id="content" cFormControl formControlName="content" rows="8"
             placeholder="Enter text content"></textarea>
         </div>
 
         <!-- Binary Content -->
         <div *ngIf="sendMessageForm.get('contentType')?.value === 'application/octet-stream'">
-          <input 
-            type="file" 
-            id="content-file"
-            class="form-control"
-            (change)="onFileSelected($event)"
-            accept="*/*">
+          <input type="file" id="content-file" class="form-control" (change)="onFileSelected($event)" accept="*/*">
           <div class="form-text">Select a file to upload as binary content</div>
           <div *ngIf="selectedFile" class="mt-2">
             <small class="text-muted">Selected file: {{ selectedFile.name }}</small>
