@@ -53,7 +53,6 @@ func (cmd *UpsertNodeSchedulerCommand) Execute(uow *db.UnitOfWork, now time.Time
 			nodeScheduler.ID = existing.ID
 			nodeScheduler.Name = existing.Name
 			nodeScheduler.CreatedAt = existing.CreatedAt
-			nodeScheduler.RunningStatus = models.NodeSchedulerRunningStatusStopped
 
 			if nodeScheduler.LastHeartbeat.IsZero() {
 				nodeScheduler.LastHeartbeat = existing.LastHeartbeat

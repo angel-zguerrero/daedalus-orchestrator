@@ -22,9 +22,10 @@ type NodeScheduler struct {
 
 	TTL int64 `orm:"ttl"`
 
-	LastHeartbeat time.Time
-	BalancingId   string
-	RunningStatus NodeSchedulerRunningStatus
+	LastHeartbeat           time.Time
+	BalancingId             string
+	RunningStatus           NodeSchedulerRunningStatus
+	AssignedTenantNodeIndex int
 
 	Information map[string]string `orm:"data-only"`
 

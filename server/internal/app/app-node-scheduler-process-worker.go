@@ -62,7 +62,7 @@ func (app *Application) processNodeSchedulerTasks(index int) {
 	log.Debug().Int("index", index).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
 }
 
-func (app *Application) sendNodeSchedulerHeartbeat(index int) {
+func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 	// Get the hostname to use as the node scheduler name
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -74,7 +74,7 @@ func (app *Application) sendNodeSchedulerHeartbeat(index int) {
 	pid := os.Getpid()
 
 	// Concatenate hostname with process ID and index
-	nodeSchedulerName := fmt.Sprintf("%s-%d-%d", hostname, pid, index)
+	nodeSchedulerName := fmt.Sprintf("%s-%d-%d", hostname, pid, tenantNodeIndex)
 
 	// Create server configuration for the business logic
 	serverConfig := &common.ServerConfing{
@@ -129,9 +129,10 @@ func (app *Application) sendNodeSchedulerHeartbeat(index int) {
 
 	// Now send heartbeat for the current server
 	nodeScheduler := &models.NodeScheduler{
-		Name:          nodeSchedulerName,
-		LastHeartbeat: time.Now(),
-		TTL:           config.GlobalConfiguration.NodeSchedulerTTL * 60, // Convert minutes to seconds
+		Name:                    nodeSchedulerName,
+		LastHeartbeat:           time.Now(),
+		TTL:                     config.GlobalConfiguration.NodeSchedulerTTL * 60, // Convert minutes to seconds
+		AssignedTenantNodeIndex: tenantNodeIndex,
 	}
 
 	// Send heartbeat by calling BulkUpsertNodeScheduler for current server
