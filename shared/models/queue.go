@@ -8,6 +8,13 @@ const (
 	StandardQueue QueueType = "standard"
 )
 
+type QueueSupervisionState string
+
+const (
+	Supervised   QueueSupervisionState = "supervised"
+	Unsupervised QueueSupervisionState = "unsupervised"
+)
+
 type QueueState string
 
 const (
@@ -47,9 +54,10 @@ type Queue struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	NodeSchedulerSupervisorId   string
-	NodeSchedulerSupervisorCode string `orm:"virtual"`
-	NodeSchedulerSupervisorName string `orm:"virtual"`
+	NodeSchedulerQueueSupervisionState QueueSupervisionState
+	NodeSchedulerSupervisorId          string
+	NodeSchedulerSupervisorCode        string `orm:"virtual"`
+	NodeSchedulerSupervisorName        string `orm:"virtual"`
 }
 
 func (Queue) TableName() string {

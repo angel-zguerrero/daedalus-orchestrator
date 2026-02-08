@@ -298,7 +298,7 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 	return "", fmt.Errorf("no message was created")
 }
 
-func (bo *QueueBO) BulkUpdateQueues(ctx context.Context, queues []models.Queue, cf, cfs string, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
+func (bo *QueueBO) AssignNodeSchedulerToQueues(ctx context.Context, queues []models.Queue, cf, cfs string, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
 	if len(queues) == 0 {
 		return nil, errors.New("no queues provided")
 	}

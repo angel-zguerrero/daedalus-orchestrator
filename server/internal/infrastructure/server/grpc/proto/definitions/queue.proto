@@ -116,6 +116,7 @@ message Queue {
   string nodeSchedulerSupervisorId = 22;
   string nodeSchedulerSupervisorCode = 23;
   string nodeSchedulerSupervisorName = 24;
+  string nodeSchedulerQueueSupervisionState = 25;
 }
 
 message QueueFindResult {

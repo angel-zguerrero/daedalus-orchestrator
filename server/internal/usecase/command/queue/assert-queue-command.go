@@ -118,6 +118,10 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			queue.VNamespace = existing.VNamespace
 			queue.CreatedAt = existing.CreatedAt
 			queue.PriorityThresholds = existing.PriorityThresholds
+			queue.NodeSchedulerSupervisorId = existing.NodeSchedulerSupervisorId
+			queue.NodeSchedulerSupervisorCode = existing.NodeSchedulerSupervisorCode
+			queue.NodeSchedulerSupervisorName = existing.NodeSchedulerSupervisorName
+			queue.NodeSchedulerQueueSupervisionState = existing.NodeSchedulerQueueSupervisionState
 
 			_, err = queueRepo.UpdateQueue(&queue, now)
 		} else {
@@ -125,6 +129,8 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			if queue.ID == "" {
 				queue.ID = idFactory.GenerateID()
 			}
+
+			queue.NodeSchedulerQueueSupervisionState = models.Unsupervised
 
 			// Upsert VNamespace if it exists (now that we have an ID)
 			if queue.VNamespace != "" {

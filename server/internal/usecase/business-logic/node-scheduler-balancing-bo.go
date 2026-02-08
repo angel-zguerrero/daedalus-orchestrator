@@ -173,6 +173,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 						// Assign NodeSchedulerSupervisorId in round-robin
 						assignedNodeScheduler := assignedNodeSchedulers[nodeSchedulerIndex%nodeSchedulerCount]
 						queue.NodeSchedulerSupervisorId = assignedNodeScheduler.ID
+						queue.NodeSchedulerQueueSupervisionState = models.Supervised
 						queuesToUpdate = append(queuesToUpdate, queue)
 
 						nodeSchedulerIndex++
@@ -180,7 +181,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 
 					// Bulk update the queues
 					if len(queuesToUpdate) > 0 {
-						_, err = queueBO.BulkUpdateQueues(ctx, queuesToUpdate, cf, cfs, tenantNode)
+						_, err = queueBO.AssignNodeSchedulerToQueues(ctx, queuesToUpdate, cf, cfs, tenantNode)
 						if err != nil {
 							bo.Config.Logger.Warn().
 								Err(err).
