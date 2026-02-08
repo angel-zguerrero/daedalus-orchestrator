@@ -254,7 +254,7 @@ func (ctrl *QueueController) GetQueuesHandler(c *gin.Context) {
 	// Check if headers should be included from query parameter
 	includeHeaders := c.Query("includeHeaders") == "true"
 
-	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), includeHeaders, cf, cfs, tenant, tenantNode)
+	findResult, err := ctrl.QueueBO.GetQueues(c.Request.Context(), c.Query("q"), c.Query("cursor"), page, c.Query("vnamespace"), includeHeaders, cf, cfs, tenant, tenantNode, true)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

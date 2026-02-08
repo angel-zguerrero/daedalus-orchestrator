@@ -116,9 +116,17 @@ func (r *QueueRepository) GetQueueById(id string, now time.Time) (*models.Queue,
 }
 
 func (r *QueueRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
+	return r.paginate(q, "", pageSize, cursor, vNamespace, now)
+}
+
+func (r *QueueRepository) PaginateBySupervisionState(q string, supervisionState models.QueueSupervisionState, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
+	return r.paginate(q, supervisionState, pageSize, cursor, vNamespace, now)
+}
+
+func (r *QueueRepository) paginate(q string, supervisionState models.QueueSupervisionState, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
 	var query string
 
-	if q == "" && vNamespace == "" {
+	if q == "" && vNamespace == "" && supervisionState == "" {
 		query = "ID != 0" // ID != 0 Workaround
 	} else {
 		var conditions []string
@@ -131,6 +139,11 @@ func (r *QueueRepository) Paginate(q string, pageSize int, cursor string, vNames
 		// Add vNamespace filter condition if vNamespace is provided
 		if vNamespace != "" {
 			conditions = append(conditions, "VNamespace = "+vNamespace)
+		}
+
+		// Add supervisionState filter condition if supervisionState is provided
+		if supervisionState != "" {
+			conditions = append(conditions, "SupervisionState = "+string(supervisionState))
 		}
 
 		// If no conditions but we got here, use the workaround

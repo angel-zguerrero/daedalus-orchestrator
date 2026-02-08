@@ -15,13 +15,14 @@ func init() {
 }
 
 type PaginateQueuesCommand struct {
-	Query          string
-	Cursor         string
-	PageSize       int
-	VNamespace     string
-	IncludeHeaders bool
-	CF             string
-	CFS            string
+	Query            string
+	Cursor           string
+	PageSize         int
+	VNamespace       string
+	IncludeHeaders   bool
+	CF               string
+	CFS              string
+	SupervisionState models.QueueSupervisionState
 }
 
 func (cmd *PaginateQueuesCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -34,10 +35,19 @@ func (cmd *PaginateQueuesCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		return *commandResult
 	}
 
-	findResult, err := queueRepo.Paginate(cmd.Query, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
-	if err != nil {
-		commandResult.Error = err.Error()
-		return *commandResult
+	var findResult *db.FindResult[models.Queue]
+	if cmd.SupervisionState != "" {
+		findResult, err = queueRepo.PaginateBySupervisionState(cmd.Query, cmd.SupervisionState, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+	} else {
+		findResult, err = queueRepo.Paginate(cmd.Query, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
 	}
 
 	// If headers are requested, populate them using RoutingHeader

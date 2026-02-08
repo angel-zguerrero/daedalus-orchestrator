@@ -224,7 +224,7 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*pb.GetQueuesResponse, error) {
 	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 
-	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, r.IncludeHeaders, cf, cfs, tenant, tenantNode)
+	findResult, err := s.QueueBO.GetQueues(ctx, r.Q, r.Cursor, int(r.PageSize), r.Vnamespace, r.IncludeHeaders, cf, cfs, tenant, tenantNode, true)
 	if err != nil {
 		return nil, err
 	}

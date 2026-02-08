@@ -188,7 +188,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantCode string) error {
 	pageSize := 100
 
 	for {
-		queuesResult, err := queueBO.GetQueues(ctx, "", cursor, pageSize, "", false, cf, cfs, &tenant, tenantNode)
+		queuesResult, err := queueBO.GetQueues(ctx, "", cursor, pageSize, "", false, cf, cfs, &tenant, tenantNode, false)
 		if err != nil {
 			bo.Config.Logger.Warn().Err(err).Msg("Failed to get queues for tenant deletion, continuing anyway")
 			break

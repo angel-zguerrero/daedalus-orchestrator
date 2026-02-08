@@ -56,7 +56,7 @@ func (bo *NodeSchedulerBalancingBO) UpsertState(ctx context.Context, state model
 	return err
 }
 
-func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonboat.RaftNode) error {
+func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonboat.RaftNode, supervisionState models.QueueSupervisionState) error {
 	nodeSchedulerBO := NewNodeSchedulerBO(bo.Config)
 	queueBO := NewQueueBO(bo.Config)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -153,14 +153,29 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 				// Paginate through all queues for this tenant
 				queuesCursor = ""
 				for {
-					findResult, err := queueBO.GetQueues(ctx, "", queuesCursor, queuesPageSize, "", false, cf, cfs, &tenant, tenantNode)
-					if err != nil {
-						bo.Config.Logger.Warn().
-							Err(err).
-							Str("tenantId", tenant.ID).
-							Int("tenantNodeIndex", tenantNodeIndex).
-							Msg("⚠️ Failed to fetch queues for tenant, skipping")
-						break
+
+					var findResult db.FindResult[models.Queue]
+					var err error
+					if supervisionState == "" {
+						findResult, err = queueBO.GetQueues(ctx, "", queuesCursor, queuesPageSize, "", false, cf, cfs, &tenant, tenantNode, false)
+						if err != nil {
+							bo.Config.Logger.Warn().
+								Err(err).
+								Str("tenantId", tenant.ID).
+								Int("tenantNodeIndex", tenantNodeIndex).
+								Msg("⚠️ Failed to fetch queues for tenant, skipping")
+							break
+						}
+					} else {
+						findResult, err = queueBO.GetQueuesBySupervisionState(ctx, "", queuesCursor, queuesPageSize, "", false, cf, cfs, &tenant, tenantNode, supervisionState, false)
+						if err != nil {
+							bo.Config.Logger.Warn().
+								Err(err).
+								Str("tenantId", tenant.ID).
+								Int("tenantNodeIndex", tenantNodeIndex).
+								Msg("⚠️ Failed to fetch queues for tenant, skipping")
+							break
+						}
 					}
 
 					if len(findResult.Entities) == 0 {

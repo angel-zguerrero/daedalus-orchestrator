@@ -207,7 +207,7 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, c
 	return nil
 }
 
-func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Queue], error) {
+func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode, includeSupervisorInfo bool) (db.FindResult[models.Queue], error) {
 	paginateQueuesCommand := &queue_command.PaginateQueuesCommand{
 		Query:          q,
 		Cursor:         cursor,
@@ -234,7 +234,44 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 		findResult.Entities = []models.Queue{}
 	}
 
-	bo.batchPopulateSupervisorFields(ctx, findResult.Entities)
+	if includeSupervisorInfo {
+		bo.batchPopulateSupervisorFields(ctx, findResult.Entities)
+	}
+
+	return findResult, nil
+}
+
+func (bo *QueueBO) GetQueuesBySupervisionState(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode, supervisionState models.QueueSupervisionState, includeSupervisorInfo bool) (db.FindResult[models.Queue], error) {
+	paginateQueuesCommand := &queue_command.PaginateQueuesCommand{
+		Query:            q,
+		Cursor:           cursor,
+		PageSize:         pageSize,
+		VNamespace:       vNamespace,
+		IncludeHeaders:   includeHeaders,
+		CF:               cf,
+		CFS:              cfs,
+		SupervisionState: supervisionState,
+	}
+
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Queue]](
+		tenantNode,
+		ctx,
+		paginateQueuesCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate queues",
+	)
+	if err != nil {
+		return db.FindResult[models.Queue]{}, fmt.Errorf("paginate queues failed: %w", err)
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.Queue{}
+	}
+
+	if includeSupervisorInfo {
+		bo.batchPopulateSupervisorFields(ctx, findResult.Entities)
+	}
 
 	return findResult, nil
 }
