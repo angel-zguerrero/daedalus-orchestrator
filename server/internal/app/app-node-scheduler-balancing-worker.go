@@ -110,13 +110,43 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 	if state.Status == models.RequestForNewBalancing {
 		log.Info().Msg("🔄 Rebalancing requested. Transitioning to 'waiting-for-node-schedulers' to stabilize")
 
-		//check for node-schedulers to be stopped then:
-		// state.Status = models.WaitingForNodeSchedulers
-		// err = balancingBO.UpsertState(ctx, *state)
-		// if err != nil {
-		// 	log.Err(err).Msg("❌ Failed to update node scheduler balancing state to 'waiting-for-node-schedulers'")
-		// 	return
-		// }
+		// Check if ALL node schedulers are stopped
+		pageSize := 100
+		cursor := ""
+		allAreStopped := true
+
+		for {
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", cursor, pageSize)
+			if err != nil {
+				log.Err(err).Msg("❌ Failed to get node schedulers for rebalancing check")
+				return
+			}
+
+			for _, ns := range findResult.Entities {
+				if ns.RunningStatus != models.NodeSchedulerRunningStatusStopped {
+					allAreStopped = false
+					break
+				}
+			}
+
+			if !allAreStopped || findResult.Cursor == "" || len(findResult.Entities) < pageSize {
+				break
+			}
+			cursor = findResult.Cursor
+		}
+
+		if allAreStopped {
+			log.Info().Msg("✅ All node schedulers are stopped. Transitioning to 'waiting-for-node-schedulers'")
+			state.Status = models.WaitingForNodeSchedulers
+			err = balancingBO.UpsertState(ctx, *state)
+			if err != nil {
+				log.Err(err).Msg("❌ Failed to update node scheduler balancing state to 'waiting-for-node-schedulers'")
+				return
+			}
+		} else {
+			log.Debug().Msg("⏳ Waiting for all node schedulers to stop...")
+			return
+		}
 	}
 
 	// 4. If waiting, check node schedulers
