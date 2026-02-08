@@ -16,7 +16,7 @@ func NewNodeSchedulerRepository(uow *UnitOfWork, factory IDGeneratorFactory) (*N
 	if uow == nil {
 		return nil, fmt.Errorf("UnitOfWork is required")
 	}
-	repo, err := GetRepository[models.NodeScheduler](uow, AdminFC, AdminFCSector, "admin_event_schema", factory)
+	repo, err := GetRepository[models.NodeScheduler](uow, MasterEventFC, MasterEventFCSector, "admin_event_schema", factory)
 	if err != nil {
 		return nil, err
 	}

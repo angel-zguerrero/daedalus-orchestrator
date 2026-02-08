@@ -63,42 +63,6 @@ func (cmd *PaginateQueuesCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		}
 	}
 
-	// Populate NodeScheduler supervisor fields
-	if len(findResult.Entities) > 0 {
-		// Collect unique NodeSchedulerSupervisorIds
-		nodeSchedulerIds := make(map[string]bool)
-		for _, queue := range findResult.Entities {
-			if queue.NodeSchedulerSupervisorId != "" {
-				nodeSchedulerIds[queue.NodeSchedulerSupervisorId] = true
-			}
-		}
-
-		// If there are NodeSchedulerSupervisorIds, fetch the NodeSchedulers
-		if len(nodeSchedulerIds) > 0 {
-			nodeSchedulerRepo, err := db.NewNodeSchedulerRepository(uow, idFactory)
-			if err == nil {
-				// Create a map of NodeScheduler ID -> NodeScheduler
-				nodeSchedulerMap := make(map[string]*models.NodeScheduler)
-				for id := range nodeSchedulerIds {
-					if ns, err := nodeSchedulerRepo.GetNodeSchedulerById(id, now); err == nil && ns != nil {
-						nodeSchedulerMap[id] = ns
-					}
-				}
-
-				// Populate the virtual fields
-				for i := range findResult.Entities {
-					queue := &findResult.Entities[i]
-					if queue.NodeSchedulerSupervisorId != "" {
-						if ns, exists := nodeSchedulerMap[queue.NodeSchedulerSupervisorId]; exists {
-							queue.NodeSchedulerSupervisorCode = ns.ID
-							queue.NodeSchedulerSupervisorName = ns.Name
-						}
-					}
-				}
-			}
-		}
-	}
-
 	commandResult.Result = *findResult
 	return *commandResult
 }
