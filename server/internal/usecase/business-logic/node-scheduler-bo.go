@@ -138,6 +138,33 @@ func (bo *NodeSchedulerBO) GetNodeSchedulers(ctx context.Context, q string, curs
 	return findResult, nil
 }
 
+func (bo *NodeSchedulerBO) GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx context.Context, q string, cursor string, pageSize int, assignedTenantNodeIndex int) (db.FindResult[models.NodeScheduler], error) {
+	paginateNodeSchedulersCommand := &node_scheduler.PaginateNodeSchedulersAssignedTenantNodeIndexCommand{
+		Cursor:                  cursor,
+		PageSize:                pageSize,
+		Q:                       q,
+		AssignedTenantNodeIndex: assignedTenantNodeIndex,
+	}
+
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.NodeScheduler]](
+		bo.Config.MasterNode,
+		ctx,
+		paginateNodeSchedulersCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate nodeSchedulers",
+	)
+	if err != nil {
+		return db.FindResult[models.NodeScheduler]{}, fmt.Errorf("paginate nodeSchedulers failed: %w", err)
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.NodeScheduler{}
+	}
+
+	return findResult, nil
+}
+
 // fetchServerResourceUsage fetches resource usage (CPU, memory, disk) for a given server ID.
 func (bo *NodeSchedulerBO) fetchServerResourceUsage() (map[string]string, error) {
 	// Directly fetch resource usage information within this method

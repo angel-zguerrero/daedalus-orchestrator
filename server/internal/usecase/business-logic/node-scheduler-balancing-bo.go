@@ -72,13 +72,13 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 			Msg("⚖️ Processing TenantNode")
 
 		// Get NodeSchedulers assigned to this TenantNode
-		query := fmt.Sprintf("AssignedTenantNodeIndex = %d", tenantNodeIndex)
+
 		nodeSchedulersCursor := ""
 		nodeSchedulersPageSize := 100
 		var assignedNodeSchedulers []models.NodeScheduler
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, query, nodeSchedulersCursor, nodeSchedulersPageSize)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", nodeSchedulersCursor, nodeSchedulersPageSize, tenantNodeIndex)
 			if err != nil {
 				return fmt.Errorf("failed to fetch node schedulers for TenantNode %d: %w", tenantNodeIndex, err)
 			}
@@ -128,6 +128,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 			}
 
 			if len(tenantsResult.Entities) == 0 {
+				fmt.Println("No tenants found")
 				break
 			}
 

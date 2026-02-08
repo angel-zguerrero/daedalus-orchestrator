@@ -49,6 +49,8 @@ func (s *NodeSchedulerService) GetNodeSchedulers(ctx context.Context, r *pb.GetN
 			ConnectionStatus: string(ns.ConnectionStatus),
 			CreatedAt:        ns.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:        ns.UpdatedAt.Format(time.RFC3339),
+			// AssignedTenantNodeIndex: int32(ns.AssignedTenantNodeIndex),
+			// RunningStatus:           string(ns.RunningStatus),
 		}
 	}
 
@@ -86,6 +88,8 @@ func (s *NodeSchedulerService) GetNodeScheduler(ctx context.Context, r *pb.GetNo
 			ConnectionStatus: string(nodeScheduler.ConnectionStatus),
 			CreatedAt:        nodeScheduler.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:        nodeScheduler.UpdatedAt.Format(time.RFC3339),
+			// AssignedTenantNodeIndex: int32(nodeScheduler.AssignedTenantNodeIndex),
+			// RunningStatus:           string(nodeScheduler.RunningStatus),
 		},
 	}, nil
 }

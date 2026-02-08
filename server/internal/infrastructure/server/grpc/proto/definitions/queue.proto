@@ -113,6 +113,9 @@ message Queue {
   string deadLetterExchangeRoutingKeyOrPattern = 19;
   int32 messagesCount = 20;
   int32 maxQueueSize = 21;
+  string nodeSchedulerSupervisorId = 22;
+  string nodeSchedulerSupervisorCode = 23;
+  string nodeSchedulerSupervisorName = 24;
 }
 
 message QueueFindResult {

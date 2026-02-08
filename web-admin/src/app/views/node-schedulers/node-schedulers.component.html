@@ -8,18 +8,9 @@
     <c-row class="mb-3">
       <c-col [md]="6">
         <div class="input-group">
-          <input 
-            type="text" 
-            cFormControl 
-            placeholder="Search by name" 
-            [(ngModel)]="searchQuery" 
-            (keydown.enter)="searchNodeSchedulers()"/>
-          <button 
-            cButton 
-            type="button" 
-            color="secondary" 
-            variant="outline" 
-            (click)="searchNodeSchedulers()">
+          <input type="text" cFormControl placeholder="Search by name" [(ngModel)]="searchQuery"
+            (keydown.enter)="searchNodeSchedulers()" />
+          <button cButton type="button" color="secondary" variant="outline" (click)="searchNodeSchedulers()">
             <svg cIcon name="cil-search"></svg>
           </button>
         </div>
@@ -44,7 +35,9 @@
         <thead>
           <tr>
             <th>Name</th>
-            <th>Status</th>
+            <th>Connection</th>
+            <th>Running</th>
+            <th>Assigned Index</th>
             <th>Last Heartbeat</th>
             <th>Resource Usage</th>
             <th>Actions</th>
@@ -61,10 +54,21 @@
               </c-badge>
             </td>
             <td>
+              <c-badge [color]="getRunningStatusColor(nodeScheduler.RunningStatus)" shape="rounded-pill">
+                {{ nodeScheduler.RunningStatus }}
+              </c-badge>
+            </td>
+            <td>
+              <c-badge color="secondary" shape="rounded-pill">
+                {{ nodeScheduler.AssignedTenantNodeIndex }}
+              </c-badge>
+            </td>
+            <td>
               <small class="text-muted">{{ nodeScheduler.LastHeartbeat | date:'medium' }}</small>
             </td>
             <td>
-              <div class="d-flex flex-column" style="min-width: 180px;" *ngIf="nodeScheduler.ConnectionStatus === 'connected'; else disconnectedPlaceholder">
+              <div class="d-flex flex-column" style="min-width: 180px;"
+                *ngIf="nodeScheduler.ConnectionStatus === 'connected'; else disconnectedPlaceholder">
                 <small class="text-muted mb-1">
                   <strong>CPU:</strong> {{ nodeScheduler.Information?.CPU || 'N/A' }}
                 </small>
@@ -76,7 +80,8 @@
                 </small>
               </div>
               <ng-template #disconnectedPlaceholder>
-                <div class="d-flex align-items-center justify-content-center" style="min-width: 180px; min-height: 60px;">
+                <div class="d-flex align-items-center justify-content-center"
+                  style="min-width: 180px; min-height: 60px;">
                   <div class="text-center text-muted">
                     <svg cIcon name="cil-ban" class="d-block mx-auto mb-1" size="lg"></svg>
                     <small>No data available</small>
@@ -85,12 +90,7 @@
               </ng-template>
             </td>
             <td>
-              <button 
-                cButton 
-                color="info" 
-                size="sm" 
-                (click)="openDetailsModal(nodeScheduler)"
-                title="View Details">
+              <button cButton color="info" size="sm" (click)="openDetailsModal(nodeScheduler)" title="View Details">
                 <svg cIcon name="cil-info"></svg>
               </button>
             </td>
@@ -110,20 +110,11 @@
 
     <!-- Pagination -->
     <div class="d-flex justify-content-end mt-3" *ngIf="nodeSchedulers.length > 0 && !loading">
-      <button 
-        cButton 
-        color="secondary" 
-        [disabled]="cursors.length === 1" 
-        (click)="previousPage()">
+      <button cButton color="secondary" [disabled]="cursors.length === 1" (click)="previousPage()">
         <svg cIcon name="cil-chevron-left" class="me-1"></svg>
         Previous
       </button>
-      <button 
-        cButton 
-        color="secondary" 
-        [disabled]="!cursor" 
-        (click)="nextPage()" 
-        class="ms-2">
+      <button cButton color="secondary" [disabled]="!cursor" (click)="nextPage()" class="ms-2">
         Next
         <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
       </button>
@@ -164,8 +155,26 @@
           </div>
           <div class="form-text">Current connection status</div>
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Assigned Tenant Node Index</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge color="secondary" shape="rounded-pill">
+              {{ selectedNodeScheduler?.AssignedTenantNodeIndex }}
+            </c-badge>
+          </div>
+          <div class="form-text">Index of the assigned tenant node</div>
+        </div>
       </div>
       <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Running Status</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="getRunningStatusColor(selectedNodeScheduler?.RunningStatus)" shape="rounded-pill">
+              {{ selectedNodeScheduler?.RunningStatus || 'N/A' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Current running status of the scheduler</div>
+        </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Last Heartbeat</label>
           <div class="p-2 bg-dark rounded">{{ selectedNodeScheduler?.LastHeartbeat | date:'full' }}</div>
@@ -185,7 +194,8 @@
     </div>
 
     <!-- Resource Information Section -->
-    <div class="mt-4" *ngIf="selectedNodeScheduler?.ConnectionStatus === 'connected'; else resourceUnavailablePlaceholder">
+    <div class="mt-4"
+      *ngIf="selectedNodeScheduler?.ConnectionStatus === 'connected'; else resourceUnavailablePlaceholder">
       <h6 class="fw-bold mb-3">
         <svg cIcon name="cil-chart" class="me-2"></svg>
         Resource Usage Information
@@ -244,7 +254,8 @@
     </ng-template>
 
     <!-- Additional Information -->
-    <div class="mt-4" *ngIf="selectedNodeScheduler?.ConnectionStatus === 'connected' && selectedNodeScheduler?.Information && getAdditionalInfo().length > 0">
+    <div class="mt-4"
+      *ngIf="selectedNodeScheduler?.ConnectionStatus === 'connected' && selectedNodeScheduler?.Information && getAdditionalInfo().length > 0">
       <h6 class="fw-bold mb-3">
         <svg cIcon name="cil-list" class="me-2"></svg>
         Additional Information

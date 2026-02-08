@@ -95,6 +95,17 @@ export class NodeSchedulersComponent implements OnInit {
     this.showAlert = false;
   }
 
+  getRunningStatusColor(status: string): string {
+    switch (status?.toLowerCase()) {
+      case 'running':
+        return 'success';
+      case 'stopped':
+        return 'warning';
+      default:
+        return 'secondary';
+    }
+  }
+
   getConnectionStatusColor(status: string): string {
     switch (status?.toLowerCase()) {
       case 'connected':
@@ -118,7 +129,7 @@ export class NodeSchedulersComponent implements OnInit {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m ${remainingSeconds}s`;
     } else if (minutes > 0) {
@@ -132,10 +143,10 @@ export class NodeSchedulersComponent implements OnInit {
     if (!this.selectedNodeScheduler?.Information) {
       return [];
     }
-    
+
     const standardKeys = ['CPU', 'Memory', 'Disk', 'OS'];
     const additionalInfo: { key: string, value: string }[] = [];
-    
+
     Object.keys(this.selectedNodeScheduler.Information).forEach(key => {
       if (!standardKeys.includes(key)) {
         additionalInfo.push({
@@ -144,7 +155,7 @@ export class NodeSchedulersComponent implements OnInit {
         });
       }
     });
-    
+
     return additionalInfo;
   }
 }

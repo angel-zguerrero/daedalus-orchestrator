@@ -47,7 +47,9 @@ type Queue struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	NodeSchedulerSupervisorId string
+	NodeSchedulerSupervisorId   string
+	NodeSchedulerSupervisorCode string `orm:"virtual"`
+	NodeSchedulerSupervisorName string `orm:"virtual"`
 }
 
 func (Queue) TableName() string {

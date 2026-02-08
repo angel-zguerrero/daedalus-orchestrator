@@ -62,6 +62,8 @@
             <th style="min-width: 150px;">Queue Size</th>
             <th style="min-width: 120px;">Allow Duplicated</th>
             <th style="min-width: 120px;">Priority Type</th>
+            <th style="min-width: 150px;">Supervisor Code</th>
+            <th style="min-width: 150px;">Supervisor Name</th>
             <th style="min-width: 240px;">Actions</th>
           </tr>
         </thead>
@@ -154,6 +156,12 @@
               <c-badge [color]="getPriorityTypeColor(getCalculatedPriorityType(queue))" shape="rounded-pill">
                 {{ getPriorityTypeLabel(getCalculatedPriorityType(queue)) }}
               </c-badge>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ queue.NodeSchedulerSupervisorCode || '-' }}">
+              <code>{{ queue.NodeSchedulerSupervisorCode || '-' }}</code>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ queue.NodeSchedulerSupervisorName || '-' }}">
+              {{ queue.NodeSchedulerSupervisorName || '-' }}
             </td>
             <td>
               <div class="btn-group" role="group" aria-label="Queue actions">
@@ -833,6 +841,28 @@
           <div class="p-2 bg-dark rounded">{{ selectedQueue?.VNamespace || selectedQueue?.vNamespace ||
             selectedQueue?.vnamespace || '-' }}</div>
           <div class="form-text">Virtual namespace for logical grouping</div>
+        </div>
+        <div class="mb-3">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-user" class="me-2"></svg>
+            Supervisor Information
+          </h6>
+          <div class="mb-2">
+            <label class="form-label fw-bold">Supervisor ID</label>
+            <div class="p-2 bg-dark rounded">{{ selectedQueue?.NodeSchedulerSupervisorId || '-' }}</div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-bold">Supervisor Code</label>
+            <div class="p-2 bg-dark rounded">
+              <code>{{ selectedQueue?.NodeSchedulerSupervisorCode || '-' }}</code>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-bold">Supervisor Name</label>
+            <div class="p-2 bg-dark rounded">{{ selectedQueue?.NodeSchedulerSupervisorName || '-' }}</div>
+          </div>
+          <div class="form-text">Information about the NodeScheduler supervising this queue</div>
         </div>
       </div>
       <div class="col-md-6">

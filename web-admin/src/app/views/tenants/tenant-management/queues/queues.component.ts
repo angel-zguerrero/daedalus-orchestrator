@@ -46,6 +46,9 @@ interface Queue {
   Headers?: { [key: string]: string };
   DeadLetterExchangeId?: string;
   DeadLetterExchangeRoutingKeyOrPattern?: string;
+  NodeSchedulerSupervisorId?: string;
+  NodeSchedulerSupervisorCode?: string;
+  NodeSchedulerSupervisorName?: string;
   CreatedAt: string;
   UpdatedAt: string;
 }

@@ -19,6 +19,8 @@ func (app *Application) StartNodeSchedulerBalancingWorker(interval time.Duration
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
+		isFirstExecution := true
+
 		for {
 			select {
 			case <-ticker.C:
@@ -39,7 +41,8 @@ func (app *Application) StartNodeSchedulerBalancingWorker(interval time.Duration
 				default:
 				}
 
-				app.checkAndBalanceNodeSchedulers()
+				app.checkAndBalanceNodeSchedulers(isFirstExecution)
+				isFirstExecution = false
 
 			case <-app.NodeSchedulerBalancingStopper.ShouldStop():
 				log.Info().Msg("ℹ️  NodeScheduler balancing worker stopped gracefully")
@@ -54,7 +57,7 @@ func generateUUID() string {
 	return strings.ReplaceAll(uuid.New().String(), "-", "")
 }
 
-func (app *Application) checkAndBalanceNodeSchedulers() {
+func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 	serverConfig := &common.ServerConfing{
 		Logger:     log.Logger,
 		MasterNode: app.MasterNode,
@@ -87,6 +90,15 @@ func (app *Application) checkAndBalanceNodeSchedulers() {
 			return
 		}
 		state = &initialState
+	} else if isFirstExecution {
+		// If it's the first execution and state already exists, we reset the status to waiting
+		log.Info().Msg("🚀 First execution after startup. Resetting balancing state status to 'waiting-for-node-schedulers'")
+		state.Status = models.WaitingForNodeSchedulers
+		err := balancingBO.UpsertState(ctx, *state)
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to reset node scheduler balancing state status on startup")
+			return
+		}
 	}
 
 	// 3. If balanced, we are done

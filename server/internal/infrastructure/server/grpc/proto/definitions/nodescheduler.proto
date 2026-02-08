@@ -24,6 +24,8 @@ message NodeScheduler {
   string ConnectionStatus = 6;
   string CreatedAt = 7;
   string UpdatedAt = 8;
+  int32 AssignedTenantNodeIndex = 9;
+  string RunningStatus = 10;
 }
 
 message NodeSchedulerFindResult {
