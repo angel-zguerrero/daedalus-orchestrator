@@ -105,7 +105,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 	// 3. If balanced, we periodically assign unassigned queues
 	if state.Status == models.Balanced {
 		log.Debug().Msg("⚖️ System is balanced. Checking for unassigned queues...")
-		lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, models.Supervised, state.LastNodeSchedulerIndices)
+		lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, models.Unsupervised, state.LastNodeSchedulerIndices)
 		if err != nil {
 			log.Err(err).Msg("❌ Failed to perform partial node scheduler balancing")
 			return

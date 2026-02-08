@@ -51,9 +51,9 @@ func (r *NodeSchedulerRepository) Paginate(q string, pageSize int, cursor string
 
 func (r *NodeSchedulerRepository) PaginateUsingAssignedTenantNodeIndex(q string, AssignedTenantNodeIndex int, pageSize int, cursor string, now time.Time) (*FindResult[models.NodeScheduler], error) {
 	if q == "" {
-		return r.Find("ID != 0 & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex), pageSize, cursor, now) // ID != 0 Workaround
+		return r.Find("ID != 0 & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
 	} else {
-		return r.Find("Name LIKE *"+q+"* & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex), pageSize, cursor, now) // ID != 0 Workaround
+		return r.Find("Name LIKE *"+q+"* & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
 	}
 }
 
