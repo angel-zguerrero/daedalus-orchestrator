@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (app *Application) StartNodeSchedulerProcessWorkers(interval time.Duration) {
+func (app *Application) StartNodeSchedulerHeartbeat(interval time.Duration) {
 	for i := range app.TenantNodes {
 		index := i
 		app.NodeSchedulerProcessStopper.RunWorker(func() {
@@ -43,6 +43,40 @@ func (app *Application) StartNodeSchedulerProcessWorkers(interval time.Duration)
 					go func() {
 						app.sendNodeSchedulerHeartbeat(index)
 					}()
+
+				case <-app.NodeSchedulerProcessStopper.ShouldStop():
+					log.Info().Int("index", index).Msg("ℹ️  NodeScheduler process worker stopped gracefully")
+					return
+				}
+			}
+		})
+	}
+}
+
+func (app *Application) StartNodeSchedulerProcessWorkers(interval time.Duration) {
+	for i := range app.TenantNodes {
+		index := i
+		app.NodeSchedulerProcessStopper.RunWorker(func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ticker.C:
+					if !app.MasterNodeIsReady {
+						continue
+					}
+
+					if !dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleScheduler) {
+						continue
+					}
+
+					select {
+					case <-app.NodeSchedulerProcessStopper.ShouldStop():
+						log.Info().Int("index", index).Msg("🛑 NodeScheduler process received stop signal before execution")
+						return
+					default:
+					}
 
 					go func() {
 						app.processNodeSchedulerTasks(index)
@@ -83,7 +117,6 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	fmt.Println("🔍 Processing node scheduler tasks for node scheduler: ", nodeSchedulerName)
 	nodeScheduler, err := nodeSchedulerBO.GetNodeSchedulerByName(ctx, nodeSchedulerName)
 	if err != nil {
 		log.Err(err).Msg("❌ Failed to get node scheduler during process node scheduler tasks " + nodeSchedulerName)
@@ -102,10 +135,8 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 				log.Err(err).Msg("❌ Error updating running status node schedulers")
 			}
 		} else if state != nil && state.Status == models.Balanced {
-			log.Debug().Any("Node scheduler", nodeScheduler).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
+			//log.Debug().Any("Node scheduler", nodeScheduler).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
 		}
-	} else {
-		log.Debug().Msg("The Node scheduller is stopped!")
 	}
 
 }
