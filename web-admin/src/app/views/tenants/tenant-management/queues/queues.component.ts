@@ -736,6 +736,7 @@ export class QueuesComponent implements OnInit {
             }
           }
 
+          // Transform the data to match backend expectations
           return {
             name: queue.Name,
             code: queue.Code,

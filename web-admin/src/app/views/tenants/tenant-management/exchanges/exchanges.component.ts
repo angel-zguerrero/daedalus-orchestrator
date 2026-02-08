@@ -359,17 +359,25 @@ export class ExchangesComponent implements OnInit {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const exchanges = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Code', 'Type', 'VNamespace'] });
+      const rawExchanges = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Code', 'Type', 'VNamespace'] });
 
       // Remove header row
-      exchanges.shift();
+      rawExchanges.shift();
 
-      if (exchanges.length === 0) {
+      if (rawExchanges.length === 0) {
         this.showAlert = true;
         this.errorMessage = 'The uploaded file is empty.';
         this.loading = false;
         return;
       }
+
+      // Transform the data to match backend expectations
+      const exchanges = rawExchanges.map((exchange: any) => ({
+        name: exchange.Name,
+        code: exchange.Code,
+        type: exchange.Type,
+        vnamespace: exchange.VNamespace
+      }));
 
       this.exchangesService.bulkCreateExchanges(this.tenantCode, { exchanges }).subscribe({
         next: () => {

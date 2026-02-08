@@ -11,7 +11,7 @@ const regions = ['us-east', 'eu-west', 'ap-south', 'sa-east'];
 const writeStream = fs.createWriteStream(fileName);
 
 // Escribir encabezados según tus instrucciones
-writeStream.write('ame,Code,Type,VNamespace\n');
+writeStream.write('Name,Code,Type,VNamespace\n');
 
 console.log(`Generando ${totalRecords} exchanges...`);
 

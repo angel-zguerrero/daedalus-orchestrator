@@ -1,7 +1,7 @@
 const fs = require('fs');
 
 const fileName = 'tenants.csv';
-const totalRecords = 100;
+const totalRecords = 1000;
 
 // Listas para generar nombres aleatorios
 const prefixes = ['Global', 'Stellar', 'Alpha', 'Nexus', 'Prime', 'Innova', 'Quantum', 'Elite', 'Vertex', 'Omega'];
@@ -22,7 +22,7 @@ function generateCode(index) {
 const writeStream = fs.createWriteStream(fileName);
 
 // Escribir encabezados
-writeStream.write('name,code\n');
+writeStream.write('Name,Code\n');
 
 console.log(`Generando ${totalRecords} registros...`);
 

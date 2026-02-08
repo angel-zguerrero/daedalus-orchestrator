@@ -208,16 +208,22 @@ export class TenantsComponent implements OnInit {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const tenants = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Code'] });
+      const rawTenants = XLSX.utils.sheet_to_json(worksheet, { header: ['Name', 'Code'] });
 
       // Remove header row
-      tenants.shift();
+      rawTenants.shift();
 
-      if (tenants.length === 0) {
+      if (rawTenants.length === 0) {
         this.showAlert = true;
         this.errorMessage = 'The uploaded file is empty.';
         return;
       }
+
+      // Transform the data to match backend expectations
+      const tenants = rawTenants.map((tenant: any) => ({
+        name: tenant.Name,
+        code: tenant.Code
+      }));
 
       this.tenantsService.bulkAssertTenants({ tenants }).subscribe({
         next: () => {
