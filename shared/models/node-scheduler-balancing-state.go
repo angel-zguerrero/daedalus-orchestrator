@@ -18,12 +18,13 @@ func init() {
 }
 
 type NodeSchedulerBalancingState struct {
-	ID           string `orm:"primary-key"`
-	BalancingId  string
-	Status       NodeSchedulerBalancingStatus
+	ID                       string `orm:"primary-key"`
+	BalancingId              string
+	Status                   NodeSchedulerBalancingStatus
+	LastNodeSchedulerIndices map[int]int `orm:"data-only"`
 
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (NodeSchedulerBalancingState) TableName() string {

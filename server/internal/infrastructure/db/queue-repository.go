@@ -143,7 +143,7 @@ func (r *QueueRepository) paginate(q string, supervisionState models.QueueSuperv
 
 		// Add supervisionState filter condition if supervisionState is provided
 		if supervisionState != "" {
-			conditions = append(conditions, "SupervisionState = "+string(supervisionState))
+			conditions = append(conditions, "NodeSchedulerQueueSupervisionState = "+string(supervisionState))
 		}
 
 		// If no conditions but we got here, use the workaround

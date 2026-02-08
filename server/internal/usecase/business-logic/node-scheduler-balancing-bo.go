@@ -9,7 +9,6 @@ import (
 	node_scheduler "deadalus-orch/server/internal/usecase/command/node-scheduler"
 	"deadalus-orch/shared/models"
 	"fmt"
-	"time"
 )
 
 type NodeSchedulerBalancingBO struct {
@@ -56,13 +55,17 @@ func (bo *NodeSchedulerBalancingBO) UpsertState(ctx context.Context, state model
 	return err
 }
 
-func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonboat.RaftNode, supervisionState models.QueueSupervisionState) error {
+func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(ctx context.Context, tenantNodes []*dragonboat.RaftNode, supervisionState models.QueueSupervisionState, lastIndices map[int]int) (map[int]int, error) {
 	nodeSchedulerBO := NewNodeSchedulerBO(bo.Config)
 	queueBO := NewQueueBO(bo.Config)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
 
-	bo.Config.Logger.Info().Msg("⚖️ Starting Node Scheduler balancing process...")
+	if lastIndices == nil {
+		lastIndices = make(map[int]int)
+	}
+
+	bo.Config.Logger.Info().
+		Str("supervisionState", string(supervisionState)).
+		Msg("⚖️ Starting Node Scheduler balancing process...")
 
 	// Iterate through each TenantNode
 	for tenantNodeIndex, tenantNode := range tenantNodes {
@@ -80,7 +83,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 		for {
 			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", nodeSchedulersCursor, nodeSchedulersPageSize, tenantNodeIndex)
 			if err != nil {
-				return fmt.Errorf("failed to fetch node schedulers for TenantNode %d: %w", tenantNodeIndex, err)
+				return lastIndices, fmt.Errorf("failed to fetch node schedulers for TenantNode %d: %w", tenantNodeIndex, err)
 			}
 
 			assignedNodeSchedulers = append(assignedNodeSchedulers, findResult.Entities...)
@@ -113,7 +116,9 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 
 		queuesCursor := ""
 		totalQueuesProcessed := 0
-		nodeSchedulerIndex := 0
+
+		// Resume from last index for this tenant node
+		nodeSchedulerIndex := lastIndices[tenantNodeIndex]
 
 		// First, get all tenants to iterate through them
 		tenantBO := NewTenantBO(bo.Config)
@@ -124,11 +129,10 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 		for {
 			tenantsResult, err := tenantBO.GetTenants(ctx, "", tenantsCursor, tenantsPageSize)
 			if err != nil {
-				return fmt.Errorf("failed to fetch tenants for TenantNode %d: %w", tenantNodeIndex, err)
+				return lastIndices, fmt.Errorf("failed to fetch tenants for TenantNode %d: %w", tenantNodeIndex, err)
 			}
 
 			if len(tenantsResult.Entities) == 0 {
-				fmt.Println("No tenants found")
 				break
 			}
 
@@ -142,13 +146,6 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 				// Calculate cf and cfs for this tenant
 				cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
 				cfs := tenant.ID
-
-				bo.Config.Logger.Debug().
-					Str("tenantId", tenant.ID).
-					Str("cf", cf).
-					Str("cfs", cfs).
-					Int("tenantNodeIndex", tenantNodeIndex).
-					Msg("⚖️ Processing tenant queues")
 
 				// Paginate through all queues for this tenant
 				queuesCursor = ""
@@ -185,13 +182,17 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 					// Distribute queues among NodeSchedulers in round-robin fashion
 					var queuesToUpdate []models.Queue
 					for _, queue := range findResult.Entities {
+						// If supervisionState is Supervised, skip queues that are already supervised
+						if supervisionState == models.Supervised && queue.NodeSchedulerQueueSupervisionState == models.Supervised {
+							continue
+						}
+
 						// Assign NodeSchedulerSupervisorId in round-robin
+						nodeSchedulerIndex++
 						assignedNodeScheduler := assignedNodeSchedulers[nodeSchedulerIndex%nodeSchedulerCount]
 						queue.NodeSchedulerSupervisorId = assignedNodeScheduler.ID
 						queue.NodeSchedulerQueueSupervisionState = models.Supervised
 						queuesToUpdate = append(queuesToUpdate, queue)
-
-						nodeSchedulerIndex++
 					}
 
 					// Bulk update the queues
@@ -221,6 +222,9 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 			tenantsCursor = tenantsResult.Cursor
 		}
 
+		// Store last index
+		lastIndices[tenantNodeIndex] = nodeSchedulerIndex
+
 		bo.Config.Logger.Info().
 			Int("tenantNodeIndex", tenantNodeIndex).
 			Int("totalQueuesProcessed", totalQueuesProcessed).
@@ -238,7 +242,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 		if len(nodeSchedulersToUpdate) > 0 {
 			_, err := nodeSchedulerBO.UpdateRunningStatusNodeScheduler(ctx, nodeSchedulersToUpdate, models.NodeSchedulerRunningStatusRunning)
 			if err != nil {
-				return fmt.Errorf("failed to update NodeSchedulers status for TenantNode %d: %w", tenantNodeIndex, err)
+				return lastIndices, fmt.Errorf("failed to update NodeSchedulers status for TenantNode %d: %w", tenantNodeIndex, err)
 			}
 
 			bo.Config.Logger.Info().
@@ -249,5 +253,5 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 	}
 
 	bo.Config.Logger.Info().Msg("✅ Node Scheduler balancing completed successfully")
-	return nil
+	return lastIndices, nil
 }

@@ -83,9 +83,10 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	fmt.Println("🔍 Processing node scheduler tasks for node scheduler: ", nodeSchedulerName)
 	nodeScheduler, err := nodeSchedulerBO.GetNodeSchedulerByName(ctx, nodeSchedulerName)
 	if err != nil {
-		log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
+		log.Err(err).Msg("❌ Failed to get node scheduler during process node scheduler tasks " + nodeSchedulerName)
 	}
 
 	if nodeScheduler.RunningStatus == models.NodeSchedulerRunningStatusRunning {

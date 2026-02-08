@@ -94,6 +94,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		// If it's the first execution and state already exists, we reset the status to waiting
 		log.Info().Msg("🚀 First execution after startup. Resetting balancing state status to 'waiting-for-node-schedulers'")
 		state.Status = models.WaitingForNodeSchedulers
+		state.LastNodeSchedulerIndices = make(map[int]int)
 		err := balancingBO.UpsertState(ctx, *state)
 		if err != nil {
 			log.Err(err).Msg("❌ Failed to reset node scheduler balancing state status on startup")
@@ -101,8 +102,21 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		}
 	}
 
-	// 3. If balanced, we are done
+	// 3. If balanced, we periodically assign unassigned queues
 	if state.Status == models.Balanced {
+		log.Debug().Msg("⚖️ System is balanced. Checking for unassigned queues...")
+		lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, models.Supervised, state.LastNodeSchedulerIndices)
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to perform partial node scheduler balancing")
+			return
+		}
+
+		// Update state with updated indices if they changed
+		state.LastNodeSchedulerIndices = lastIndices
+		err = balancingBO.UpsertState(ctx, *state)
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to update node scheduler balancing indices")
+		}
 		return
 	}
 
@@ -189,7 +203,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		if time.Since(latestCreated) > waitTime {
 			log.Info().Msg("⚖️  Wait time passed since last node scheduler creation. Starting balancing...")
 
-			err = balancingBO.BalanceNodeSchedulers(app.TenantNodes, "")
+			lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, models.Unsupervised, state.LastNodeSchedulerIndices)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to balance node schedulers")
 				return
@@ -197,6 +211,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 
 			// 6. Update state to balanced
 			state.Status = models.Balanced
+			state.LastNodeSchedulerIndices = lastIndices
 			err = balancingBO.UpsertState(ctx, *state)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to update node scheduler balancing state to 'balanced'")
