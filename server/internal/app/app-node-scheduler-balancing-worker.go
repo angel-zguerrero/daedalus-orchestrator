@@ -95,6 +95,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		log.Info().Msg("🚀 First execution after startup. Resetting balancing state status to 'waiting-for-node-schedulers'")
 		state.Status = models.WaitingForNodeSchedulers
 		state.LastNodeSchedulerIndices = make(map[int]int)
+		state.BalancingId = generateUUID()
 		err := balancingBO.UpsertState(ctx, *state)
 		if err != nil {
 			log.Err(err).Msg("❌ Failed to reset node scheduler balancing state status on startup")
@@ -105,7 +106,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 	// 3. If balanced, we periodically assign unassigned queues
 	if state.Status == models.Balanced {
 		log.Debug().Msg("⚖️ System is balanced. Checking for unassigned queues...")
-		lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, models.Unsupervised, state.LastNodeSchedulerIndices)
+		lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, models.Unsupervised, state.LastNodeSchedulerIndices, state.BalancingId)
 		if err != nil {
 			log.Err(err).Msg("❌ Failed to perform partial node scheduler balancing")
 			return
@@ -203,7 +204,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		if time.Since(latestCreated) > waitTime {
 			log.Info().Msg("⚖️  Wait time passed since last node scheduler creation. Starting balancing...")
 
-			lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, models.Unsupervised, state.LastNodeSchedulerIndices)
+			lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, "", state.LastNodeSchedulerIndices, state.BalancingId)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to balance node schedulers")
 				return

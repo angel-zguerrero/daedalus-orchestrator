@@ -20,6 +20,7 @@ type PaginateNodeSchedulersAssignedTenantNodeIndexCommand struct {
 	PageSize                int
 	Q                       string
 	AssignedTenantNodeIndex int
+	BalancingId             string
 }
 
 func (cmd *PaginateNodeSchedulersAssignedTenantNodeIndexCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -32,7 +33,7 @@ func (cmd *PaginateNodeSchedulersAssignedTenantNodeIndexCommand) Execute(uow *db
 		return *commandResult
 	}
 
-	nodeSchedulerInMasterFound, err := nodeSchedulerInMasterRepo.PaginateUsingAssignedTenantNodeIndex(cmd.Q, cmd.AssignedTenantNodeIndex, cmd.PageSize, cmd.Cursor, now)
+	nodeSchedulerInMasterFound, err := nodeSchedulerInMasterRepo.PaginateUsingAssignedTenantNodeIndex(cmd.Q, cmd.AssignedTenantNodeIndex, cmd.BalancingId, cmd.PageSize, cmd.Cursor, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

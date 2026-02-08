@@ -189,12 +189,13 @@ func (bo *NodeSchedulerBO) GetNodeSchedulers(ctx context.Context, q string, curs
 	return findResult, nil
 }
 
-func (bo *NodeSchedulerBO) GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx context.Context, q string, cursor string, pageSize int, assignedTenantNodeIndex int) (db.FindResult[models.NodeScheduler], error) {
+func (bo *NodeSchedulerBO) GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx context.Context, q string, cursor string, pageSize int, assignedTenantNodeIndex int, balancingId string) (db.FindResult[models.NodeScheduler], error) {
 	paginateNodeSchedulersCommand := &node_scheduler.PaginateNodeSchedulersAssignedTenantNodeIndexCommand{
 		Cursor:                  cursor,
 		PageSize:                pageSize,
 		Q:                       q,
 		AssignedTenantNodeIndex: assignedTenantNodeIndex,
+		BalancingId:             balancingId,
 	}
 
 	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.NodeScheduler]](

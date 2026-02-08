@@ -168,6 +168,13 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	balancingBO := business_logic.NewNodeSchedulerBalancingBO(serverConfig)
+	state, err := balancingBO.GetState(ctx)
+	if err != nil {
+		log.Err(err).Msg("❌ Failed to get node scheduler balancing state")
+		return
+	}
+
 	if app.MasterNodeIsLeader {
 		// First, paginate through all existing node schedulers to update their connection status
 		pageSize := 100
@@ -175,7 +182,7 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 		allNodeSchedulers := []*models.NodeScheduler{}
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", cursor, pageSize, tenantNodeIndex)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", cursor, pageSize, tenantNodeIndex, "")
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
 				break
@@ -197,6 +204,9 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 
 		// Bulk upsert all existing node schedulers to update their connection status
 		if len(allNodeSchedulers) > 0 {
+			for _, ns := range allNodeSchedulers {
+				ns.BalancingId = "" // maintain the current balancing id in the node scheduler
+			}
 			_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, allNodeSchedulers)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
@@ -212,6 +222,7 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 		LastHeartbeat:           time.Now(),
 		TTL:                     config.GlobalConfiguration.NodeSchedulerTTL * 60, // Convert minutes to seconds
 		AssignedTenantNodeIndex: tenantNodeIndex,
+		BalancingId:             state.BalancingId, // update the balancing id
 	}
 
 	// Send heartbeat by calling BulkUpsertNodeScheduler for current server

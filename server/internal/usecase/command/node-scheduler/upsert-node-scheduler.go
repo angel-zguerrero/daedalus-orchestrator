@@ -54,6 +54,9 @@ func (cmd *UpsertNodeSchedulerCommand) Execute(uow *db.UnitOfWork, now time.Time
 			nodeScheduler.Name = existing.Name
 			nodeScheduler.CreatedAt = existing.CreatedAt
 			nodeScheduler.RunningStatus = existing.RunningStatus
+			if nodeScheduler.BalancingId == "" {
+				nodeScheduler.BalancingId = existing.BalancingId
+			}
 
 			if nodeScheduler.LastHeartbeat.IsZero() {
 				nodeScheduler.LastHeartbeat = existing.LastHeartbeat

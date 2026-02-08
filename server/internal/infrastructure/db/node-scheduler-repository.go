@@ -49,12 +49,21 @@ func (r *NodeSchedulerRepository) Paginate(q string, pageSize int, cursor string
 	}
 }
 
-func (r *NodeSchedulerRepository) PaginateUsingAssignedTenantNodeIndex(q string, AssignedTenantNodeIndex int, pageSize int, cursor string, now time.Time) (*FindResult[models.NodeScheduler], error) {
-	if q == "" {
-		return r.Find("ID != 0 & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
+func (r *NodeSchedulerRepository) PaginateUsingAssignedTenantNodeIndex(q string, AssignedTenantNodeIndex int, balancingId string, pageSize int, cursor string, now time.Time) (*FindResult[models.NodeScheduler], error) {
+	if balancingId != "" {
+		if q == "" {
+			return r.Find("ID != 0 & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected)+" & BalancingId = "+balancingId, pageSize, cursor, now) // ID != 0 Workaround
+		} else {
+			return r.Find("Name LIKE *"+q+"* & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected)+" & BalancingId = "+balancingId, pageSize, cursor, now) // ID != 0 Workaround
+		}
 	} else {
-		return r.Find("Name LIKE *"+q+"* & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
+		if q == "" {
+			return r.Find("ID != 0 & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
+		} else {
+			return r.Find("Name LIKE *"+q+"* & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
+		}
 	}
+
 }
 
 func (r *NodeSchedulerRepository) DeleteNodeSchedulerById(id string, now time.Time) (bool, error) {

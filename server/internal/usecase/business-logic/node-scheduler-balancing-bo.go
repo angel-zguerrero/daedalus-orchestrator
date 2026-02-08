@@ -55,7 +55,7 @@ func (bo *NodeSchedulerBalancingBO) UpsertState(ctx context.Context, state model
 	return err
 }
 
-func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(ctx context.Context, tenantNodes []*dragonboat.RaftNode, supervisionState models.QueueSupervisionState, lastIndices map[int]int) (map[int]int, error) {
+func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(ctx context.Context, tenantNodes []*dragonboat.RaftNode, supervisionState models.QueueSupervisionState, lastIndices map[int]int, balancingId string) (map[int]int, error) {
 	nodeSchedulerBO := NewNodeSchedulerBO(bo.Config)
 	queueBO := NewQueueBO(bo.Config)
 
@@ -81,7 +81,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(ctx context.Context, t
 		var assignedNodeSchedulers []models.NodeScheduler
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", nodeSchedulersCursor, nodeSchedulersPageSize, tenantNodeIndex)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", nodeSchedulersCursor, nodeSchedulersPageSize, tenantNodeIndex, balancingId)
 			if err != nil {
 				return lastIndices, fmt.Errorf("failed to fetch node schedulers for TenantNode %d: %w", tenantNodeIndex, err)
 			}
