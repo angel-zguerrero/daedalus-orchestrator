@@ -62,7 +62,6 @@
             <th style="min-width: 150px;">Queue Size</th>
             <th style="min-width: 120px;">Allow Duplicated</th>
             <th style="min-width: 120px;">Priority Type</th>
-            <th style="min-width: 150px;">Supervisor Code</th>
             <th style="min-width: 150px;">Supervisor Name</th>
             <th style="min-width: 240px;">Actions</th>
           </tr>
@@ -156,9 +155,6 @@
               <c-badge [color]="getPriorityTypeColor(getCalculatedPriorityType(queue))" shape="rounded-pill">
                 {{ getPriorityTypeLabel(getCalculatedPriorityType(queue)) }}
               </c-badge>
-            </td>
-            <td class="text-truncate" style="max-width: 150px;" title="{{ queue.NodeSchedulerSupervisorCode || '-' }}">
-              <code>{{ queue.NodeSchedulerSupervisorCode || '-' }}</code>
             </td>
             <td class="text-truncate" style="max-width: 150px;" title="{{ queue.NodeSchedulerSupervisorName || '-' }}">
               {{ queue.NodeSchedulerSupervisorName || '-' }}
