@@ -53,6 +53,7 @@ func (cmd *UpsertNodeSchedulerCommand) Execute(uow *db.UnitOfWork, now time.Time
 			nodeScheduler.ID = existing.ID
 			nodeScheduler.Name = existing.Name
 			nodeScheduler.CreatedAt = existing.CreatedAt
+			nodeScheduler.RunningStatus = existing.RunningStatus
 
 			if nodeScheduler.LastHeartbeat.IsZero() {
 				nodeScheduler.LastHeartbeat = existing.LastHeartbeat
@@ -60,6 +61,7 @@ func (cmd *UpsertNodeSchedulerCommand) Execute(uow *db.UnitOfWork, now time.Time
 
 			if nodeScheduler.LastHeartbeat.UnixNano() < now.Add(-config.GlobalConfiguration.NodeSchedulerHeartbeatTimeout).UnixNano() {
 				nodeScheduler.ConnectionStatus = models.ConnectionStatusDisconnected
+				nodeScheduler.RunningStatus = models.NodeSchedulerRunningStatusStopped
 			} else {
 				nodeScheduler.ConnectionStatus = models.ConnectionStatusConnected
 			}

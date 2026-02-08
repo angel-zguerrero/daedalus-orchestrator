@@ -220,7 +220,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(tenantNodes []*dragonb
 		}
 
 		if len(nodeSchedulersToUpdate) > 0 {
-			_, err := nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, nodeSchedulersToUpdate)
+			_, err := nodeSchedulerBO.UpdateRunningStatusNodeScheduler(ctx, nodeSchedulersToUpdate, models.NodeSchedulerRunningStatusRunning)
 			if err != nil {
 				return fmt.Errorf("failed to update NodeSchedulers status for TenantNode %d: %w", tenantNodeIndex, err)
 			}

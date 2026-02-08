@@ -112,6 +112,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return upsertNodeSchedulerCommand.Execute(uow, now)
 	}
 
+	updateRunningStatusNodeSchedulerCommand, ok := cmd.(node_scheduler_command.UpdateRunningStatusNodeSchedulerCommand)
+	if ok {
+		return updateRunningStatusNodeSchedulerCommand.Execute(uow, now)
+	}
+
 	deleteNodeSchedulerCommand, ok := cmd.(node_scheduler_command.DeleteNodeSchedulerCommand)
 	if ok {
 		return deleteNodeSchedulerCommand.Execute(uow, now)

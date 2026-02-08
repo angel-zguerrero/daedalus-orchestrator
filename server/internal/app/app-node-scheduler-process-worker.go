@@ -57,9 +57,43 @@ func (app *Application) StartNodeSchedulerProcessWorkers(interval time.Duration)
 	}
 }
 
-func (app *Application) processNodeSchedulerTasks(index int) {
-	// Placeholder for task review logic
-	log.Debug().Int("index", index).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
+func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
+
+	// Get the hostname to use as the node scheduler name
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Err(err).Msg("❌ Failed to get hostname for NodeScheduler heartbeat")
+		return
+	}
+
+	// Get the process ID
+	pid := os.Getpid()
+
+	// Concatenate hostname with process ID and index
+	nodeSchedulerName := fmt.Sprintf("%s-%d-%d", hostname, pid, tenantNodeIndex)
+
+	// Create server configuration for the business logic
+	serverConfig := &common.ServerConfing{
+		Logger:     log.Logger,
+		MasterNode: app.MasterNode,
+	}
+
+	nodeSchedulerBO := business_logic.NewNodeSchedulerBO(serverConfig)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	nodeScheduler, err := nodeSchedulerBO.GetNodeSchedulerByName(ctx, nodeSchedulerName)
+	if err != nil {
+		log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
+	}
+
+	if nodeScheduler.RunningStatus == models.NodeSchedulerRunningStatusRunning {
+		log.Debug().Any("Node scheduler:::", nodeScheduler).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
+	} else {
+		log.Debug().Msg("The Node scheduller is stopped!")
+	}
+
 }
 
 func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
@@ -123,6 +157,19 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 				log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
 			} else {
 				log.Debug().Int("count", len(allNodeSchedulers)).Msg("✅ Updated connection status for existing NodeSchedulers")
+			}
+
+			balancingBO := business_logic.NewNodeSchedulerBalancingBO(serverConfig)
+			state, err := balancingBO.GetState(ctx)
+			if err != nil {
+				log.Err(err).Msg("❌ Failed to get node scheduler balancing state")
+				return
+			}
+			if state != nil && state.Status == models.RequestForNewBalancing {
+				_, err = nodeSchedulerBO.UpdateRunningStatusNodeScheduler(ctx, allNodeSchedulers, models.NodeSchedulerRunningStatusStopped)
+				if err != nil {
+					log.Err(err).Msg("❌ Error updating running status node schedulers")
+				}
 			}
 		}
 	}

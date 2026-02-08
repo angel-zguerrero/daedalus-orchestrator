@@ -89,9 +89,60 @@ func (bo *NodeSchedulerBO) BulkUpsertNodeScheduler(ctx context.Context, nodeSche
 	return created, nil
 }
 
+func (bo *NodeSchedulerBO) UpdateRunningStatusNodeScheduler(ctx context.Context, nodeSchedulers []*models.NodeScheduler, runningStatus models.NodeSchedulerRunningStatus) ([]models.NodeScheduler, error) {
+	if len(nodeSchedulers) == 0 {
+		return nil, errors.New("no nodeSchedulers provided")
+	}
+
+	updateRunningStatusNodeSchedulerCommand := &node_scheduler.UpdateRunningStatusNodeSchedulerCommand{
+		NodeSchedulers: make([]models.NodeScheduler, len(nodeSchedulers)),
+		RunningStatus:  runningStatus,
+	}
+	for i, t := range nodeSchedulers {
+		updateRunningStatusNodeSchedulerCommand.NodeSchedulers[i] = *t
+	}
+
+	created, err := dragonboat.ExecuteRepositoryCommand[[]models.NodeScheduler](
+		bo.Config.MasterNode,
+		ctx,
+		updateRunningStatusNodeSchedulerCommand,
+		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(nodeSchedulers)),
+		bo.Config.Logger,
+		"update running status command",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return created, nil
+}
+
 func (bo *NodeSchedulerBO) GetNodeScheduler(ctx context.Context, nodeSchedulerID string) (models.NodeScheduler, error) {
 	findNodeSchedulerCommand := &node_scheduler.FindNodeSchedulerCommand{
 		NodeSchedulerID: nodeSchedulerID,
+	}
+
+	nodeScheduler, err := dragonboat.ExecuteRepositoryQuery[models.NodeScheduler](
+		bo.Config.MasterNode,
+		ctx,
+		findNodeSchedulerCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"find nodeScheduler",
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "entity not found") {
+			return models.NodeScheduler{}, errors.New("NodeScheduler not found")
+		}
+		return models.NodeScheduler{}, fmt.Errorf("find nodeSchedulers command failed: %w", err)
+	}
+
+	return nodeScheduler, nil
+}
+
+func (bo *NodeSchedulerBO) GetNodeSchedulerByName(ctx context.Context, nodeSchedulerName string) (models.NodeScheduler, error) {
+	findNodeSchedulerCommand := &node_scheduler.FindNodeSchedulerCommand{
+		NodeSchedulerName: nodeSchedulerName,
 	}
 
 	nodeScheduler, err := dragonboat.ExecuteRepositoryQuery[models.NodeScheduler](
