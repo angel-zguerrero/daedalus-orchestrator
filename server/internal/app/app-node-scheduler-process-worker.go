@@ -101,7 +101,7 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 				log.Err(err).Msg("❌ Error updating running status node schedulers")
 			}
 		} else if state != nil && state.Status == models.Balanced {
-			log.Debug().Any("Node scheduler:::", nodeScheduler).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
+			log.Debug().Any("Node scheduler", nodeScheduler).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
 		}
 	} else {
 		log.Debug().Msg("The Node scheduller is stopped!")
