@@ -27,12 +27,30 @@ func NewTenantController(Config *common.ServerConfing) *TenantController {
 }
 
 type createTenantInMasterRequest struct {
-	Code string `json:"code" binding:"required"`
-	Name string `json:"name" binding:"required"`
+	Code       any `json:"code"`
+	Name       any `json:"name"`
+	CodePascal any `json:"Code"`
+	NamePascal any `json:"Name"`
 }
 
 type createBulkTenantInMasterRequest struct {
 	Tenants []createTenantInMasterRequest `json:"tenants" binding:"required"`
+}
+
+func (r createTenantInMasterRequest) GetCode() string {
+	codePascal := common.ToString(r.CodePascal)
+	if codePascal != "" {
+		return codePascal
+	}
+	return common.ToString(r.Code)
+}
+
+func (r createTenantInMasterRequest) GetName() string {
+	namePascal := common.ToString(r.NamePascal)
+	if namePascal != "" {
+		return namePascal
+	}
+	return common.ToString(r.Name)
 }
 
 // CreateTenantHandler handles POST /rest-api/tenants
@@ -44,7 +62,15 @@ func (ctrl *TenantController) CreateTenantHandler(c *gin.Context) {
 		return
 	}
 
-	tenantInMaster, err := ctrl.TenantBO.CreateTenant(c.Request.Context(), req.Code, req.Name)
+	code := req.GetCode()
+	name := req.GetName()
+
+	if code == "" || name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Code and Name are required (supports both lowercase and PascalCase keys)"})
+		return
+	}
+
+	tenantInMaster, err := ctrl.TenantBO.CreateTenant(c.Request.Context(), code, name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -65,12 +91,25 @@ func (ctrl *TenantController) BulkCreateTenantHandler(c *gin.Context) {
 	}
 	tenants := []*models.TenantInMaster{}
 	for _, t := range req.Tenants {
+		code := t.GetCode()
+		name := t.GetName()
+
+		if code == "" || name == "" {
+			continue // Skip invalid entries in bulk
+		}
+
 		tenant := &models.TenantInMaster{
-			Code: t.Code,
-			Name: t.Name,
+			Code: code,
+			Name: name,
 		}
 		tenants = append(tenants, tenant)
 	}
+
+	if len(tenants) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid tenants provided"})
+		return
+	}
+
 	tenantsInMaster, err := ctrl.TenantBO.BulkCreateTenant(c.Request.Context(), tenants)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

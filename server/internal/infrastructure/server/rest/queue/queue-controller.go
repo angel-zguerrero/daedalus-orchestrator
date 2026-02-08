@@ -25,8 +25,8 @@ func NewQueueController(Config *common.ServerConfing) *QueueController {
 }
 
 type createQueueRequest struct {
-	Code                                  string            `json:"code" binding:"required"`
-	Name                                  string            `json:"name" binding:"required"`
+	Code                                  any               `json:"code"`
+	Name                                  any               `json:"name"`
 	Type                                  string            `json:"type" binding:"required"`
 	State                                 string            `json:"state"`
 	VNamespace                            string            `json:"vnamespace" binding:"required"`
@@ -40,6 +40,14 @@ type createQueueRequest struct {
 	Headers                               map[string]string `json:"headers"`
 	DeadLetterExchangeId                  string            `json:"deadLetterExchangeId"`
 	DeadLetterExchangeRoutingKeyOrPattern string            `json:"deadLetterExchangeRoutingKeyOrPattern"`
+}
+
+func (r createQueueRequest) GetCode() string {
+	return common.ToString(r.Code)
+}
+
+func (r createQueueRequest) GetName() string {
+	return common.ToString(r.Name)
 }
 
 type createBulkQueueRequest struct {
@@ -64,6 +72,14 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		return
 	}
 
+	code := req.GetCode()
+	name := req.GetName()
+
+	if code == "" || name == "" || req.Type == "" || req.VNamespace == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Code, Name, Type, and VNamespace are required"})
+		return
+	}
+
 	// Validate queue type
 	if !isValidQueueType(req.Type) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid queue type: %s. Valid types are: standard", req.Type)})
@@ -84,9 +100,9 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 
 	// Create queue with all properties
 	queue := &models.Queue{
-		Code:                                  req.Code,
+		Code:                                  code,
 		VNamespace:                            req.VNamespace,
-		Name:                                  req.Name,
+		Name:                                  name,
 		Type:                                  models.QueueType(req.Type),
 		State:                                 models.QueueState(req.State),
 		DefaultQueueMessageTTL:                req.DefaultQueueMessageTTL,
@@ -116,7 +132,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 	var req createBulkQueueRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		ctrl.Config.Logger.Warn().Err(err).Msg("create queue attempt with invalid payload")
+		ctrl.Config.Logger.Warn().Err(err).Msg("create queues bulk attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
@@ -134,6 +150,13 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 	queues := []*models.Queue{}
 
 	for _, t := range req.Queues {
+		code := t.GetCode()
+		name := t.GetName()
+
+		if code == "" || name == "" || t.Type == "" || t.VNamespace == "" {
+			continue // Skip invalid entries in bulk
+		}
+
 		// Set default state if not provided
 		if t.State == "" {
 			t.State = string(models.QueueActive)
@@ -143,9 +166,9 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			t.MaxAttempts = 1
 		}
 		queue := &models.Queue{
-			Code:                                  t.Code,
+			Code:                                  code,
 			VNamespace:                            t.VNamespace,
-			Name:                                  t.Name,
+			Name:                                  name,
 			Type:                                  models.QueueType(t.Type),
 			State:                                 models.QueueState(t.State),
 			DefaultQueueMessageTTL:                t.DefaultQueueMessageTTL,
@@ -160,6 +183,11 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			DeadLetterExchangeRoutingKeyOrPattern: t.DeadLetterExchangeRoutingKeyOrPattern,
 		}
 		queues = append(queues, queue)
+	}
+
+	if len(queues) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid queues provided"})
+		return
 	}
 
 	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), queues, cf, cfs, tenant, tenantNode)

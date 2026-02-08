@@ -26,11 +26,19 @@ func NewExchangeController(Config *common.ServerConfing) *ExchangeController {
 }
 
 type createExchangeRequest struct {
-	Code       string            `json:"code" binding:"required"`
-	Name       string            `json:"name" binding:"required"`
+	Code       any               `json:"code"`
+	Name       any               `json:"name"`
 	Type       string            `json:"type" binding:"required"`
 	VNamespace string            `json:"vnamespace" binding:"required"`
 	Headers    map[string]string `json:"headers"`
+}
+
+func (r createExchangeRequest) GetCode() string {
+	return common.ToString(r.Code)
+}
+
+func (r createExchangeRequest) GetName() string {
+	return common.ToString(r.Name)
 }
 
 type createBulkExchangeRequest struct {
@@ -58,15 +66,23 @@ type queueMessageData struct {
 func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
 	var req createExchangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		ctrl.Config.Logger.Warn().Err(err).Msg("create tenant attempt with invalid payload")
+		ctrl.Config.Logger.Warn().Err(err).Msg("create exchange attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	code := req.GetCode()
+	name := req.GetName()
+
+	if code == "" || name == "" || req.Type == "" || req.VNamespace == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Code, Name, Type, and VNamespace are required"})
 		return
 	}
 
 	// Use tenant data from interceptor context
 	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
-	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), req.Code, req.VNamespace, req.Name, models.ExchangeType(req.Type), req.Headers, cf, cfs, tenant, tenantNode)
+	exchange, err := ctrl.ExchangeBO.CreateExchange(c.Request.Context(), code, req.VNamespace, name, models.ExchangeType(req.Type), req.Headers, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -81,7 +97,7 @@ func (ctrl *ExchangeController) CreateExchangeHandler(c *gin.Context) {
 func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 	var req createBulkExchangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		ctrl.Config.Logger.Warn().Err(err).Msg("create tenant attempt with invalid payload")
+		ctrl.Config.Logger.Warn().Err(err).Msg("create exchanges bulk attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
@@ -92,15 +108,28 @@ func (ctrl *ExchangeController) BulkCreateExchangeHandler(c *gin.Context) {
 	exchanges := []*models.Exchange{}
 
 	for _, t := range req.Exchanges {
+		code := t.GetCode()
+		name := t.GetName()
+
+		if code == "" || name == "" || t.Type == "" || t.VNamespace == "" {
+			continue // Skip invalid entries in bulk
+		}
+
 		exchange := &models.Exchange{
-			Code:       t.Code,
+			Code:       code,
 			VNamespace: t.VNamespace,
-			Name:       t.Name,
+			Name:       name,
 			Type:       models.ExchangeType(t.Type),
 			Headers:    t.Headers,
 		}
 		exchanges = append(exchanges, exchange)
 	}
+
+	if len(exchanges) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid exchanges provided"})
+		return
+	}
+
 	exchangesResult, err := ctrl.ExchangeBO.BulkCreateExchange(c.Request.Context(), exchanges, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
