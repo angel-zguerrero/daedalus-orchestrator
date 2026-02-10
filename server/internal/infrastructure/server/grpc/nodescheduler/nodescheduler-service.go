@@ -25,7 +25,7 @@ func NewNodeSchedulerService(config *common.ServerConfing) *NodeSchedulerService
 }
 
 func (s *NodeSchedulerService) GetNodeSchedulers(ctx context.Context, r *pb.GetNodeSchedulersRequest) (*pb.GetNodeSchedulersResponse, error) {
-	findResult, err := s.NodeSchedulerBO.GetNodeSchedulers(ctx, r.Q, r.Cursor, int(r.PageSize))
+	findResult, err := s.NodeSchedulerBO.GetNodeSchedulers(ctx, r.Q, "", "", -1, r.Cursor, int(r.PageSize))
 	if err != nil {
 		return nil, err
 	}

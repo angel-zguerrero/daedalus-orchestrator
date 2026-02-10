@@ -48,7 +48,7 @@ func (ctrl *NodeSchedulerController) GetNodeSchedulersHandler(c *gin.Context) {
 		page = 1000
 	}
 
-	findResult, err := ctrl.NodeSchedulerBO.GetNodeSchedulers(c.Request.Context(), c.Query("q"), c.Query("cursor"), page)
+	findResult, err := ctrl.NodeSchedulerBO.GetNodeSchedulers(c.Request.Context(), c.Query("q"), "", "", -1, c.Query("cursor"), page)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

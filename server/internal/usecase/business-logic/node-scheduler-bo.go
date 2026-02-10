@@ -163,39 +163,14 @@ func (bo *NodeSchedulerBO) GetNodeSchedulerByName(ctx context.Context, nodeSched
 	return nodeScheduler, nil
 }
 
-func (bo *NodeSchedulerBO) GetNodeSchedulers(ctx context.Context, q string, cursor string, pageSize int) (db.FindResult[models.NodeScheduler], error) {
+func (bo *NodeSchedulerBO) GetNodeSchedulers(ctx context.Context, q string, balancingId string, connectionStatus models.ConnectionStatus, assignedTenantNodeIndex int, cursor string, pageSize int) (db.FindResult[models.NodeScheduler], error) {
 	paginateNodeSchedulersCommand := &node_scheduler.PaginateNodeSchedulersCommand{
-		Cursor:   cursor,
-		PageSize: pageSize,
-		Q:        q,
-	}
-
-	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.NodeScheduler]](
-		bo.Config.MasterNode,
-		ctx,
-		paginateNodeSchedulersCommand,
-		config.GlobalConfiguration.ApiRaftTimeout,
-		bo.Config.Logger,
-		"paginate nodeSchedulers",
-	)
-	if err != nil {
-		return db.FindResult[models.NodeScheduler]{}, fmt.Errorf("paginate nodeSchedulers failed: %w", err)
-	}
-
-	if findResult.Entities == nil {
-		findResult.Entities = []models.NodeScheduler{}
-	}
-
-	return findResult, nil
-}
-
-func (bo *NodeSchedulerBO) GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx context.Context, q string, cursor string, pageSize int, assignedTenantNodeIndex int, balancingId string) (db.FindResult[models.NodeScheduler], error) {
-	paginateNodeSchedulersCommand := &node_scheduler.PaginateNodeSchedulersAssignedTenantNodeIndexCommand{
 		Cursor:                  cursor,
 		PageSize:                pageSize,
 		Q:                       q,
-		AssignedTenantNodeIndex: assignedTenantNodeIndex,
 		BalancingId:             balancingId,
+		ConnectionStatus:        connectionStatus,
+		AssignedTenantNodeIndex: assignedTenantNodeIndex,
 	}
 
 	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.NodeScheduler]](

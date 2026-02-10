@@ -182,7 +182,7 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 		allNodeSchedulers := []*models.NodeScheduler{}
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", cursor, pageSize, tenantNodeIndex, "")
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", "", models.ConnectionStatusConnected, tenantNodeIndex, cursor, pageSize)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
 				break

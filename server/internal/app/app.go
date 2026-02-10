@@ -233,7 +233,7 @@ func (app *Application) Run() {
 	app.StartNodeClearExpiredTTLWorker(1*time.Minute, 10)
 
 	app.StartNodeSchedulerProcessWorkers(300 * time.Millisecond)
-	app.StartNodeSchedulerHeartbeat(10 * time.Second)
+	app.StartNodeSchedulerHeartbeat(1 * time.Second)
 
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 

@@ -39,7 +39,7 @@ Available Flags:
   --max-column-families       Maximum number of column families (default 10, max 100 in production, 10 in non-production). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
   --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
-  --node-scheduler-heartbeat-timeout  Timeout for node scheduler heartbeats (e.g., 3m, 5m). Minimum 3 minutes. Default 3m. Overrides config file and environment variable.
+  --node-scheduler-heartbeat-timeout  Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Default 3s. Overrides config file and environment variable.
   --node-scheduler-ttl         TTL for node scheduler entries in minutes. Minimum 60. Default 1440. Overrides config file and environment variable.
   --tenant-summary-worker-interval  Interval for tenant summary worker in seconds. Minimum 10. Default 30. Overrides config file and environment variable.
   --max-headers                Maximum number of headers. Default 100, minimum 5, maximum 1000. Overrides config file and environment variable.
@@ -107,7 +107,7 @@ Configuration File:
     max_column_families           Maximum number of column families.
     grpc_server_listen_addr_host   Host address for the gRPC server.
     grpc_server_listen_addr_port   Port for the gRPC server.
-    node_scheduler_heartbeat_timeout  Timeout for node scheduler heartbeats in seconds (e.g., 180 for 3m).
+    node_scheduler_heartbeat_timeout  Timeout for node scheduler heartbeats in seconds (e.g., 3 for 3s).
     node_scheduler_ttl            TTL for node scheduler entries in minutes.
     tenant_summary_worker_interval  Interval for tenant summary worker in seconds.
     max_headers                   Maximum number of headers.
@@ -200,7 +200,7 @@ var GrpcServerListenAddrHostFlag = flag.String(constants.GrpcServerListenAddrHos
 var GrpcServerListenAddrPortFlag = flag.Int(constants.GrpcServerListenAddrPortFlagName, 0, "Port for the gRPC server. Default 4545. Overrides config file and environment variable.")
 
 // NodeSchedulerHeartbeatTimeoutFlag defines the --node-scheduler-heartbeat-timeout command-line flag for specifying the node scheduler heartbeat timeout.
-var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHeartbeatTimeoutFlagName, 3*time.Minute, "Timeout for node scheduler heartbeats (e.g., 3m, 5m). Minimum 3 minutes. Overrides config file and environment variable.")
+var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHeartbeatTimeoutFlagName, 3*time.Second, "Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Overrides config file and environment variable.")
 
 // NodeSchedulerTTLFlag defines the --node-scheduler-ttl command-line flag for specifying the node scheduler TTL.
 var NodeSchedulerTTLFlag = flag.Int64(constants.NodeSchedulerTTLFlagName, 1440, "TTL for node scheduler entries in minutes. Minimum 60. Overrides config file and environment variable.")
@@ -577,11 +577,11 @@ func LoadDefaultConfiguration() error {
 
 	// Apply defaults and validations for NodeScheduler settings
 	if config.NodeSchedulerHeartbeatTimeout == 0 {
-		config.NodeSchedulerHeartbeatTimeout = 3 * time.Minute // Default to 3 minutes
+		config.NodeSchedulerHeartbeatTimeout = 3 * time.Second // Default to 3 minutes
 	}
-	if config.NodeSchedulerHeartbeatTimeout < 3*time.Minute {
-		log.Warn().Msgf("NodeSchedulerHeartbeatTimeout (%v) is less than minimum 3 minutes. Setting to 3 minutes.", config.NodeSchedulerHeartbeatTimeout)
-		config.NodeSchedulerHeartbeatTimeout = 3 * time.Minute
+	if config.NodeSchedulerHeartbeatTimeout < 3*time.Second {
+		log.Warn().Msgf("NodeSchedulerHeartbeatTimeout (%v) is less than minimum 3 seconds. Setting to 3 seconds.", config.NodeSchedulerHeartbeatTimeout)
+		config.NodeSchedulerHeartbeatTimeout = 3 * time.Second
 	}
 
 	if config.NodeSchedulerTTL == 0 {

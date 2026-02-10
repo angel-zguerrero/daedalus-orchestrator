@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	models "deadalus-orch/shared/models"
@@ -41,29 +42,35 @@ func (r *NodeSchedulerRepository) GetNodeSchedulerById(id string, now time.Time)
 	return r.FindByField("ID", id, now)
 }
 
-func (r *NodeSchedulerRepository) Paginate(q string, pageSize int, cursor string, now time.Time) (*FindResult[models.NodeScheduler], error) {
-	if q == "" {
+func (r *NodeSchedulerRepository) Paginate(q string, balancingId string, connectionStatus models.ConnectionStatus, AssignedTenantNodeIndex int, pageSize int, cursor string, now time.Time) (*FindResult[models.NodeScheduler], error) {
+	var conditions []string
+
+	// Add name search condition if q is provided
+	if q != "" {
+		conditions = append(conditions, "Name LIKE *"+q+"*")
+	}
+
+	// Add balancingId	 filter condition if vNamespace is provided
+	if balancingId != "" {
+		conditions = append(conditions, "BalancingId = "+balancingId)
+	}
+
+	// Add connectionStatus filter condition if vNamespace is provided
+	if connectionStatus != "" {
+		conditions = append(conditions, "ConnectionStatus = "+string(connectionStatus))
+	}
+
+	// Add AssignedTenantNodeIndex filter condition if vNamespace is provided
+	if AssignedTenantNodeIndex > -1 {
+		conditions = append(conditions, "AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex))
+	}
+
+	// If no conditions but we got here, use the workaround
+	if len(conditions) == 0 {
 		return r.Find("ID != 0", pageSize, cursor, now) // ID != 0 Workaround
 	} else {
-		return r.Find("Name LIKE *"+q+"*", pageSize, cursor, now) // ID != 0 Workaround
+		return r.Find(strings.Join(conditions, " & "), pageSize, cursor, now) // ID != 0 Workaround
 	}
-}
-
-func (r *NodeSchedulerRepository) PaginateUsingAssignedTenantNodeIndex(q string, AssignedTenantNodeIndex int, balancingId string, pageSize int, cursor string, now time.Time) (*FindResult[models.NodeScheduler], error) {
-	if balancingId != "" {
-		if q == "" {
-			return r.Find("ID != 0 & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected)+" & BalancingId = "+balancingId, pageSize, cursor, now) // ID != 0 Workaround
-		} else {
-			return r.Find("Name LIKE *"+q+"* & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected)+" & BalancingId = "+balancingId, pageSize, cursor, now) // ID != 0 Workaround
-		}
-	} else {
-		if q == "" {
-			return r.Find("ID != 0 & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
-		} else {
-			return r.Find("Name LIKE *"+q+"* & AssignedTenantNodeIndex = "+strconv.Itoa(AssignedTenantNodeIndex)+" & ConnectionStatus = "+string(models.ConnectionStatusConnected), pageSize, cursor, now) // ID != 0 Workaround
-		}
-	}
-
 }
 
 func (r *NodeSchedulerRepository) DeleteNodeSchedulerById(id string, now time.Time) (bool, error) {

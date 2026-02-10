@@ -81,7 +81,7 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(ctx context.Context, t
 		var assignedNodeSchedulers []models.NodeScheduler
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulersUsingAssignedTenantNodeIndex(ctx, "", nodeSchedulersCursor, nodeSchedulersPageSize, tenantNodeIndex, balancingId)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", balancingId, models.ConnectionStatusConnected, tenantNodeIndex, nodeSchedulersCursor, nodeSchedulersPageSize)
 			if err != nil {
 				return lastIndices, fmt.Errorf("failed to fetch node schedulers for TenantNode %d: %w", tenantNodeIndex, err)
 			}
@@ -235,6 +235,10 @@ func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(ctx context.Context, t
 		var nodeSchedulersToUpdate []*models.NodeScheduler
 		for i := range assignedNodeSchedulers {
 			ns := assignedNodeSchedulers[i]
+			if ns.ConnectionStatus == models.ConnectionStatusDisconnected {
+				fmt.Println("NodeScheduler is disconnected, skipping.")
+				continue
+			}
 			ns.RunningStatus = models.NodeSchedulerRunningStatusRunning
 			nodeSchedulersToUpdate = append(nodeSchedulersToUpdate, &ns)
 		}

@@ -16,9 +16,12 @@ func init() {
 
 // PaginateNodeSchedulersCommand represents a command to authenticate a user.
 type PaginateNodeSchedulersCommand struct {
-	Cursor   string
-	PageSize int
-	Q        string
+	Cursor                  string
+	PageSize                int
+	Q                       string
+	BalancingId             string
+	ConnectionStatus        models.ConnectionStatus
+	AssignedTenantNodeIndex int
 }
 
 func (cmd *PaginateNodeSchedulersCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -31,7 +34,7 @@ func (cmd *PaginateNodeSchedulersCommand) Execute(uow *db.UnitOfWork, now time.T
 		return *commandResult
 	}
 
-	nodeSchedulerInMasterFound, err := nodeSchedulerInMasterRepo.Paginate(cmd.Q, cmd.PageSize, cmd.Cursor, now)
+	nodeSchedulerInMasterFound, err := nodeSchedulerInMasterRepo.Paginate(cmd.Q, cmd.BalancingId, cmd.ConnectionStatus, cmd.AssignedTenantNodeIndex, cmd.PageSize, cmd.Cursor, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

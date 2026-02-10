@@ -45,11 +45,6 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return paginateNodeSchedulersCommand.Execute(uow, now)
 	}
 
-	paginateNodeSchedulersAssignedTenantNodeIndexCommand, ok := input.(node_scheduler_command.PaginateNodeSchedulersAssignedTenantNodeIndexCommand)
-	if ok {
-		return paginateNodeSchedulersAssignedTenantNodeIndexCommand.Execute(uow, now)
-	}
-
 	findNodeSchedulerCommand, ok := input.(node_scheduler_command.FindNodeSchedulerCommand)
 	if ok {
 		return findNodeSchedulerCommand.Execute(uow, now)

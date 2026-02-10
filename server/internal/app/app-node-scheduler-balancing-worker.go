@@ -131,7 +131,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		allAreStopped := true
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", cursor, pageSize)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", state.BalancingId, models.ConnectionStatusConnected, -1, cursor, pageSize)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to get node schedulers for rebalancing check")
 				return
@@ -173,7 +173,7 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		var latestCreated time.Time
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", cursor, pageSize)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", state.BalancingId, models.ConnectionStatusConnected, -1, cursor, pageSize)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to get node schedulers for balancing check")
 				return

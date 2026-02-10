@@ -35,6 +35,7 @@
         <thead>
           <tr>
             <th>Name</th>
+            <th>Balancing ID</th>
             <th>Connection</th>
             <th>Running</th>
             <th>Assigned Index</th>
@@ -47,6 +48,9 @@
           <tr *ngFor="let nodeScheduler of nodeSchedulers" class="align-middle">
             <td class="text-truncate" style="max-width: 250px;" title="{{ nodeScheduler.Name }}">
               <strong>{{ nodeScheduler.Name }}</strong>
+            </td>
+            <td>
+              <small class="text-muted">{{ nodeScheduler.BalancingId || 'N/A' }}</small>
             </td>
             <td>
               <c-badge [color]="getConnectionStatusColor(nodeScheduler.ConnectionStatus)" shape="rounded-pill">
@@ -163,6 +167,11 @@
             </c-badge>
           </div>
           <div class="form-text">Index of the assigned tenant node</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Balancing ID</label>
+          <div class="p-2 bg-dark rounded">{{ selectedNodeScheduler?.BalancingId || 'N/A' }}</div>
+          <div class="form-text">Current balancing process identifier</div>
         </div>
       </div>
       <div class="col-md-6">
