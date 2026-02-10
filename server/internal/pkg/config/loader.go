@@ -166,7 +166,7 @@ var RestListenAddrHostFlag = flag.String("rest-host", "", "Host address for the 
 var RestListenAddrPortFlag = flag.Int("rest-port", 0, "Port for the Rest API. Overrides config file and environment variable.")
 
 // ApiRaftTimeoutFlag defines the --api-raft-timeout command-line flag for specifying the API to Raft node request timeout.
-var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 5*time.Second, "Timeout for API to Raft node requests (e.g., 5s, 1m). Overrides config file and environment variable.")
+var ApiRaftTimeoutFlag = flag.Duration("api-raft-timeout", 30*time.Second, "Timeout for API to Raft node requests (e.g., 5s, 1m). Overrides config file and environment variable.")
 
 // MaxShardsFlag defines the --max-shards command-line flag.
 var MaxShardsFlag = flag.Int(
@@ -639,8 +639,8 @@ func LoadDefaultConfiguration() error {
 	// This logic seems fine.
 
 	if config.ApiRaftTimeout <= 0 {
-		log.Warn().Msgf("API Raft Timeout was configured to %v, which is invalid or zero. Resetting to default 5s.", config.ApiRaftTimeout)
-		config.ApiRaftTimeout = 5 * time.Second
+		log.Warn().Msgf("API Raft Timeout was configured to %v, which is invalid or zero. Resetting to default 30s.", config.ApiRaftTimeout)
+		config.ApiRaftTimeout = 30 * time.Second
 	}
 
 	// Specific default logic for cluster setup
