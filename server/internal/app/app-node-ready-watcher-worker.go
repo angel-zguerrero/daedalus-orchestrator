@@ -17,12 +17,29 @@ import (
 
 func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 	app.NodeReadyWatcherStopper.RunWorker(func() {
-		masterReadyCh := app.MasterNode.StartNodeReadyWatcher(interval)
+		// Create contexts that can be cancelled when the worker should stop
+		masterCtx, masterCancel := context.WithCancel(context.Background())
+		defer masterCancel()
+		
+		masterReadyCh := app.MasterNode.StartNodeReadyWatcher(masterCtx, interval)
 
 		tenantReadyChs := make([]<-chan bool, len(app.TenantNodes))
+		tenantCancels := make([]context.CancelFunc, len(app.TenantNodes))
+		
 		for i, node := range app.TenantNodes {
-			tenantReadyChs[i] = node.StartNodeReadyWatcher(interval)
+			tenantCtx, tenantCancel := context.WithCancel(context.Background())
+			tenantCancels[i] = tenantCancel
+			tenantReadyChs[i] = node.StartNodeReadyWatcher(tenantCtx, interval)
 		}
+		
+		// Ensure all contexts are cancelled when we exit
+		defer func() {
+			for _, cancel := range tenantCancels {
+				if cancel != nil {
+					cancel()
+				}
+			}
+		}()
 
 		readyMap := make(map[int]bool) // key -1 for master, 0..N-1 for tenants
 		const masterKey = -1
@@ -85,8 +102,16 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 				log.Info().Msg("✅ Master + all tenants ready for consensus.")
 				app.MasterNodeIsReady = true
 
+				// Safe stopper management with proper synchronization
 				if app.AssignTenantsStopper != nil {
-					app.AssignTenantsStopper.Stop()
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								log.Debug().Interface("panic", r).Msg("Recovered from AssignTenantsStopper.Stop panic")
+							}
+						}()
+						app.AssignTenantsStopper.Stop()
+					}()
 				}
 				app.AssignTenantsStopper = syncutil.NewStopper()
 				app.AssignTenants()
@@ -128,7 +153,17 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			if !allReady && app.MasterNodeIsReady {
 				log.Warn().Msg("⚠️️ One or more nodes are not ready. Marking node as not ready.")
 				app.MasterNodeIsReady = false
-				app.AssignTenantsStopper.Stop()
+				// Safe stopper management with proper synchronization
+				if app.AssignTenantsStopper != nil {
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								log.Debug().Interface("panic", r).Msg("Recovered from AssignTenantsStopper.Stop panic")
+							}
+						}()
+						app.AssignTenantsStopper.Stop()
+					}()
+				}
 				app.CloseRestAPI()
 				app.CloseGrpcAPI()
 			}
@@ -136,6 +171,13 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			select {
 			case <-app.NodeReadyWatcherStopper.ShouldStop():
 				log.Info().Msg("ℹ️  NodeReadyWatcher received stop signal.")
+				// Cancel all contexts to stop the watchers cleanly
+				masterCancel()
+				for _, cancel := range tenantCancels {
+					if cancel != nil {
+						cancel()
+					}
+				}
 				return
 			case <-time.After(interval):
 			}

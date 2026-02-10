@@ -266,52 +266,86 @@ func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command)
 // StartNodeReadyWatcher starts a goroutine that periodically checks if the Raft node is ready
 // to process proposals by attempting a synchronous proposal (SyncPropose) of a no-op like command.
 // It sends true on the returned channel when the node becomes ready, and false if it becomes not ready.
-// This can be used to monitor the health and leadership status of the node.
+// The goroutine can be stopped by canceling the provided context.
 //
 // Parameters:
+//   - ctx: The context to control the lifetime of the watcher goroutine.
 //   - interval: The time.Duration between readiness checks.
 //
 // Returns:
 //   - A <-chan bool that emits true when the node is ready, and false otherwise.
-//     The channel is closed when the watcher stops (which is implicitly when the RaftNode might be stopped,
-//     though this watcher runs indefinitely until the underlying NH operations fail consistently or the program exits).
-func (mn *RaftNode) StartNodeReadyWatcher(interval time.Duration) <-chan bool {
-	readyChan := make(chan bool)
+//     The channel is closed when the watcher stops (either by context cancellation or error).
+func (mn *RaftNode) StartNodeReadyWatcher(ctx context.Context, interval time.Duration) <-chan bool {
+	readyChan := make(chan bool, 1) // Buffered to avoid blocking
 
 	go func() {
-		defer close(readyChan)
+		defer func() {
+			// Protect against double-close with recover
+			if r := recover(); r != nil {
+				log.Debug().Interface("panic", r).Msg("Recovered from panic in StartNodeReadyWatcher")
+			}
+			// Safe close using a select with default
+			select {
+			case <-readyChan: // If already closed, this will not block
+			default:
+				close(readyChan)
+			}
+		}()
+		
 		var lastReady bool
 		var initialized bool
+		
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
 
 		for {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			select {
+			case <-ctx.Done():
+				log.Debug().Msg("NodeReadyWatcher stopped by context cancellation")
+				return
+			case <-ticker.C:
+				// Check if node is stopped first
+				mn.mu.RLock()
+				if mn.stopped {
+					mn.mu.RUnlock()
+					log.Debug().Msg("NodeReadyWatcher stopped because node is stopped")
+					return
+				}
+				mn.mu.RUnlock()
+				
+				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 
-			cmd := general_command.FSM_Command{
-				Now:  utils.GetNowInInt(),
-				Type: general_command.RW,
-				CMD: general_command.RWK_Command{
-					Op: general_command.Write,
-					CMD: general_command.WK_Command{
-						Key:                "ready",
-						Value:              []byte(Int64ToBytes(time.Now().UnixMilli())),
-						ColumnFamilyName:   db.MetaFC,
-						ColumnFamilySector: db.MetaFCSector,
-						Op:                 general_command.PutOp,
+				cmd := general_command.FSM_Command{
+					Now:  utils.GetNowInInt(),
+					Type: general_command.RW,
+					CMD: general_command.RWK_Command{
+						Op: general_command.Write,
+						CMD: general_command.WK_Command{
+							Key:                "ready",
+							Value:              []byte(Int64ToBytes(time.Now().UnixMilli())),
+							ColumnFamilyName:   db.MetaFC,
+							ColumnFamilySector: db.MetaFCSector,
+							Op:                 general_command.PutOp,
+						},
 					},
-				},
+				}
+
+				_, err := mn.Write(checkCtx, cmd)
+				cancel()
+
+				currentReady := (err == nil)
+				if !initialized || currentReady != lastReady {
+					lastReady = currentReady
+					initialized = true
+					select {
+					case readyChan <- currentReady:
+						// Message sent successfully
+					case <-ctx.Done():
+						// Context cancelled while trying to send
+						return
+					}
+				}
 			}
-
-			_, err := mn.Write(ctx, cmd)
-			cancel()
-
-			currentReady := (err == nil)
-			if !initialized || currentReady != lastReady {
-				lastReady = currentReady
-				initialized = true
-				readyChan <- currentReady
-			}
-
-			time.Sleep(interval)
 		}
 	}()
 
