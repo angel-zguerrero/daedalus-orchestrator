@@ -200,7 +200,7 @@ var GrpcServerListenAddrHostFlag = flag.String(constants.GrpcServerListenAddrHos
 var GrpcServerListenAddrPortFlag = flag.Int(constants.GrpcServerListenAddrPortFlagName, 0, "Port for the gRPC server. Default 4545. Overrides config file and environment variable.")
 
 // NodeSchedulerHeartbeatTimeoutFlag defines the --node-scheduler-heartbeat-timeout command-line flag for specifying the node scheduler heartbeat timeout.
-var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHeartbeatTimeoutFlagName, 3*time.Second, "Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Overrides config file and environment variable.")
+var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHeartbeatTimeoutFlagName, 15*time.Second, "Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Overrides config file and environment variable.")
 
 // NodeSchedulerTTLFlag defines the --node-scheduler-ttl command-line flag for specifying the node scheduler TTL.
 var NodeSchedulerTTLFlag = flag.Int64(constants.NodeSchedulerTTLFlagName, 1440, "TTL for node scheduler entries in minutes. Minimum 60. Overrides config file and environment variable.")
@@ -577,11 +577,11 @@ func LoadDefaultConfiguration() error {
 
 	// Apply defaults and validations for NodeScheduler settings
 	if config.NodeSchedulerHeartbeatTimeout == 0 {
-		config.NodeSchedulerHeartbeatTimeout = 3 * time.Second // Default to 3 minutes
+		config.NodeSchedulerHeartbeatTimeout = 15 * time.Second // Default to 15 seconds
 	}
-	if config.NodeSchedulerHeartbeatTimeout < 3*time.Second {
-		log.Warn().Msgf("NodeSchedulerHeartbeatTimeout (%v) is less than minimum 3 seconds. Setting to 3 seconds.", config.NodeSchedulerHeartbeatTimeout)
-		config.NodeSchedulerHeartbeatTimeout = 3 * time.Second
+	if config.NodeSchedulerHeartbeatTimeout < 15*time.Second {
+		log.Warn().Msgf("NodeSchedulerHeartbeatTimeout (%v) is less than minimum 15 seconds. Setting to 15 seconds.", config.NodeSchedulerHeartbeatTimeout)
+		config.NodeSchedulerHeartbeatTimeout = 15 * time.Second
 	}
 
 	if config.NodeSchedulerTTL == 0 {
