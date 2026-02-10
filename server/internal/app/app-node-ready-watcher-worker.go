@@ -57,10 +57,6 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 						if !ready && app.MasterNodeIsReady {
 							log.Warn().Int("tenant", i).Msg("⚠️️ Tenant node does not respond.")
 						}
-
-						if ready {
-							defineColumnFamilies(app)
-						}
 						readyMap[i] = ready
 					default:
 					}
@@ -85,6 +81,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			}()
 
 			if allReady && !app.MasterNodeIsReady {
+				defineColumnFamilies(app)
 				log.Info().Msg("✅ Master + all tenants ready for consensus.")
 				app.MasterNodeIsReady = true
 
