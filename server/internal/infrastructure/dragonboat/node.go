@@ -43,38 +43,61 @@ type RaftTuningParams struct {
 	CompactionOverhead uint64
 }
 
+// GetClusterEnvironmentType determines if we're running in a small distributed cluster
+// and returns optimized parameters accordingly
+func getClusterEnvironmentMultiplier() (heartbeatMultiplier, electionMultiplier float64) {
+	// For small clusters (typical distributed setups), use more conservative values
+	// These multipliers help compensate for network latency and reduce re-elections
+	if appConfig.GlobalConfiguration.MaxShards <= 20 {
+		return 1.5, 2.0 // 50% higher heartbeat, 100% higher election RTTs
+	} else if appConfig.GlobalConfiguration.MaxShards <= 100 {
+		return 1.2, 1.5 // 20% higher heartbeat, 50% higher election RTTs
+	}
+	return 1.0, 1.0 // Standard values for larger clusters
+}
+
 func RecommendRaftParamsForShards() RaftTuningParams {
 	numShards := appConfig.GlobalConfiguration.MaxShards
-	// Base values
-	var heartbeatRTT int
+	
+	// Get environment-specific multipliers for small distributed clusters
+	heartbeatMultiplier, electionMultiplier := getClusterEnvironmentMultiplier()
+	
+	// Base values optimized for distributed 3-node clusters
+	// HeartbeatRTT should be higher for network stability
+	var baseHeartbeatRTT int
 	switch {
 	case numShards <= 100:
-		heartbeatRTT = 2
+		baseHeartbeatRTT = 5  // Increased from 2 for better network stability
 	case numShards <= 200:
-		heartbeatRTT = 3
+		baseHeartbeatRTT = 6  // Increased from 3
 	case numShards <= 300:
-		heartbeatRTT = 4
+		baseHeartbeatRTT = 7  // Increased from 4
 	case numShards <= 600:
-		heartbeatRTT = 5
+		baseHeartbeatRTT = 8  // Increased from 5
 	case numShards <= 1000:
-		heartbeatRTT = 7
+		baseHeartbeatRTT = 10 // Increased from 7
 	default:
-		heartbeatRTT = 7
+		baseHeartbeatRTT = 10
 	}
-	var electionRTT int
-
+	
+	var baseElectionRTT int
 	// ElectionRTT should grow as shard count increases, to avoid split votes.
+	// Increased values for distributed environments to prevent frequent re-elections
 	if numShards <= 100 {
-		electionRTT = 20
+		baseElectionRTT = 50  // Increased from 20 for better stability in 3-node clusters
 	} else if numShards <= 300 {
-		electionRTT = 40
+		baseElectionRTT = 80  // Increased from 40
 	} else if numShards <= 600 {
-		electionRTT = 80
+		baseElectionRTT = 120 // Increased from 80
 	} else if numShards <= 1000 {
-		electionRTT = 150
+		baseElectionRTT = 200 // Increased from 150
 	} else {
-		electionRTT = 300
+		baseElectionRTT = 350 // Increased from 300
 	}
+	
+	// Apply environment-specific multipliers
+	heartbeatRTT := int(float64(baseHeartbeatRTT) * heartbeatMultiplier)
+	electionRTT := int(float64(baseElectionRTT) * electionMultiplier)
 
 	// SnapshotEntries determines how often full snapshots are taken.
 	// Higher shard count = less frequent snapshots to reduce IO pressure.
@@ -202,8 +225,8 @@ func (mn *RaftNode) Stop() {
 //   - The result of the proposal from the state machine.
 //   - An error if marshaling fails or if SyncPropose encounters an error.
 func (mn *RaftNode) Write(ctx context.Context, comand general_command.FSM_Command) (statemachine.Result, error) { // Changed FSM_Command to general_command.FSM_Command
-	mn.mu.Lock()
-	defer mn.mu.Unlock()
+	mn.mu.RLock() // Use read lock since we only read the stopped field
+	defer mn.mu.RUnlock()
 	if mn.stopped {
 		return statemachine.Result{}, errors.New("raft node is stopped")
 	}
@@ -227,8 +250,8 @@ func (mn *RaftNode) Write(ctx context.Context, comand general_command.FSM_Comman
 //   - The result of the read operation from the state machine.
 //   - An error if marshaling fails or if SyncRead encounters an error.
 func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command) (interface{}, error) { // Changed Query_Command to general_command.Query_Command
-	mn.mu.Lock()
-	defer mn.mu.Unlock()
+	mn.mu.RLock() // Use read lock since we only read the stopped field
+	defer mn.mu.RUnlock()
 	if mn.stopped {
 		return statemachine.Result{}, errors.New("raft node is stopped")
 	}
