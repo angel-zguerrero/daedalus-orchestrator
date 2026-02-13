@@ -135,16 +135,16 @@ func (mn *RaftNode) StartReplica(NH *dragonboat.NodeHost) error {
 	if runtime.GOOS == "darwin" {
 		signal.Ignore(syscall.Signal(0xd))
 	}
-	_ = RecommendRaftParamsForShards()
+	raftParams := RecommendRaftParamsForShards()
 	cfg := config.Config{
 		ReplicaID:          mn.ReplicaID,
 		ShardID:            mn.ShardID,
 		CheckQuorum:        true,
-		ElectionRTT:        10,
-		HeartbeatRTT:       1,
-		SnapshotEntries:    10,
-		CompactionOverhead: 5,
-		//IsNonVoting:        !ContainsRole(mn.Roles, RoleConsensus),
+		ElectionRTT:        uint64(raftParams.ElectionRTT),
+		HeartbeatRTT:       uint64(raftParams.HeartbeatRTT),
+		SnapshotEntries:    raftParams.SnapshotEntries,
+		CompactionOverhead: raftParams.CompactionOverhead,
+		IsNonVoting:        !ContainsRole(mn.Roles, RoleConsensus),
 	}
 
 	// stateMachine := func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
