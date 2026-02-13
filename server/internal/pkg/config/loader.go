@@ -44,6 +44,7 @@ Available Flags:
   --tenant-summary-worker-interval  Interval for tenant summary worker in seconds. Minimum 10. Default 30. Overrides config file and environment variable.
   --max-headers                Maximum number of headers. Default 100, minimum 5, maximum 1000. Overrides config file and environment variable.
   --node-scheduler-balancing-wait-time  Wait time after the last node scheduler is created before balancing (in seconds). Minimum 10. Default 30. Overrides config file and environment variable.
+  --deployment-id              Unique identifier for cluster isolation (default 1). Overrides config file and environment variable.
 
 
 Environment Variables:
@@ -75,6 +76,7 @@ Environment Variables:
   TENANT_SUMMARY_WORKER_INTERVAL  Interval for tenant summary worker in seconds. (Corresponds to ` + constants.EnvVarTenantSummaryWorkerInterval + `)
   MAX_HEADERS                 Maximum number of headers. (Corresponds to ` + constants.EnvVarMaxHeaders + `)
   NODE_SCHEDULER_BALANCING_WAIT_TIME Wait time after last node scheduler is created (in seconds). (Corresponds to ` + constants.EnvVarNodeSchedulerBalancingWaitTime + `)
+  DEPLOYMENT_ID                Unique identifier for cluster isolation. (Corresponds to ` + constants.EnvVarDeploymentID + `)
 
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
@@ -112,6 +114,7 @@ Configuration File:
     tenant_summary_worker_interval  Interval for tenant summary worker in seconds.
     max_headers                   Maximum number of headers.
     node_scheduler_balancing_wait_time Wait time after last node scheduler is created in seconds.
+    deployment_id                 Unique identifier for cluster isolation.
 
 
 Precedence of Configuration:
@@ -213,6 +216,9 @@ var MaxHeadersFlag = flag.Int(constants.MaxHeadersFlagName, 0, "Maximum number o
 
 // NodeSchedulerBalancingWaitTimeFlag defines the --node-scheduler-balancing-wait-time command-line flag.
 var NodeSchedulerBalancingWaitTimeFlag = flag.Int64(constants.NodeSchedulerBalancingWaitTimeFlagName, 30, "Wait time after the last node scheduler is created before balancing (in seconds). Minimum 10. Overrides config file and environment variable.")
+
+// DeploymentIDFlag defines the --deployment-id command-line flag.
+var DeploymentIDFlag = flag.Uint64(constants.DeploymentIDFlagName, 0, "Unique identifier for cluster isolation. Overrides config file and environment variable.")
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -452,6 +458,14 @@ func LoadDefaultConfiguration() error {
 		config.NodeSchedulerBalancingWaitTime = time.Duration(waitTime) * time.Second
 	}
 
+	if envVal := os.Getenv(constants.EnvVarDeploymentID); envVal != "" {
+		deploymentID, err := strconv.ParseUint(envVal, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarDeploymentID, err)
+		}
+		config.DeploymentID = deploymentID
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -541,6 +555,10 @@ func LoadDefaultConfiguration() error {
 		config.NodeSchedulerBalancingWaitTime = time.Duration(*NodeSchedulerBalancingWaitTimeFlag) * time.Second
 	}
 
+	if *DeploymentIDFlag != 0 { // Only override if different from default
+		config.DeploymentID = *DeploymentIDFlag
+	}
+
 	// Apply defaults if values are not set by any source
 	if config.DefaultRootUser == "" {
 		config.DefaultRootUser = "admin"
@@ -617,6 +635,11 @@ func LoadDefaultConfiguration() error {
 	if config.NodeSchedulerBalancingWaitTime < 10*time.Second {
 		log.Warn().Msgf("NodeSchedulerBalancingWaitTime (%v) is less than minimum 10 seconds. Setting to 10 seconds.", config.NodeSchedulerBalancingWaitTime)
 		config.NodeSchedulerBalancingWaitTime = 10 * time.Second
+	}
+
+	if config.DeploymentID == 0 {
+		// Default DeploymentID is 0 to maintain compatibility with existing Dragonboat clusters
+		config.DeploymentID = 0
 	}
 
 	// Default for ApiRaftTimeout if not set by file, env, or flag (flag itself has a default of 5s)
@@ -931,6 +954,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.node_scheduler_balancing_wait_time = w
+		case constants.ConfigDeploymentIDKey:
+			id, err := strconv.ParseUint(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.deployment_id = id
 
 		}
 	}

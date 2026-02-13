@@ -25,7 +25,7 @@ func (app *Application) StartNodeSchedulerHeartbeat(interval time.Duration) {
 				select {
 				case <-ticker.C:
 					if !app.MasterNodeIsReady {
-						log.Debug().Int("index", index).Msg("⏳ NodeScheduler process is waiting for the master node to be ready")
+						//log.Debug().Int("index", index).Msg("⏳ NodeScheduler process is waiting for the master node to be ready")
 						continue
 					}
 
@@ -232,5 +232,5 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 		return
 	}
 
-	log.Debug().Str("nodeSchedulerName", nodeSchedulerName).Msg("✅ NodeScheduler heartbeat sent successfully")
+	//log.Debug().Str("nodeSchedulerName", nodeSchedulerName).Msg("✅ NodeScheduler heartbeat sent successfully")
 }

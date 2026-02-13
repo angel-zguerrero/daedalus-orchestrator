@@ -9,7 +9,10 @@ import (
 	"encoding/gob"
 	"errors"
 	"math"
+	"os/signal"
+	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/lni/dragonboat/v4"
@@ -46,55 +49,49 @@ type RaftTuningParams struct {
 // GetClusterEnvironmentType determines if we're running in a small distributed cluster
 // and returns optimized parameters accordingly
 func getClusterEnvironmentMultiplier() (heartbeatMultiplier, electionMultiplier float64) {
-	// For small clusters (typical distributed setups), use more conservative values
-	// These multipliers help compensate for network latency and reduce re-elections
+	// For small clusters, we still want to be slightly conservative but not as much as before
 	if appConfig.GlobalConfiguration.MaxShards <= 20 {
-		return 1.5, 2.0 // 50% higher heartbeat, 100% higher election RTTs
+		return 1.1, 1.2 // 10% higher heartbeat, 20% higher election RTTs
 	} else if appConfig.GlobalConfiguration.MaxShards <= 100 {
-		return 1.2, 1.5 // 20% higher heartbeat, 50% higher election RTTs
+		return 1.05, 1.1 // 5% higher heartbeat, 10% higher election RTTs
 	}
 	return 1.0, 1.0 // Standard values for larger clusters
 }
 
 func RecommendRaftParamsForShards() RaftTuningParams {
 	numShards := appConfig.GlobalConfiguration.MaxShards
-	
+
 	// Get environment-specific multipliers for small distributed clusters
 	heartbeatMultiplier, electionMultiplier := getClusterEnvironmentMultiplier()
-	
+
 	// Base values optimized for distributed 3-node clusters
 	// HeartbeatRTT should be higher for network stability
 	var baseHeartbeatRTT int
 	switch {
 	case numShards <= 100:
-		baseHeartbeatRTT = 5  // Increased from 2 for better network stability
+		baseHeartbeatRTT = 2 // Increased from 1 for better stability
 	case numShards <= 200:
-		baseHeartbeatRTT = 6  // Increased from 3
-	case numShards <= 300:
-		baseHeartbeatRTT = 7  // Increased from 4
-	case numShards <= 600:
-		baseHeartbeatRTT = 8  // Increased from 5
-	case numShards <= 1000:
-		baseHeartbeatRTT = 10 // Increased from 7
+		baseHeartbeatRTT = 3
+	case numShards <= 500:
+		baseHeartbeatRTT = 5
 	default:
-		baseHeartbeatRTT = 10
+		baseHeartbeatRTT = 8
 	}
-	
+
 	var baseElectionRTT int
 	// ElectionRTT should grow as shard count increases, to avoid split votes.
-	// Increased values for distributed environments to prevent frequent re-elections
 	if numShards <= 100 {
-		baseElectionRTT = 50  // Increased from 20 for better stability in 3-node clusters
+		baseElectionRTT = 20 // Increased from 10 for better stability
 	} else if numShards <= 300 {
-		baseElectionRTT = 80  // Increased from 40
+		baseElectionRTT = 30
 	} else if numShards <= 600 {
-		baseElectionRTT = 120 // Increased from 80
+		baseElectionRTT = 50
 	} else if numShards <= 1000 {
-		baseElectionRTT = 200 // Increased from 150
+		baseElectionRTT = 80
 	} else {
-		baseElectionRTT = 350 // Increased from 300
+		baseElectionRTT = 100
 	}
-	
+
 	// Apply environment-specific multipliers
 	heartbeatRTT := int(float64(baseHeartbeatRTT) * heartbeatMultiplier)
 	electionRTT := int(float64(baseElectionRTT) * electionMultiplier)
@@ -135,16 +132,19 @@ func RecommendRaftParamsForShards() RaftTuningParams {
 // Returns:
 //   - An error if any step fails, such as directory creation, NodeHost initialization, or starting the replica.
 func (mn *RaftNode) StartReplica(NH *dragonboat.NodeHost) error {
-	recommendedCfg := RecommendRaftParamsForShards()
+	if runtime.GOOS == "darwin" {
+		signal.Ignore(syscall.Signal(0xd))
+	}
+	_ = RecommendRaftParamsForShards()
 	cfg := config.Config{
 		ReplicaID:          mn.ReplicaID,
 		ShardID:            mn.ShardID,
 		CheckQuorum:        true,
-		ElectionRTT:        uint64(recommendedCfg.ElectionRTT),
-		HeartbeatRTT:       uint64(recommendedCfg.HeartbeatRTT),
-		SnapshotEntries:    uint64(recommendedCfg.SnapshotEntries),
-		CompactionOverhead: uint64(recommendedCfg.CompactionOverhead),
-		IsNonVoting:        !ContainsRole(mn.Roles, RoleConsensus),
+		ElectionRTT:        10,
+		HeartbeatRTT:       1,
+		SnapshotEntries:    10,
+		CompactionOverhead: 5,
+		//IsNonVoting:        !ContainsRole(mn.Roles, RoleConsensus),
 	}
 
 	// stateMachine := func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
@@ -161,6 +161,7 @@ func (mn *RaftNode) StartReplica(NH *dragonboat.NodeHost) error {
 	if mn.Join {
 		initialMembersMap = map[uint64]string{}
 	}
+	log.Info().Interface("initialMembersMap", initialMembersMap).Interface("Join", mn.Join).Interface("cfg", cfg).Msg("Starting replica")
 	return mn.NH.StartOnDiskReplica(initialMembersMap, mn.Join, mn.stateMachine, cfg)
 
 }
@@ -185,13 +186,11 @@ func (mn *RaftNode) RequestAddReplica(replicaID uint64, member Member) error {
 		return err
 	}
 	// Wait for the result of the request.
-	select {
-	case r := <-rs.ResultC():
-		if r.Completed() {
-			log.Info().Msg("✅ Replica added successfully") // Changed Spanish to English
-		} else {
-			log.Error().Interface("Result", r).Msg("❌ Error adding replica") // Changed Spanish to English
-		}
+	r := <-rs.ResultC()
+	if r.Completed() {
+		log.Info().Msg("✅ Replica added successfully") // Changed Spanish to English
+	} else {
+		log.Error().Interface("Result", r).Msg("❌ Error adding replica") // Changed Spanish to English
 	}
 	return err
 }
@@ -291,10 +290,10 @@ func (mn *RaftNode) StartNodeReadyWatcher(ctx context.Context, interval time.Dur
 				close(readyChan)
 			}
 		}()
-		
+
 		var lastReady bool
 		var initialized bool
-		
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -312,7 +311,7 @@ func (mn *RaftNode) StartNodeReadyWatcher(ctx context.Context, interval time.Dur
 					return
 				}
 				mn.mu.RUnlock()
-				
+
 				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 
 				cmd := general_command.FSM_Command{

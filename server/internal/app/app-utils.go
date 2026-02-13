@@ -6,19 +6,19 @@ func RecommendRTTMillisecond() uint64 {
 	shardCount := config.GlobalConfiguration.MaxShards
 	switch {
 	case shardCount <= 50:
-		return 200
+		return 100 // Increased from 50
 	case shardCount <= 100:
-		return 250
+		return 150 // Increased from 75
 	case shardCount <= 200:
-		return 350
+		return 200 // Increased from 100
 	case shardCount <= 400:
-		return 375
+		return 250 // Increased from 150
 	case shardCount <= 800:
-		return 450
+		return 300 // Increased from 200
 	case shardCount <= 1600:
-		return 500
+		return 350 // Increased from 250
 
 	default:
-		return 300
+		return 200
 	}
 }
