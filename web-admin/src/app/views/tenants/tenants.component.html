@@ -35,8 +35,15 @@
         </button>
       </c-col>
     </c-row>
+
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loading">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading tenants...</p>
+    </div>
+
     <!-- Tenants Table -->
-    <div class="table-responsive">
+    <div class="table-responsive" *ngIf="!loading">
       <table cTable class="mt-4" [hover]="true">
         <thead>
           <tr>

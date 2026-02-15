@@ -75,14 +75,17 @@ export class TenantsComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
+    this.loading = true;
     this.tenantsService.getTenants(cursor, this.pageSize, this.searchQuery).subscribe({
       next: (response) => {
         this.tenants = response.result.Entities;
         this.cursor = response.result.Cursor;
+        this.loading = false;
       },
       error: (error) => {
         this.showAlert = true;
         this.errorMessage = ErrorUtil.formatErrorMessage(error);
+        this.loading = false;
       }
     });
   }

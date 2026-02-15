@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lni/goutils/syncutil"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,18 +19,18 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 		// Create contexts that can be cancelled when the worker should stop
 		masterCtx, masterCancel := context.WithCancel(context.Background())
 		defer masterCancel()
-		
+
 		masterReadyCh := app.MasterNode.StartNodeReadyWatcher(masterCtx, interval)
 
 		tenantReadyChs := make([]<-chan bool, len(app.TenantNodes))
 		tenantCancels := make([]context.CancelFunc, len(app.TenantNodes))
-		
+
 		for i, node := range app.TenantNodes {
 			tenantCtx, tenantCancel := context.WithCancel(context.Background())
 			tenantCancels[i] = tenantCancel
 			tenantReadyChs[i] = node.StartNodeReadyWatcher(tenantCtx, interval)
 		}
-		
+
 		// Ensure all contexts are cancelled when we exit
 		defer func() {
 			for _, cancel := range tenantCancels {
@@ -97,75 +96,56 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 				}
 			}()
 
-			if allReady && !app.MasterNodeIsReady {
-				defineColumnFamilies(app)
-				log.Info().Msg("✅ Master + all tenants ready for consensus.")
-				app.MasterNodeIsReady = true
-
-				// Safe stopper management with proper synchronization
-				if app.AssignTenantsStopper != nil {
-					func() {
-						defer func() {
-							if r := recover(); r != nil {
-								log.Debug().Interface("panic", r).Msg("Recovered from AssignTenantsStopper.Stop panic")
-							}
-						}()
-						app.AssignTenantsStopper.Stop()
-					}()
+			if allReady {
+				if !app.MasterNodeIsReady {
+					log.Info().Msg("✅ Master + all tenants ready for consensus.")
+					app.MasterNodeIsReady = true
 				}
-				app.AssignTenantsStopper = syncutil.NewStopper()
-				app.AssignTenants()
-				app.StartAssignTenantsWorker(10 * time.Minute)
-				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConsensus) {
-					bootstrapRootUserCmd := &auth_command.BootstrapRootUserCommand{}
-					cmd := general_command.FSM_Command{
-						Now:  utils.GetNowInInt(),
-						Type: general_command.REPOSITORY_COMMAND,
-						CMD:  bootstrapRootUserCmd,
-					}
 
-					ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-					defer cancel()
-					_, err := app.MasterNode.Write(ctx, cmd)
-					if err != nil {
-						log.Fatal().
-							Err(err).
-							Str("package", "app").
-							Str("func", "Run").
-							Msgf("❌ Failed to bootstrap root user")
+				if !app.MasterNodeBootstrapped {
+					defineColumnFamilies(app)
+					log.Info().Msg("📦 Database column families defined.")
+
+					if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConsensus) {
+						bootstrapRootUserCmd := &auth_command.BootstrapRootUserCommand{}
+						cmd := general_command.FSM_Command{
+							Now:  utils.GetNowInInt(),
+							Type: general_command.REPOSITORY_COMMAND,
+							CMD:  bootstrapRootUserCmd,
+						}
+
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+						defer cancel()
+						_, err := app.MasterNode.Write(ctx, cmd)
+						if err != nil {
+							log.Error().Err(err).Msg("❌ Failed to bootstrap root user (will retry)")
+							// Don't set bootstrapped true if this failed
+						} else {
+							app.MasterNodeBootstrapped = true
+
+							// Start background workers only after successful bootstrap
+							app.AssignTenants()
+							app.StartAssignTenantsWorker(10 * time.Minute)
+						}
+					} else {
+						// Non-consensus nodes are "bootstrapped" once they see the cluster ready
+						app.MasterNodeBootstrapped = true
 					}
 				}
 
+				// Always ensure APIs are running if roles match, but Start*API() has internal guards
 				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleAdmin) {
 					app.StartRestAPI()
-				} else {
-					app.CloseRestAPI()
 				}
 
 				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConnector) {
 					app.StartGrpcAPI()
-				} else {
-					app.CloseGrpcAPI()
 				}
-
 			}
 
 			if !allReady && app.MasterNodeIsReady {
-				log.Warn().Msg("⚠️️ One or more nodes are not ready. Marking node as not ready.")
+				log.Warn().Msg("⚠️️ One or more nodes are not ready (transient unreadiness). APIs and workers remain active.")
 				app.MasterNodeIsReady = false
-				// Safe stopper management with proper synchronization
-				if app.AssignTenantsStopper != nil {
-					func() {
-						defer func() {
-							if r := recover(); r != nil {
-								log.Debug().Interface("panic", r).Msg("Recovered from AssignTenantsStopper.Stop panic")
-							}
-						}()
-						app.AssignTenantsStopper.Stop()
-					}()
-				}
-				app.CloseRestAPI()
-				app.CloseGrpcAPI()
 			}
 
 			select {
