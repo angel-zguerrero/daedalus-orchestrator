@@ -40,9 +40,7 @@ func (app *Application) StartNodeSchedulerHeartbeat(interval time.Duration) {
 					default:
 					}
 
-					go func() {
-						app.sendNodeSchedulerHeartbeat(index)
-					}()
+					app.sendNodeSchedulerHeartbeat(index)
 
 				case <-app.NodeSchedulerProcessStopper.ShouldStop():
 					log.Info().Int("index", index).Msg("ℹ️  NodeScheduler process worker stopped gracefully")
@@ -78,9 +76,7 @@ func (app *Application) StartNodeSchedulerProcessWorkers(interval time.Duration)
 					default:
 					}
 
-					go func() {
-						app.processNodeSchedulerTasks(index)
-					}()
+					app.processNodeSchedulerTasks(index)
 
 				case <-app.NodeSchedulerProcessStopper.ShouldStop():
 					log.Info().Int("index", index).Msg("ℹ️  NodeScheduler process worker stopped gracefully")
@@ -114,23 +110,27 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 
 	nodeSchedulerBO := business_logic.NewNodeSchedulerBO(serverConfig)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
-	nodeScheduler, err := nodeSchedulerBO.GetNodeSchedulerByName(ctx, nodeSchedulerName)
+	getCtx, getCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	nodeScheduler, err := nodeSchedulerBO.GetNodeSchedulerByName(getCtx, nodeSchedulerName)
+	getCancel()
 	if err != nil {
 		log.Err(err).Msg("❌ Failed to get node scheduler during process node scheduler tasks " + nodeSchedulerName)
 	}
 
 	if nodeScheduler.RunningStatus == models.NodeSchedulerRunningStatusRunning {
 		balancingBO := business_logic.NewNodeSchedulerBalancingBO(serverConfig)
-		state, err := balancingBO.GetState(ctx)
+
+		stateCtx, stateCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		state, err := balancingBO.GetState(stateCtx)
+		stateCancel()
 		if err != nil {
 			log.Err(err).Msg("❌ Failed to get node scheduler balancing state")
 			return
 		}
 		if state != nil && state.Status == models.RequestForNewBalancing {
-			_, err = nodeSchedulerBO.UpdateRunningStatusNodeScheduler(ctx, []*models.NodeScheduler{&nodeScheduler}, models.NodeSchedulerRunningStatusStopped)
+			updateCtx, updateCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			_, err = nodeSchedulerBO.UpdateRunningStatusNodeScheduler(updateCtx, []*models.NodeScheduler{&nodeScheduler}, models.NodeSchedulerRunningStatusStopped)
+			updateCancel()
 			if err != nil {
 				log.Err(err).Msg("❌ Error updating running status node schedulers")
 			}
@@ -164,12 +164,14 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 	// Create NodeScheduler business object
 	nodeSchedulerBO := business_logic.NewNodeSchedulerBO(serverConfig)
 
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
+	// Each Raft operation gets its own fresh context to avoid "invalid deadline" errors.
+	// A single shared context would cause later operations to fail if earlier ones are slow
+	// (e.g., during cluster reconfiguration when adding new members).
 	balancingBO := business_logic.NewNodeSchedulerBalancingBO(serverConfig)
-	state, err := balancingBO.GetState(ctx)
+
+	getStateCtx, getStateCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	state, err := balancingBO.GetState(getStateCtx)
+	getStateCancel()
 	if err != nil {
 		log.Err(err).Msg("❌ Failed to get node scheduler balancing state")
 		return
@@ -182,7 +184,9 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 		allNodeSchedulers := []*models.NodeScheduler{}
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", "", models.ConnectionStatusConnected, tenantNodeIndex, cursor, pageSize)
+			paginateCtx, paginateCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(paginateCtx, "", "", models.ConnectionStatusConnected, tenantNodeIndex, cursor, pageSize)
+			paginateCancel()
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
 				break
@@ -207,7 +211,9 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 			for _, ns := range allNodeSchedulers {
 				ns.BalancingId = "" // maintain the current balancing id in the node scheduler
 			}
-			_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, allNodeSchedulers)
+			upsertCtx, upsertCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(upsertCtx, allNodeSchedulers)
+			upsertCancel()
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
 			} else {
@@ -226,7 +232,9 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 	}
 
 	// Send heartbeat by calling BulkUpsertNodeScheduler for current server
-	_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(ctx, []*models.NodeScheduler{nodeScheduler})
+	heartbeatCtx, heartbeatCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(heartbeatCtx, []*models.NodeScheduler{nodeScheduler})
+	heartbeatCancel()
 	if err != nil {
 		log.Err(err).Msg("❌ Failed to send NodeScheduler heartbeat")
 		return

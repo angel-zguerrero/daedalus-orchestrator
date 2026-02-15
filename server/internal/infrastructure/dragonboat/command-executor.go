@@ -42,9 +42,15 @@ func ExecuteRepositoryCommand[T any](
 ) (T, error) {
 	var zero T
 
-	// Create timeout context
-	writeCtx, writeCancel := context.WithTimeout(ctx, timeout)
-	defer writeCancel()
+	// Only create a new timeout if the parent context doesn't already have a deadline.
+	// This prevents double-wrapping (caller sets 30s, then this adds another timeout),
+	// which causes "invalid deadline" errors when the parent expires first.
+	writeCtx := ctx
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var writeCancel context.CancelFunc
+		writeCtx, writeCancel = context.WithTimeout(ctx, timeout)
+		defer writeCancel()
+	}
 
 	// Create FSM command
 	fsmCmd := general_command.FSM_Command{
@@ -124,9 +130,13 @@ func ExecuteRepositoryQuery[T any](
 		Now: time.Now().UnixNano(),
 	}
 
-	// Create timeout context
-	readCtx, readCancel := context.WithTimeout(ctx, timeout)
-	defer readCancel()
+	// Only create a new timeout if the parent context doesn't already have a deadline.
+	readCtx := ctx
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var readCancel context.CancelFunc
+		readCtx, readCancel = context.WithTimeout(ctx, timeout)
+		defer readCancel()
+	}
 
 	// Execute read operation
 	result, err := raftNode.Read(readCtx, *queryCommand)

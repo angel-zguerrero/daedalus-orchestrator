@@ -3,8 +3,6 @@ package dragonboat
 import (
 	"bytes"
 	"context"
-	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/pkg/utils"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"encoding/gob"
 	"errors"
@@ -21,6 +19,7 @@ import (
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/rs/zerolog/log"
 
+	"deadalus-orch/server/internal/infrastructure/db"
 	appConfig "deadalus-orch/server/internal/pkg/config"
 )
 
@@ -314,22 +313,17 @@ func (mn *RaftNode) StartNodeReadyWatcher(ctx context.Context, interval time.Dur
 
 				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 
-				cmd := general_command.FSM_Command{
-					Now:  utils.GetNowInInt(),
-					Type: general_command.RW,
-					CMD: general_command.RWK_Command{
-						Op: general_command.Write,
-						CMD: general_command.WK_Command{
-							Key:                "ready",
-							Value:              []byte(Int64ToBytes(time.Now().UnixMilli())),
-							ColumnFamilyName:   db.MetaFC,
-							ColumnFamilySector: db.MetaFCSector,
-							Op:                 general_command.PutOp,
-						},
+				queryCmd := general_command.Query_Command{
+					Now: time.Now().UnixNano(),
+					Command: general_command.RK_Command{
+						Key:                "readiness-check",
+						Op:                 general_command.GetOp,
+						ColumnFamilyName:   db.MetaFC,
+						ColumnFamilySector: db.MetaFCSector,
 					},
 				}
 
-				_, err := mn.Write(checkCtx, cmd)
+				_, err := mn.Read(checkCtx, queryCmd)
 				cancel()
 
 				currentReady := (err == nil)

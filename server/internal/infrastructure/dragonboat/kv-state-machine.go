@@ -133,8 +133,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	if len(ents) == 0 {
 		return nil, nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// No mutex needed here — Dragonboat guarantees Update() is called sequentially per shard.
+	// Using a Lock here would contend with Lookup()/SaveSnapshot() which use RLock().
 
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	batch := db.NewWriteBatch()
