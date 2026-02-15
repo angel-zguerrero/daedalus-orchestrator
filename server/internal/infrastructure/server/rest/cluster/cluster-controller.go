@@ -1,9 +1,11 @@
 package cluster
 
 import (
+	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -175,28 +177,153 @@ func (cc *ClusterController) AddReplica(c *gin.Context) {
 	}
 }
 
-// GetClusterInfo gets information about the current cluster state
+// ClusterNodeInfo represents information about a node in the cluster from GetClusterConfig
+type ClusterNodeInfo struct {
+	NodeID  uint64 `json:"node_id"`
+	Address string `json:"address"`
+	ShardID uint64 `json:"shard_id"`
+}
+
+// ClusterConfigInfo represents the cluster configuration information
+type ClusterConfigInfo struct {
+	ShardID uint64            `json:"shard_id"`
+	Nodes   []ClusterNodeInfo `json:"nodes"`
+	Total   int               `json:"total"`
+}
+
+// EnhancedClusterInfo represents the complete cluster information
+type EnhancedClusterInfo struct {
+	// Primary information from GetClusterConfig
+	ClusterConfig []ClusterConfigInfo `json:"cluster_config"`
+	
+	// Secondary information (current node configuration)
+	NodeConfiguration struct {
+		MasterNode  gin.H   `json:"master_node"`
+		TenantNodes []gin.H `json:"tenant_nodes"`
+	} `json:"node_configuration"`
+}
+
+// GetClusterInfo gets information about the current cluster state using GetClusterConfig as primary data
 // @Summary Get cluster information
-// @Description Retrieves information about the current cluster state including node details
+// @Description Retrieves information about the current cluster state including live cluster configuration and node details
 // @Tags Cluster Management
 // @Produce json
-// @Success 200 {object} map[string]interface{} "Cluster information"
+// @Success 200 {object} EnhancedClusterInfo "Enhanced cluster information"
 // @Router /api/v1/cluster/info [get]
 func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
-	info := gin.H{
-		"master_node": gin.H{
-			"replica_id":  cc.Config.MasterNode.ReplicaID,
-			"shard_id":    cc.Config.MasterNode.ShardID,
-			"self_member": cc.Config.MasterNode.SelfMember,
-			"roles":       cc.Config.MasterNode.Roles,
-		},
-		"tenant_nodes": make([]gin.H, 0),
+	response := EnhancedClusterInfo{
+		ClusterConfig: []ClusterConfigInfo{},
 	}
 
-	// Add tenant nodes info
-	tenantNodes := info["tenant_nodes"].([]gin.H)
+	// Get cluster configuration from all available shards using GetClusterConfig
+	shardsToCheck := []uint64{dragonboat.MasterShardID}
+	for _, tenantNode := range cc.Config.TenantNodes {
+		shardsToCheck = append(shardsToCheck, tenantNode.ShardID)
+	}
+
+	// Extract cluster config information from each shard
+	for _, shardID := range shardsToCheck {
+		var raftNode *dragonboat.RaftNode
+		
+		// Get the appropriate RaftNode for this shard
+		if shardID == dragonboat.MasterShardID {
+			raftNode = cc.Config.MasterNode
+		} else {
+			// Find tenant node with matching ShardID
+			for _, tenantNode := range cc.Config.TenantNodes {
+				if tenantNode.ShardID == shardID {
+					raftNode = tenantNode
+					break
+				}
+			}
+		}
+
+		if raftNode != nil && raftNode.NH != nil {
+			// Use SyncGetShardMembership to get live cluster configuration
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			
+			membership, err := raftNode.NH.SyncGetShardMembership(ctx, shardID)
+			if err != nil {
+				log.Warn().
+					Uint64("shard_id", shardID).
+					Err(err).
+					Msg("⚠️ Failed to get shard membership for shard")
+				continue
+			}
+
+			// Build cluster config info for this shard
+			clusterConfigInfo := ClusterConfigInfo{
+				ShardID: shardID,
+				Nodes:   []ClusterNodeInfo{},
+				Total:   len(membership.Nodes),
+			}
+
+			// Extract node information from cluster membership
+			for nodeID, addr := range membership.Nodes {
+				nodeInfo := ClusterNodeInfo{
+					NodeID:  nodeID,
+					Address: addr,
+					ShardID: shardID,
+				}
+				clusterConfigInfo.Nodes = append(clusterConfigInfo.Nodes, nodeInfo)
+				
+				log.Debug().
+					Uint64("shard_id", shardID).
+					Uint64("node_id", nodeID).
+					Str("addr", addr).
+					Msg("🔍 Found cluster node")
+			}
+
+			// Also include non-voting nodes if any
+			for nodeID, addr := range membership.NonVotings {
+				nodeInfo := ClusterNodeInfo{
+					NodeID:  nodeID,
+					Address: addr + " (non-voting)",
+					ShardID: shardID,
+				}
+				clusterConfigInfo.Nodes = append(clusterConfigInfo.Nodes, nodeInfo)
+				clusterConfigInfo.Total++
+				
+				log.Debug().
+					Uint64("shard_id", shardID).
+					Uint64("node_id", nodeID).
+					Str("addr", addr).
+					Msg("🔍 Found non-voting cluster node")
+			}
+
+			// Also include witness nodes if any
+			for nodeID, addr := range membership.Witnesses {
+				nodeInfo := ClusterNodeInfo{
+					NodeID:  nodeID,
+					Address: addr + " (witness)",
+					ShardID: shardID,
+				}
+				clusterConfigInfo.Nodes = append(clusterConfigInfo.Nodes, nodeInfo)
+				clusterConfigInfo.Total++
+				
+				log.Debug().
+					Uint64("shard_id", shardID).
+					Uint64("node_id", nodeID).
+					Str("addr", addr).
+					Msg("🔍 Found witness cluster node")
+			}
+
+			response.ClusterConfig = append(response.ClusterConfig, clusterConfigInfo)
+		}
+	}
+
+	// Secondary information: Current node configuration
+	response.NodeConfiguration.MasterNode = gin.H{
+		"replica_id":  cc.Config.MasterNode.ReplicaID,
+		"shard_id":    cc.Config.MasterNode.ShardID,
+		"self_member": cc.Config.MasterNode.SelfMember,
+		"roles":       cc.Config.MasterNode.Roles,
+	}
+
+	response.NodeConfiguration.TenantNodes = make([]gin.H, 0)
 	for tenantID, node := range cc.Config.TenantNodes {
-		tenantNodes = append(tenantNodes, gin.H{
+		response.NodeConfiguration.TenantNodes = append(response.NodeConfiguration.TenantNodes, gin.H{
 			"tenant_id":   tenantID,
 			"replica_id":  node.ReplicaID,
 			"shard_id":    node.ShardID,
@@ -204,9 +331,12 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 			"roles":       node.Roles,
 		})
 	}
-	info["tenant_nodes"] = tenantNodes
 
-	c.JSON(http.StatusOK, info)
+	log.Info().
+		Int("cluster_shards", len(response.ClusterConfig)).
+		Msg("✅ Retrieved enhanced cluster information")
+
+	c.JSON(http.StatusOK, response)
 }
 
 // RegisterRoutes registers the cluster management routes with the provided router group

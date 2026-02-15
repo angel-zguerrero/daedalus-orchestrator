@@ -1,6 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ClusterService, ClusterInfo, NodeInfo, TenantNodeInfo, AddReplicaRequest, DisplayNode } from './services/cluster.service';
+import { 
+  ClusterService, 
+  EnhancedClusterInfo, 
+  ClusterConfigInfo, 
+  ClusterNodeInfo,
+  NodeInfo, 
+  TenantNodeInfo, 
+  AddReplicaRequest, 
+  DisplayNode 
+} from './services/cluster.service';
 import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent, SpinnerComponent, BadgeComponent } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
@@ -29,7 +38,13 @@ import { ErrorUtil } from '../../shared/utils/error.util';
   ]
 })
 export class ClusterComponent implements OnInit {
-  clusterInfo: ClusterInfo | null = null;
+  // Primary cluster information from GetClusterConfig
+  enhancedClusterInfo: EnhancedClusterInfo | null = null;
+  clusterConfigData: ClusterConfigInfo[] = [];
+  totalClusterNodes = 0;
+  totalShards = 0;
+
+  // Secondary information: legacy node configuration for compatibility
   allNodes: DisplayNode[] = [];
 
   public addNodeModalVisible = false;
@@ -62,10 +77,12 @@ export class ClusterComponent implements OnInit {
     this.loading = true;
     this.showAlert = false;
 
-    this.clusterService.getClusterInfo().subscribe({
-      next: (clusterInfo: ClusterInfo) => {
-        this.clusterInfo = clusterInfo;
-        this.buildAllNodesList();
+    this.clusterService.getEnhancedClusterInfo().subscribe({
+      next: (enhancedClusterInfo: EnhancedClusterInfo) => {
+        this.enhancedClusterInfo = enhancedClusterInfo;
+        this.clusterConfigData = enhancedClusterInfo.cluster_config;
+        this.calculateClusterStats();
+        this.buildAllNodesList(); // For backward compatibility with secondary info
         this.loading = false;
       },
       error: (error) => {
@@ -75,24 +92,39 @@ export class ClusterComponent implements OnInit {
     });
   }
 
+  calculateClusterStats(): void {
+    this.totalClusterNodes = 0;
+    this.totalShards = this.clusterConfigData.length;
+    
+    this.clusterConfigData.forEach(shard => {
+      this.totalClusterNodes += shard.total;
+    });
+  }
+
   buildAllNodesList(): void {
-    if (!this.clusterInfo) return;
+    if (!this.enhancedClusterInfo || !this.enhancedClusterInfo.node_configuration) return;
 
     this.allNodes = [];
 
-    // Add master node
-    this.allNodes.push({
-      ...this.clusterInfo.master_node,
-      node_type: 'Master'
-    } as DisplayNode);
+    const nodeConfig = this.enhancedClusterInfo.node_configuration;
 
-    // Add tenant nodes
-    this.clusterInfo.tenant_nodes.forEach(tenantNode => {
+    // Add master node if it exists
+    if (nodeConfig.master_node) {
       this.allNodes.push({
-        ...tenantNode,
-        node_type: 'Tenant'
+        ...nodeConfig.master_node,
+        node_type: 'Master'
       } as DisplayNode);
-    });
+    }
+
+    // Add tenant nodes if they exist
+    if (nodeConfig.tenant_nodes && Array.isArray(nodeConfig.tenant_nodes)) {
+      nodeConfig.tenant_nodes.forEach(tenantNode => {
+        this.allNodes.push({
+          ...tenantNode,
+          node_type: 'Tenant'
+        } as DisplayNode);
+      });
+    }
 
     // Sort by replica_id
     this.allNodes.sort((a, b) => a.replica_id - b.replica_id);
@@ -155,16 +187,54 @@ export class ClusterComponent implements OnInit {
   }
 
   getAvailableShards(): number[] {
-    if (!this.clusterInfo) return [];
+    if (!this.enhancedClusterInfo || !this.enhancedClusterInfo.node_configuration) return [];
 
-    const shards: number[] = [this.clusterInfo.master_node.shard_id];
-    this.clusterInfo.tenant_nodes.forEach(node => {
-      if (!shards.includes(node.shard_id)) {
-        shards.push(node.shard_id);
-      }
-    });
+    const nodeConfig = this.enhancedClusterInfo.node_configuration;
+    const shards: number[] = [];
+    
+    // Add master node shard if it exists
+    if (nodeConfig.master_node && nodeConfig.master_node.shard_id !== undefined) {
+      shards.push(nodeConfig.master_node.shard_id);
+    }
+    
+    // Add tenant nodes shards if they exist
+    if (nodeConfig.tenant_nodes && Array.isArray(nodeConfig.tenant_nodes)) {
+      nodeConfig.tenant_nodes.forEach(node => {
+        if (node && node.shard_id !== undefined && !shards.includes(node.shard_id)) {
+          shards.push(node.shard_id);
+        }
+      });
+    }
 
     return shards.sort((a, b) => a - b);
+  }
+
+  getClusterNodesByShardId(shardId: number): ClusterNodeInfo[] {
+    const shard = this.clusterConfigData.find(s => s.shard_id === shardId);
+    return shard ? shard.nodes : [];
+  }
+
+  getShardDisplayName(shardId: number): string {
+    if (!this.enhancedClusterInfo || !this.enhancedClusterInfo.node_configuration) {
+      return `Shard ${shardId}`;
+    }
+    
+    const nodeConfig = this.enhancedClusterInfo.node_configuration;
+    
+    // Check if it's the master shard
+    if (nodeConfig.master_node && nodeConfig.master_node.shard_id === shardId) {
+      return `Master Shard (${shardId})`;
+    }
+    
+    // Check if it's a tenant shard
+    if (nodeConfig.tenant_nodes && Array.isArray(nodeConfig.tenant_nodes)) {
+      const tenantNode = nodeConfig.tenant_nodes.find(node => node && node.shard_id === shardId);
+      if (tenantNode && tenantNode.tenant_id) {
+        return `Tenant Shard ${shardId} (${tenantNode.tenant_id})`;
+      }
+    }
+    
+    return `Shard ${shardId}`;
   }
 
   getNodeTypeColor(nodeType: string): string {

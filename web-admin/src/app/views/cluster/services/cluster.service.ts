@@ -23,6 +23,30 @@ export interface DisplayNode extends NodeInfo {
   tenant_id?: string;
 }
 
+// New interfaces for cluster config information
+export interface ClusterNodeInfo {
+  node_id: number;
+  address: string;
+  shard_id: number;
+}
+
+export interface ClusterConfigInfo {
+  shard_id: number;
+  nodes: ClusterNodeInfo[];
+  total: number;
+}
+
+export interface NodeConfiguration {
+  master_node: NodeInfo;
+  tenant_nodes: TenantNodeInfo[];
+}
+
+export interface EnhancedClusterInfo {
+  cluster_config: ClusterConfigInfo[];
+  node_configuration: NodeConfiguration;
+}
+
+// Legacy interface for backward compatibility
 export interface ClusterInfo {
   master_node: NodeInfo;
   tenant_nodes: TenantNodeInfo[];
@@ -58,7 +82,14 @@ export class ClusterService {
   constructor(private http: HttpClient) { }
 
   /**
-   * Get cluster information including master node and tenant nodes
+   * Get enhanced cluster information including cluster config and node configuration
+   */
+  getEnhancedClusterInfo(): Observable<EnhancedClusterInfo> {
+    return this.http.get<EnhancedClusterInfo>(`${this.apiUrl}/info`);
+  }
+
+  /**
+   * Get cluster information including master node and tenant nodes (legacy method for backward compatibility)
    */
   getClusterInfo(): Observable<ClusterInfo> {
     return this.http.get<ClusterInfo>(`${this.apiUrl}/info`);

@@ -18,8 +18,8 @@
       <c-spinner></c-spinner>
     </div>
 
-    <!-- Cluster Info -->
-    <div *ngIf="!loading && clusterInfo">
+    <!-- Enhanced Cluster Info -->
+    <div *ngIf="!loading && enhancedClusterInfo">
       <!-- Actions Row -->
       <c-row class="mb-3">
         <c-col [md]="12" class="d-flex justify-content-end">
@@ -30,46 +30,100 @@
         </c-col>
       </c-row>
 
-      <!-- Cluster Overview Cards -->
+      <!-- Primary Cluster Overview Cards (from GetClusterConfig) -->
       <c-row class="mb-4">
         <c-col [sm]="6" [lg]="3">
           <c-card class="mb-3">
             <c-card-body class="text-center">
-              <div class="fs-4 fw-semibold text-primary">{{ allNodes.length }}</div>
-              <div class="text-medium-emphasis text-uppercase fw-semibold small">Total Nodes</div>
+              <div class="fs-4 fw-semibold text-primary">{{ totalClusterNodes }}</div>
+              <div class="text-medium-emphasis text-uppercase fw-semibold small">Live Cluster Nodes</div>
             </c-card-body>
           </c-card>
         </c-col>
         <c-col [sm]="6" [lg]="3">
           <c-card class="mb-3">
             <c-card-body class="text-center">
-              <div class="fs-4 fw-semibold text-success">1</div>
-              <div class="text-medium-emphasis text-uppercase fw-semibold small">Master Node</div>
+              <div class="fs-4 fw-semibold text-success">{{ totalShards }}</div>
+              <div class="text-medium-emphasis text-uppercase fw-semibold small">Active Shards</div>
             </c-card-body>
           </c-card>
         </c-col>
         <c-col [sm]="6" [lg]="3">
           <c-card class="mb-3">
             <c-card-body class="text-center">
-              <div class="fs-4 fw-semibold text-info">{{ clusterInfo.tenant_nodes.length }}</div>
-              <div class="text-medium-emphasis text-uppercase fw-semibold small">Tenant Nodes</div>
+              <div class="fs-4 fw-semibold text-info">{{ allNodes.length }}</div>
+              <div class="text-medium-emphasis text-uppercase fw-semibold small">Local Configured Nodes</div>
             </c-card-body>
           </c-card>
         </c-col>
         <c-col [sm]="6" [lg]="3">
           <c-card class="mb-3">
             <c-card-body class="text-center">
-              <div class="fs-4 fw-semibold text-warning">{{ getAvailableShards().length }}</div>
-              <div class="text-medium-emphasis text-uppercase fw-semibold small">Total Shards</div>
+              <div class="fs-4 fw-semibold text-warning">{{ enhancedClusterInfo.node_configuration.tenant_nodes.length }}</div>
+              <div class="text-medium-emphasis text-uppercase fw-semibold small">Local Tenant Nodes</div>
             </c-card-body>
           </c-card>
         </c-col>
       </c-row>
 
-      <!-- Cluster Nodes Table -->
+      <!-- Primary: Live Cluster Configuration (from GetClusterConfig) -->
+      <c-card class="mb-4">
+        <c-card-header>
+          <div class="d-flex justify-content-between align-items-center">
+            <span>
+              <svg cIcon name="cil-sitemap" class="me-2"></svg>
+              Live Cluster Configuration
+            </span>
+            <c-badge color="success" shape="rounded-pill">Primary Information</c-badge>
+          </div>
+        </c-card-header>
+        <c-card-body>
+          <div class="row">
+            <div *ngFor="let shardConfig of clusterConfigData" class="col-md-6 col-lg-4 mb-3">
+              <c-card class="h-100">
+                <c-card-header class="bg-primary text-white">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <strong>{{ getShardDisplayName(shardConfig.shard_id) }}</strong>
+                    <c-badge color="warning" shape="rounded-pill">{{ shardConfig.total }} nodes</c-badge>
+                  </div>
+                </c-card-header>
+                <c-card-body class="p-2">
+                  <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                      <thead>
+                        <tr>
+                          <th>Node ID</th>
+                          <th>Address</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let node of shardConfig.nodes" class="align-middle">
+                          <td><strong>{{ node.node_id }}</strong></td>
+                          <td><code class="small">{{ node.address }}</code></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </c-card-body>
+              </c-card>
+            </div>
+          </div>
+          <c-alert color="info" *ngIf="clusterConfigData.length === 0">
+            <strong>No cluster configuration available.</strong> This might be expected if the cluster is not fully initialized.
+          </c-alert>
+        </c-card-body>
+      </c-card>
+
+      <!-- Secondary: Local Node Configuration -->
       <c-card>
         <c-card-header>
-          Cluster Nodes
+          <div class="d-flex justify-content-between align-items-center">
+            <span>
+              <svg cIcon name="cil-settings" class="me-2"></svg>
+              Local Node Configuration
+            </span>
+            <c-badge color="secondary" shape="rounded-pill">Secondary Information</c-badge>
+          </div>
         </c-card-header>
         <c-card-body>
           <div class="table-responsive">
@@ -118,7 +172,7 @@
     </div>
 
     <!-- No Data State -->
-    <div *ngIf="!loading && !clusterInfo" class="text-center p-4 text-muted">
+    <div *ngIf="!loading && !enhancedClusterInfo" class="text-center p-4 text-muted">
       <svg cIcon name="cil-cloud-download" size="3xl" class="mb-3"></svg>
       <p>Failed to load cluster information</p>
     </div>
@@ -173,8 +227,8 @@
 
       <c-row class="g-3 mt-3">
         <c-col [md]="12">
-          <c-form-check id="specific_shards" formControlName="specific_shards">
-            <input cFormCheckInput type="checkbox" id="specific_shards" />
+          <c-form-check id="specific_shards">
+            <input cFormCheckInput type="checkbox" id="specific_shards" formControlName="specific_shards" />
             <label cFormLabel for="specific_shards">
               Add to specific shards only (default: add to all shards)
             </label>
