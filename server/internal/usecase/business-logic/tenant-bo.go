@@ -194,7 +194,7 @@ func (bo *TenantBO) DeleteTenant(ctx context.Context, tenantCode string) error {
 			break
 		}
 
-		if queuesResult.Entities == nil || len(queuesResult.Entities) == 0 {
+		if len(queuesResult.Entities) == 0 {
 			break
 		}
 

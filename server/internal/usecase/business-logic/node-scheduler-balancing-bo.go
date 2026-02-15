@@ -55,6 +55,20 @@ func (bo *NodeSchedulerBalancingBO) UpsertState(ctx context.Context, state model
 	return err
 }
 
+func (bo *NodeSchedulerBalancingBO) RequestRebalance(ctx context.Context) error {
+	state, err := bo.GetState(ctx)
+	if err != nil {
+		return err
+	}
+
+	if state == nil || state.Status == models.RequestForNewBalancing {
+		return nil // Already requested or no state to update
+	}
+
+	state.Status = models.RequestForNewBalancing
+	return bo.UpsertState(ctx, *state)
+}
+
 func (bo *NodeSchedulerBalancingBO) BalanceNodeSchedulers(ctx context.Context, tenantNodes []*dragonboat.RaftNode, supervisionState models.QueueSupervisionState, lastIndices map[int]int, balancingId string) (map[int]int, error) {
 	nodeSchedulerBO := NewNodeSchedulerBO(bo.Config)
 	queueBO := NewQueueBO(bo.Config)

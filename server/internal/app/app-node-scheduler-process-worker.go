@@ -149,7 +149,7 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 			return
 		}
 		if state != nil && state.Status == models.RequestForNewBalancing {
-			fmt.Println("::::::::::::. 🔄 Starting new balancing process for node scheduler " + nodeSchedulerName)
+			fmt.Println("🔄 Starting new balancing process for node scheduler " + nodeSchedulerName)
 			updateCtx, updateCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			_, err = nodeSchedulerBO.UpdateRunningStatusNodeScheduler(updateCtx, []*models.NodeScheduler{&nodeScheduler}, models.NodeSchedulerRunningStatusStopped)
 			updateCancel()

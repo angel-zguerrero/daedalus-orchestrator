@@ -4,10 +4,12 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/infrastructure/server/common"
 	grpc_server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	rest_server "deadalus-orch/server/internal/infrastructure/server/rest"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/telemetry"
+	business_logic "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
@@ -248,6 +250,21 @@ func (app *Application) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Request Rebalancing if node is scheduler
+	if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleScheduler) {
+		log.Info().Msg("🔄 Requesting cluster rebalance before shutdown...")
+		serverConfig := &common.ServerConfing{
+			Logger:     log.Logger,
+			MasterNode: app.MasterNode,
+		}
+		balancingBO := business_logic.NewNodeSchedulerBalancingBO(serverConfig)
+		rebalanceCtx, rebalanceCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := balancingBO.RequestRebalance(rebalanceCtx); err != nil {
+			log.Warn().Err(err).Msg("⚠️ Failed to request rebalance on shutdown")
+		}
+		rebalanceCancel()
+	}
+
 	// Stop Master Node
 	wg.Add(1)
 	go func() {
@@ -357,17 +374,8 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ NodeSchedulerBalancingStopper stopped.")
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if app.MasterNode != nil {
-			log.Info().Msg("🔌 Stopping Node Host.")
-			app.NH.Close()
-			log.Info().Msg("✅ Node Host stopped.")
-		} else {
-			log.Warn().Msg("⚠️ No Node Host to stop.")
-		}
-	}()
+	// Stop Master Node will also stop Node Host at the very end
+	// Removing the separate parallel Node Host stop to avoid race conditions
 
 	// Wait with timeout
 	done := make(chan struct{})
@@ -381,6 +389,15 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ All components stopped gracefully.")
 	case <-ctx.Done():
 		log.Warn().Msg("⚠️ Stop operation timed out. Some components may not have stopped.")
+	}
+
+	// Finally stop the Node Host after everything else is done
+	if app.MasterNode != nil {
+		log.Info().Msg("🔌 Stopping Node Host.")
+		app.NH.Close()
+		log.Info().Msg("✅ Node Host stopped.")
+	} else {
+		log.Warn().Msg("⚠️ No Node Host to stop.")
 	}
 }
 
