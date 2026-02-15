@@ -202,9 +202,8 @@ func (app *Application) reviewNodeSchedulersConnectionStatus() {
 
 	// Bulk upsert all existing node schedulers to update their connection status
 	if len(allNodeSchedulers) > 0 {
-		for _, ns := range allNodeSchedulers {
-			ns.BalancingId = "" // maintain the current balancing id in the node scheduler
-		}
+		// Don't modify BalancingId - preserve the existing value to maintain synchronization
+		// The BalancingId is managed by the balancing system and heartbeat process
 		upsertCtx, upsertCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_, err := nodeSchedulerBO.BulkUpsertNodeScheduler(upsertCtx, allNodeSchedulers)
 		upsertCancel()

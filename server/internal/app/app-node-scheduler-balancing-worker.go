@@ -125,21 +125,23 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 	if state.Status == models.RequestForNewBalancing {
 		log.Info().Msg("🔄 Rebalancing requested. Transitioning to 'waiting-for-node-schedulers' to stabilize")
 
-		// Check if ALL node schedulers are stopped
+		// Check if ALL connected node schedulers are stopped (regardless of BalancingId)
+		// We need to check ALL because new node schedulers might have different BalancingId
 		pageSize := 100
 		cursor := ""
 		allAreStopped := true
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", state.BalancingId, models.ConnectionStatusConnected, -1, cursor, pageSize)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", "", models.ConnectionStatusConnected, -1, cursor, pageSize)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to get node schedulers for rebalancing check")
 				return
 			}
 
 			for _, ns := range findResult.Entities {
-				if ns.RunningStatus != models.NodeSchedulerRunningStatusStopped {
+				if ns.RunningStatus != models.NodeSchedulerRunningStatusStopped && ns.RunningStatus != "" {
 					allAreStopped = false
+					log.Debug().Str("nodeSchedulerName", ns.Name).Str("runningStatus", string(ns.RunningStatus)).Str("balancingId", ns.BalancingId).Msg("⏳ Node scheduler not stopped yet")
 					break
 				}
 			}
@@ -153,6 +155,9 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		if allAreStopped {
 			log.Info().Msg("✅ All node schedulers are stopped. Transitioning to 'waiting-for-node-schedulers'")
 			state.Status = models.WaitingForNodeSchedulers
+			state.LastNodeSchedulerIndices = make(map[int]int) // Reset indices for new balancing cycle
+			state.BalancingId = generateUUID()                 // Generate new balancing ID for synchronization
+			log.Info().Str("newBalancingId", state.BalancingId).Msg("🆔 Generated new BalancingId for rebalancing cycle")
 			err = balancingBO.UpsertState(ctx, *state)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to update node scheduler balancing state to 'waiting-for-node-schedulers'")
@@ -166,14 +171,15 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 
 	// 4. If waiting, check node schedulers
 	if state.Status == models.WaitingForNodeSchedulers {
-		// Get all node schedulers to find the latest created one
+		// Get ALL connected node schedulers to find the latest created one
+		// Note: We don't filter by BalancingId here because node schedulers need time to sync via heartbeats
 		pageSize := 100
 		cursor := ""
 		totalFetched := 0
 		var latestCreated time.Time
 
 		for {
-			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", state.BalancingId, models.ConnectionStatusConnected, -1, cursor, pageSize)
+			findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", "", models.ConnectionStatusConnected, -1, cursor, pageSize)
 			if err != nil {
 				log.Err(err).Msg("❌ Failed to get node schedulers for balancing check")
 				return
@@ -202,23 +208,49 @@ func (app *Application) checkAndBalanceNodeSchedulers(isFirstExecution bool) {
 		// 5. Check if wait time has passed
 		waitTime := config.GlobalConfiguration.NodeSchedulerBalancingWaitTime
 		if time.Since(latestCreated) > waitTime {
-			log.Info().Msg("⚖️  Wait time passed since last node scheduler creation. Starting balancing...")
+			// 5.1. Before balancing, verify that node schedulers have synchronized their BalancingId
+			// This prevents balancing with incomplete data
+			syncedSchedulers := 0
+			cursor = ""
+			for {
+				findResult, err := nodeSchedulerBO.GetNodeSchedulers(ctx, "", state.BalancingId, models.ConnectionStatusConnected, -1, cursor, pageSize)
+				if err != nil {
+					log.Err(err).Msg("❌ Failed to get node schedulers with current BalancingId")
+					return
+				}
 
-			lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, "", state.LastNodeSchedulerIndices, state.BalancingId)
-			if err != nil {
-				log.Err(err).Msg("❌ Failed to balance node schedulers")
-				return
+				syncedSchedulers += len(findResult.Entities)
+
+				if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
+					break
+				}
+				cursor = findResult.Cursor
 			}
 
-			// 6. Update state to balanced
-			state.Status = models.Balanced
-			state.LastNodeSchedulerIndices = lastIndices
-			err = balancingBO.UpsertState(ctx, *state)
-			if err != nil {
-				log.Err(err).Msg("❌ Failed to update node scheduler balancing state to 'balanced'")
-				return
+			log.Debug().Int("syncedSchedulers", syncedSchedulers).Int("totalSchedulers", totalFetched).Str("balancingId", state.BalancingId).Msg("📊 BalancingId synchronization status")
+
+			// Only proceed if we have a reasonable number of synchronized schedulers
+			if syncedSchedulers > 0 && syncedSchedulers >= totalFetched/2 { // At least 50% synchronized
+				log.Info().Msg("⚖️  Wait time passed and BalancingId synchronized. Starting balancing...")
+
+				lastIndices, err := balancingBO.BalanceNodeSchedulers(ctx, app.TenantNodes, "", state.LastNodeSchedulerIndices, state.BalancingId)
+				if err != nil {
+					log.Err(err).Msg("❌ Failed to balance node schedulers")
+					return
+				}
+
+				// 6. Update state to balanced
+				state.Status = models.Balanced
+				state.LastNodeSchedulerIndices = lastIndices
+				err = balancingBO.UpsertState(ctx, *state)
+				if err != nil {
+					log.Err(err).Msg("❌ Failed to update node scheduler balancing state to 'balanced'")
+					return
+				}
+				log.Info().Msg("✅ Node schedulers balanced successfully")
+			} else {
+				log.Debug().Msg("⏳ Waiting for more node schedulers to synchronize BalancingId via heartbeats...")
 			}
-			log.Info().Msg("✅ Node schedulers balanced successfully")
 		} else {
 			remaining := waitTime - time.Since(latestCreated)
 			log.Debug().Interface("remaining", remaining).Msg("⏳ Waiting for node scheduler creations to stabilize")

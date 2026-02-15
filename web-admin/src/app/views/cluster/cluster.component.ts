@@ -1,14 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { 
-  ClusterService, 
-  EnhancedClusterInfo, 
-  ClusterConfigInfo, 
+import {
+  ClusterService,
+  EnhancedClusterInfo,
+  ClusterConfigInfo,
   ClusterNodeInfo,
-  NodeInfo, 
-  TenantNodeInfo, 
-  AddReplicaRequest, 
-  DisplayNode 
+  NodeInfo,
+  TenantNodeInfo,
+  AddReplicaRequest,
+  DisplayNode
 } from './services/cluster.service';
 import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent, SpinnerComponent, BadgeComponent } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -95,7 +95,7 @@ export class ClusterComponent implements OnInit {
   calculateClusterStats(): void {
     this.totalClusterNodes = 0;
     this.totalShards = this.clusterConfigData.length;
-    
+
     this.clusterConfigData.forEach(shard => {
       this.totalClusterNodes += shard.total;
     });
@@ -191,12 +191,12 @@ export class ClusterComponent implements OnInit {
 
     const nodeConfig = this.enhancedClusterInfo.node_configuration;
     const shards: number[] = [];
-    
+
     // Add master node shard if it exists
     if (nodeConfig.master_node && nodeConfig.master_node.shard_id !== undefined) {
       shards.push(nodeConfig.master_node.shard_id);
     }
-    
+
     // Add tenant nodes shards if they exist
     if (nodeConfig.tenant_nodes && Array.isArray(nodeConfig.tenant_nodes)) {
       nodeConfig.tenant_nodes.forEach(node => {
@@ -218,14 +218,14 @@ export class ClusterComponent implements OnInit {
     if (!this.enhancedClusterInfo || !this.enhancedClusterInfo.node_configuration) {
       return `Shard ${shardId}`;
     }
-    
+
     const nodeConfig = this.enhancedClusterInfo.node_configuration;
-    
+
     // Check if it's the master shard
     if (nodeConfig.master_node && nodeConfig.master_node.shard_id === shardId) {
       return `Master Shard (${shardId})`;
     }
-    
+
     // Check if it's a tenant shard
     if (nodeConfig.tenant_nodes && Array.isArray(nodeConfig.tenant_nodes)) {
       const tenantNode = nodeConfig.tenant_nodes.find(node => node && node.shard_id === shardId);
@@ -233,7 +233,7 @@ export class ClusterComponent implements OnInit {
         return `Tenant Shard ${shardId} (${tenantNode.tenant_id})`;
       }
     }
-    
+
     return `Shard ${shardId}`;
   }
 

@@ -18,6 +18,15 @@ export interface TenantNodeInfo extends NodeInfo {
   tenant_id?: string;
 }
 
+// New NodeSchedulerBalancingState interface
+export interface NodeSchedulerBalancingState {
+  ID: string;
+  BalancingId: string;
+  Status: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
 export interface DisplayNode extends NodeInfo {
   node_type: string;
   tenant_id?: string;
@@ -44,6 +53,7 @@ export interface NodeConfiguration {
 export interface EnhancedClusterInfo {
   cluster_config: ClusterConfigInfo[];
   node_configuration: NodeConfiguration;
+  balancing_state?: NodeSchedulerBalancingState;
 }
 
 // Legacy interface for backward compatibility

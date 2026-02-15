@@ -9,6 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+
+	business_logic "deadalus-orch/server/internal/usecase/business-logic"
+	"deadalus-orch/shared/models"
 )
 
 // ClusterController handles cluster management operations like adding/removing nodes
@@ -195,12 +198,14 @@ type ClusterConfigInfo struct {
 type EnhancedClusterInfo struct {
 	// Primary information from GetClusterConfig
 	ClusterConfig []ClusterConfigInfo `json:"cluster_config"`
-	
+
 	// Secondary information (current node configuration)
 	NodeConfiguration struct {
 		MasterNode  gin.H   `json:"master_node"`
 		TenantNodes []gin.H `json:"tenant_nodes"`
 	} `json:"node_configuration"`
+
+	BalancingState *models.NodeSchedulerBalancingState `json:"balancing_state"`
 }
 
 // GetClusterInfo gets information about the current cluster state using GetClusterConfig as primary data
@@ -224,7 +229,7 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 	// Extract cluster config information from each shard
 	for _, shardID := range shardsToCheck {
 		var raftNode *dragonboat.RaftNode
-		
+
 		// Get the appropriate RaftNode for this shard
 		if shardID == dragonboat.MasterShardID {
 			raftNode = cc.Config.MasterNode
@@ -242,7 +247,7 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 			// Use SyncGetShardMembership to get live cluster configuration
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			
+
 			membership, err := raftNode.NH.SyncGetShardMembership(ctx, shardID)
 			if err != nil {
 				log.Warn().
@@ -267,7 +272,7 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 					ShardID: shardID,
 				}
 				clusterConfigInfo.Nodes = append(clusterConfigInfo.Nodes, nodeInfo)
-				
+
 				log.Debug().
 					Uint64("shard_id", shardID).
 					Uint64("node_id", nodeID).
@@ -284,7 +289,7 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 				}
 				clusterConfigInfo.Nodes = append(clusterConfigInfo.Nodes, nodeInfo)
 				clusterConfigInfo.Total++
-				
+
 				log.Debug().
 					Uint64("shard_id", shardID).
 					Uint64("node_id", nodeID).
@@ -301,7 +306,7 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 				}
 				clusterConfigInfo.Nodes = append(clusterConfigInfo.Nodes, nodeInfo)
 				clusterConfigInfo.Total++
-				
+
 				log.Debug().
 					Uint64("shard_id", shardID).
 					Uint64("node_id", nodeID).
@@ -335,6 +340,16 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 	log.Info().
 		Int("cluster_shards", len(response.ClusterConfig)).
 		Msg("✅ Retrieved enhanced cluster information")
+
+	balancingBO := business_logic.NewNodeSchedulerBalancingBO(cc.Config)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	state, err := balancingBO.GetState(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("❌ Failed to get balancing state")
+	} else if state != nil {
+		response.BalancingState = state
+	}
 
 	c.JSON(http.StatusOK, response)
 }
