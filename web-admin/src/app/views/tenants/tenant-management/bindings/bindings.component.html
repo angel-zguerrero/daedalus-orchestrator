@@ -52,8 +52,14 @@
       </c-col>
     </c-row>
 
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loading">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading bindings...</p>
+    </div>
+
     <!-- Bindings Table -->
-    <div class="table-responsive">
+    <div class="table-responsive" *ngIf="!loading">
       <table cTable class="mt-4" [hover]="true" style="min-width: 1200px;">
         <thead>
           <tr>

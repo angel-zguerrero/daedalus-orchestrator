@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -132,8 +133,8 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 	if len(ents) == 0 {
 		return nil, nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// No mutex needed here — Dragonboat guarantees Update() is called sequentially per shard.
+	// Using a Lock here would contend with Lookup()/SaveSnapshot() which use RLock().
 
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	batch := db.NewWriteBatch()
@@ -572,6 +573,10 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 
 	dec := gob.NewDecoder(r)
 
+	batch := db.NewWriteBatch()
+	count := 0
+	knownCFs := make(map[string]bool)
+
 	for {
 		select {
 		case <-done:
@@ -597,11 +602,47 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 			return fmt.Errorf("decode failed: %w", err)
 		}
 
-		if err := kv_store.PutRaw(entry.CFName, entry.CFNSector, string(entry.Key), entry.Value); err != nil {
+		// Ensure Column Family exists
+		if !knownCFs[entry.CFName] {
+			exists, _, err := kv_store.ExistsColumnFamily(entry.CFName)
+			if err != nil {
+				kv_store.Close()
+				os.RemoveAll(dbdir)
+				return fmt.Errorf("failed to check column family existence: %w", err)
+			}
+			if !exists {
+				isTTL := strings.HasPrefix(entry.CFName, db.ColumnFamilyTTLPrefix)
+				if err := kv_store.CreateColumnFamily(entry.CFName, isTTL); err != nil {
+					kv_store.Close()
+					os.RemoveAll(dbdir)
+					return fmt.Errorf("failed to create column family %s: %w", entry.CFName, err)
+				}
+				log.Info().Str("cf_name", entry.CFName).Bool("is_ttl", isTTL).Msg("Created missing column family during recovery")
+			}
+			knownCFs[entry.CFName] = true
+		}
+
+		batch.Put(entry.CFName, entry.CFNSector, string(entry.Key), entry.Value, time.Now())
+		count++
+
+		if count%10000 == 0 {
+			if err := kv_store.WriteRaw(batch); err != nil {
+				kv_store.Close()
+				os.RemoveAll(dbdir)
+				return fmt.Errorf("write raw failed during snapshot recovery: %w", err)
+			}
+			batch = db.NewWriteBatch()
+			log.Info().Int("count", count).Msg("Intermediate batch write successful during snapshot recovery")
+		}
+	}
+
+	if batch.Count() > 0 {
+		if err := kv_store.WriteRaw(batch); err != nil {
 			kv_store.Close()
 			os.RemoveAll(dbdir)
-			return fmt.Errorf("put failed during snapshot recovery for CF %s, Key %s: %w", entry.CFName, string(entry.Key), err)
+			return fmt.Errorf("final write raw failed during snapshot recovery: %w", err)
 		}
+		log.Info().Int("total_count", count).Msg("Final batch write successful during snapshot recovery")
 	}
 
 	// Persist directory changes

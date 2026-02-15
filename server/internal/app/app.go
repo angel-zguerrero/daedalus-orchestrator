@@ -56,6 +56,7 @@ import (
 type Application struct {
 	MasterNodeIsReady             bool
 	MasterNodeIsLeader            bool
+	MasterNodeBootstrapped        bool
 	MasterNode                    *dragonboat.RaftNode
 	TenantNodes                   []*dragonboat.RaftNode
 	TenantNodesDictionary         map[string]*dragonboat.RaftNode
@@ -196,6 +197,7 @@ func (app *Application) Run() {
 		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
 		RTTMillisecond: RTTMillisecond,
 		RaftAddress:    dragonboat.MemmberToAddr(selfMember),
+		DeploymentID:   config.GlobalConfiguration.DeploymentID,
 	})
 	app.NH = NH
 	if err != nil {
@@ -330,6 +332,11 @@ func (app *Application) Stop() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Debug().Interface("panic", r).Msg("Recovered from AssignTenantsStopper.Stop panic")
+			}
+		}()
 		app.AssignTenantsStopper.Stop()
 		log.Info().Msg("✅ AssignTenantsStopper stopped.")
 	}()

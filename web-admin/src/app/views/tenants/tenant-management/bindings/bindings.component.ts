@@ -12,8 +12,9 @@ import {
   CardModule, 
   FormModule, 
   GridModule, 
-  AlertModule, 
-  BadgeModule
+  AlertComponent, 
+  SpinnerComponent,
+  BadgeComponent
 } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators, FormControl, ValidatorFn, AbstractControl } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
@@ -118,8 +119,9 @@ interface Binding {
     CardModule,
     FormModule,
     GridModule,
-    AlertModule,
-    BadgeModule,
+    AlertComponent,
+    SpinnerComponent,
+    BadgeComponent,
     ReactiveFormsModule,
     FormsModule,
     IconDirective,
@@ -1014,6 +1016,7 @@ export class BindingsComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
+    this.loading = true;
     
     const vnamespaceFilter = this.selectedVNamespaceFilter?.Code || this.selectedVNamespaceFilter?.Name || '';
 
@@ -1021,10 +1024,12 @@ export class BindingsComponent implements OnInit {
       next: (response) => {
         this.bindings = response.result.Entities || [];
         this.cursor = response.result.Cursor;
+        this.loading = false;
       },
       error: (error) => {
         this.showAlert = true;
         this.errorMessage = ErrorUtil.formatErrorMessage(error);
+        this.loading = false;
       }
     });
   }

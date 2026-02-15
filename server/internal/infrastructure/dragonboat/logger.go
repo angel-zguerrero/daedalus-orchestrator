@@ -1,7 +1,6 @@
 package dragonboat
 
 import (
-	"errors"
 	"fmt" // Used for errors.New(fmt.Sprintf(...))
 
 	dblog "github.com/lni/dragonboat/v4/logger"
@@ -33,7 +32,7 @@ func (l *zerologgerLogger) Warningf(format string, args ...interface{}) {
 // Errorf logs an error message using zerolog.
 // It creates an error from the format string and arguments and includes the logger's name as a 'source' field.
 func (l *zerologgerLogger) Errorf(format string, args ...interface{}) {
-	log.Error().Err(errors.New(fmt.Sprintf(format, args...))).Str("source", l.name).Msgf(format, args...)
+	log.Error().Err(fmt.Errorf(format, args...)).Str("source", l.name).Msgf(format, args...)
 }
 
 // Debugf logs a debug message using zerolog.
@@ -45,7 +44,7 @@ func (l *zerologgerLogger) Debugf(format string, args ...interface{}) {
 // Panicf logs a panic message using zerolog and then panics.
 // It includes the logger's name as a field.
 func (l *zerologgerLogger) Panicf(format string, args ...interface{}) {
-	log.Error().Err(errors.New(fmt.Sprintf(format, args...))).Str("source", l.name).Msgf(format, args...)
+	log.Error().Err(fmt.Errorf(format, args...)).Str("source", l.name).Msgf(format, args...)
 }
 
 // SetLevel is part of the dblog.ILogger interface. In this implementation,

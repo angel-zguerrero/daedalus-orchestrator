@@ -27,13 +27,22 @@ type PebbleStore struct {
 }
 
 func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamilyNames []string) (*PebbleStore, error) {
-	opts := pebble.Options{}
+	// Tuned for minimal memory footprint per shard instance.
+	// Dragonboat manages its own WAL for durability, so we minimize Pebble's overhead.
+	cache := pebble.NewCache(0)
+	opts := &pebble.Options{
+		MaxManifestFileSize: 1024 * 32, // 32KB
+		MemTableSize:        1024 * 32, // 32KB instead of default 4MB
+		Cache:               cache,
+	}
 	dbPath = filepath.Join(dbPath, "pebble")
 	err := utils.EnsureDirExists(dbPath)
 	if err != nil {
+		cache.Unref()
 		return nil, err
 	}
-	db, err := pebble.Open(dbPath, &opts)
+	db, err := pebble.Open(dbPath, opts)
+	cache.Unref()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open pebble database at %s: %w", dbPath, err)
 	}
@@ -185,7 +194,7 @@ func (ps *PebbleStore) Put(columnFamily, columnFamilySector, key string, value [
 	}
 	if !isTTL {
 		// No TTL, escritura directa
-		err := ps.db.Set(dataKey, value, pebble.Sync)
+		err := ps.db.Set(dataKey, value, pebble.NoSync)
 		if err != nil {
 			return fmt.Errorf("Put: failed to set key '%s' in CF '%s': %w", key, columnFamily, err)
 		}
@@ -236,7 +245,7 @@ func (ps *PebbleStore) Put(columnFamily, columnFamilySector, key string, value [
 		return fmt.Errorf("Put: failed to set ttl index key: %w", err)
 	}
 
-	if err := batch.Commit(pebble.Sync); err != nil {
+	if err := batch.Commit(pebble.NoSync); err != nil {
 		return fmt.Errorf("Put: failed to commit TTL batch: %w", err)
 	}
 
@@ -260,7 +269,7 @@ func (ps *PebbleStore) PutRaw(columnFamily, columnFamilySector, key string, valu
 	// actualCfPrefix is like "mycf:", key is "mykey" -> prefixedKey is "mycf:mykey"
 	finalKey := fmt.Sprintf("%s:%s", columnFamilySector, key)
 	prefixedKey := append(actualCfPrefix, []byte(finalKey)...)
-	err := ps.db.Set(prefixedKey, value, pebble.Sync)
+	err := ps.db.Set(prefixedKey, value, pebble.NoSync)
 	if err != nil {
 		return fmt.Errorf("Put: failed to set key '%s' in non-TTL cf '%s': %w", key, resolvedCfName, err)
 	}
@@ -346,7 +355,7 @@ func (ps *PebbleStore) CleanExpiredKeys(now time.Time) error {
 		}
 
 		if operationsInBatch > 0 {
-			if err := b.Commit(pebble.Sync); err != nil {
+			if err := b.Commit(pebble.NoSync); err != nil {
 				b.Close() // Ensure close, though Commit usually does.
 				return fmt.Errorf("CleanExpiredKeys: failed to commit batch for cf %s: %w", cfName, err)
 			}
@@ -380,7 +389,7 @@ func (ps *PebbleStore) ClearAll() error {
 
 	for cfName, cfPrefix := range allPrefixes {
 		// DeleteRange deletes all keys in the range [start, end), including start, excluding end.
-		err := ps.db.DeleteRange(cfPrefix, prefixRangeEnd(cfPrefix), pebble.Sync)
+		err := ps.db.DeleteRange(cfPrefix, prefixRangeEnd(cfPrefix), pebble.NoSync)
 		if err != nil {
 			return fmt.Errorf("ClearAll: failed to delete range for cf %s (prefix %s): %w", cfName, string(cfPrefix), err)
 		}
@@ -647,7 +656,7 @@ func (ps *PebbleStore) Delete(columnFamily, columnFamilySector, key string, now 
 		// Standard Delete for non-TTL CFs
 		finalKey := fmt.Sprintf("%s:%s", columnFamilySector, key)
 		prefixedKey := append(actualCfPrefix, []byte(finalKey)...)
-		err := ps.db.Delete(prefixedKey, pebble.Sync)
+		err := ps.db.Delete(prefixedKey, pebble.NoSync)
 		if err != nil {
 			return fmt.Errorf("Delete: failed to delete key '%s' in non-TTL cf '%s': %w", key, resolvedCfName, err)
 		}
@@ -706,7 +715,7 @@ func (ps *PebbleStore) Delete(columnFamily, columnFamilySector, key string, now 
 	// If expireRefKey was not found, we can't reconstruct the exact indexKey.
 	// CleanExpiredKeys will eventually clean up orphaned index entries if any.
 
-	if err := b.Commit(pebble.Sync); err != nil {
+	if err := b.Commit(pebble.NoSync); err != nil {
 		return fmt.Errorf("Delete: failed to commit batch for TTL cf '%s', key '%s': %w", resolvedCfName, key, err)
 	}
 	return nil
@@ -834,7 +843,7 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 		}
 	}
 
-	if err := b.Commit(pebble.Sync); err != nil {
+	if err := b.Commit(pebble.NoSync); err != nil {
 		return fmt.Errorf("Write: failed to commit batch: %w", err)
 	}
 
@@ -870,7 +879,7 @@ func (ps *PebbleStore) WriteRaw(batch *WriteBatch) error { // batch.Data is []X
 	}
 
 	// Commit the batch with Sync to ensure data is written to persistent storage.
-	if err := b.Commit(pebble.Sync); err != nil {
+	if err := b.Commit(pebble.NoSync); err != nil {
 		return fmt.Errorf("Write: failed to commit batch: %w", err)
 	}
 
@@ -999,7 +1008,7 @@ func (ps *PebbleStore) DeleteColumnFamily(columnFamilyName string) error {
 	}
 
 	// Delete all keys associated with this column family
-	err := ps.db.DeleteRange(cfPrefix, prefixRangeEnd(cfPrefix), pebble.Sync)
+	err := ps.db.DeleteRange(cfPrefix, prefixRangeEnd(cfPrefix), pebble.NoSync)
 	if err != nil {
 		return fmt.Errorf("failed to delete data for column family %s: %w", columnFamilyName, err)
 	}

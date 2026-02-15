@@ -283,15 +283,18 @@ export class QueuesComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
+    this.loading = true;
 
     this.queuesService.getQueues(this.tenantCode, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter, true).subscribe({
       next: (response) => {
         this.queues = response.result.Entities || [];
         this.cursor = response.result.Cursor;
+        this.loading = false;
       },
       error: (error) => {
         this.showAlert = true;
         this.errorMessage = ErrorUtil.formatErrorMessage(error);
+        this.loading = false;
       }
     });
   }

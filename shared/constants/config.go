@@ -83,6 +83,9 @@ const ConfigMaxHeadersKey = "max_headers"
 // ConfigNodeSchedulerBalancingWaitTimeKey is the key for the node scheduler balancing wait time setting in the configuration file (in seconds).
 const ConfigNodeSchedulerBalancingWaitTimeKey = "node_scheduler_balancing_wait_time"
 
+// ConfigDeploymentIDKey is the key for the deployment ID setting in the configuration file.
+const ConfigDeploymentIDKey = "deployment_id"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -173,6 +176,9 @@ const EnvVarMaxHeaders = "MAX_HEADERS"
 // EnvVarNodeSchedulerBalancingWaitTime is the environment variable name for the node scheduler balancing wait time (in seconds).
 const EnvVarNodeSchedulerBalancingWaitTime = "NODE_SCHEDULER_BALANCING_WAIT_TIME"
 
+// EnvVarDeploymentID is the environment variable name for the deployment ID.
+const EnvVarDeploymentID = "DEPLOYMENT_ID"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -253,3 +259,6 @@ const MaxHeadersFlagName = "max-headers"
 
 // NodeSchedulerBalancingWaitTimeFlagName is the command-line flag name for the node scheduler balancing wait time (in seconds).
 const NodeSchedulerBalancingWaitTimeFlagName = "node-scheduler-balancing-wait-time"
+
+// DeploymentIDFlagName is the command-line flag name for the deployment ID.
+const DeploymentIDFlagName = "deployment-id"

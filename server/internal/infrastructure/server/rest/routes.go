@@ -3,6 +3,7 @@ package rest_server
 import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
+	"deadalus-orch/server/internal/infrastructure/server/rest/cluster"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/nodescheduler"
@@ -25,6 +26,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	bindingController := binding.NewBindingController(s.Config)
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 	nodeSchedulerController := nodescheduler.NewNodeSchedulerController(s.Config)
+	clusterController := cluster.NewClusterController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -79,6 +81,14 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		{
 			nodeSchedulersGroup.GET("", nodeSchedulerController.GetNodeSchedulersHandler)
 			nodeSchedulersGroup.GET("/:id", nodeSchedulerController.GetNodeSchedulerHandler)
+		}
+
+		// Cluster management endpoints
+		apiV1Group := restAPIGroup.Group("/v1")
+		apiV1Group.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		apiV1Group.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 30))
+		{
+			clusterController.RegisterRoutes(apiV1Group)
 		}
 
 	}

@@ -171,16 +171,19 @@ export class ExchangesComponent implements OnInit {
     if (!isPrevious && cursor) {
       this.cursors.push(cursor);
     }
+    this.loading = true;
     
     this.exchangesService.getExchanges(this.tenantCode, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter).subscribe({
       next: (response) => {
         this.exchanges = response.result.Entities || [];
         console.log('Loaded exchanges with headers:', this.exchanges.map(e => ({ id: e.ID, headers: e.Headers || e.headers })));
         this.cursor = response.result.Cursor;
+        this.loading = false;
       },
       error: (error) => {
         this.showAlert = true;
         this.errorMessage = ErrorUtil.formatErrorMessage(error);
+        this.loading = false;
       }
     });
   }
