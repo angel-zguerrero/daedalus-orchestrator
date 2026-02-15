@@ -52,6 +52,27 @@ func (app *Application) StartNodeSchedulerHeartbeat(interval time.Duration) {
 }
 
 func (app *Application) StartNodeSchedulerProcessWorkers(interval time.Duration) {
+	// Worker for checking connection status (runs only on Leader)
+	app.NodeSchedulerProcessStopper.RunWorker(func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if !app.MasterNodeIsReady {
+					continue
+				}
+
+				if app.MasterNodeIsLeader {
+					app.reviewNodeSchedulersConnectionStatus()
+				}
+			case <-app.NodeSchedulerProcessStopper.ShouldStop():
+				return
+			}
+		}
+	})
+
 	for i := range app.TenantNodes {
 		index := i
 		app.NodeSchedulerProcessStopper.RunWorker(func() {
@@ -128,6 +149,7 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 			return
 		}
 		if state != nil && state.Status == models.RequestForNewBalancing {
+			fmt.Println("::::::::::::. 🔄 Starting new balancing process for node scheduler " + nodeSchedulerName)
 			updateCtx, updateCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			_, err = nodeSchedulerBO.UpdateRunningStatusNodeScheduler(updateCtx, []*models.NodeScheduler{&nodeScheduler}, models.NodeSchedulerRunningStatusStopped)
 			updateCancel()
@@ -136,6 +158,60 @@ func (app *Application) processNodeSchedulerTasks(tenantNodeIndex int) {
 			}
 		} else if state != nil && state.Status == models.Balanced {
 			//log.Debug().Any("Node scheduler", nodeScheduler).Msg("🔍 Reviewing node scheduler tasks (placeholder)")
+		}
+	}
+
+}
+
+func (app *Application) reviewNodeSchedulersConnectionStatus() {
+
+	serverConfig := &common.ServerConfing{
+		Logger:     log.Logger,
+		MasterNode: app.MasterNode,
+	}
+
+	// Create NodeScheduler business object
+	nodeSchedulerBO := business_logic.NewNodeSchedulerBO(serverConfig)
+	// First, paginate through all existing node schedulers to update their connection status
+	pageSize := 100
+	cursor := ""
+	allNodeSchedulers := []*models.NodeScheduler{}
+
+	for {
+		paginateCtx, paginateCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		findResult, err := nodeSchedulerBO.GetNodeSchedulers(paginateCtx, "", "", models.ConnectionStatusConnected, -1, cursor, pageSize)
+		paginateCancel()
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
+			break
+		}
+
+		// Convert to pointers and add to the list (without TTL and LastHeartbeat to preserve existing values)
+		for _, ns := range findResult.Entities {
+			nodeSchedulerCopy := ns // Create a copy to avoid reference issues
+			// Don't set TTL or LastHeartbeat - let the upsert command handle these based on existing values
+			allNodeSchedulers = append(allNodeSchedulers, &nodeSchedulerCopy)
+		}
+
+		// Check if we have more pages
+		if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
+			break
+		}
+		cursor = findResult.Cursor
+	}
+
+	// Bulk upsert all existing node schedulers to update their connection status
+	if len(allNodeSchedulers) > 0 {
+		for _, ns := range allNodeSchedulers {
+			ns.BalancingId = "" // maintain the current balancing id in the node scheduler
+		}
+		upsertCtx, upsertCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, err := nodeSchedulerBO.BulkUpsertNodeScheduler(upsertCtx, allNodeSchedulers)
+		upsertCancel()
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
+		} else {
+			log.Debug().Int("count", len(allNodeSchedulers)).Msg("✅ Updated connection status for existing NodeSchedulers")
 		}
 	}
 
@@ -175,51 +251,6 @@ func (app *Application) sendNodeSchedulerHeartbeat(tenantNodeIndex int) {
 	if err != nil {
 		log.Err(err).Msg("❌ Failed to get node scheduler balancing state")
 		return
-	}
-
-	if app.MasterNodeIsLeader {
-		// First, paginate through all existing node schedulers to update their connection status
-		pageSize := 100
-		cursor := ""
-		allNodeSchedulers := []*models.NodeScheduler{}
-
-		for {
-			paginateCtx, paginateCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			findResult, err := nodeSchedulerBO.GetNodeSchedulers(paginateCtx, "", "", models.ConnectionStatusConnected, tenantNodeIndex, cursor, pageSize)
-			paginateCancel()
-			if err != nil {
-				log.Err(err).Msg("❌ Failed to paginate NodeSchedulers during heartbeat")
-				break
-			}
-
-			// Convert to pointers and add to the list (without TTL and LastHeartbeat to preserve existing values)
-			for _, ns := range findResult.Entities {
-				nodeSchedulerCopy := ns // Create a copy to avoid reference issues
-				// Don't set TTL or LastHeartbeat - let the upsert command handle these based on existing values
-				allNodeSchedulers = append(allNodeSchedulers, &nodeSchedulerCopy)
-			}
-
-			// Check if we have more pages
-			if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
-				break
-			}
-			cursor = findResult.Cursor
-		}
-
-		// Bulk upsert all existing node schedulers to update their connection status
-		if len(allNodeSchedulers) > 0 {
-			for _, ns := range allNodeSchedulers {
-				ns.BalancingId = "" // maintain the current balancing id in the node scheduler
-			}
-			upsertCtx, upsertCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			_, err = nodeSchedulerBO.BulkUpsertNodeScheduler(upsertCtx, allNodeSchedulers)
-			upsertCancel()
-			if err != nil {
-				log.Err(err).Msg("❌ Failed to update existing NodeSchedulers connection status")
-			} else {
-				log.Debug().Int("count", len(allNodeSchedulers)).Msg("✅ Updated connection status for existing NodeSchedulers")
-			}
-		}
 	}
 
 	// Now send heartbeat for the current server
