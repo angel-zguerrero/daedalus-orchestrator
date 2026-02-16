@@ -32,7 +32,9 @@ func newTestRocksDBStoreForEnqueue(t *testing.T) *db.RocksdbStore {
 	opts.SetCreateIfMissingColumnFamilies(true)
 	goOp := grocksdb.NewDefaultOptions()
 
-	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, []string{EnqueueRocksDefaultFC, EnqueueRocksTestFC, EnqueueRocksTemporalFC}, []*grocksdb.Options{goOp, goOp, goOp})
+	// Include AdminFC like in Pebble tests - some internal codes use it
+	cfNames := []string{EnqueueRocksDefaultFC, EnqueueRocksTestFC, EnqueueRocksTemporalFC, db.AdminFC}
+	rocks, cfHs, err := grocksdb.OpenDbColumnFamilies(opts, tmpDir, cfNames, []*grocksdb.Options{goOp, goOp, goOp, goOp})
 	require.NoError(t, err)
 	t.Cleanup(func() { rocks.Close() })
 
@@ -46,7 +48,7 @@ func newTestRocksDBStoreForEnqueue(t *testing.T) *db.RocksdbStore {
 		}
 	}
 
-	ttlCFMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames)-2)
+	ttlCFMap := make(map[string]*grocksdb.ColumnFamilyHandle, len(columnFamilyNames)-3)
 	for i, name := range columnFamilyNames {
 		if name == EnqueueRocksTemporalFC {
 			ttlCFMap[name] = cfHs[i]
