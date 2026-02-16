@@ -204,14 +204,19 @@ func TestRepository_Create_DuplicateUnique(t *testing.T) {
 	assert.NoError(t, err)
 
 	uIndexKey := "admin:users:idx-u:Name:Alice"
-	dataey := "admin:users:data:123"
-	mockStore.On("Get", "cf1", testColumnFamilySector, uIndexKey, mock.Anything).Return([]byte("123"), nil)
+	dataKey := "admin:users:data:123"
+	
+	// Mock for checking if unique field exists (should return true indicating duplicate)
 	mockStore.On("Exists", "cf1", testColumnFamilySector, uIndexKey, mock.Anything).Return(true, nil)
-	mockStore.On("Exists", "cf1", testColumnFamilySector, dataey, mock.Anything).Return(false, nil)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(false, nil)
 
-	_, err = repo.Create(&user, time.Now())
+	// Create should fail due to duplicate unique field
+	id, err := repo.Create(&user, time.Now())
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate unique field")
+	assert.Empty(t, id)
+	assert.Contains(t, err.Error(), "duplicate unique field: Name = Alice")
+
+	mockStore.AssertExpectations(t)
 }
 
 func TestRepository_Create_MissingPrimaryKeyValue(t *testing.T) {
@@ -572,27 +577,25 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 	assert.NoError(t, err)
 
 	users := []*User{
-		{Name: "Alice"},
-		{Name: "Alice"}, // duplicado intencional
+		{Name: "Alice"}, // New user
+		{Name: "Bob"},   // Duplicate user that already exists
 	}
 
-	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil).Once() // For first Alice
-	// For second Alice, Exists check will happen against the batch first (which passes), then DB.
-	// This mock is for the DB check for the *second* Alice, assuming the first one was "not in DB" for its Exists check
-	// and then added to the batch. The test logic in BulkCreate checks batch then DB.
-	// So, this mock should reflect that the key *now* exists in DB due to the first Alice (hypothetically).
-	// However, the current test structure for duplicate unique in BulkCreate relies on the mock for `Exists`
-	// for *each* entity. If an entity's value is already in uniqueInBatch, it errors before DB check.
-	// If not in batch, it checks DB.
-	// Let's adjust the mock to simulate the scenario where the second "Alice" check finds the first "Alice" already in the DB
-	// (or rather, that the key it would use is taken).
-	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(true, nil).Once()
-
+	// Mock for Alice (new user)
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil).Once()
 	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(false, nil).Once()
+	
+	// Mock for Bob (existing user) - should cause error
+	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Bob", mock.Anything).Return(true, nil).Once()
 	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:id2", mock.Anything).Return(false, nil).Once()
-	_, err = repo.BulkCreate(users, time.Now())
+
+	// BulkCreate should fail due to duplicate unique field
+	ids, err := repo.BulkCreate(users, time.Now())
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate unique field")
+	assert.Nil(t, ids)
+	assert.Contains(t, err.Error(), "duplicate unique field: Name = Bob")
+
+	mockStore.AssertExpectations(t)
 }
 
 func TestRepository_BulkCreate_WriteError(t *testing.T) {
@@ -911,24 +914,25 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 		Email:  "new@example.com", // Assume this is unique for now
 		Status: "active",
 		Meta: Meta{
-			Tag:         "existingTag", // This tag will cause a duplicate error
+			Tag:         "existingTag", // This tag will cause a duplicate match
 			ConfigCode:  102,
 			Description: "Desc",
 		},
 	}
-
+	
 	// Mock for unique checks
 	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(false, nil)
 	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:data:uc456", mock.Anything).Return(false, nil)
 	// Simulate Meta.Tag being a duplicate
 	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Meta.Tag:existingTag", mock.Anything).Return(true, nil)
-	// No On("Write") should be called
 
-	_, err = repo.Create(&user, time.Now())
-	require.Error(t, err)
+	// Create should fail due to duplicate nested unique field
+	id, err := repo.Create(&user, time.Now())
+	assert.Error(t, err)
+	assert.Empty(t, id)
 	assert.Contains(t, err.Error(), "duplicate unique field: Meta.Tag = existingTag")
 
-	//mockStore.AssertExpectations(t)
+	mockStore.AssertExpectations(t)
 }
 
 func TestRepository_FindByField_NestedSuccess_UserComplex(t *testing.T) {
@@ -1317,8 +1321,10 @@ func TestRepository_CreateExchangeWithCompoundUniqueness_DuplicateCompound(t *te
 	mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(false, nil)
 	mockStore.On("Exists", "cf1", testColumnFamilySector, compoundIdxKey, mock.Anything).Return(true, nil)
 
-	_, err = repo.Create(exchange, now)
-	require.Error(t, err)
+	// Create should fail due to duplicate compound unique constraint
+	id, err := repo.Create(exchange, now)
+	assert.Error(t, err)
+	assert.Empty(t, id)
 	assert.Contains(t, err.Error(), "duplicate unique compound constraint")
 
 	mockStore.AssertExpectations(t)

@@ -668,9 +668,10 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 	batch := NewWriteBatch()
 
 	type uniqueCheck struct {
-		Key       string
-		FieldName string
-		Value     string
+		Key         string
+		FieldName   string
+		Value       string
+		EntityIndex int // Index of the entity in the entities array
 	}
 
 	type uniqueCompoundCheck struct {
@@ -678,6 +679,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		CompoundIndex  int
 		FieldValues    map[string]string // fieldName -> value
 		CompositeValue string            // concatenated field values for key generation
+		EntityIndex    int               // Index of the entity in the entities array
 	}
 	var uniqueChecks []uniqueCheck
 	var uniqueCompoundChecks []uniqueCompoundCheck
@@ -689,7 +691,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 	// Map to detect duplicate primary keys in the batch
 	primaryKeysInBatch := make(map[string]struct{})
 
-	for _, entity := range entities {
+	for i, entity := range entities {
 		generatedID := r.idGeneratorFactory.GenerateID()
 		var currentEntityIDValue string
 
@@ -769,9 +771,10 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 				fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
 				uniqueIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
 				uniqueChecks = append(uniqueChecks, uniqueCheck{
-					Key:       uniqueIdxKey,
-					FieldName: def.Name,
-					Value:     fieldValue,
+					Key:         uniqueIdxKey,
+					FieldName:   def.Name,
+					Value:       fieldValue,
+					EntityIndex: i,
 				})
 
 				// Validación de duplicados en el mismo batch
@@ -785,7 +788,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 	}
 
 	// Check unique compound constraints
-	for _, entity := range entities {
+	for i, entity := range entities {
 		val := reflect.ValueOf(entity)
 		if val.Kind() == reflect.Ptr {
 			val = val.Elem()
@@ -827,11 +830,12 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 				CompoundIndex:  compoundIndex,
 				FieldValues:    fieldValues,
 				CompositeValue: compositeValue,
+				EntityIndex:    i,
 			})
 		}
 	}
 
-	// Validar duplicados en la base
+	// Check for duplicates in database and return errors for unique constraint violations
 	// This check inherently respects shouldSkipUniqueness because items are not added to uniqueChecks
 	for _, check := range uniqueChecks {
 		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, r.definition.ColumnFamilySector, check.Key, now)
@@ -843,7 +847,7 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 	}
 
-	// Validate unique compound constraints in database
+	// Check compound unique constraints in database and return errors for violations
 	for _, check := range uniqueCompoundChecks {
 		exists, err := r.kvStore.Exists(r.definition.ColumnFamily, r.definition.ColumnFamilySector, check.Key, now)
 		if err != nil {
@@ -854,8 +858,9 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 		}
 	}
 
-	// Insertar datos y sus índices
+	// Insert data and indices for all entities
 	for i, entity := range entities {
+
 		entityPtrVal := reflect.ValueOf(entity) // entity is *T
 
 		id := ids[i]
