@@ -38,7 +38,7 @@ Available Flags:
   --max-shards                Maximum number of shards (default 10, max 1000). Overrides config file and environment variable.
   --max-column-families       Maximum number of column families (default 10, max 100 in production, 10 in non-production). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
-  --grpc-port                  Port for the gRPC server. Default 4545. Overrides config file and environment variable.
+  --grpc-port                  Port for the gRPC server. Default 4000. Overrides config file and environment variable.
   --node-scheduler-heartbeat-timeout  Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Default 3s. Overrides config file and environment variable.
   --node-scheduler-ttl         TTL for node scheduler entries in minutes. Minimum 60. Default 1440. Overrides config file and environment variable.
   --tenant-summary-worker-interval  Interval for tenant summary worker in seconds. Minimum 10. Default 30. Overrides config file and environment variable.
@@ -200,7 +200,7 @@ var MaxColumnFamiliesFlag = flag.Int(
 var GrpcServerListenAddrHostFlag = flag.String(constants.GrpcServerListenAddrHostFlagName, "", "Host address for the gRPC server. Overrides config file and environment variable.")
 
 // GrpcServerListenAddrPortFlag defines the --grpc-port command-line flag for specifying the gRPC server listen port.
-var GrpcServerListenAddrPortFlag = flag.Int(constants.GrpcServerListenAddrPortFlagName, 0, "Port for the gRPC server. Default 4545. Overrides config file and environment variable.")
+var GrpcServerListenAddrPortFlag = flag.Int(constants.GrpcServerListenAddrPortFlagName, 0, "Port for the gRPC server. Default 4000. Overrides config file and environment variable.")
 
 // NodeSchedulerHeartbeatTimeoutFlag defines the --node-scheduler-heartbeat-timeout command-line flag for specifying the node scheduler heartbeat timeout.
 var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHeartbeatTimeoutFlagName, 15*time.Second, "Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Overrides config file and environment variable.")
@@ -590,7 +590,7 @@ func LoadDefaultConfiguration() error {
 		config.GrpcServerListenAddrHost = "0.0.0.0"
 	}
 	if config.GrpcServerListenAddrPort == 0 { // Note: 0 is the default for int if not set by flag/env/file
-		config.GrpcServerListenAddrPort = 4545 // Default gRPC port
+		config.GrpcServerListenAddrPort = 4000 // Default gRPC port
 	}
 
 	// Apply defaults and validations for NodeScheduler settings

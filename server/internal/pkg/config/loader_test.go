@@ -271,7 +271,7 @@ func TestLoadDefault_GrpcServer_Defaults(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "0.0.0.0", GlobalConfiguration.GrpcServerListenAddrHost, "Default gRPC host should be 0.0.0.0")
-	assert.Equal(t, 4545, GlobalConfiguration.GrpcServerListenAddrPort, "Default gRPC port should be 4545")
+	assert.Equal(t, 4000, GlobalConfiguration.GrpcServerListenAddrPort, "Default gRPC port should be 4000")
 }
 
 func TestLoadDefault_GrpcServer_ConfigFile(t *testing.T) {
