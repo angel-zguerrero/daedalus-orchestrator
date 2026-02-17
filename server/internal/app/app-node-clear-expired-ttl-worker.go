@@ -88,7 +88,7 @@ func (app *Application) clearMasterNodeTTL() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 
-		if _, err := app.MasterNode.Write(ctx, cmd); err != nil {
+		if _, err := app.MasterNode.SyncWrite(ctx, cmd); err != nil {
 			log.Err(err).Msg("❌ Failed to clear TTL on master node")
 		} else {
 			log.Info().Msg("✅ TTL cleared on master node")
@@ -108,7 +108,7 @@ func (app *Application) clearTenantBatchTTL(batch []*dragonboat.RaftNode) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 
-		if _, err := node.Write(ctx, cmd); err != nil {
+		if _, err := node.SyncWrite(ctx, cmd); err != nil {
 			log.Err(err).
 				Str("node", strconv.FormatUint(node.ShardID, 10)).
 				Msg("❌ Failed to clear TTL on tenant node")

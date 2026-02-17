@@ -248,7 +248,7 @@ func (app *Application) updateMasterWithSummary(_ string, summary models.TenantS
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resultData, err := app.MasterNode.Write(ctx, fsm_cmd)
+	resultData, err := app.MasterNode.SyncWrite(ctx, fsm_cmd)
 	if err != nil {
 		return err
 	}
@@ -281,7 +281,7 @@ func (app *Application) refreshLastUpdateAtInTenantNode(tenantNode *dragonboat.R
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resultData, err := tenantNode.Write(ctx, fsm_cmd)
+	resultData, err := tenantNode.SyncWrite(ctx, fsm_cmd)
 	if err != nil {
 		return err
 	}

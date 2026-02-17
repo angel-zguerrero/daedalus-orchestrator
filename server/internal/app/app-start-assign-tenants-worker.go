@@ -127,7 +127,7 @@ func (app *Application) AssignTenants() {
 							CMD:  deleteColumnFamilyCommandSector,
 						}
 
-						_, err = tenantNode.Write(writeCtx, ccfCmd)
+						_, err = tenantNode.SyncWrite(writeCtx, ccfCmd)
 						if err != nil {
 							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
 							fmt.Println("Failed to delete tenant", err)
@@ -146,7 +146,7 @@ func (app *Application) AssignTenants() {
 							CMD:  deleteColumnFamilyTTLCommandSector,
 						}
 
-						_, err = tenantNode.Write(writeCtx, ccfTTLCmd)
+						_, err = tenantNode.SyncWrite(writeCtx, ccfTTLCmd)
 						if err != nil {
 							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
 							fmt.Println("Failed to delete tenant", err)
@@ -163,7 +163,7 @@ func (app *Application) AssignTenants() {
 							CMD:  deleteTenantInMasterCommand,
 						}
 
-						result, err = app.MasterNode.Write(writeCtx, atstCmd)
+						result, err = app.MasterNode.SyncWrite(writeCtx, atstCmd)
 						if err != nil {
 							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
 							fmt.Println("Failed to delete tenant", err)
@@ -189,7 +189,7 @@ func (app *Application) AssignTenants() {
 				CMD:  assignCmd,
 			}
 
-			result, err = app.MasterNode.Write(writeCtx, atstCmd)
+			result, err = app.MasterNode.SyncWrite(writeCtx, atstCmd)
 			if err != nil {
 				//log.Fatal().Err(err).Strs("Codes", assignableTenantCodes).Msg("Failed to assign tenants to shard")
 				fmt.Println("Failed to assign tenants to shard", err)

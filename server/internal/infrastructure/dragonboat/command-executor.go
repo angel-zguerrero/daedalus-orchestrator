@@ -60,7 +60,7 @@ func ExecuteRepositoryCommand[T any](
 	}
 
 	// Execute write operation
-	result, err := raftNode.Write(writeCtx, fsmCmd)
+	result, err := raftNode.SyncWrite(writeCtx, fsmCmd)
 	if err != nil {
 		logger.Error().Err(err).Msgf("Failed to execute %s", operationName)
 		return zero, fmt.Errorf("failed to execute %s: %w", operationName, err)

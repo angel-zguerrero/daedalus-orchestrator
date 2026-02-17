@@ -136,7 +136,7 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespa
 		CMD:  deleteExchangeCommand,
 	}
 
-	result, err := tenantNode.Write(writeCtx, atstCmd)
+	result, err := tenantNode.SyncWrite(writeCtx, atstCmd)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Failed to delete exchange")
 		return errors.New("Failed to delete exchange: " + err.Error())

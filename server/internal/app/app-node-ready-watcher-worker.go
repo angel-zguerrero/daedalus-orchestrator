@@ -116,7 +116,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 
 						ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 						defer cancel()
-						_, err := app.MasterNode.Write(ctx, cmd)
+						_, err := app.MasterNode.SyncWrite(ctx, cmd)
 						if err != nil {
 							log.Error().Err(err).Msg("❌ Failed to bootstrap root user (will retry)")
 							// Don't set bootstrapped true if this failed
@@ -184,7 +184,7 @@ func defineColumnFamilies(app *Application) {
 			writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Hour)
 			defer writeCancel()
 
-			_, err := tenantNode.Write(writeCtx, ccfCmd)
+			_, err := tenantNode.SyncWrite(writeCtx, ccfCmd)
 			if err != nil {
 				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to create column family for Shard")
 			}
@@ -200,7 +200,7 @@ func defineColumnFamilies(app *Application) {
 				CMD:  createColumnFamilyCommandTtl,
 			}
 
-			_, err = tenantNode.Write(writeCtx, ccfCmdTtl)
+			_, err = tenantNode.SyncWrite(writeCtx, ccfCmdTtl)
 			if err != nil {
 				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to create column family for Shard")
 			}

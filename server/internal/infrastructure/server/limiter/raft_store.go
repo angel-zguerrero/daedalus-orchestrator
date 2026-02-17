@@ -121,7 +121,7 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 		},
 	}
 
-	if _, err := s.node.Write(ctx, writeCmd); err != nil {
+	if _, err := s.node.SyncWrite(ctx, writeCmd); err != nil {
 		return limiter.Context{}, err
 	}
 
@@ -221,7 +221,7 @@ func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) erro
 		},
 	}
 
-	_, err := s.node.Write(ctx, writeCmd)
+	_, err := s.node.SyncWrite(ctx, writeCmd)
 	return err
 }
 
@@ -259,7 +259,7 @@ func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (l
 		},
 	}
 
-	if _, err := s.node.Write(ctx, writeCmd); err != nil {
+	if _, err := s.node.SyncWrite(ctx, writeCmd); err != nil {
 		return limiter.Context{}, err
 	}
 

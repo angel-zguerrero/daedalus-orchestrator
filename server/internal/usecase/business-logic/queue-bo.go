@@ -185,7 +185,7 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, c
 		CMD:  deleteQueueCommand,
 	}
 
-	result, err := tenantNode.Write(writeCtx, atstCmd)
+	result, err := tenantNode.SyncWrite(writeCtx, atstCmd)
 	if err != nil {
 		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Failed to delete queue")
 		return errors.New("Failed to delete queue: " + err.Error())

@@ -212,7 +212,7 @@ func (mn *RaftNode) Stop() {
 	mn.stopped = true
 }
 
-// Write proposes a batch of commands to the Raft log.
+// SyncWrite proposes a batch of commands to the Raft log.
 // It marshals the commands into JSON and uses SyncPropose to apply them.
 // This is a synchronous operation that waits for the proposal to be committed or to fail.
 //
@@ -223,7 +223,7 @@ func (mn *RaftNode) Stop() {
 // Returns:
 //   - The result of the proposal from the state machine.
 //   - An error if marshaling fails or if SyncPropose encounters an error.
-func (mn *RaftNode) Write(ctx context.Context, comand general_command.FSM_Command) (statemachine.Result, error) { // Changed FSM_Command to general_command.FSM_Command
+func (mn *RaftNode) SyncWrite(ctx context.Context, comand general_command.FSM_Command) (statemachine.Result, error) { // Changed FSM_Command to general_command.FSM_Command
 	mn.mu.RLock() // Use read lock since we only read the stopped field
 	defer mn.mu.RUnlock()
 	if mn.stopped {
