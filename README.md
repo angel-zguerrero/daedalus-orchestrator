@@ -191,14 +191,13 @@ go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=12
 
 go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 -replica 3  -rest-port 3003  -grpc-port 4003 --role=admin,consensus -master-db-engine pebble
 
-go run . -self-member-host 127.0.0.1 -initial-members=127.0.0.1:r4 -cluster-base-port 5000 -replica 4  -rest-port 3004 -grpc-port 4004 -join --role=scheduler
+go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -replica 4  -rest-port 3004 -grpc-port 4004 -join --role=scheduler,connector
 
+go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -replica 5  -rest-port 3005 -grpc-port 4005 -join --role=scheduler,connector
 
-go run . -self-member-host 127.0.0.1 -initial-members=127.0.0.1:r5 -cluster-base-port 5000 -replica 5  -rest-port 3005 -grpc-port 4005 -join --role=scheduler
+go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -replica 6  -rest-port 3006 -grpc-port 4006 -join --role=scheduler,connector
 
-go run . -self-member-host 127.0.0.1 -initial-members=127.0.0.1:r6 -cluster-base-port 5000 -replica 6  -rest-port 3006 -grpc-port 4006 -join --role=scheduler
-
-go run . -self-member-host 127.0.0.1 -initial-members=127.0.0.1:r7 -cluster-base-port 5000 -replica 7  -rest-port 3007 -grpc-port 4007 -join --role=scheduler
+go run . -self-member-host 127.0.0.1 -cluster-base-port 5000 -replica 7  -rest-port 3007 -grpc-port 4007 -join --role=scheduler,connector
 
 ## With NX:
 

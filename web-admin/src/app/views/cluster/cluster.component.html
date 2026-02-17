@@ -266,23 +266,20 @@
       <c-row class="g-3 mt-3">
         <c-col [md]="12">
           <c-alert color="warning">
-            <strong>Next Steps:</strong> After successfully adding the replica, start your new node with one of these commands:
+            <strong>Next Steps:</strong> After successfully adding the replica, start your new node with one of these
+            commands:
             <br><br>
-            
+
             <strong>Option 1: Same machine</strong> (each node on different port):
             <br>
-            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ (enhancedClusterInfo?.port_configuration?.rest_port || 3000) + (addNodeForm.get('replica_id')?.value || 0) }} -grpc-port {{ (enhancedClusterInfo?.port_configuration?.grpc_port || 4000) + (addNodeForm.get('replica_id')?.value || 0) }} -join</code>
+            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ (enhancedClusterInfo?.port_configuration?.rest_port || 3000) + (addNodeForm.get('replica_id')?.value || 0) }} -grpc-port {{ (enhancedClusterInfo?.port_configuration?.grpc_port || 4000) + (addNodeForm.get('replica_id')?.value || 0) }} -join --role=scheduler,connector</code>
             <br><br>
-            
+
             <strong>Option 2: Separate machines</strong> (can use same ports since they are on different hosts):
             <br>
-            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ enhancedClusterInfo?.port_configuration?.rest_port || '3000' }} -grpc-port {{ enhancedClusterInfo?.port_configuration?.grpc_port || '4000' }} -join</code>
+            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ enhancedClusterInfo?.port_configuration?.rest_port || '3000' }} -grpc-port {{ enhancedClusterInfo?.port_configuration?.grpc_port || '4000' }} -join --role=scheduler,connector</code>
             <br><br>
-            
-            <small class="text-muted">
-              <strong>Note:</strong> On separate machines, each node can use the same ports since they are on different hosts. 
-              Replace "host" with the specific IP address or hostname of the machine where the node will run.
-            </small>
+
           </c-alert>
         </c-col>
       </c-row>
