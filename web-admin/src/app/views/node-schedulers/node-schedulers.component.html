@@ -99,17 +99,18 @@
               </button>
             </td>
           </tr>
-          <tr *ngIf="nodeSchedulers.length === 0 && !loading">
-            <td colspan="5" class="text-center py-4">
-              <div class="text-muted">
-                <svg cIcon name="cil-grid" size="3xl" class="d-block mx-auto mb-2"></svg>
-                <h6>No node schedulers found</h6>
-                <p class="mb-0">No active node schedulers are currently registered.</p>
-              </div>
-            </td>
-          </tr>
+
         </tbody>
       </table>
+      <div *ngIf="nodeSchedulers.length === 0 && !loading">
+        <div class="text-center py-5">
+          <div class="text-muted">
+            <svg cIcon name="cil-grid" size="3xl" class="d-block mx-auto mb-2"></svg>
+            <h6>No node schedulers found</h6>
+            <p class="mb-0">No active node schedulers are currently registered.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Pagination -->
