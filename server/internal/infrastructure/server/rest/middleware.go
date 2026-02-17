@@ -28,7 +28,7 @@ import (
 )
 
 // tenantContextMiddleware creates a middleware that extracts tenant information and injects it into the context
-func tenantContextMiddleware(tenantBO *bo.TenantBO, tenantNodesDictionary map[string]*dragonboat.RaftNode, logger zerolog.Logger) gin.HandlerFunc {
+func tenantContextMiddleware(tenantBO *bo.TenantBO, serverConfig *common.ServerConfing, logger zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Solo aplica a rutas que tienen un parámetro :code de tenant
 		tenantCode := c.Param("code")
@@ -51,10 +51,19 @@ func tenantContextMiddleware(tenantBO *bo.TenantBO, tenantNodesDictionary map[st
 		cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
 		cfs := tenant.ID
 
-		// Obtener el nodo correspondiente al tenant
-		node, exists := tenantNodesDictionary[cfs]
-		if !exists {
-			logger.Error().Str("tenantCode", tenantCode).Str("cfs", cfs).Msg("No node found for tenant")
+		// Obtener el nodo correspondiente al tenant usando ShardId
+		var node *dragonboat.RaftNode
+		serverConfig.TenantNodesLock.Lock()
+		for i := range serverConfig.TenantNodes {
+			if serverConfig.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+				node = serverConfig.TenantNodes[i]
+				break
+			}
+		}
+		serverConfig.TenantNodesLock.Unlock()
+
+		if node == nil {
+			logger.Error().Str("tenantCode", tenantCode).Str("cfs", cfs).Int("shardId", tenant.ShardId).Msg("No node found for tenant shard in REST middleware")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Tenant node not available"})
 			c.Abort()
 			return

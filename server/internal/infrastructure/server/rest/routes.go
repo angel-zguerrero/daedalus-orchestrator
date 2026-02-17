@@ -42,7 +42,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 		tenantsGroup := restAPIGroup.Group("/tenants")
 		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
-		tenantsGroup.Use(tenantContextMiddleware(tenantBO, s.Config.TenantNodesDictionary, s.Config.Logger))
+		tenantsGroup.Use(tenantContextMiddleware(tenantBO, s.Config, s.Config.Logger))
 		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			tenantsGroup.GET("", tenantController.GetTenantsHandler)

@@ -152,7 +152,16 @@ func (bo *TenantBO) GetTenant(ctx context.Context, tenantCode string) (models.Te
 		return models.TenantInMaster{}, nil, nil, fmt.Errorf("find tenant failed: %w", err)
 	}
 
-	node := bo.Config.TenantNodesDictionary[tenantInMaster.ID]
+	// Buscar el nodo correspondiente usando ShardId
+	var node *dragonboat.RaftNode
+	bo.Config.TenantNodesLock.Lock()
+	for i := range bo.Config.TenantNodes {
+		if bo.Config.TenantNodes[i].ShardID == uint64(tenantInMaster.ShardId) {
+			node = bo.Config.TenantNodes[i]
+			break
+		}
+	}
+	bo.Config.TenantNodesLock.Unlock()
 
 	if node == nil {
 		return tenantInMaster, nil, nil, nil

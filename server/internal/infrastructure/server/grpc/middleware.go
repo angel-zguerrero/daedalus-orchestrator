@@ -35,7 +35,7 @@ import (
 )
 
 // UnaryTenantInterceptor returns a new unary server interceptor that extracts tenant information and injects it into the context
-func UnaryTenantInterceptor(tenantBO *bo.TenantBO, tenantNodesDictionary map[string]*dragonboat.RaftNode, logger zerolog.Logger) grpc.UnaryServerInterceptor {
+func UnaryTenantInterceptor(tenantBO *bo.TenantBO, serverConfig *common.ServerConfing, logger zerolog.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Extract tenant code from the request using reflection
 		tenantCode := extractTenantCodeFromRequest(req)
@@ -55,10 +55,19 @@ func UnaryTenantInterceptor(tenantBO *bo.TenantBO, tenantNodesDictionary map[str
 		cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
 		cfs := tenant.ID
 
-		// Obtener el nodo correspondiente al tenant
-		node, exists := tenantNodesDictionary[cfs]
-		if !exists {
-			logger.Error().Str("tenantCode", tenantCode).Str("cfs", cfs).Msg("No node found for tenant in gRPC interceptor")
+		// Obtener el nodo correspondiente al tenant usando ShardId
+		var node *dragonboat.RaftNode
+		serverConfig.TenantNodesLock.Lock()
+		for i := range serverConfig.TenantNodes {
+			if serverConfig.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+				node = serverConfig.TenantNodes[i]
+				break
+			}
+		}
+		serverConfig.TenantNodesLock.Unlock()
+
+		if node == nil {
+			logger.Error().Str("tenantCode", tenantCode).Str("cfs", cfs).Int("shardId", tenant.ShardId).Msg("No node found for tenant shard in gRPC interceptor")
 			return nil, status.Errorf(codes.Internal, "Tenant node not available")
 		}
 
