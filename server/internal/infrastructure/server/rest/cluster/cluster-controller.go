@@ -4,6 +4,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
+	"deadalus-orch/server/internal/pkg/config"
 	"net/http"
 	"time"
 
@@ -194,6 +195,13 @@ type ClusterConfigInfo struct {
 	Total   int               `json:"total"`
 }
 
+// ClusterPortInfo represents the port configuration information for the cluster
+type ClusterPortInfo struct {
+	ClusterBasePort int `json:"cluster_base_port"`
+	RestPort        int `json:"rest_port"`
+	GrpcPort        int `json:"grpc_port"`
+}
+
 // EnhancedClusterInfo represents the complete cluster information
 type EnhancedClusterInfo struct {
 	// Primary information from GetClusterConfig
@@ -206,6 +214,9 @@ type EnhancedClusterInfo struct {
 	} `json:"node_configuration"`
 
 	BalancingState *models.NodeSchedulerBalancingState `json:"balancing_state"`
+	
+	// Port configuration information
+	PortConfiguration ClusterPortInfo `json:"port_configuration"`
 }
 
 // GetClusterInfo gets information about the current cluster state using GetClusterConfig as primary data
@@ -341,6 +352,7 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 		Int("cluster_shards", len(response.ClusterConfig)).
 		Msg("✅ Retrieved enhanced cluster information")
 
+	// Get balancing state information
 	balancingBO := business_logic.NewNodeSchedulerBalancingBO(cc.Config)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -349,6 +361,13 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 		log.Error().Err(err).Msg("❌ Failed to get balancing state")
 	} else if state != nil {
 		response.BalancingState = state
+	}
+
+	// Add port configuration information
+	response.PortConfiguration = ClusterPortInfo{
+		ClusterBasePort: config.GlobalConfiguration.ClusterBasePort,
+		RestPort:        config.GlobalConfiguration.RestListenAddrPort,
+		GrpcPort:        config.GlobalConfiguration.GrpcServerListenAddrPort,
 	}
 
 	c.JSON(http.StatusOK, response)

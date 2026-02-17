@@ -63,9 +63,17 @@ export class ClusterComponent implements OnInit {
     this.addNodeForm = this.formBuilder.group({
       replica_id: ['', [Validators.required, Validators.min(1)]],
       host: ['127.0.0.1', [Validators.required, Validators.pattern(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/)]],
-      port: ['', [Validators.required, Validators.min(1024), Validators.max(65535)]],
-      specific_shards: [false],
-      shard_ids: [[]]
+      port: ['', [Validators.required, Validators.min(1024), Validators.max(65535)]]
+    });
+
+    // Watch replica_id changes to auto-calculate port
+    this.addNodeForm.get('replica_id')?.valueChanges.subscribe(replicaId => {
+      if (replicaId && !isNaN(replicaId)) {
+        const calculatedPort = 5000 + parseInt(replicaId);
+        this.addNodeForm.get('port')?.setValue(calculatedPort);
+      } else {
+        this.addNodeForm.get('port')?.setValue('');
+      }
     });
   }
 
@@ -134,9 +142,7 @@ export class ClusterComponent implements OnInit {
     this.addNodeForm.reset({
       replica_id: '',
       host: '127.0.0.1',
-      port: '',
-      specific_shards: false,
-      shard_ids: []
+      port: ''
     });
     this.addNodeModalVisible = true;
   }
@@ -162,11 +168,6 @@ export class ClusterComponent implements OnInit {
       port: parseInt(formValue.port)
     };
 
-    // Only include shard_ids if specific shards are selected
-    if (formValue.specific_shards && formValue.shard_ids && formValue.shard_ids.length > 0) {
-      request.shard_ids = formValue.shard_ids.map((id: string) => parseInt(id));
-    }
-
     this.clusterService.addReplica(request).subscribe({
       next: (response) => {
         this.addingNode = false;
@@ -186,28 +187,6 @@ export class ClusterComponent implements OnInit {
     });
   }
 
-  getAvailableShards(): number[] {
-    if (!this.enhancedClusterInfo || !this.enhancedClusterInfo.node_configuration) return [];
-
-    const nodeConfig = this.enhancedClusterInfo.node_configuration;
-    const shards: number[] = [];
-
-    // Add master node shard if it exists
-    if (nodeConfig.master_node && nodeConfig.master_node.shard_id !== undefined) {
-      shards.push(nodeConfig.master_node.shard_id);
-    }
-
-    // Add tenant nodes shards if they exist
-    if (nodeConfig.tenant_nodes && Array.isArray(nodeConfig.tenant_nodes)) {
-      nodeConfig.tenant_nodes.forEach(node => {
-        if (node && node.shard_id !== undefined && !shards.includes(node.shard_id)) {
-          shards.push(node.shard_id);
-        }
-      });
-    }
-
-    return shards.sort((a, b) => a - b);
-  }
 
   getClusterNodesByShardId(shardId: number): ClusterNodeInfo[] {
     const shard = this.clusterConfigData.find(s => s.shard_id === shardId);
@@ -281,20 +260,4 @@ export class ClusterComponent implements OnInit {
     this.loadClusterInfo();
   }
 
-  onShardSelectionChange(event: any, shardId: number): void {
-    const currentShardIds = this.addNodeForm.get('shard_ids')?.value || [];
-
-    if (event.target.checked) {
-      if (!currentShardIds.includes(shardId)) {
-        currentShardIds.push(shardId);
-      }
-    } else {
-      const index = currentShardIds.indexOf(shardId);
-      if (index > -1) {
-        currentShardIds.splice(index, 1);
-      }
-    }
-
-    this.addNodeForm.get('shard_ids')?.setValue(currentShardIds);
-  }
 }

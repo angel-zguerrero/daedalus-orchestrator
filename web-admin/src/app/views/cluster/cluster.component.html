@@ -224,7 +224,7 @@
     <c-modal-body>
       <c-alert color="info" class="mb-3">
         <strong>Important:</strong> Make sure to add the replica to the cluster <strong>before</strong> starting the new
-        node with the <code>--join true</code> flag.
+        node with the <code>--join</code> flag.
       </c-alert>
 
       <c-row class="g-3">
@@ -239,13 +239,14 @@
           </c-form-feedback>
         </c-col>
         <c-col [md]="6">
-          <label cLabel for="port">Port *</label>
-          <input cFormControl id="port" type="number" placeholder="5004" formControlName="port"
+          <label cLabel for="port">Port (Auto-calculated)</label>
+          <input cFormControl id="port" type="number" placeholder="Auto-generated" formControlName="port"
             [valid]="addNodeForm.get('port')?.touched ? addNodeForm.get('port')?.valid : undefined" min="1024"
             max="65535" />
           <c-form-feedback *ngIf="addNodeForm.get('port')?.invalid && addNodeForm.get('port')?.touched" [valid]="false">
             Port is required and must be between 1024 and 65535
           </c-form-feedback>
+          <small class="text-muted">Port is automatically calculated as 5000 + Replica ID (but can be edited)</small>
         </c-col>
       </c-row>
 
@@ -260,38 +261,28 @@
         </c-col>
       </c-row>
 
-      <c-row class="g-3 mt-3">
-        <c-col [md]="12">
-          <c-form-check id="specific_shards">
-            <input cFormCheckInput type="checkbox" id="specific_shards" formControlName="specific_shards" />
-            <label cFormLabel for="specific_shards">
-              Add to specific shards only (default: add to all shards)
-            </label>
-          </c-form-check>
-        </c-col>
-      </c-row>
 
-      <c-row class="g-3 mt-2" *ngIf="addNodeForm.get('specific_shards')?.value">
-        <c-col [md]="12">
-          <label cLabel>Select Shards</label>
-          <div class="d-flex flex-wrap gap-2">
-            <c-form-check *ngFor="let shardId of getAvailableShards()" [id]="'shard_' + shardId">
-              <input cFormCheckInput type="checkbox" [id]="'shard_' + shardId" [value]="shardId"
-                (change)="onShardSelectionChange($event, shardId)" />
-              <label cFormLabel [for]="'shard_' + shardId">
-                Shard {{ shardId }}
-              </label>
-            </c-form-check>
-          </div>
-        </c-col>
-      </c-row>
 
       <c-row class="g-3 mt-3">
         <c-col [md]="12">
           <c-alert color="warning">
-            <strong>Next Steps:</strong> After successfully adding the replica, start your new node with:
+            <strong>Next Steps:</strong> After successfully adding the replica, start your new node with one of these commands:
             <br><br>
-            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port 5000 -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port 300{{ addNodeForm.get('replica_id')?.value }} -grpc-port 400{{ addNodeForm.get('replica_id')?.value }} -join true</code>
+            
+            <strong>Option 1: Same machine</strong> (each node on different port):
+            <br>
+            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ (enhancedClusterInfo?.port_configuration?.rest_port || 3000) + (addNodeForm.get('replica_id')?.value || 0) }} -grpc-port {{ (enhancedClusterInfo?.port_configuration?.grpc_port || 4000) + (addNodeForm.get('replica_id')?.value || 0) }} -join true</code>
+            <br><br>
+            
+            <strong>Option 2: Separate machines</strong> (can use same ports since they are on different hosts):
+            <br>
+            <code>go run . -self-member-host host -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ enhancedClusterInfo?.port_configuration?.rest_port || '3000' }} -grpc-port {{ enhancedClusterInfo?.port_configuration?.grpc_port || '4000' }} -join true</code>
+            <br><br>
+            
+            <small class="text-muted">
+              <strong>Note:</strong> On separate machines, each node can use the same ports since they are on different hosts. 
+              Replace "host" with the specific IP address or hostname of the machine where the node will run.
+            </small>
           </c-alert>
         </c-col>
       </c-row>

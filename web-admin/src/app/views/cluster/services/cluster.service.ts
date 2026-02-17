@@ -50,10 +50,17 @@ export interface NodeConfiguration {
   tenant_nodes: TenantNodeInfo[];
 }
 
+export interface ClusterPortInfo {
+  cluster_base_port: number;
+  rest_port: number;
+  grpc_port: number;
+}
+
 export interface EnhancedClusterInfo {
   cluster_config: ClusterConfigInfo[];
   node_configuration: NodeConfiguration;
   balancing_state?: NodeSchedulerBalancingState;
+  port_configuration: ClusterPortInfo;
 }
 
 // Legacy interface for backward compatibility
