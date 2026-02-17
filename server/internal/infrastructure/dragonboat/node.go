@@ -37,6 +37,7 @@ type RaftNode struct {
 	mu             sync.RWMutex
 	stopped        bool
 	readSem        chan struct{} // max 100 inflight reads
+	writeSem       chan struct{} // max 100 inflight writes
 }
 
 type RaftTuningParams struct {
@@ -237,6 +238,86 @@ func (mn *RaftNode) SyncWrite(ctx context.Context, comand general_command.FSM_Co
 	return mn.NH.SyncPropose(ctx, cs, buf.Bytes())
 }
 
+// WriteResult encapsulates the result of an asynchronous write operation
+type WriteResult struct {
+	Result statemachine.Result
+	Error  error
+}
+
+// Write proposes a command to the Raft log asynchronously.
+// It marshals the command and uses Propose to apply it.
+// Returns a channel that will receive the result when the proposal completes.
+//
+// Parameters:
+//   - ctx: The context for the proposal.
+//   - command: The command to be written.
+//
+// Returns:
+//   - A read-only channel that will receive the WriteResult when the proposal completes.
+//   - An error if the node is stopped, semaphore acquisition fails, marshaling fails, or Propose encounters an error.
+func (mn *RaftNode) Write(ctx context.Context, command general_command.FSM_Command) (<-chan WriteResult, error) {
+	mn.mu.RLock()
+	if mn.stopped {
+		return nil, errors.New("raft node is stopped")
+	}
+	mn.mu.RUnlock()
+
+	// Acquire write semaphore with 10-second timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	select {
+	case mn.writeSem <- struct{}{}:
+		// Semaphore acquired
+	case <-timeoutCtx.Done():
+		return nil, errors.New("write semaphore acquisition timeout")
+	}
+
+	cs := mn.GetClient()
+	var buf bytes.Buffer
+
+	if err := gob.NewEncoder(&buf).Encode(command); err != nil {
+		<-mn.writeSem // Release semaphore on encoding error
+		return nil, err
+	}
+
+	rs, err := mn.NH.Propose(cs, buf.Bytes(), 10*time.Second)
+	if err != nil {
+		<-mn.writeSem // Release semaphore on proposal error
+		return nil, err
+	}
+
+	resultChan := make(chan WriteResult, 1)
+
+	// Handle the result asynchronously
+	go func() {
+		defer func() { <-mn.writeSem }() // Release semaphore when done
+		defer close(resultChan)
+
+		select {
+		case result := <-rs.ResultC():
+			if result.Completed() {
+				resultChan <- WriteResult{
+					Result: result.GetResult(),
+					Error:  nil,
+				}
+			} else {
+				resultChan <- WriteResult{
+					Result: statemachine.Result{},
+					Error:  errors.New("proposal failed or timed out"),
+				}
+			}
+		case <-ctx.Done():
+			resultChan <- WriteResult{
+				Result: statemachine.Result{},
+				Error:  ctx.Err(),
+			}
+		}
+	}()
+
+	return resultChan, nil
+}
+
 // Read performs a linearizable local read from the Raft state machine using ReadIndex and ReadLocalNode.
 func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command) (interface{}, error) {
 	if mn.stopped {
@@ -396,7 +477,8 @@ func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMe
 	raftNode.InitialMembers = initialMembers
 	raftNode.Join = join
 	raftNode.Roles = roles
-	raftNode.readSem = make(chan struct{}, 100) // max 100 inflight reads
+	raftNode.readSem = make(chan struct{}, 100)  // max 100 inflight reads
+	raftNode.writeSem = make(chan struct{}, 100) // max 100 inflight writes
 	// The passed stateMachineFn is assigned here.
 	raftNode.stateMachine = stateMachineFn
 	// However, StartReplica currently uses its own hardcoded state machine if not careful.

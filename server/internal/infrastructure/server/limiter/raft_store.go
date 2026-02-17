@@ -121,8 +121,19 @@ func (s *RaftStore) Increment(ctx context.Context, key string, quantity int64, r
 		},
 	}
 
-	if _, err := s.node.SyncWrite(ctx, writeCmd); err != nil {
+	resultChan, err := s.node.Write(ctx, writeCmd)
+	if err != nil {
 		return limiter.Context{}, err
+	}
+
+	// Wait for the result since we need to return the context
+	select {
+	case writeResult := <-resultChan:
+		if writeResult.Error != nil {
+			return limiter.Context{}, writeResult.Error
+		}
+	case <-ctx.Done():
+		return limiter.Context{}, ctx.Err()
 	}
 
 	return limiter.Context{
@@ -221,8 +232,18 @@ func (s *RaftStore) Set(ctx context.Context, key string, c limiter.Context) erro
 		},
 	}
 
-	_, err := s.node.SyncWrite(ctx, writeCmd)
-	return err
+	resultChan, err := s.node.Write(ctx, writeCmd)
+	if err != nil {
+		return err
+	}
+
+	// Wait for the result
+	select {
+	case writeResult := <-resultChan:
+		return writeResult.Error
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (limiter.Context, error) {
@@ -259,8 +280,19 @@ func (s *RaftStore) Reset(ctx context.Context, key string, rate limiter.Rate) (l
 		},
 	}
 
-	if _, err := s.node.SyncWrite(ctx, writeCmd); err != nil {
+	resultChan, err := s.node.Write(ctx, writeCmd)
+	if err != nil {
 		return limiter.Context{}, err
+	}
+
+	// Wait for the result since we need to return the context
+	select {
+	case writeResult := <-resultChan:
+		if writeResult.Error != nil {
+			return limiter.Context{}, writeResult.Error
+		}
+	case <-ctx.Done():
+		return limiter.Context{}, ctx.Err()
 	}
 
 	return limiter.Context{

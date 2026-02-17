@@ -60,14 +60,27 @@ func ExecuteRepositoryCommand[T any](
 	}
 
 	// Execute write operation
-	result, err := raftNode.SyncWrite(writeCtx, fsmCmd)
+	resultChan, err := raftNode.Write(writeCtx, fsmCmd)
 	if err != nil {
-		logger.Error().Err(err).Msgf("Failed to execute %s", operationName)
-		return zero, fmt.Errorf("failed to execute %s: %w", operationName, err)
+		logger.Error().Err(err).Msgf("Failed to start %s", operationName)
+		return zero, fmt.Errorf("failed to start %s: %w", operationName, err)
+	}
+
+	// Wait for the result since we need to process it
+	var writeResult WriteResult
+	select {
+	case writeResult = <-resultChan:
+		if writeResult.Error != nil {
+			logger.Error().Err(writeResult.Error).Msgf("Failed to execute %s", operationName)
+			return zero, fmt.Errorf("failed to execute %s: %w", operationName, writeResult.Error)
+		}
+	case <-writeCtx.Done():
+		logger.Error().Err(writeCtx.Err()).Msgf("%s operation timed out", operationName)
+		return zero, fmt.Errorf("%s operation timed out: %w", operationName, writeCtx.Err())
 	}
 
 	// Decode result
-	buf := bytes.NewBuffer(result.Data)
+	buf := bytes.NewBuffer(writeResult.Result.Data)
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {

@@ -88,11 +88,24 @@ func (app *Application) clearMasterNodeTTL() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 
-		if _, err := app.MasterNode.SyncWrite(ctx, cmd); err != nil {
-			log.Err(err).Msg("❌ Failed to clear TTL on master node")
-		} else {
-			log.Info().Msg("✅ TTL cleared on master node")
+		resultChan, err := app.MasterNode.Write(ctx, cmd)
+		if err != nil {
+			log.Err(err).Msg("❌ Failed to start TTL clear operation on master node")
+			return
 		}
+
+		go func() {
+			select {
+			case writeResult := <-resultChan:
+				if writeResult.Error != nil {
+					log.Err(writeResult.Error).Msg("❌ Failed to clear TTL on master node")
+				} else {
+					log.Info().Msg("✅ TTL cleared on master node")
+				}
+			case <-ctx.Done():
+				log.Warn().Msg("⏱️ TTL clear operation timed out on master node")
+			}
+		}()
 	}
 }
 
@@ -108,14 +121,31 @@ func (app *Application) clearTenantBatchTTL(batch []*dragonboat.RaftNode) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 
-		if _, err := node.SyncWrite(ctx, cmd); err != nil {
+		resultChan, err := node.Write(ctx, cmd)
+		if err != nil {
 			log.Err(err).
 				Str("node", strconv.FormatUint(node.ShardID, 10)).
-				Msg("❌ Failed to clear TTL on tenant node")
-		} else {
-			log.Info().
-				Str("node", strconv.FormatUint(node.ShardID, 10)).
-				Msg("✅ TTL cleared on tenant node")
+				Msg("❌ Failed to start TTL clear operation on tenant node")
+			return
 		}
+
+		go func(nodeID uint64) {
+			select {
+			case writeResult := <-resultChan:
+				if writeResult.Error != nil {
+					log.Err(writeResult.Error).
+						Str("node", strconv.FormatUint(nodeID, 10)).
+						Msg("❌ Failed to clear TTL on tenant node")
+				} else {
+					log.Info().
+						Str("node", strconv.FormatUint(nodeID, 10)).
+						Msg("✅ TTL cleared on tenant node")
+				}
+			case <-ctx.Done():
+				log.Warn().
+					Str("node", strconv.FormatUint(nodeID, 10)).
+					Msg("⏱️ TTL clear operation timed out on tenant node")
+			}
+		}(node.ShardID)
 	}
 }

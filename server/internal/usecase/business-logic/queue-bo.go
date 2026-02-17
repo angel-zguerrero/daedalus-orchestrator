@@ -185,13 +185,26 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, c
 		CMD:  deleteQueueCommand,
 	}
 
-	result, err := tenantNode.SyncWrite(writeCtx, atstCmd)
+	resultChan, err := tenantNode.Write(writeCtx, atstCmd)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Failed to delete queue")
-		return errors.New("Failed to delete queue: " + err.Error())
+		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Failed to start delete queue operation")
+		return errors.New("Failed to start delete queue operation: " + err.Error())
 	}
 
-	buf := bytes.NewBuffer(result.Data)
+	// Wait for the result since we need to process it
+	var writeResult dragonboat.WriteResult
+	select {
+	case writeResult = <-resultChan:
+		if writeResult.Error != nil {
+			bo.Config.Logger.Error().Err(writeResult.Error).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Failed to delete queue")
+			return errors.New("Failed to delete queue: " + writeResult.Error.Error())
+		}
+	case <-writeCtx.Done():
+		bo.Config.Logger.Error().Err(writeCtx.Err()).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Delete queue operation timed out")
+		return errors.New("Delete queue operation timed out: " + writeCtx.Err().Error())
+	}
+
+	buf := bytes.NewBuffer(writeResult.Result.Data)
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {

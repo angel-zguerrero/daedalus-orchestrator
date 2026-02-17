@@ -127,10 +127,22 @@ func (app *Application) AssignTenants() {
 							CMD:  deleteColumnFamilyCommandSector,
 						}
 
-						_, err = tenantNode.SyncWrite(writeCtx, ccfCmd)
+						resultChan, err := tenantNode.Write(writeCtx, ccfCmd)
 						if err != nil {
 							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
-							fmt.Println("Failed to delete tenant", err)
+							fmt.Println("Failed to start delete tenant operation", err)
+							return
+						}
+						// Wait for result since this is sequential
+						select {
+						case writeResult := <-resultChan:
+							if writeResult.Error != nil {
+								//log.Fatal().Err(writeResult.Error).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+								fmt.Println("Failed to delete tenant", writeResult.Error)
+								return
+							}
+						case <-writeCtx.Done():
+							fmt.Println("Delete tenant operation timed out", writeCtx.Err())
 							return
 						}
 
@@ -146,10 +158,22 @@ func (app *Application) AssignTenants() {
 							CMD:  deleteColumnFamilyTTLCommandSector,
 						}
 
-						_, err = tenantNode.SyncWrite(writeCtx, ccfTTLCmd)
+						resultChan, err = tenantNode.Write(writeCtx, ccfTTLCmd)
 						if err != nil {
 							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
-							fmt.Println("Failed to delete tenant", err)
+							fmt.Println("Failed to start delete tenant TTL operation", err)
+							return
+						}
+						// Wait for result since this is sequential
+						select {
+						case writeResult := <-resultChan:
+							if writeResult.Error != nil {
+								//log.Fatal().Err(writeResult.Error).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+								fmt.Println("Failed to delete tenant", writeResult.Error)
+								return
+							}
+						case <-writeCtx.Done():
+							fmt.Println("Delete tenant TTL operation timed out", writeCtx.Err())
 							return
 						}
 
@@ -163,10 +187,22 @@ func (app *Application) AssignTenants() {
 							CMD:  deleteTenantInMasterCommand,
 						}
 
-						result, err = app.MasterNode.SyncWrite(writeCtx, atstCmd)
+						resultChan, err = app.MasterNode.Write(writeCtx, atstCmd)
 						if err != nil {
 							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
-							fmt.Println("Failed to delete tenant", err)
+							fmt.Println("Failed to start delete tenant from master operation", err)
+							return
+						}
+						// Wait for result since this is sequential
+						select {
+						case writeResult := <-resultChan:
+							if writeResult.Error != nil {
+								//log.Fatal().Err(writeResult.Error).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+								fmt.Println("Failed to delete tenant", writeResult.Error)
+								return
+							}
+						case <-writeCtx.Done():
+							fmt.Println("Delete tenant from master operation timed out", writeCtx.Err())
 							return
 						}
 						fmt.Printf("Tenant %s deleted successfully\n", tenant.Code)
@@ -189,22 +225,35 @@ func (app *Application) AssignTenants() {
 				CMD:  assignCmd,
 			}
 
-			result, err = app.MasterNode.SyncWrite(writeCtx, atstCmd)
+			resultChan, err := app.MasterNode.Write(writeCtx, atstCmd)
 			if err != nil {
 				//log.Fatal().Err(err).Strs("Codes", assignableTenantCodes).Msg("Failed to assign tenants to shard")
-				fmt.Println("Failed to assign tenants to shard", err)
+				fmt.Println("Failed to start assign tenants to shard operation", err)
 				return
 			}
 
-			buf = bytes.NewBuffer(result.([]byte))
-			dec = gob.NewDecoder(buf)
-			if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
-				//log.Fatal().
-				//	Strs("Codes", assignableTenantCodes).
-				//	Err(err).
-				//	Str("commandError", parsedResult.Error).
-				//	Msg("Shard assignment failed for one or more tenants")
-				fmt.Println("Shard assignment failed for one or more tenants", err)
+			// Wait for result since we need to process it
+			select {
+			case writeResult := <-resultChan:
+				if writeResult.Error != nil {
+					//log.Fatal().Err(writeResult.Error).Strs("Codes", assignableTenantCodes).Msg("Failed to assign tenants to shard")
+					fmt.Println("Failed to assign tenants to shard", writeResult.Error)
+					return
+				}
+
+				buf = bytes.NewBuffer(writeResult.Result.Data)
+				dec = gob.NewDecoder(buf)
+				if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
+					//log.Fatal().
+					//	Strs("Codes", assignableTenantCodes).
+					//	Err(err).
+					//	Str("commandError", parsedResult.Error).
+					//	Msg("Shard assignment failed for one or more tenants")
+					fmt.Println("Shard assignment failed for one or more tenants", err)
+					return
+				}
+			case <-writeCtx.Done():
+				fmt.Println("Assign tenants to shard operation timed out", writeCtx.Err())
 				return
 			}
 		}

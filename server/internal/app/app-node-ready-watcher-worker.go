@@ -116,16 +116,26 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 
 						ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 						defer cancel()
-						_, err := app.MasterNode.SyncWrite(ctx, cmd)
+						resultChan, err := app.MasterNode.Write(ctx, cmd)
 						if err != nil {
-							log.Error().Err(err).Msg("❌ Failed to bootstrap root user (will retry)")
-							// Don't set bootstrapped true if this failed
+							log.Error().Err(err).Msg("❌ Failed to start bootstrap root user operation (will retry)")
 						} else {
-							app.MasterNodeBootstrapped = true
+							// Wait for the result since bootstrap is critical
+							select {
+							case writeResult := <-resultChan:
+								if writeResult.Error != nil {
+									log.Error().Err(writeResult.Error).Msg("❌ Failed to bootstrap root user (will retry)")
+									// Don't set bootstrapped true if this failed
+								} else {
+									app.MasterNodeBootstrapped = true
 
-							// Start background workers only after successful bootstrap
-							app.AssignTenants()
-							app.StartAssignTenantsWorker(10 * time.Minute)
+									// Start background workers only after successful bootstrap
+									app.AssignTenants()
+									app.StartAssignTenantsWorker(10 * time.Minute)
+								}
+							case <-ctx.Done():
+								log.Error().Err(ctx.Err()).Msg("❌ Bootstrap root user operation timed out (will retry)")
+							}
 						}
 					} else {
 						// Non-consensus nodes are "bootstrapped" once they see the cluster ready
@@ -184,9 +194,18 @@ func defineColumnFamilies(app *Application) {
 			writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Hour)
 			defer writeCancel()
 
-			_, err := tenantNode.SyncWrite(writeCtx, ccfCmd)
+			resultChan, err := tenantNode.Write(writeCtx, ccfCmd)
 			if err != nil {
-				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to create column family for Shard")
+				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to start create column family operation for Shard")
+			}
+			// Wait for the result since column family creation is critical
+			select {
+			case writeResult := <-resultChan:
+				if writeResult.Error != nil {
+					log.Fatal().Err(writeResult.Error).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to create column family for Shard")
+				}
+			case <-writeCtx.Done():
+				log.Fatal().Err(writeCtx.Err()).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Column family creation timed out for Shard")
 			}
 
 			createColumnFamilyCommandTtl := &general_command.CreateColumnFamilyCommand{
@@ -200,9 +219,18 @@ func defineColumnFamilies(app *Application) {
 				CMD:  createColumnFamilyCommandTtl,
 			}
 
-			_, err = tenantNode.SyncWrite(writeCtx, ccfCmdTtl)
+			resultChan, err = tenantNode.Write(writeCtx, ccfCmdTtl)
 			if err != nil {
-				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to create column family for Shard")
+				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to start create TTL column family operation for Shard")
+			}
+			// Wait for the result since TTL column family creation is critical
+			select {
+			case writeResult := <-resultChan:
+				if writeResult.Error != nil {
+					log.Fatal().Err(writeResult.Error).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to create column family for Shard")
+				}
+			case <-writeCtx.Done():
+				log.Fatal().Err(writeCtx.Err()).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("TTL column family creation timed out for Shard")
 			}
 		}
 	}

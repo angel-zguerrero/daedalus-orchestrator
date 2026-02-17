@@ -136,13 +136,26 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespa
 		CMD:  deleteExchangeCommand,
 	}
 
-	result, err := tenantNode.SyncWrite(writeCtx, atstCmd)
+	resultChan, err := tenantNode.Write(writeCtx, atstCmd)
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Failed to delete exchange")
-		return errors.New("Failed to delete exchange: " + err.Error())
+		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Failed to start delete exchange operation")
+		return errors.New("Failed to start delete exchange operation: " + err.Error())
 	}
 
-	buf := bytes.NewBuffer(result.Data)
+	// Wait for the result since we need to process it
+	var writeResult dragonboat.WriteResult
+	select {
+	case writeResult = <-resultChan:
+		if writeResult.Error != nil {
+			bo.Config.Logger.Error().Err(writeResult.Error).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Failed to delete exchange")
+			return errors.New("Failed to delete exchange: " + writeResult.Error.Error())
+		}
+	case <-writeCtx.Done():
+		bo.Config.Logger.Error().Err(writeCtx.Err()).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Delete exchange operation timed out")
+		return errors.New("Delete exchange operation timed out: " + writeCtx.Err().Error())
+	}
+
+	buf := bytes.NewBuffer(writeResult.Result.Data)
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {

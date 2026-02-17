@@ -248,12 +248,23 @@ func (app *Application) updateMasterWithSummary(_ string, summary models.TenantS
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resultData, err := app.MasterNode.SyncWrite(ctx, fsm_cmd)
+	resultChan, err := app.MasterNode.Write(ctx, fsm_cmd)
 	if err != nil {
 		return err
 	}
 
-	buf := bytes.NewBuffer(resultData.Data)
+	// Wait for the result since we need to process it
+	var writeResult dragonboat.WriteResult
+	select {
+	case writeResult = <-resultChan:
+		if writeResult.Error != nil {
+			return writeResult.Error
+		}
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	buf := bytes.NewBuffer(writeResult.Result.Data)
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
@@ -281,12 +292,23 @@ func (app *Application) refreshLastUpdateAtInTenantNode(tenantNode *dragonboat.R
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resultData, err := tenantNode.SyncWrite(ctx, fsm_cmd)
+	resultChan, err := tenantNode.Write(ctx, fsm_cmd)
 	if err != nil {
 		return err
 	}
 
-	buf := bytes.NewBuffer(resultData.Data)
+	// Wait for the result since we need to process it
+	var writeResult dragonboat.WriteResult
+	select {
+	case writeResult = <-resultChan:
+		if writeResult.Error != nil {
+			return writeResult.Error
+		}
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	buf := bytes.NewBuffer(writeResult.Result.Data)
 	dec := gob.NewDecoder(buf)
 	parsedResult := &commands.CommandResult{}
 	if err := dec.Decode(parsedResult); err != nil {
