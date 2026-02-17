@@ -271,12 +271,12 @@
             
             <strong>Option 1: Same machine</strong> (each node on different port):
             <br>
-            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ (enhancedClusterInfo?.port_configuration?.rest_port || 3000) + (addNodeForm.get('replica_id')?.value || 0) }} -grpc-port {{ (enhancedClusterInfo?.port_configuration?.grpc_port || 4000) + (addNodeForm.get('replica_id')?.value || 0) }} -join true</code>
+            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ (enhancedClusterInfo?.port_configuration?.rest_port || 3000) + (addNodeForm.get('replica_id')?.value || 0) }} -grpc-port {{ (enhancedClusterInfo?.port_configuration?.grpc_port || 4000) + (addNodeForm.get('replica_id')?.value || 0) }} -join</code>
             <br><br>
             
             <strong>Option 2: Separate machines</strong> (can use same ports since they are on different hosts):
             <br>
-            <code>go run . -self-member-host host -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ enhancedClusterInfo?.port_configuration?.rest_port || '3000' }} -grpc-port {{ enhancedClusterInfo?.port_configuration?.grpc_port || '4000' }} -join true</code>
+            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ enhancedClusterInfo?.port_configuration?.rest_port || '3000' }} -grpc-port {{ enhancedClusterInfo?.port_configuration?.grpc_port || '4000' }} -join</code>
             <br><br>
             
             <small class="text-muted">
