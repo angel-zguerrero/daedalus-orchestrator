@@ -75,7 +75,9 @@ func (app *Application) AssignTenants() {
 
 		result, err := app.MasterNode.Read(ctx, *queryCommand)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Paginate tenants command failed")
+			//log.Fatal().Err(err).Msg("Paginate tenants command failed")
+
+			fmt.Println("Paginate tenants command failed", err)
 			return
 		}
 
@@ -83,12 +85,16 @@ func (app *Application) AssignTenants() {
 		dec := gob.NewDecoder(buf)
 		parsedResult := &commands.CommandResult{}
 		if err := dec.Decode(parsedResult); err != nil {
-			log.Fatal().Err(err).Msg("Paginate tenants command failed (decode)")
+			//log.Fatal().Err(err).Msg("Paginate tenants command failed (decode)")
+
+			fmt.Println("Paginate tenants command failed (decode)", err)
 			return
 		}
 
 		if parsedResult.Error != "" {
-			log.Fatal().Str("error", parsedResult.Error).Msg("Paginate tenants command failed (business error)")
+			//log.Fatal().Str("error", parsedResult.Error).Msg("Paginate tenants command failed (business error)")
+
+			fmt.Println("Paginate tenants command failed (business error)", parsedResult.Error)
 			return
 		}
 
@@ -123,7 +129,8 @@ func (app *Application) AssignTenants() {
 
 						_, err = tenantNode.Write(writeCtx, ccfCmd)
 						if err != nil {
-							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							fmt.Println("Failed to delete tenant", err)
 							return
 						}
 
@@ -141,7 +148,8 @@ func (app *Application) AssignTenants() {
 
 						_, err = tenantNode.Write(writeCtx, ccfTTLCmd)
 						if err != nil {
-							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							fmt.Println("Failed to delete tenant", err)
 							return
 						}
 
@@ -157,7 +165,9 @@ func (app *Application) AssignTenants() {
 
 						result, err = app.MasterNode.Write(writeCtx, atstCmd)
 						if err != nil {
-							log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							//log.Fatal().Err(err).Str("Code", tenant.Code).Msg("Failed to delete tenant")
+							fmt.Println("Failed to delete tenant", err)
+							return
 						}
 						fmt.Printf("Tenant %s deleted successfully\n", tenant.Code)
 					}
@@ -181,17 +191,21 @@ func (app *Application) AssignTenants() {
 
 			result, err = app.MasterNode.Write(writeCtx, atstCmd)
 			if err != nil {
-				log.Fatal().Err(err).Strs("Codes", assignableTenantCodes).Msg("Failed to assign tenants to shard")
+				//log.Fatal().Err(err).Strs("Codes", assignableTenantCodes).Msg("Failed to assign tenants to shard")
+				fmt.Println("Failed to assign tenants to shard", err)
+				return
 			}
 
 			buf = bytes.NewBuffer(result.([]byte))
 			dec = gob.NewDecoder(buf)
 			if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
-				log.Fatal().
-					Strs("Codes", assignableTenantCodes).
-					Err(err).
-					Str("commandError", parsedResult.Error).
-					Msg("Shard assignment failed for one or more tenants")
+				//log.Fatal().
+				//	Strs("Codes", assignableTenantCodes).
+				//	Err(err).
+				//	Str("commandError", parsedResult.Error).
+				//	Msg("Shard assignment failed for one or more tenants")
+				fmt.Println("Shard assignment failed for one or more tenants", err)
+				return
 			}
 		}
 

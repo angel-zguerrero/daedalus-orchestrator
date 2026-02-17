@@ -36,6 +36,7 @@ type RaftNode struct {
 	stateMachine   func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine // A factory function that creates an instance of the on-disk state machine for this replica.
 	mu             sync.RWMutex
 	stopped        bool
+	readSem        chan struct{} // max 100 inflight reads
 }
 
 type RaftTuningParams struct {
@@ -236,18 +237,41 @@ func (mn *RaftNode) Write(ctx context.Context, comand general_command.FSM_Comman
 	return mn.NH.SyncPropose(ctx, cs, buf.Bytes())
 }
 
-// Read performs a linearizable read from the Raft state machine.
-// It marshals the read command (RK_Command) into JSON and uses SyncRead.
-// This is a synchronous operation that waits for the read to be processed or to fail.
-//
-// Parameters:
-//   - ctx: The context for the synchronous read.
-//   - cmd: The RK_Command describing the read operation.
-//
-// Returns:
-//   - The result of the read operation from the state machine.
-//   - An error if marshaling fails or if SyncRead encounters an error.
-func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command) (interface{}, error) { // Changed Query_Command to general_command.Query_Command
+// Read performs a linearizable local read from the Raft state machine using ReadIndex and ReadLocalNode.
+func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command) (interface{}, error) {
+	if mn.stopped {
+		return statemachine.Result{}, errors.New("raft node is stopped")
+	}
+	select {
+	case mn.readSem <- struct{}{}:
+		defer func() { <-mn.readSem }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(cmd); err != nil {
+		return nil, err
+	}
+
+	// In Dragonboat v4, ReadLocalNode requires a RequestState from ReadIndex to ensure linearizability.
+	rs, err := mn.NH.ReadIndex(mn.ShardID, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case res := <-rs.ResultC():
+		if !res.Completed() {
+			return nil, errors.New("read index failed or timed out")
+		}
+		return mn.NH.ReadLocalNode(rs, buf.Bytes())
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (mn *RaftNode) SyncRead(ctx context.Context, cmd general_command.Query_Command) (interface{}, error) { // Changed Query_Command to general_command.Query_Command
 	mn.mu.RLock() // Use read lock since we only read the stopped field
 	defer mn.mu.RUnlock()
 	if mn.stopped {
@@ -372,6 +396,7 @@ func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMe
 	raftNode.InitialMembers = initialMembers
 	raftNode.Join = join
 	raftNode.Roles = roles
+	raftNode.readSem = make(chan struct{}, 100) // max 100 inflight reads
 	// The passed stateMachineFn is assigned here.
 	raftNode.stateMachine = stateMachineFn
 	// However, StartReplica currently uses its own hardcoded state machine if not careful.
