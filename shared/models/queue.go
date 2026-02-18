@@ -36,6 +36,9 @@ type Queue struct {
 
 	MessagesCount int
 
+	MaxDeliveringMessages     int // Max number of messages that can be in delivering state at the same time for this queue. 0 means no limit.
+	CurrentDeliveringMessages int // Number of messages that are currently in delivering state for this queue.
+
 	DefaultQueueMessageTTL       int
 	DefaultQueueMessageDelayTime int
 	QueueExpires                 int

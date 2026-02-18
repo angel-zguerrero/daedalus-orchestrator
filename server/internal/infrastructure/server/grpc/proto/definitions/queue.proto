@@ -36,6 +36,7 @@ message CreateQueueRequest {
   string deadLetterExchangeId = 14;
   string deadLetterExchangeRoutingKeyOrPattern = 15;
   int32 maxQueueSize = 16;
+  int32 maxDeliveringMessages = 17;
 }
 
 message CreateQueueResponse {
@@ -64,6 +65,7 @@ message CreateQueueItem {
   string deadLetterExchangeId = 13;
   string deadLetterExchangeRoutingKeyOrPattern = 14;
   int32 maxQueueSize = 15;
+  int32 maxDeliveringMessages = 16;
 }
 
 message BulkCreateQueueResponse {
@@ -117,6 +119,8 @@ message Queue {
   string nodeSchedulerSupervisorCode = 23;
   string nodeSchedulerSupervisorName = 24;
   string nodeSchedulerQueueSupervisionState = 25;
+  int32 maxDeliveringMessages = 26;
+  int32 currentDeliveringMessages = 27;
 }
 
 message QueueFindResult {

@@ -36,6 +36,7 @@ type createQueueRequest struct {
 	AllowDuplicated                       bool              `json:"allowDuplicated"`
 	MaxAttempts                           int               `json:"maxAttempts"`
 	MaxQueueSize                          int               `json:"maxQueueSize" binding:"min=0"`
+	MaxDeliveringMessages                 int               `json:"maxDeliveringMessages" binding:"min=0"`
 	DesiredPriorityThresholds             map[int]int       `json:"desiredPriorityThresholds"`
 	Headers                               map[string]string `json:"headers"`
 	DeadLetterExchangeId                  string            `json:"deadLetterExchangeId"`
@@ -111,6 +112,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		AllowDuplicated:                       req.AllowDuplicated,
 		MaxAttempts:                           req.MaxAttempts,
 		MaxQueueSize:                          req.MaxQueueSize,
+		MaxDeliveringMessages:                 req.MaxDeliveringMessages,
 		DesiredPriorityThresholds:             req.DesiredPriorityThresholds,
 		Headers:                               req.Headers,
 		DeadLetterExchangeId:                  req.DeadLetterExchangeId,
@@ -177,6 +179,7 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			AllowDuplicated:                       t.AllowDuplicated,
 			MaxAttempts:                           t.MaxAttempts,
 			MaxQueueSize:                          t.MaxQueueSize,
+			MaxDeliveringMessages:                 t.MaxDeliveringMessages,
 			DesiredPriorityThresholds:             t.DesiredPriorityThresholds,
 			Headers:                               t.Headers,
 			DeadLetterExchangeId:                  t.DeadLetterExchangeId,

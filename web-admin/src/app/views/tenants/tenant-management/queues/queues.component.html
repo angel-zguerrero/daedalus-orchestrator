@@ -66,6 +66,7 @@
             <th style="min-width: 100px;">Max Attempts</th>
             <th style="min-width: 100px;">Messages</th>
             <th style="min-width: 150px;">Queue Size</th>
+            <th style="min-width: 150px;">Delivering Messages</th>
             <th style="min-width: 120px;">Allow Duplicated</th>
             <th style="min-width: 120px;">Priority Type</th>
             <th style="min-width: 150px;">Supervisor Name</th>
@@ -148,6 +149,24 @@
               <ng-template #unlimitedSize>
                 <div class="text-center">
                   <span class="text-muted">Max: ∞</span>
+                  <small class="d-block text-muted">Unlimited</small>
+                </div>
+              </ng-template>
+            </td>
+            <td class="text-center">
+              <div *ngIf="queue.MaxDeliveringMessages && queue.MaxDeliveringMessages > 0; else unlimitedDelivering">
+                <div class="d-flex align-items-center justify-content-center">
+                  <span class="me-2">{{ queue.CurrentDeliveringMessages || 0 }} / {{ queue.MaxDeliveringMessages }}</span>
+                </div>
+                <c-progress height="4" class="mt-1" style="width: 100px; margin: 0 auto;">
+                  <c-progress-bar [value]="((queue.CurrentDeliveringMessages || 0) / queue.MaxDeliveringMessages) * 100"
+                    [color]="((queue.CurrentDeliveringMessages || 0) / queue.MaxDeliveringMessages) > 0.8 ? 'danger' : ((queue.CurrentDeliveringMessages || 0) / queue.MaxDeliveringMessages) > 0.6 ? 'warning' : 'success'">
+                  </c-progress-bar>
+                </c-progress>
+              </div>
+              <ng-template #unlimitedDelivering>
+                <div class="text-center">
+                  <span class="me-2">{{ queue.CurrentDeliveringMessages || 0 }}</span>
                   <small class="d-block text-muted">Unlimited</small>
                 </div>
               </ng-template>
@@ -295,6 +314,13 @@
           <input cFormControl id="maxQueueSize" formControlName="maxQueueSize" type="number" min="0" placeholder="0" />
           <small class="form-text text-muted">Maximum messages in queue (0 = unlimited)</small>
         </c-col>
+        <c-col [md]="4">
+          <label cLabel for="maxDeliveringMessages">Max Delivering Messages</label>
+          <input cFormControl id="maxDeliveringMessages" formControlName="maxDeliveringMessages" type="number" min="0" placeholder="0" />
+          <small class="form-text text-muted">Maximum messages in delivering state (0 = unlimited)</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4" class="d-flex align-items-center">
           <div class="form-check">
             <input cFormCheck id="allowDuplicated" formControlName="allowDuplicated" type="checkbox" />
@@ -560,6 +586,14 @@
             placeholder="0" />
           <small class="form-text text-muted">Maximum messages in queue (0 = unlimited)</small>
         </c-col>
+        <c-col [md]="4">
+          <label cLabel for="maxDeliveringMessages-update">Max Delivering Messages</label>
+          <input cFormControl id="maxDeliveringMessages-update" formControlName="maxDeliveringMessages" type="number" min="0"
+            placeholder="0" />
+          <small class="form-text text-muted">Maximum messages in delivering state (0 = unlimited)</small>
+        </c-col>
+      </c-row>
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="4" class="d-flex align-items-center">
           <div class="form-check">
             <input cFormCheck id="allowDuplicated-update" formControlName="allowDuplicated" type="checkbox" />
@@ -961,6 +995,30 @@
           <div class="form-text">Maximum number of messages allowed in the queue</div>
         </div>
         <div class="mb-3">
+          <label class="form-label fw-bold">Max Delivering Messages</label>
+          <div class="p-2 bg-dark rounded">
+            <span *ngIf="selectedQueue?.MaxDeliveringMessages && selectedQueue.MaxDeliveringMessages > 0; else unlimitedDelivering">
+              {{ selectedQueue.MaxDeliveringMessages }} messages maximum in delivering state
+              <div class="mt-2">
+                <small class="text-muted d-block">Current: {{ selectedQueue?.CurrentDeliveringMessages || 0 }} / {{
+                  selectedQueue.MaxDeliveringMessages }}</small>
+                <c-progress height="8" class="mt-1">
+                  <c-progress-bar [value]="((selectedQueue?.CurrentDeliveringMessages || 0) / selectedQueue.MaxDeliveringMessages) * 100"
+                    [color]="((selectedQueue?.CurrentDeliveringMessages || 0) / selectedQueue.MaxDeliveringMessages) > 0.8 ? 'danger' : ((selectedQueue?.CurrentDeliveringMessages || 0) / selectedQueue.MaxDeliveringMessages) > 0.6 ? 'warning' : 'success'">
+                  </c-progress-bar>
+                </c-progress>
+                <small class="text-muted">{{ (((selectedQueue?.CurrentDeliveringMessages || 0) / selectedQueue.MaxDeliveringMessages) *
+                  100).toFixed(1) }}% delivering</small>
+              </div>
+            </span>
+            <ng-template #unlimitedDelivering>
+              <span class="text-muted">Unlimited</span>
+              <small class="text-muted d-block">Current delivering: {{ selectedQueue?.CurrentDeliveringMessages || 0 }} messages</small>
+            </ng-template>
+          </div>
+          <div class="form-text">Maximum number of messages that can be in delivering state simultaneously</div>
+        </div>
+        <div class="mb-3">
           <label class="form-label fw-bold">Allow Duplicated</label>
           <div class="p-2 bg-dark rounded">
             <c-badge [color]="(selectedQueue?.AllowDuplicated || selectedQueue?.allowDuplicated) ? 'success' : 'danger'"
@@ -1195,6 +1253,7 @@
         <li><strong>AllowDuplicated</strong>: Allow duplicates (true/false, yes/no, 1/0, optional, default: true)</li>
         <li><strong>MaxAttempts</strong>: Maximum attempts (number > 0, optional, default: 1)</li>
         <li><strong>MaxQueueSize</strong>: Maximum queue size (number >= 0, optional, default: 0 = unlimited)</li>
+        <li><strong>MaxDeliveringMessages</strong>: Maximum messages in delivering state (number >= 0, optional, default: 0 = unlimited)</li>
         <li><strong>PriorityType</strong>: Priority type (normal/fair, optional, default: normal)</li>
         <li><strong>MaxPriority</strong>: Maximum priority level (1-100, optional, default: 1)</li>
         <li><strong>PriorityThresholds</strong>: For fair priority, comma-separated values per priority (e.g.,

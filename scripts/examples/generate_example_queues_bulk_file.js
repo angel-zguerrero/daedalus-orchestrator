@@ -11,7 +11,7 @@ const writeStream = fs.createWriteStream(fileName);
 const headers = [
     'name', 'code', 'type', 'vnamespace', 'defaultqueuemessagettl',
     'defaultqueuemessagedelaytime', 'queueexpires', 'allowduplicated',
-    'maxattempts', 'maxqueuesize', 'prioritytype', 'maxpriority', 'prioritythresholds'
+    'maxattempts', 'maxqueuesize', 'prioritytype', 'maxpriority', 'prioritythresholds', 'maxdeliveringmessages'
 ];
 
 // Escribir cabecera (también entre comillas para consistencia)
@@ -22,6 +22,7 @@ for (let i = 1; i <= totalRecords; i++) {
     const vNamespace = namespaces[i % namespaces.length];
     const priorityType = priorityTypes[Math.floor(Math.random() * priorityTypes.length)];
     const maxPriority = priorityType === 'fair' ? Math.floor(Math.random() * 3) + 2 : 1;
+    const maxDeliveringMessages = Math.floor(Math.random() * 10); // Random value between 0 and 9
 
     // Generar array de umbrales
     let thresholdsArray = [];
@@ -45,7 +46,8 @@ for (let i = 1; i <= totalRecords; i++) {
         maxqueuesize: 0,
         prioritytype: priorityType,
         maxpriority: maxPriority,
-        prioritythresholds: thresholdsString
+        prioritythresholds: thresholdsString,
+        maxdeliveringmessages: maxDeliveringMessages
     };
 
     // Envolver TODOS los campos en comillas para consistencia CSV

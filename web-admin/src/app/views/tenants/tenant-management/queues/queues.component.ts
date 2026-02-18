@@ -40,6 +40,8 @@ interface Queue {
   AllowDuplicated: boolean;
   MaxAttempts: number;
   MaxQueueSize: number;
+  MaxDeliveringMessages?: number;
+  CurrentDeliveringMessages?: number;
   MessagesCount?: number;
   DesiredPriorityThresholds: { [key: number]: number };
   PriorityThresholds: { [key: number]: number };
@@ -196,6 +198,7 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
       maxQueueSize: [0, [Validators.min(0)]],
+      maxDeliveringMessages: [0, [Validators.min(0)]],
       priorityType: ['normal', Validators.required],
       maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]],
       deadLetterExchangeId: [''],
@@ -220,6 +223,7 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: [true],
       maxAttempts: [1, [Validators.required, Validators.min(1)]],
       maxQueueSize: [0, [Validators.min(0)]],
+      maxDeliveringMessages: [0, [Validators.min(0)]],
       priorityType: ['normal', Validators.required],
       maxPriority: [1, [Validators.required, Validators.min(1), Validators.max(100)]],
       deadLetterExchangeId: [''],
@@ -340,6 +344,7 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: true,
       maxAttempts: 1,
       maxQueueSize: 0,
+      maxDeliveringMessages: 0,
       priorityType: 'normal',
       maxPriority: 1,
       deadLetterExchangeId: '',
@@ -376,6 +381,7 @@ export class QueuesComponent implements OnInit {
       allowDuplicated: queue.AllowDuplicated !== undefined ? queue.AllowDuplicated : true,
       maxAttempts: queue.MaxAttempts || 1,
       maxQueueSize: queue.MaxQueueSize || 0,
+      maxDeliveringMessages: queue.MaxDeliveringMessages || 0,
       priorityType: calculatedPriorityType,
       maxPriority: actualMaxPriority,
       deadLetterExchangeId: queue.DeadLetterExchangeId || '',
@@ -459,7 +465,8 @@ export class QueuesComponent implements OnInit {
         ...formValue,
         desiredPriorityThresholds,
         maxPriority: this.maxPriority,
-        headers: headersObj
+        headers: headersObj,
+        maxDeliveringMessages: formValue.maxDeliveringMessages
       };
 
       this.queuesService.createQueue(this.tenantCode, queueData).subscribe({
@@ -515,6 +522,7 @@ export class QueuesComponent implements OnInit {
         allowDuplicated: formValue.allowDuplicated,
         maxAttempts: formValue.maxAttempts,
         maxQueueSize: formValue.maxQueueSize,
+        maxDeliveringMessages: formValue.maxDeliveringMessages,
         priorityType: formValue.priorityType,
         maxPriority: this.updateMaxPriority,
         desiredPriorityThresholds,
@@ -607,7 +615,7 @@ export class QueuesComponent implements OnInit {
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawQueues = XLSX.utils.sheet_to_json(worksheet, {
-          header: ['Name', 'Code', 'Type', 'VNamespace', 'DefaultQueueMessageTTL', 'DefaultQueueMessageDelayTime', 'QueueExpires', 'AllowDuplicated', 'MaxAttempts', 'MaxQueueSize', 'PriorityType', 'MaxPriority', 'PriorityThresholds']
+          header: ['Name', 'Code', 'Type', 'VNamespace', 'DefaultQueueMessageTTL', 'DefaultQueueMessageDelayTime', 'QueueExpires', 'AllowDuplicated', 'MaxAttempts', 'MaxQueueSize', 'PriorityType', 'MaxPriority', 'PriorityThresholds', 'MaxDeliveringMessages']
         });
 
         // Remove header row
@@ -685,6 +693,15 @@ export class QueuesComponent implements OnInit {
             }
           }
 
+          // Process MaxDeliveringMessages - ensure it's a number >= 0
+          let maxDeliveringMessages = 0; // default value
+          if (queue.MaxDeliveringMessages !== undefined && queue.MaxDeliveringMessages !== null && queue.MaxDeliveringMessages !== '') {
+            maxDeliveringMessages = parseInt(queue.MaxDeliveringMessages, 10);
+            if (isNaN(maxDeliveringMessages) || maxDeliveringMessages < 0) {
+              throw new Error(`Row ${index + 2}: Invalid MaxDeliveringMessages value: ${queue.MaxDeliveringMessages}. Must be a number >= 0`);
+            }
+          }
+
           // Process PriorityType
           let priorityType = 'normal'; // default value
           if (queue.PriorityType !== undefined && queue.PriorityType !== null && queue.PriorityType !== '') {
@@ -751,6 +768,7 @@ export class QueuesComponent implements OnInit {
             allowDuplicated: allowDuplicated,
             maxAttempts: maxAttempts,
             maxQueueSize: maxQueueSize,
+            maxDeliveringMessages: maxDeliveringMessages,
             priorityType: priorityType,
             maxPriority: maxPriority,
             desiredPriorityThresholds: desiredPriorityThresholds

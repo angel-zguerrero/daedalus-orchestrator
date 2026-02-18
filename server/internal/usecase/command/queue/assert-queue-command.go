@@ -76,6 +76,12 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			return *commandResult
 		}
 
+		// Validate MaxDeliveringMessages
+		if queue.MaxDeliveringMessages < 0 {
+			commandResult.Error = "MaxDeliveringMessages must be greater than or equal to 0"
+			return *commandResult
+		}
+
 		// Validate Dead Letter Exchange if provided
 		if queue.DeadLetterExchangeId != "" {
 			exchange, err := exchangeRepo.GetExchangeById(queue.DeadLetterExchangeId, now)
@@ -122,6 +128,8 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			queue.NodeSchedulerSupervisorCode = existing.NodeSchedulerSupervisorCode
 			queue.NodeSchedulerSupervisorName = existing.NodeSchedulerSupervisorName
 			queue.NodeSchedulerQueueSupervisionState = existing.NodeSchedulerQueueSupervisionState
+			queue.CurrentDeliveringMessages = existing.CurrentDeliveringMessages
+			// Note: MaxDeliveringMessages can be updated from API, so we don't preserve the existing value
 
 			_, err = queueRepo.UpdateQueue(&queue, now)
 		} else {
