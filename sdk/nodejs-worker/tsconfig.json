@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "CommonJS",
+        "declaration": true,
+        "outDir": "./dist",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "moduleResolution": "node",
+        "baseUrl": ".",
+        "paths": {
+            "@daedalus/sdk": [
+                "src/index.ts"
+            ]
+        }
+    },
+    "include": [
+        "src/**/*",
+        "examples/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}

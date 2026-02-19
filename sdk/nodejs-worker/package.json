@@ -1,0 +1,17 @@
+{
+    "name": "@daedalus/nodejs-worker",
+    "version": "1.0.0",
+    "description": "Daedalus Orchestrator Node.js Worker",
+    "main": "dist/src/index.js",
+    "types": "dist/src/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "example:simple-worker": "ts-node examples/simple-worker/index.ts"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "typescript": "^5.0.0",
+        "ts-node": "^10.9.0",
+        "@types/node": "^20.0.0"
+    }
+}

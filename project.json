@@ -65,6 +65,33 @@
                 "parallel": false,
                 "cwd": "server"
             }
+        },
+        "build-sdk-nodejs": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "npm install"
+                    },
+                    {
+                        "command": "npm run build"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/nodejs-worker"
+            }
+        },
+        "run-nodejs-simple-worker": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "npx ts-node examples/simple-worker/index.ts"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/nodejs-worker"
+            }
         }
     }
 }
