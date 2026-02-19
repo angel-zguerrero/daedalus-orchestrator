@@ -1,0 +1,70 @@
+{
+    "$schema": "./node_modules/nx/schemas/project-schema.json",
+    "name": "server",
+    "projectType": "application",
+    "sourceRoot": "server",
+    "targets": {
+        "serve": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "go run cmd/main.go"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "server"
+            }
+        },
+        "serve-admin": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "nx run daedalus-web-admin:build:development"
+                    },
+                    {
+                        "command": "go run cmd/main.go"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "server"
+            }
+        },
+        "serve-rocksdb": {
+            "executor": "nx:run-commands",
+            "options": {
+                "env": {
+                    "CGO_CFLAGS": "-I/opt/homebrew/include",
+                    "CGO_LDFLAGS": "-L/opt/homebrew/lib -lrocksdb"
+                },
+                "commands": [
+                    {
+                        "command": "go run -tags rocksdb cmd/main.go -master-db-engine=rocksdb -tenant-db-engine=rocksdb"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "server"
+            }
+        },
+        "serve-rocksdb-admin": {
+            "executor": "nx:run-commands",
+            "options": {
+                "env": {
+                    "CGO_CFLAGS": "-I/opt/homebrew/include",
+                    "CGO_LDFLAGS": "-L/opt/homebrew/lib -lrocksdb"
+                },
+                "commands": [
+                    {
+                        "command": "nx run daedalus-web-admin:build:development"
+                    },
+                    {
+                        "command": "go run -tags rocksdb cmd/main.go -master-db-engine=rocksdb -tenant-db-engine=rocksdb"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "server"
+            }
+        }
+    }
+}
