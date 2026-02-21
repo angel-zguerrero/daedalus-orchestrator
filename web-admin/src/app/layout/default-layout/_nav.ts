@@ -24,6 +24,6 @@ export const navItems: INavData[] = [
   {
     name: 'Job Workers',
     url: '/job-workers',
-    iconComponent: { name: 'cil-list-rich' }
+    iconComponent: { name: 'cil-list' }
   }
 ];
