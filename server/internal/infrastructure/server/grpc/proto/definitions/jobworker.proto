@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package jobworker;
+
+option go_package = "pb/jobworker;jobworker";
+
+service JobWorkerService {
+  rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
+}
+
+message ClaimWorkFilter {
+  repeated string tenantCodes = 1;
+  repeated string excludeTenantCodes = 2;
+  repeated string tenantPatterns = 3;
+  repeated string excludeTenantPatterns = 4;
+
+  repeated string vNamespaces = 5;
+  repeated string excludeVNamespaces = 6;
+  repeated string vNamespacePatterns = 7;
+  repeated string excludeVNamespacePatterns = 8;
+
+  repeated string queueCodes = 9;
+  repeated string excludeQueueCodes = 10;
+  repeated string queuePatterns = 11;
+  repeated string excludeQueuePatterns = 12;
+}
+
+message ClaimWorkCapacityPolicy {
+  int32 maxQueueMessages = 1;
+  int32 currentQueueMessages = 2;
+  ClaimWorkFilter claimWorkFilter = 3;
+}
+
+message QueueMessage {
+  string ID = 1;
+  string MessageID = 2;
+  string Content = 3;
+  string ContentType = 4;
+  map<string, string> Headers = 5;
+  string QueueID = 6;
+  int32 Priority = 7;
+  string Handler = 8;
+  map<string, string> Parameters = 9;
+  string VNamespace = 10;
+  string CreatedAt = 11;
+}
+
+message ClaimWorkRequest {
+  string workerID = 1;
+  map<string, string> information = 2;
+  repeated ClaimWorkCapacityPolicy capacityPolicies = 3;
+  string workerName = 4;
+}
+
+message ClaimWorkResponse {
+  string message = 1;
+  repeated QueueMessage messages = 2;
+}
+
+//protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/jobworker.proto

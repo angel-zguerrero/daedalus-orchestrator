@@ -9,13 +9,15 @@ import (
 	"google.golang.org/grpc"
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
-	"deadalus-orch/server/internal/infrastructure/server/grpc/auth"     // Import new auth service
-	"deadalus-orch/server/internal/infrastructure/server/grpc/exchange" // Import new exchange service
+	"deadalus-orch/server/internal/infrastructure/server/grpc/auth"      // Import new auth service
+	"deadalus-orch/server/internal/infrastructure/server/grpc/exchange"  // Import new exchange service
+	"deadalus-orch/server/internal/infrastructure/server/grpc/jobworker" // Import jobworker service
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/nodescheduler" // Import nodescheduler service
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth"                   // Import new auth pb
 	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"           // Import new exchange pb
+	pbJobWorker "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/jobworker"         // Import jobworker pb
 	pbNodeScheduler "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/nodescheduler" // Import nodescheduler pb
 	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"                 // Import new queue pb
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
@@ -72,6 +74,10 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	// Register new NodeSchedulerService
 	nodeSchedulerSvc := nodescheduler.NewNodeSchedulerService(cfg)
 	pbNodeScheduler.RegisterNodeSchedulerServiceServer(server, nodeSchedulerSvc)
+
+	// Register new JobWorkerService
+	jobWorkerSvc := jobworker.NewJobWorkerService(cfg)
+	pbJobWorker.RegisterJobWorkerServiceServer(server, jobWorkerSvc)
 
 	return &GrpcServer{
 		Config:     cfg,

@@ -20,5 +20,10 @@ export const navItems: INavData[] = [
     name: 'Node Schedulers',
     url: '/node-schedulers',
     iconComponent: { name: 'cil-task' }
+  },
+  {
+    name: 'Job Workers',
+    url: '/job-workers',
+    iconComponent: { name: 'cil-list-rich' }
   }
 ];

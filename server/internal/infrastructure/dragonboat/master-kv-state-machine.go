@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
+	job_worker_command "deadalus-orch/server/internal/usecase/command/job-worker"
 	node_scheduler_command "deadalus-orch/server/internal/usecase/command/node-scheduler"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"time"
@@ -53,6 +54,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 	getNodeSchedulerBalancingStateCommand, ok := input.(node_scheduler_command.GetNodeSchedulerBalancingStateCommand)
 	if ok {
 		return getNodeSchedulerBalancingStateCommand.Execute(uow, now)
+	}
+
+	paginateJobWorkersCommand, ok := input.(job_worker_command.PaginateJobWorkersCommand)
+	if ok {
+		return paginateJobWorkersCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
@@ -120,6 +126,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	upsertNodeSchedulerBalancingStateCommand, ok := cmd.(node_scheduler_command.UpsertNodeSchedulerBalancingStateCommand)
 	if ok {
 		return upsertNodeSchedulerBalancingStateCommand.Execute(uow, now)
+	}
+
+	upsertJobWorkerCommand, ok := cmd.(job_worker_command.UpsertJobWorkerCommand)
+	if ok {
+		return upsertJobWorkerCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

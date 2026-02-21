@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
 	"deadalus-orch/server/internal/infrastructure/server/rest/cluster"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
+	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/nodescheduler"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
@@ -26,6 +27,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	bindingController := binding.NewBindingController(s.Config)
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 	nodeSchedulerController := nodescheduler.NewNodeSchedulerController(s.Config)
+	jobWorkerController := jobworker.NewJobWorkerController(s.Config)
 	clusterController := cluster.NewClusterController(s.Config)
 
 	// Crear el TenantBO para el middleware
@@ -81,6 +83,14 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		{
 			nodeSchedulersGroup.GET("", nodeSchedulerController.GetNodeSchedulersHandler)
 			nodeSchedulersGroup.GET("/:id", nodeSchedulerController.GetNodeSchedulerHandler)
+		}
+
+		jobWorkersGroup := restAPIGroup.Group("/job-workers")
+		jobWorkersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		jobWorkersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
+		{
+			jobWorkersGroup.GET("", jobWorkerController.GetJobWorkersHandler)
+			jobWorkersGroup.GET("/:id", jobWorkerController.GetJobWorkerHandler)
 		}
 
 		// Cluster management endpoints
