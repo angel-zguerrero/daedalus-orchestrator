@@ -15,9 +15,10 @@ func init() {
 
 // PaginateJobWorkersCommand represents a command to paginate job workers.
 type PaginateJobWorkersCommand struct {
-	Cursor   string
-	PageSize int
-	Q        string
+	Cursor           string
+	PageSize         int
+	Q                string
+	ConnectionStatus models.JobWorkerConnectionStatus
 }
 
 func (cmd *PaginateJobWorkersCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -30,7 +31,7 @@ func (cmd *PaginateJobWorkersCommand) Execute(uow *db.UnitOfWork, now time.Time)
 		return *commandResult
 	}
 
-	found, err := repo.Paginate(cmd.Q, cmd.PageSize, cmd.Cursor, now)
+	found, err := repo.Paginate(cmd.Q, cmd.ConnectionStatus, cmd.PageSize, cmd.Cursor, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

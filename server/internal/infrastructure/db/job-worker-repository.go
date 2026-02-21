@@ -42,12 +42,16 @@ func (r *JobWorkerRepository) GetJobWorkerById(id string, now time.Time) (*model
 	return r.FindByField("ID", id, now)
 }
 
-func (r *JobWorkerRepository) Paginate(q string, pageSize int, cursor string, now time.Time) (*FindResult[models.JobWorker], error) {
+func (r *JobWorkerRepository) Paginate(q string, status models.JobWorkerConnectionStatus, pageSize int, cursor string, now time.Time) (*FindResult[models.JobWorker], error) {
 	var conditions []string
 
 	// Add name search condition if q is provided
 	if q != "" {
 		conditions = append(conditions, "Name LIKE *"+q+"*")
+	}
+
+	if status != "" {
+		conditions = append(conditions, "ConnectionStatus = "+string(status))
 	}
 
 	// If no conditions but we got here, use the workaround

@@ -70,6 +70,7 @@ type Application struct {
 	AssignTenantsStopper          *syncutil.Stopper
 	TenantSummaryWorkerStopper    *syncutil.Stopper
 	NodeSchedulerBalancingStopper *syncutil.Stopper
+	JobWorkerHeartbeatStopper     *syncutil.Stopper
 
 	ApiLock  sync.Mutex
 	GrpcLock sync.Mutex
@@ -242,6 +243,7 @@ func (app *Application) Run() {
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
 	app.StartNodeSchedulerBalancingWorker(10 * time.Second)
+	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
 }
 
@@ -374,6 +376,14 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ NodeSchedulerBalancingStopper stopped.")
 	}()
 
+	// Stop Job Worker Heartbeat Monitor
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.JobWorkerHeartbeatStopper.Stop()
+		log.Info().Msg("✅ JobWorkerHeartbeatStopper stopped.")
+	}()
+
 	// Stop Master Node will also stop Node Host at the very end
 	// Removing the separate parallel Node Host stop to avoid race conditions
 
@@ -412,6 +422,7 @@ func NewApplication() *Application {
 		AssignTenantsStopper:          syncutil.NewStopper(),
 		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
 		NodeSchedulerBalancingStopper: syncutil.NewStopper(),
+		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary: make(map[string]*dragonboat.RaftNode),
