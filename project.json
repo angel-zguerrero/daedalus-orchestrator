@@ -78,7 +78,7 @@
                     }
                 ],
                 "parallel": false,
-                "cwd": "sdk/nodejs-worker"
+                "cwd": "sdk/nodejs-sdk"
             }
         },
         "run-nodejs-simple-worker": {
@@ -90,7 +90,7 @@
                     }
                 ],
                 "parallel": false,
-                "cwd": "sdk/nodejs-worker"
+                "cwd": "sdk/nodejs-sdk"
             }
         }
     }

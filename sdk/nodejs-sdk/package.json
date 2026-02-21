@@ -1,5 +1,5 @@
 {
-    "name": "@daedalus/nodejs-worker",
+    "name": "@daedalus/nodejs-sdk",
     "version": "1.0.0",
     "description": "Daedalus Orchestrator Node.js Worker",
     "main": "dist/src/index.js",
