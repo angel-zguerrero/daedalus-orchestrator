@@ -67,12 +67,12 @@ func (r *SessionRepository) SessionExists(jwtToken string, now time.Time) (bool,
 	if userName == "" {
 		return false, fmt.Errorf("username not found in token claims")
 	}
-	existingSession, err := r.repo.FindByField("UserName", userName, now)
+	existingSessionResult, err := r.repo.Find("UserName="+userName+" & CurrentToken="+jwtToken, 1, "", now)
 	if err != nil {
 		return false, fmt.Errorf("error querying session for user %s: %w", userName, err)
 	}
 
-	if existingSession == nil || existingSession.CurrentToken != jwtToken {
+	if existingSessionResult == nil || len(existingSessionResult.Entities) == 0 {
 		return false, nil // No session found
 	}
 
@@ -100,22 +100,22 @@ func (r *SessionRepository) RegisterSession(jwtToken string, now time.Time) erro
 	sessionTTL := int64(time.Until(expiresAt.Time).Seconds())
 
 	// Check if a session for this user already exists
-	existingSession, err := r.repo.FindByField("UserName", userName, now)
+	existingSessionResult, err := r.repo.Find("UserName="+userName+" & CurrentToken="+jwtToken, 1, "", now)
 	if err != nil {
 		// Distinguish between "not found" (which is not an error from FindByField, it returns nil)
 		// and actual DB errors.
 		return fmt.Errorf("error checking for existing session for user %s: %w", userName, err)
 	}
 
-	if existingSession != nil {
-		existingSession.CurrentToken = jwtToken
+	if existingSessionResult != nil && len(existingSessionResult.Entities) > 0 {
+		existingSession := existingSessionResult.Entities[0]
 		existingSession.TTL = sessionTTL // Update with the new token's expiry
 
 		// The Update method of the generic repository needs to be careful about TTL.
 		// The `orm:"ttl"` tag on UserSession.TTL means the repository's Create/Update
 		// methods will look for this field to pass to kvStore.PutTTL.
 		// The value of UserSession.TTL (absolute time) is used by the repo to calculate duration.
-		_, err := r.repo.Update(existingSession, now)
+		_, err := r.repo.Update(&existingSession, now)
 		if err != nil {
 			return fmt.Errorf("failed to update session for user %s: %w", userName, err)
 		}
@@ -123,7 +123,7 @@ func (r *SessionRepository) RegisterSession(jwtToken string, now time.Time) erro
 	} else {
 		// Create new session
 		newSession := &models.UserSession{
-			ID:           uuid.NewSHA1(uuid.NameSpaceURL, []byte(userName)).String(),
+			ID:           uuid.NewSHA1(uuid.NameSpaceURL, []byte(userName+jwtToken)).String(),
 			UserName:     userName,
 			CurrentToken: jwtToken,
 			TTL:          sessionTTL,
@@ -150,14 +150,15 @@ func (r *SessionRepository) RemoveSession(jwtToken string, now time.Time) error 
 	}
 
 	// Check if a session for this user already exists
-	existingSession, err := r.repo.FindByField("UserName", userName, now)
+	existingSessionResult, err := r.repo.Find("UserName="+userName+" & CurrentToken="+jwtToken, 1, "", now)
 	if err != nil {
 		// Distinguish between "not found" (which is not an error from FindByField, it returns nil)
 		// and actual DB errors.
 		return fmt.Errorf("error checking for existing session for user %s: %w", userName, err)
 	}
 
-	if existingSession != nil {
+	if existingSessionResult != nil && len(existingSessionResult.Entities) > 0 {
+		existingSession := existingSessionResult.Entities[0]
 
 		_, err := r.repo.Delete(existingSession.ID, now)
 		if err != nil {
@@ -170,11 +171,17 @@ func (r *SessionRepository) RemoveSession(jwtToken string, now time.Time) error 
 }
 
 // GetSessionByUsername is a helper if direct username access is needed (not part of original request but good practice)
-func (r *SessionRepository) GetSessionByUsername(username string, now time.Time) (*models.UserSession, error) {
-	session, err := r.repo.FindByField("UserName", username, now)
+func (r *SessionRepository) GetSessionByUsername(username string, jwtToken string, now time.Time) (*models.UserSession, error) {
+	sessionRult, err := r.repo.Find("UserName="+username+" & CurrentToken="+jwtToken, 1, "", now)
 	if err != nil {
 		return nil, fmt.Errorf("error getting session for user %s: %w", username, err)
 	}
 
-	return session, nil
+	if len(sessionRult.Entities) == 0 {
+		return nil, nil
+	}
+
+	session := sessionRult.Entities[0]
+
+	return &session, nil
 }
