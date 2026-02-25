@@ -156,17 +156,11 @@ export class DaedalusSDK {
                         return;
                     }
 
-                    if (response && response.messages && response.messages.length > 0) {
-                        console.log(`✅ Claimed ${response.messages.length} messages`);
-                        if (onMessage) {
-                            for (const msg of response.messages) {
-                                try {
-                                    await onMessage(msg);
-                                } catch (processErr: any) {
-                                    console.error('❌ Error processing message:', processErr.message);
-                                }
-                            }
-                        }
+                    if (response && response.knowledge === "ok") {
+                        console.log(`✅ ClaimWork successful, received {"knowledge": "ok"}`);
+                        // Removed processing of messages since it's no longer returned
+                    } else if (response) {
+                        console.log(`⚠️ ClaimWork unexpected response:`, response);
                     }
                 });
             } catch (err: any) {

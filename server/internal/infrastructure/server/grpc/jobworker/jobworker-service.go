@@ -53,39 +53,12 @@ func (s *JobWorkerService) ClaimWork(ctx context.Context, r *pb.ClaimWorkRequest
 		capacityPolicies[fmt.Sprintf("policy-%d", i)] = policy
 	}
 
-	messages, err := s.JobWorkerBO.ClaimWork(ctx, r.WorkerID, r.WorkerName, r.Information, capacityPolicies)
+	_, err := s.JobWorkerBO.ClaimWork(ctx, r.WorkerID, r.WorkerName, r.Information, capacityPolicies)
 	if err != nil {
 		return nil, err
 	}
 
-	// Map model messages to proto messages
-	pbMessages := make([]*pb.QueueMessage, len(messages))
-	for i, m := range messages {
-		headers := make(map[string]string)
-		for k, v := range m.Headers {
-			headers[k] = v
-		}
-		params := make(map[string]string)
-		for k, v := range m.Parameters {
-			params[k] = v
-		}
-		pbMessages[i] = &pb.QueueMessage{
-			ID:          m.ID,
-			MessageID:   m.MessageID,
-			Content:     string(m.Content),
-			ContentType: m.ContentType,
-			Headers:     headers,
-			QueueID:     m.QueueID,
-			Priority:    int32(m.Priority),
-			Handler:     m.Handler,
-			Parameters:  params,
-			VNamespace:  m.VNamespace,
-			CreatedAt:   m.CreatedAt.Format(time.RFC3339),
-		}
-	}
-
 	return &pb.ClaimWorkResponse{
-		Message:  "ClaimWork successful",
-		Messages: pbMessages,
+		Knowledge: "ok",
 	}, nil
 }

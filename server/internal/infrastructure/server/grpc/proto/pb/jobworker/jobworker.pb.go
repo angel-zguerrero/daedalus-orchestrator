@@ -407,8 +407,7 @@ func (x *ClaimWorkRequest) GetWorkerName() string {
 
 type ClaimWorkResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Messages      []*QueueMessage        `protobuf:"bytes,2,rep,name=messages,proto3" json:"messages,omitempty"`
+	Knowledge     string                 `protobuf:"bytes,1,opt,name=knowledge,proto3" json:"knowledge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -443,18 +442,11 @@ func (*ClaimWorkResponse) Descriptor() ([]byte, []int) {
 	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ClaimWorkResponse) GetMessage() string {
+func (x *ClaimWorkResponse) GetKnowledge() string {
 	if x != nil {
-		return x.Message
+		return x.Knowledge
 	}
 	return ""
-}
-
-func (x *ClaimWorkResponse) GetMessages() []*QueueMessage {
-	if x != nil {
-		return x.Messages
-	}
-	return nil
 }
 
 var File_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto protoreflect.FileDescriptor
@@ -514,10 +506,9 @@ const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto
 	"workerName\x1a>\n" +
 	"\x10InformationEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"b\n" +
-	"\x11ClaimWorkResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\x123\n" +
-	"\bmessages\x18\x02 \x03(\v2\x17.jobworker.QueueMessageR\bmessages2Z\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"1\n" +
+	"\x11ClaimWorkResponse\x12\x1c\n" +
+	"\tknowledge\x18\x01 \x01(\tR\tknowledge2Z\n" +
 	"\x10JobWorkerService\x12F\n" +
 	"\tClaimWork\x12\x1b.jobworker.ClaimWorkRequest\x1a\x1c.jobworker.ClaimWorkResponseB\x18Z\x16pb/jobworker;jobworkerb\x06proto3"
 
@@ -550,14 +541,13 @@ var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_d
 	6, // 2: jobworker.QueueMessage.Parameters:type_name -> jobworker.QueueMessage.ParametersEntry
 	7, // 3: jobworker.ClaimWorkRequest.information:type_name -> jobworker.ClaimWorkRequest.InformationEntry
 	1, // 4: jobworker.ClaimWorkRequest.capacityPolicies:type_name -> jobworker.ClaimWorkCapacityPolicy
-	2, // 5: jobworker.ClaimWorkResponse.messages:type_name -> jobworker.QueueMessage
-	3, // 6: jobworker.JobWorkerService.ClaimWork:input_type -> jobworker.ClaimWorkRequest
-	4, // 7: jobworker.JobWorkerService.ClaimWork:output_type -> jobworker.ClaimWorkResponse
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	3, // 5: jobworker.JobWorkerService.ClaimWork:input_type -> jobworker.ClaimWorkRequest
+	4, // 6: jobworker.JobWorkerService.ClaimWork:output_type -> jobworker.ClaimWorkResponse
+	6, // [6:7] is the sub-list for method output_type
+	5, // [5:6] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_init() }

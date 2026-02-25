@@ -53,8 +53,7 @@ message ClaimWorkRequest {
 }
 
 message ClaimWorkResponse {
-  string message = 1;
-  repeated QueueMessage messages = 2;
+  string knowledge = 1;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/jobworker.proto
