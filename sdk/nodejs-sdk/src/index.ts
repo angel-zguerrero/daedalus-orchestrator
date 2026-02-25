@@ -120,7 +120,7 @@ export class DaedalusSDK {
             workerName,
             information,
             capacityPolicies,
-            intervalMs = 10000,
+            intervalMs = 10000, // 10 seconds
             onMessage
         } = options;
 
