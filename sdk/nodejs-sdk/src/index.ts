@@ -156,10 +156,7 @@ export class DaedalusSDK {
                         return;
                     }
 
-                    if (response && response.knowledge === "ok") {
-                        console.log(`✅ ClaimWork successful, received {"knowledge": "ok"}`);
-                        // Removed processing of messages since it's no longer returned
-                    } else if (response) {
+                    if (response && response.knowledge !== "ok") {
                         console.log(`⚠️ ClaimWork unexpected response:`, response);
                     }
                 });
