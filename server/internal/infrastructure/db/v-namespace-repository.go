@@ -48,6 +48,31 @@ func (r *VNamespaceRepository) Paginate(q string, pageSize int, cursor string, n
 	}
 }
 
+// PaginateWithClaimWorkFilter paginates vnamespaces applying the DB-level rules derived from the
+// ClaimWorkFilter. ExcludeVNamespacePatterns are applied as an in-memory post-filter.
+func (r *VNamespaceRepository) PaginateWithClaimWorkFilter(f models.ClaimWorkFilter, pageSize int, cursor string, now time.Time) (*FindResult[models.VNamespace], error) {
+	fq := BuildVNamespaceFilterQuery(f)
+
+	//fmt.Printf("DB query for ClaimWorkFilter VNSpaces: %s cursor: %s\n", fq.DBQuery, cursor) // Debug log to verify the generated DB query
+
+	result, err := r.Find(fq.DBQuery, pageSize, cursor, now)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(fq.ExcludePatterns) > 0 {
+		filtered := result.Entities[:0]
+		for _, ns := range result.Entities {
+			if !MatchesExcludePatterns(ns.Name, fq.ExcludePatterns) {
+				filtered = append(filtered, ns)
+			}
+		}
+		result.Entities = filtered
+	}
+
+	return result, nil
+}
+
 func (r *VNamespaceRepository) DeleteVNamespaceById(id string, now time.Time) (bool, error) {
 	return r.Delete(id, now)
 }

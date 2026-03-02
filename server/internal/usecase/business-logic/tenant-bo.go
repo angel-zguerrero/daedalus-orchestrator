@@ -3,6 +3,7 @@ package business_logic
 import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"fmt"
 
@@ -14,8 +15,6 @@ import (
 	"errors"
 	"strings"
 	"time"
-
-	"deadalus-orch/server/internal/infrastructure/dragonboat"
 
 	"github.com/google/uuid"
 	db4 "github.com/lni/dragonboat/v4"
@@ -280,6 +279,35 @@ func (bo *TenantBO) GetTenants(ctx context.Context, q string, cursor string, pag
 	)
 	if err != nil {
 		return db.FindResult[models.TenantInMaster]{}, fmt.Errorf("paginate tenants failed: %w", err)
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.TenantInMaster{}
+	}
+
+	return findResult, nil
+}
+
+// GetTenantsWithFilter paginates tenants using DB-level filter rules derived from a ClaimWorkFilter.
+// Inclusion lists, exact exclusions, and LIKE patterns are pushed to the repository;
+// only ExcludeTenantPatterns (which need NOT LIKE) are applied in memory inside the repository.
+func (bo *TenantBO) GetTenantsWithFilter(ctx context.Context, filter models.ClaimWorkFilter, cursor string, pageSize int) (db.FindResult[models.TenantInMaster], error) {
+	cmd := &tenant_command.PaginateTenantsWithFilterCommand{
+		Filter:   filter,
+		Cursor:   cursor,
+		PageSize: pageSize,
+	}
+
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.TenantInMaster]](
+		bo.Config.MasterNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate tenants with filter",
+	)
+	if err != nil {
+		return db.FindResult[models.TenantInMaster]{}, fmt.Errorf("paginate tenants with filter failed: %w", err)
 	}
 
 	if findResult.Entities == nil {

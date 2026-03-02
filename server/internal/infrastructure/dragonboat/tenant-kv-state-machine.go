@@ -50,6 +50,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return paginateQueuesCommand.Execute(uow, now)
 	}
 
+	paginateQueuesWithFilterCommand, ok := cmd.(queue_command.PaginateQueuesWithFilterCommand)
+	if ok {
+		return paginateQueuesWithFilterCommand.Execute(uow, now)
+	}
+
 	findBindingCommand, ok := cmd.(binding_command.FindBindingCommand)
 	if ok {
 		return findBindingCommand.Execute(uow, now)
@@ -68,6 +73,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
 	if ok {
 		return paginateVNamespacesCommand.Execute(uow, now)
+	}
+
+	paginateVNamespacesWithFilterCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesWithFilterCommand)
+	if ok {
+		return paginateVNamespacesWithFilterCommand.Execute(uow, now)
 	}
 
 	paginateTenantUpdatedAtFromCommand, ok := cmd.(tenant_summary_command.PaginateTenantUpdatedAtFromCommand)

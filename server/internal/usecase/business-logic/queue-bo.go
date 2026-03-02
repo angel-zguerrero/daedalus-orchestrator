@@ -254,6 +254,39 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 	return findResult, nil
 }
 
+// GetQueuesWithFilter paginates queues using DB-level filter rules derived from a ClaimWorkFilter.
+// Only queues with MessagesCount > 0 are returned. The vNamespace filter and exact code
+// exclusions are pushed to the repository; ExcludeQueuePatterns are applied in memory inside
+// the repository.
+func (bo *QueueBO) GetQueuesWithFilter(ctx context.Context, filter models.ClaimWorkFilter, cursor string, pageSize int, vNamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Queue], error) {
+	cmd := &queue_command.PaginateQueuesWithFilterCommand{
+		Filter:     filter,
+		VNamespace: vNamespace,
+		Cursor:     cursor,
+		PageSize:   pageSize,
+		CF:         cf,
+		CFS:        cfs,
+	}
+
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Queue]](
+		tenantNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate queues with filter",
+	)
+	if err != nil {
+		return db.FindResult[models.Queue]{}, fmt.Errorf("paginate queues with filter failed: %w", err)
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.Queue{}
+	}
+
+	return findResult, nil
+}
+
 func (bo *QueueBO) GetQueuesBySupervisionState(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode, supervisionState models.QueueSupervisionState, includeSupervisorInfo bool) (db.FindResult[models.Queue], error) {
 	paginateQueuesCommand := &queue_command.PaginateQueuesCommand{
 		Query:            q,

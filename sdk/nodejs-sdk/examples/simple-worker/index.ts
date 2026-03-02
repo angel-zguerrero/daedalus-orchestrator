@@ -41,7 +41,6 @@ async function main() {
                 maxQueueMessages: 10,
                 currentQueueMessages: 0,
                 claimWorkFilter: {
-                    tenantCodes: ['default']
                 }
             }
         ],
