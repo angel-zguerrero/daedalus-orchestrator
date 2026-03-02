@@ -1,6 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
+const crypto = require('crypto');
 
 export interface ClaimWorkFilter {
     tenantCodes?: string[];
@@ -24,7 +25,6 @@ export interface ClaimWorkCapacityPolicy {
 }
 
 export interface WorkerOptions {
-    workerId: string;
     workerName: string;
     information?: Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
     capacityPolicies: ClaimWorkCapacityPolicy[];
@@ -116,13 +116,14 @@ export class DaedalusSDK {
 
     async createWorker(options: WorkerOptions) {
         const {
-            workerId,
             workerName,
             information,
             capacityPolicies,
             intervalMs = 10000, // 10 seconds
             onMessage
         } = options;
+
+        const workerId = `${crypto.randomUUID()}-${Date.now()}`;
 
         const run = async () => {
             try {

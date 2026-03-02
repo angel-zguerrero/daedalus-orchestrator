@@ -34,7 +34,7 @@ type ClaimWorkCapacityPolicy struct {
 
 type JobWorker struct {
 	ID   string `orm:"primary-key"`
-	Name string `orm:"unique"`
+	Name string // Human-readable name for the worker, not necessarily unique
 
 	TTL int64 `orm:"ttl"`
 

@@ -40,8 +40,8 @@ func (cmd *UpsertJobWorkerCommand) Execute(uow *db.UnitOfWork, now time.Time) co
 			return *commandResult
 		}
 
-		// Look for existing JobWorker by name (primary upsert strategy)
-		existing, err := repo.GetJobWorkerByName(jobWorker.Name, now)
+		// Look for existing JobWorker by ID (primary upsert strategy)
+		existing, err := repo.GetJobWorkerById(jobWorker.ID, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

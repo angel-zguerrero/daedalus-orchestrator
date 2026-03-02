@@ -33,8 +33,7 @@ async function main() {
     await daedalusSDK.connect();
 
     await daedalusSDK.createWorker({
-        workerId: 'worker-node-1',
-        workerName: 'Simple Node.js Worker',
+        workerName: 'Simple Node.js Worker 2',
         intervalMs: 10000,
         information: getSystemInfo,
         capacityPolicies: [
