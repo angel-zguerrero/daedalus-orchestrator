@@ -162,28 +162,12 @@ func (r *QueueRepository) DeleteQueueById(id string, now time.Time) (bool, error
 }
 
 // PaginateWithClaimWorkFilter paginates queues applying the DB-level rules from the ClaimWorkFilter.
-// Only queues with MessagesCount > 0 are returned. ExcludeQueuePatterns are applied in memory.
+// Only queues with MessagesCount > 0 are returned. Inclusion lists, exact exclusions, and NOT LIKE
+// pattern exclusions are all pushed to the DB query.
 func (r *QueueRepository) PaginateWithClaimWorkFilter(f models.ClaimWorkFilter, vNamespace string, pageSize int, cursor string, now time.Time) (*FindResult[models.Queue], error) {
 	fq := BuildQueueFilterQuery(f, vNamespace)
 
-	fmt.Printf("Executing QUEUE PaginateWithClaimWorkFilter with DB query: %s\n", fq.DBQuery)
-
-	result, err := r.Find(fq.DBQuery, pageSize, cursor, now)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(fq.ExcludePatterns) > 0 {
-		filtered := result.Entities[:0]
-		for _, q := range result.Entities {
-			if !MatchesExcludePatterns(q.Code, fq.ExcludePatterns) {
-				filtered = append(filtered, q)
-			}
-		}
-		result.Entities = filtered
-	}
-
-	return result, nil
+	return r.Find(fq.DBQuery, pageSize, cursor, now)
 }
 
 // isValidQueueType validates if the queue type is one of the allowed types

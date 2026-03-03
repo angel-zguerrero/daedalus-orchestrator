@@ -2,21 +2,16 @@ package db
 
 import (
 	"fmt"
-	"path"
 	"strings"
 
 	"deadalus-orch/shared/models"
 )
 
 // ClaimWorkFilterQuery is the result of translating a ClaimWorkFilter into DB-layer constructs.
-// The DB query string already encodes the inclusion and exact-exclusion rules.
-// The ExcludePatterns slice must be applied as an in-memory post-filter by the caller.
+// The DB query string encodes inclusion rules, exact exclusions, and NOT LIKE pattern exclusions.
 type ClaimWorkFilterQuery struct {
 	// DBQuery is the filter string ready to be passed to Repository.Find.
 	DBQuery string
-	// ExcludePatterns are glob patterns that could not be expressed as DB queries (no NOT LIKE support).
-	// The caller should drop any record whose relevant field matches one of these globs.
-	ExcludePatterns []string
 }
 
 // BuildTenantFilterQuery converts the tenant-relevant parts of a ClaimWorkFilter into a
@@ -34,12 +29,14 @@ func BuildTenantFilterQuery(f models.ClaimWorkFilter) ClaimWorkFilterQuery {
 	}
 
 	var exclusionClauses []string
-	// Exact-match exclusions can be expressed at DB level with !=
 	for _, code := range f.ExcludeTenantCodes {
 		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Code != %s", code))
 	}
+	for _, pat := range f.ExcludeTenantPatterns {
+		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Code NOT LIKE %s", pat))
+	}
 
-	return buildFilterQuery(inclusionClauses, exclusionClauses, f.ExcludeTenantPatterns)
+	return buildFilterQuery(inclusionClauses, exclusionClauses)
 }
 
 // BuildVNamespaceFilterQuery converts the vnamespace-relevant parts of a ClaimWorkFilter.
@@ -56,8 +53,11 @@ func BuildVNamespaceFilterQuery(f models.ClaimWorkFilter) ClaimWorkFilterQuery {
 	for _, ns := range f.ExcludeVNamespaces {
 		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Name != %s", ns))
 	}
+	for _, pat := range f.ExcludeVNamespacePatterns {
+		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Name NOT LIKE %s", pat))
+	}
 
-	return buildFilterQuery(inclusionClauses, exclusionClauses, f.ExcludeVNamespacePatterns)
+	return buildFilterQuery(inclusionClauses, exclusionClauses)
 }
 
 // BuildQueueFilterQuery converts the queue-relevant parts of a ClaimWorkFilter.
@@ -75,8 +75,11 @@ func BuildQueueFilterQuery(f models.ClaimWorkFilter, vNamespace string) ClaimWor
 	for _, code := range f.ExcludeQueueCodes {
 		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Code != %s", code))
 	}
+	for _, pat := range f.ExcludeQueuePatterns {
+		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Code NOT LIKE %s", pat))
+	}
 
-	fq := buildFilterQuery(inclusionClauses, exclusionClauses, f.ExcludeQueuePatterns)
+	fq := buildFilterQuery(inclusionClauses, exclusionClauses)
 
 	// Always restrict to queues that have pending messages
 	var extraClauses []string
@@ -96,9 +99,8 @@ func BuildQueueFilterQuery(f models.ClaimWorkFilter, vNamespace string) ClaimWor
 
 // buildFilterQuery is the generic query assembler shared by the three entity builders above.
 // inclusionClauses – OR-combined; if empty, all records are included.
-// exclusionClauses – AND-combined; always appended.
-// excludePatterns  – returned as-is for in-memory post-filtering (no NOT LIKE in the DSL).
-func buildFilterQuery(inclusionClauses, exclusionClauses, excludePatterns []string) ClaimWorkFilterQuery {
+// exclusionClauses – AND-combined; always appended (includes both != and NOT LIKE clauses).
+func buildFilterQuery(inclusionClauses, exclusionClauses []string) ClaimWorkFilterQuery {
 	var parts []string
 
 	// Inclusion block (OR)
@@ -123,18 +125,6 @@ func buildFilterQuery(inclusionClauses, exclusionClauses, excludePatterns []stri
 	}
 
 	return ClaimWorkFilterQuery{
-		DBQuery:         query,
-		ExcludePatterns: excludePatterns,
+		DBQuery: query,
 	}
-}
-
-// MatchesExcludePatterns returns true when value matches any of the glob patterns in the slice.
-// Uses path.Match semantics (* ? [range]).
-func MatchesExcludePatterns(value string, patterns []string) bool {
-	for _, pat := range patterns {
-		if ok, _ := path.Match(pat, value); ok {
-			return true
-		}
-	}
-	return false
 }

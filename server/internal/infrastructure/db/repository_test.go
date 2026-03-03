@@ -205,7 +205,7 @@ func TestRepository_Create_DuplicateUnique(t *testing.T) {
 
 	uIndexKey := "admin:users:idx-u:Name:Alice"
 	dataKey := "admin:users:data:123"
-	
+
 	// Mock for checking if unique field exists (should return true indicating duplicate)
 	mockStore.On("Exists", "cf1", testColumnFamilySector, uIndexKey, mock.Anything).Return(true, nil)
 	mockStore.On("Exists", "cf1", testColumnFamilySector, dataKey, mock.Anything).Return(false, nil)
@@ -584,7 +584,7 @@ func TestRepository_BulkCreate_DuplicateUnique(t *testing.T) {
 	// Mock for Alice (new user)
 	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Alice", mock.Anything).Return(false, nil).Once()
 	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:id1", mock.Anything).Return(false, nil).Once()
-	
+
 	// Mock for Bob (existing user) - should cause error
 	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:idx-u:Name:Bob", mock.Anything).Return(true, nil).Once()
 	mockStore.On("Exists", "cf1", testColumnFamilySector, "admin:users:data:id2", mock.Anything).Return(false, nil).Once()
@@ -919,9 +919,11 @@ func TestRepository_Create_NestedDuplicateUnique_UserComplex(t *testing.T) {
 			Description: "Desc",
 		},
 	}
-	
-	// Mock for unique checks
-	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(false, nil)
+
+	// Mock for unique checks.
+	// Email may or may not be checked before Meta.Tag depending on map iteration order,
+	// so it is marked as optional with Maybe().
+	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Email:new@example.com", mock.Anything).Return(false, nil).Maybe()
 	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:data:uc456", mock.Anything).Return(false, nil)
 	// Simulate Meta.Tag being a duplicate
 	mockStore.On("Exists", "cf_complex", testColumnFamilySector, "test_sch:users_complex:idx-u:Meta.Tag:existingTag", mock.Anything).Return(true, nil)

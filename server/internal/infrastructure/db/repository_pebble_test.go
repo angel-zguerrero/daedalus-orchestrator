@@ -1116,6 +1116,39 @@ func TestRepository_Find_Operators_Pebble(t *testing.T) {
 		assert.Equal(t, "Eva", res.Entities[0].Name)
 	})
 
+	t.Run("NOT LIKE operator - prefix", func(t *testing.T) {
+		res, err := repo.Find("LastName NOT LIKE Z*", 10, "", now)
+		require.NoError(t, err)
+		require.Len(t, res.Entities, 4)
+		names := make([]string, len(res.Entities))
+		for i, e := range res.Entities {
+			names[i] = e.Name
+		}
+		assert.ElementsMatch(t, []string{"Bea", "Cleo", "Dana", "Eva"}, names)
+	})
+
+	t.Run("NOT LIKE operator - suffix", func(t *testing.T) {
+		res, err := repo.Find("LastName NOT LIKE *nez", 10, "", now)
+		require.NoError(t, err)
+		require.Len(t, res.Entities, 3)
+		names := make([]string, len(res.Entities))
+		for i, e := range res.Entities {
+			names[i] = e.Name
+		}
+		assert.ElementsMatch(t, []string{"Ana", "Dana", "Eva"}, names)
+	})
+
+	t.Run("NOT LIKE operator - contains", func(t *testing.T) {
+		res, err := repo.Find("LastName NOT LIKE *ela*", 10, "", now)
+		require.NoError(t, err)
+		require.Len(t, res.Entities, 4)
+		names := make([]string, len(res.Entities))
+		for i, e := range res.Entities {
+			names[i] = e.Name
+		}
+		assert.ElementsMatch(t, []string{"Ana", "Bea", "Cleo", "Dana"}, names)
+	})
+
 	t.Run("BETWEEN operator", func(t *testing.T) {
 		res, err := repo.Find("Age BETWEEN 25 AND 35", 10, "", now)
 		require.NoError(t, err)

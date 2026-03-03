@@ -289,8 +289,8 @@ func (bo *TenantBO) GetTenants(ctx context.Context, q string, cursor string, pag
 }
 
 // GetTenantsWithFilter paginates tenants using DB-level filter rules derived from a ClaimWorkFilter.
-// Inclusion lists, exact exclusions, and LIKE patterns are pushed to the repository;
-// only ExcludeTenantPatterns (which need NOT LIKE) are applied in memory inside the repository.
+// Inclusion lists, exact exclusions, LIKE patterns, and NOT LIKE pattern exclusions are all pushed
+// to the repository and executed at the DB level.
 func (bo *TenantBO) GetTenantsWithFilter(ctx context.Context, filter models.ClaimWorkFilter, cursor string, pageSize int) (db.FindResult[models.TenantInMaster], error) {
 	cmd := &tenant_command.PaginateTenantsWithFilterCommand{
 		Filter:   filter,

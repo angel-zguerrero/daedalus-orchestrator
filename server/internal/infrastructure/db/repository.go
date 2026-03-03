@@ -215,7 +215,7 @@ func parse(tokens []token) (*exprNode, error) {
 }
 func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) (map[string]bool, error) {
 	// Regular field condition parsing
-	conditionRegex := regexp.MustCompile(`(?i)^([\w.]+)\s*(=|!=|<=|>=|<|>|LIKE|BETWEEN)\s*(.+)$`)
+	conditionRegex := regexp.MustCompile(`(?i)^([\w.]+)\s*(=|!=|<=|>=|<|>|NOT LIKE|LIKE|BETWEEN)\s*(.+)$`)
 	parts := conditionRegex.FindStringSubmatch(strings.TrimSpace(condStr))
 	if len(parts) != 4 {
 		return nil, fmt.Errorf("invalid condition: %s", condStr)
@@ -276,6 +276,32 @@ func (r *Repository[T]) evalCondition(condStr string, limit int, now time.Time) 
 				}
 				indexedVal := parts[4]
 				if regex.MatchString(indexedVal) {
+					allIDs[string(item.Value)] = true
+				}
+			}
+			if next == "" {
+				break
+			}
+			cursorInner = next
+		}
+	case "NOT LIKE":
+		likeRegex := strings.ReplaceAll(value, "*", ".*")
+		regex, err := regexp.Compile("^" + likeRegex + "$")
+		if err != nil {
+			return nil, fmt.Errorf("invalid NOT LIKE pattern: %s", value)
+		}
+		for {
+			items, next, err := r.kvStore.SearchByPatternPaginatedKV(r.definition.ColumnFamily, r.definition.ColumnFamilySector, prefix+"*", cursorInner, limit, now)
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range items {
+				parts := strings.Split(string(item.Key), ":")
+				if len(parts) < 5 {
+					continue
+				}
+				indexedVal := parts[4]
+				if !regex.MatchString(indexedVal) {
 					allIDs[string(item.Value)] = true
 				}
 			}
