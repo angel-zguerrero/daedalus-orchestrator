@@ -86,6 +86,11 @@ const ConfigNodeSchedulerBalancingWaitTimeKey = "node_scheduler_balancing_wait_t
 // ConfigDeploymentIDKey is the key for the deployment ID setting in the configuration file.
 const ConfigDeploymentIDKey = "deployment_id"
 
+// ConfigMessageLeaseDurationKey is the key for the message lease duration setting in the
+// configuration file (in seconds). It defines how long a dequeued message is locked
+// to a JobWorker before the lease expires.
+const ConfigMessageLeaseDurationKey = "message_lease_duration"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -179,6 +184,10 @@ const EnvVarNodeSchedulerBalancingWaitTime = "NODE_SCHEDULER_BALANCING_WAIT_TIME
 // EnvVarDeploymentID is the environment variable name for the deployment ID.
 const EnvVarDeploymentID = "DEPLOYMENT_ID"
 
+// EnvVarMessageLeaseDuration is the environment variable name for the message lease duration
+// (in seconds). It defines how long a dequeued message is locked to a JobWorker.
+const EnvVarMessageLeaseDuration = "MESSAGE_LEASE_DURATION"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -262,3 +271,11 @@ const NodeSchedulerBalancingWaitTimeFlagName = "node-scheduler-balancing-wait-ti
 
 // DeploymentIDFlagName is the command-line flag name for the deployment ID.
 const DeploymentIDFlagName = "deployment-id"
+
+// MessageLeaseDurationFlagName is the command-line flag name for the message lease duration
+// (in seconds).
+const MessageLeaseDurationFlagName = "message-lease-duration"
+
+// DefaultMessageLeaseDurationSeconds is the default lease duration for a dequeued message
+// when no other source sets it.
+const DefaultMessageLeaseDurationSeconds int64 = 30

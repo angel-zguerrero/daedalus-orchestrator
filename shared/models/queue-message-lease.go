@@ -18,3 +18,7 @@ type QueueMessageLease struct {
 	LeaseUntil     time.Time `orm:"data-only"`
 	TTL            int64     `orm:"ttl"`
 }
+
+func (QueueMessageLease) TableName() string {
+	return "queue_message_leases"
+}

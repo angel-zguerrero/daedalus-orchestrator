@@ -220,6 +220,11 @@ var NodeSchedulerBalancingWaitTimeFlag = flag.Int64(constants.NodeSchedulerBalan
 // DeploymentIDFlag defines the --deployment-id command-line flag.
 var DeploymentIDFlag = flag.Uint64(constants.DeploymentIDFlagName, 0, "Unique identifier for cluster isolation. Overrides config file and environment variable.")
 
+// MessageLeaseDurationFlag defines the --message-lease-duration command-line flag.
+// It specifies, in seconds, how long a dequeued message is locked to a JobWorker
+// before the lease expires automatically.
+var MessageLeaseDurationFlag = flag.Int64(constants.MessageLeaseDurationFlagName, 0, fmt.Sprintf("Duration in seconds a dequeued message is leased to a JobWorker (default: %d, minimum: 5). Overrides config file and environment variable.", constants.DefaultMessageLeaseDurationSeconds))
+
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
 // The loading order of precedence is:
@@ -466,6 +471,14 @@ func LoadDefaultConfiguration() error {
 		config.DeploymentID = deploymentID
 	}
 
+	if envVal := os.Getenv(constants.EnvVarMessageLeaseDuration); envVal != "" {
+		messageLeaseDuration, err := strconv.ParseInt(envVal, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarMessageLeaseDuration, err)
+		}
+		config.MessageLeaseDuration = time.Duration(messageLeaseDuration) * time.Second
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -557,6 +570,10 @@ func LoadDefaultConfiguration() error {
 
 	if *DeploymentIDFlag != 0 { // Only override if different from default
 		config.DeploymentID = *DeploymentIDFlag
+	}
+
+	if *MessageLeaseDurationFlag != 0 {
+		config.MessageLeaseDuration = time.Duration(*MessageLeaseDurationFlag) * time.Second
 	}
 
 	// Apply defaults if values are not set by any source
@@ -664,6 +681,18 @@ func LoadDefaultConfiguration() error {
 	if config.ApiRaftTimeout <= 0 {
 		log.Warn().Msgf("API Raft Timeout was configured to %v, which is invalid or zero. Resetting to default 30s.", config.ApiRaftTimeout)
 		config.ApiRaftTimeout = 30 * time.Second
+	}
+
+	// Apply default and validation for MessageLeaseDuration.
+	// Priority: args > env var > config file, handled above; this block covers the
+	// "not set by any source" case.
+	if config.MessageLeaseDuration == 0 {
+		config.MessageLeaseDuration = time.Duration(constants.DefaultMessageLeaseDurationSeconds) * time.Second
+		log.Info().Msgf("MessageLeaseDuration not specified, defaulting to %v", config.MessageLeaseDuration)
+	}
+	if config.MessageLeaseDuration < 5*time.Second {
+		log.Warn().Msgf("MessageLeaseDuration (%v) is less than minimum 5 seconds. Setting to 5 seconds.", config.MessageLeaseDuration)
+		config.MessageLeaseDuration = 5 * time.Second
 	}
 
 	// Specific default logic for cluster setup
@@ -960,6 +989,12 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.deployment_id = id
+		case constants.ConfigMessageLeaseDurationKey:
+			d, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.message_lease_duration = d
 
 		}
 	}
