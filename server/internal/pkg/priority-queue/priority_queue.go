@@ -1,4 +1,4 @@
-package queuesystem
+package priorityqueue
 
 import (
 	"sort"

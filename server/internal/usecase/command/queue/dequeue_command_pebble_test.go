@@ -116,6 +116,9 @@ func TestDequeueCommand_Pebble(t *testing.T) {
 		{"FairPriority_ThreeTiers_FullDrain", testDQ_FairPriority_ThreeTiers_FullDrain},
 		{"FairPriority_LowerAddedAfterHigherDrained", testDQ_FairPriority_LowerAddedAfterHigherDrained},
 		{"FairPriority_SinglePriority_FIFOOrder", testDQ_FairPriority_SinglePriority_FIFOOrder},
+		{"WeightedThresholds_HighestStillFirst", testDQ_WeightedThresholds_HighestStillFirst},
+		{"WeightedThresholds_OneCycle", testDQ_WeightedThresholds_OneCycle},
+		{"WeightedThresholds_TwoCycles", testDQ_WeightedThresholds_TwoCycles},
 	}
 	for _, tc := range tests {
 		tc := tc
@@ -232,17 +235,16 @@ func testDQ_MaxDeliveringMessages(t *testing.T) {
 	dequeueExpectErrorDQ(t, store, q.ID, "worker-b", now.Add(3*time.Second), "maximum number of in-flight messages")
 }
 
-// ─── Fair-priority tests ────────────────────────────────────────────────────────────────────────────
+// ─── Fair-priority tests (threshold = 0 → drain-all) ──────────────────────────
 //
-// DequeueCommand creates a fresh PriorityQueue per call (all processedCounts=0,
-// currentIndex=0 pointing to highest priority). One Dequeue() on that new PQ
-// always returns the highest-priority non-empty partition. The observable
-// behaviour across N consecutive DequeueCommand calls is therefore:
+// When DesiredPriorityThresholds maps every priority to 0, the PriorityQueue
+// drains all messages of the highest tier before moving to the next.  The
+// persisted scheduler state (PQProcessedCounts, PQCurrentPriority) is still
+// written and restored on every call, but for threshold=0 the currentIndex
+// never advances mid-tier — it moves only when the tier's partition runs empty.
+// Observable behaviour across N calls: strict-priority drain.
 //
-//   All P(n) messages before any P(n-1) message  (strict-priority drain)
-//
-// This is the fair-priority guarantee: lower priorities are never permanently
-// starved — they are served as soon as all higher-priority messages are gone.
+//   All P(n) messages before any P(n-1) message.
 
 // testDQ_FairPriority_HigherPriorityFirst proves that the higher-priority
 // message is always delivered first, regardless of insertion order.
@@ -342,6 +344,84 @@ func testDQ_FairPriority_LowerAddedAfterHigherDrained(t *testing.T) {
 	dr3 := dequeueDQ(t, store, q.ID, "w3", now.Add(5*time.Millisecond))
 	assert.Equal(t, 1, dr3.Message.Priority, "third dequeue must return the late P1 message")
 	assert.Equal(t, "p1-late", dr3.Message.MessageID)
+}
+
+// ─── Weighted-threshold (stateful cycling) tests ──────────────────────────────
+//
+// DequeueCommand persists the PriorityQueue scheduler state (PQProcessedCounts,
+// PQCurrentPriority) in the queue record after every Execute(), and restores it
+// at the start of the next call.  This makes the weighted cycling defined by
+// DesiredPriorityThresholds fully observable through real Pebble I/O:
+//
+//   thresholds {3:4, 2:3, 1:2}  →  cycle: 4×P3, 3×P2, 2×P1, 4×P3, 3×P2, …
+
+// testDQ_WeightedThresholds_HighestStillFirst verifies that on a brand-new
+// queue (PQProcessedCounts=nil, no prior state) the very first dequeue for
+// each tier still produces P3→P2→P1 in priority order.
+func testDQ_WeightedThresholds_HighestStillFirst(t *testing.T) {
+	store := newDequeueTestStore(t)
+	now := time.Now()
+	q := createQueueDQ(t, store, "q-wt-hf", "WT_HF", models.QueueActive, map[int]int{3: 4, 2: 3, 1: 2}, now)
+	enqueueMsgDQ(t, store, "msg-p1", 1, q.ID, now)
+	enqueueMsgDQ(t, store, "msg-p2", 2, q.ID, now.Add(time.Millisecond))
+	enqueueMsgDQ(t, store, "msg-p3", 3, q.ID, now.Add(2*time.Millisecond))
+	dr1 := dequeueDQ(t, store, q.ID, "w1", now.Add(3*time.Millisecond))
+	assert.Equal(t, 3, dr1.Message.Priority, "P3 must be served first")
+	dr2 := dequeueDQ(t, store, q.ID, "w2", now.Add(4*time.Millisecond))
+	assert.Equal(t, 2, dr2.Message.Priority, "P3 exhausted → P2 next")
+	dr3 := dequeueDQ(t, store, q.ID, "w3", now.Add(5*time.Millisecond))
+	assert.Equal(t, 1, dr3.Message.Priority, "P2 exhausted → P1 last")
+}
+
+// testDQ_WeightedThresholds_OneCycle verifies that a queue with thresholds
+// {3:4, 2:3, 1:2} and more than one cycle's worth of messages produces the
+// cycling pattern 4×P3, 3×P2, 2×P1 in the first nine dequeues.
+func testDQ_WeightedThresholds_OneCycle(t *testing.T) {
+	store := newDequeueTestStore(t)
+	now := time.Now()
+	q := createQueueDQ(t, store, "q-wt-one", "WT_ONE", models.QueueActive, map[int]int{3: 4, 2: 3, 1: 2}, now)
+	const n = 10
+	for i := 0; i < n; i++ {
+		enqueueMsgDQ(t, store, fmt.Sprintf("p3-%d", i), 3, q.ID, now.Add(time.Duration(i)*time.Millisecond))
+		enqueueMsgDQ(t, store, fmt.Sprintf("p2-%d", i), 2, q.ID, now.Add(time.Duration(n+i)*time.Millisecond))
+		enqueueMsgDQ(t, store, fmt.Sprintf("p1-%d", i), 1, q.ID, now.Add(time.Duration(2*n+i)*time.Millisecond))
+	}
+	// First full cycle: 4×P3, 3×P2, 2×P1
+	want := []int{3, 3, 3, 3, 2, 2, 2, 1, 1}
+	got := make([]int, 0, len(want))
+	for i := 0; i < len(want); i++ {
+		dr := dequeueDQ(t, store, q.ID, fmt.Sprintf("w-%d", i), now.Add(time.Duration(3*n+i)*time.Millisecond))
+		got = append(got, dr.Message.Priority)
+	}
+	assert.Equal(t, want, got,
+		"first cycle with thresholds {3:4, 2:3, 1:2} must produce 4×P3, 3×P2, 2×P1")
+}
+
+// testDQ_WeightedThresholds_TwoCycles verifies TWO complete cycles of the
+// weighted pattern across real Pebble I/O.  With thresholds {3:4, 2:3, 1:2}
+// and 10 msgs per tier the first 18 dequeues must follow:
+//
+//	cycle 1: P3×4, P2×3, P1×2
+//	cycle 2: P3×4, P2×3, P1×2
+func testDQ_WeightedThresholds_TwoCycles(t *testing.T) {
+	store := newDequeueTestStore(t)
+	now := time.Now()
+	q := createQueueDQ(t, store, "q-wt-2c", "WT_2C", models.QueueActive, map[int]int{3: 4, 2: 3, 1: 2}, now)
+	const n = 10
+	for i := 0; i < n; i++ {
+		enqueueMsgDQ(t, store, fmt.Sprintf("p3-%d", i), 3, q.ID, now.Add(time.Duration(i)*time.Millisecond))
+		enqueueMsgDQ(t, store, fmt.Sprintf("p2-%d", i), 2, q.ID, now.Add(time.Duration(n+i)*time.Millisecond))
+		enqueueMsgDQ(t, store, fmt.Sprintf("p1-%d", i), 1, q.ID, now.Add(time.Duration(2*n+i)*time.Millisecond))
+	}
+	oneCycle := []int{3, 3, 3, 3, 2, 2, 2, 1, 1}
+	want := append(append([]int{}, oneCycle...), oneCycle...)
+	got := make([]int, 0, len(want))
+	for i := 0; i < len(want); i++ {
+		dr := dequeueDQ(t, store, q.ID, fmt.Sprintf("w-%d", i), now.Add(time.Duration(3*n+i)*time.Millisecond))
+		got = append(got, dr.Message.Priority)
+	}
+	assert.Equal(t, want, got,
+		"two full cycles with thresholds {3:4, 2:3, 1:2} must interleave as 4×P3,3×P2,2×P1 twice")
 }
 
 // testDQ_FairPriority_SinglePriority_FIFOOrder confirms same-priority messages

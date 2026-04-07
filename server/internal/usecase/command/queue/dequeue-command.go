@@ -2,7 +2,7 @@ package queue
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
-	queuesystem "deadalus-orch/server/internal/infrastructure/queue-system"
+	priorityqueue "deadalus-orch/server/internal/pkg/priority-queue"
 	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -121,11 +121,11 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 
 	// ── 3. threshold-based fair priority selection ────────────────────────────────
 	//
-	// Build an in-memory priority queue using the queue's DesiredPriorityThresholds.
-	// Each non-empty partition is enqueued as a Task. A single Dequeue() call on a
-	// freshly constructed PQ always returns the highest-priority task that has not
-	// exhausted its threshold, which is exactly what we need for a single-message
-	// stateless dequeue.
+	// Build an in-memory PriorityQueue, restore the persisted scheduler state
+	// (PQProcessedCounts + PQCurrentPriority) so that the weighted cycling defined
+	// by DesiredPriorityThresholds is maintained across independent Execute() calls,
+	// then run a single Dequeue() to pick the next partition.
+	// The updated state is written back into the queue record at step 6.
 
 	thresholds := queue.DesiredPriorityThresholds
 	if thresholds == nil {
@@ -133,14 +133,18 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		thresholds = make(map[int]int)
 	}
 
-	pq := queuesystem.NewPriorityQueue(thresholds)
+	pq := priorityqueue.NewPriorityQueue(thresholds)
 	for i, p := range partitions {
-		pq.Enqueue(queuesystem.Task{
+		pq.Enqueue(priorityqueue.Task{
 			ID:       p.ID,
 			Priority: p.Priority,
 			Index:    i,
 		})
 	}
+
+	// Restore persisted scheduler position so the weighted cycling continues
+	// across independent DequeueCommand calls.
+	pq.RestoreState(queue.PQProcessedCounts, queue.PQCurrentPriority)
 
 	selectedTask := pq.Dequeue()
 	if selectedTask == nil {
@@ -148,6 +152,11 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		commandResult.Error = fmt.Sprintf("queue '%s' is empty (priority queue returned nil)", queue.Code)
 		return *commandResult
 	}
+
+	// Capture the updated scheduler state — written to the queue record at step 6.
+	newCounts, newCurrentPriority := pq.GetState()
+	queue.PQProcessedCounts = newCounts
+	queue.PQCurrentPriority = newCurrentPriority
 
 	// Find the selected partition.
 	var selectedPartition *models.QueuePartition
