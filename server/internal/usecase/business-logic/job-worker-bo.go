@@ -457,3 +457,60 @@ func (bo *JobWorkerBO) ReviewJobWorkersConnectionStatus(ctx context.Context) {
 		}
 	}
 }
+
+// AckMessage acknowledges a message by executing the AckMessage command on the appropriate tenant node.
+func (bo *JobWorkerBO) AckMessage(ctx context.Context, leaseID, tenantCode string) error {
+	if leaseID == "" {
+		return errors.New("leaseID is required")
+	}
+	if tenantCode == "" {
+		return errors.New("tenantCode is required")
+	}
+
+	// Get the tenant to determine the correct node
+	tenantBO := NewTenantBO(bo.Config)
+	tenant, tenantNode, _, err := tenantBO.GetTenant(ctx, tenantCode)
+	if err != nil {
+		return fmt.Errorf("failed to get tenant %s: %w", tenantCode, err)
+	}
+
+	// Verify we have a valid tenant node
+	if tenantNode == nil {
+		return fmt.Errorf("failed to get node for tenant %s", tenantCode)
+	}
+
+	// Determine CF and CFS based on tenant (same pattern as dequeue)
+	cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
+	cfs := tenant.ID
+
+	// Execute the AckMessage command
+	ackCmd := &queue_command.AckMessageCommand{
+		LeaseID: leaseID,
+		CF:      cf,
+		CFS:     cfs,
+	}
+
+	result, err := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
+		tenantNode,
+		ctx,
+		ackCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"ack message",
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to ack message: %w", err)
+	}
+
+	if !result.Success {
+		return fmt.Errorf("ack message failed: %s", result.Message)
+	}
+
+	bo.Config.Logger.Debug().
+		Str("leaseID", leaseID).
+		Str("tenantCode", tenantCode).
+		Msg("✅ Message acknowledged successfully")
+
+	return nil
+}

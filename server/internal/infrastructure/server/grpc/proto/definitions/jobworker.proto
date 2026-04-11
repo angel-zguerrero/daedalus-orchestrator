@@ -6,6 +6,7 @@ option go_package = "pb/jobworker;jobworker";
 
 service JobWorkerService {
   rpc ClaimWork(stream ClaimWorkRequest) returns (stream ClaimWorkStreamMessage);
+  rpc AckMessage(AckMessageRequest) returns (AckMessageResponse);
 }
 
 message ClaimWorkFilter {
@@ -74,6 +75,16 @@ message ClaimWorkStreamMessage {
     ClaimWorkResponse ack = 1;
     ClaimedQueueMessage claimedMessage = 2;
   }
+}
+
+message AckMessageRequest {
+  string leaseID = 1;
+  string tenantCode = 2;
+}
+
+message AckMessageResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/jobworker.proto

@@ -1,6 +1,7 @@
 package jobworker
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -175,4 +176,25 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 			return stream.Context().Err()
 		}
 	}
+}
+
+func (s *JobWorkerService) AckMessage(ctx context.Context, req *pb.AckMessageRequest) (*pb.AckMessageResponse, error) {
+	s.Config.Logger.Debug().
+		Str("leaseID", req.LeaseID).
+		Str("tenantCode", req.TenantCode).
+		Msg("Received AckMessage request")
+
+	err := s.JobWorkerBO.AckMessage(ctx, req.LeaseID, req.TenantCode)
+	if err != nil {
+		s.Config.Logger.Error().Err(err).Msg("Failed to ack message")
+		return &pb.AckMessageResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &pb.AckMessageResponse{
+		Success: true,
+		Message: "Message acknowledged successfully",
+	}, nil
 }

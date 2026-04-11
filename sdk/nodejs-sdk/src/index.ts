@@ -51,12 +51,16 @@ export interface ClaimedMessage {
     tenantCode: string;
 }
 
+export interface AckCallback {
+    (): Promise<void>;
+}
+
 export interface WorkerOptions {
     workerName: string;
     information?: Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
     capacityPolicies: ClaimWorkCapacityPolicy[];
     intervalMs?: number;
-    onMessage?: (claimedMessage: ClaimedMessage) => Promise<void> | void;
+    onMessage?: (claimedMessage: ClaimedMessage, ack: AckCallback) => Promise<void> | void;
 }
 
 export class DaedalusSDK {
@@ -141,6 +145,27 @@ export class DaedalusSDK {
         return metadata;
     }
 
+    async ackMessage(leaseID: string, tenantCode: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.jobWorkerClient.AckMessage(
+                { leaseID, tenantCode },
+                this.getMetadata(),
+                (err: any, response: any) => {
+                    if (err) {
+                        console.error('❌ Failed to ack message:', err.message);
+                        return reject(err);
+                    }
+                    if (!response.success) {
+                        console.error('❌ Ack message failed:', response.message);
+                        return reject(new Error(response.message));
+                    }
+                    console.log('✅ Message acknowledged successfully');
+                    resolve();
+                }
+            );
+        });
+    }
+
     async createWorker(options: WorkerOptions) {
         const {
             workerName,
@@ -174,7 +199,7 @@ export class DaedalusSDK {
 
                         if (onMessage) {
                             try {
-                                await onMessage({
+                                const claimedMessage: ClaimedMessage = {
                                     message: {
                                         id: claimed.message.ID,
                                         messageId: claimed.message.MessageID,
@@ -195,7 +220,13 @@ export class DaedalusSDK {
                                         leaseUntil: claimed.lease.LeaseUntil
                                     },
                                     tenantCode: claimed.tenantCode
-                                });
+                                };
+
+                                const ackCallback: AckCallback = async () => {
+                                    await this.ackMessage(claimed.lease.ID, claimed.tenantCode);
+                                };
+
+                                await onMessage(claimedMessage, ackCallback);
                             } catch (handlerError: any) {
                                 console.error('❌ Error in onMessage handler:', handlerError.message);
                             }

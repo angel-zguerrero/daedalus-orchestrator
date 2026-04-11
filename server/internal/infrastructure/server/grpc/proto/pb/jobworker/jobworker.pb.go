@@ -659,6 +659,110 @@ func (*ClaimWorkStreamMessage_Ack) isClaimWorkStreamMessage_Message() {}
 
 func (*ClaimWorkStreamMessage_ClaimedMessage) isClaimWorkStreamMessage_Message() {}
 
+type AckMessageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LeaseID       string                 `protobuf:"bytes,1,opt,name=leaseID,proto3" json:"leaseID,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,2,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckMessageRequest) Reset() {
+	*x = AckMessageRequest{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckMessageRequest) ProtoMessage() {}
+
+func (x *AckMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckMessageRequest.ProtoReflect.Descriptor instead.
+func (*AckMessageRequest) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AckMessageRequest) GetLeaseID() string {
+	if x != nil {
+		return x.LeaseID
+	}
+	return ""
+}
+
+func (x *AckMessageRequest) GetTenantCode() string {
+	if x != nil {
+		return x.TenantCode
+	}
+	return ""
+}
+
+type AckMessageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckMessageResponse) Reset() {
+	*x = AckMessageResponse{}
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckMessageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckMessageResponse) ProtoMessage() {}
+
+func (x *AckMessageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckMessageResponse.ProtoReflect.Descriptor instead.
+func (*AckMessageResponse) Descriptor() ([]byte, []int) {
+	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AckMessageResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *AckMessageResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto protoreflect.FileDescriptor
 
 const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc = "" +
@@ -735,9 +839,19 @@ const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto
 	"\x16ClaimWorkStreamMessage\x120\n" +
 	"\x03ack\x18\x01 \x01(\v2\x1c.jobworker.ClaimWorkResponseH\x00R\x03ack\x12H\n" +
 	"\x0eclaimedMessage\x18\x02 \x01(\v2\x1e.jobworker.ClaimedQueueMessageH\x00R\x0eclaimedMessageB\t\n" +
-	"\amessage2c\n" +
+	"\amessage\"M\n" +
+	"\x11AckMessageRequest\x12\x18\n" +
+	"\aleaseID\x18\x01 \x01(\tR\aleaseID\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x02 \x01(\tR\n" +
+	"tenantCode\"H\n" +
+	"\x12AckMessageResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xae\x01\n" +
 	"\x10JobWorkerService\x12O\n" +
-	"\tClaimWork\x12\x1b.jobworker.ClaimWorkRequest\x1a!.jobworker.ClaimWorkStreamMessage(\x010\x01B\x18Z\x16pb/jobworker;jobworkerb\x06proto3"
+	"\tClaimWork\x12\x1b.jobworker.ClaimWorkRequest\x1a!.jobworker.ClaimWorkStreamMessage(\x010\x01\x12I\n" +
+	"\n" +
+	"AckMessage\x12\x1c.jobworker.AckMessageRequest\x1a\x1d.jobworker.AckMessageResponseB\x18Z\x16pb/jobworker;jobworkerb\x06proto3"
 
 var (
 	file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescOnce sync.Once
@@ -751,7 +865,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_
 	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_goTypes = []any{
 	(*ClaimWorkFilter)(nil),         // 0: jobworker.ClaimWorkFilter
 	(*ClaimWorkCapacityPolicy)(nil), // 1: jobworker.ClaimWorkCapacityPolicy
@@ -761,24 +875,28 @@ var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_g
 	(*QueueMessageLease)(nil),       // 5: jobworker.QueueMessageLease
 	(*ClaimedQueueMessage)(nil),     // 6: jobworker.ClaimedQueueMessage
 	(*ClaimWorkStreamMessage)(nil),  // 7: jobworker.ClaimWorkStreamMessage
-	nil,                             // 8: jobworker.QueueMessage.HeadersEntry
-	nil,                             // 9: jobworker.QueueMessage.ParametersEntry
-	nil,                             // 10: jobworker.ClaimWorkRequest.InformationEntry
+	(*AckMessageRequest)(nil),       // 8: jobworker.AckMessageRequest
+	(*AckMessageResponse)(nil),      // 9: jobworker.AckMessageResponse
+	nil,                             // 10: jobworker.QueueMessage.HeadersEntry
+	nil,                             // 11: jobworker.QueueMessage.ParametersEntry
+	nil,                             // 12: jobworker.ClaimWorkRequest.InformationEntry
 }
 var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_depIdxs = []int32{
 	0,  // 0: jobworker.ClaimWorkCapacityPolicy.claimWorkFilter:type_name -> jobworker.ClaimWorkFilter
-	8,  // 1: jobworker.QueueMessage.Headers:type_name -> jobworker.QueueMessage.HeadersEntry
-	9,  // 2: jobworker.QueueMessage.Parameters:type_name -> jobworker.QueueMessage.ParametersEntry
-	10, // 3: jobworker.ClaimWorkRequest.information:type_name -> jobworker.ClaimWorkRequest.InformationEntry
+	10, // 1: jobworker.QueueMessage.Headers:type_name -> jobworker.QueueMessage.HeadersEntry
+	11, // 2: jobworker.QueueMessage.Parameters:type_name -> jobworker.QueueMessage.ParametersEntry
+	12, // 3: jobworker.ClaimWorkRequest.information:type_name -> jobworker.ClaimWorkRequest.InformationEntry
 	1,  // 4: jobworker.ClaimWorkRequest.capacityPolicies:type_name -> jobworker.ClaimWorkCapacityPolicy
 	2,  // 5: jobworker.ClaimedQueueMessage.message:type_name -> jobworker.QueueMessage
 	5,  // 6: jobworker.ClaimedQueueMessage.lease:type_name -> jobworker.QueueMessageLease
 	4,  // 7: jobworker.ClaimWorkStreamMessage.ack:type_name -> jobworker.ClaimWorkResponse
 	6,  // 8: jobworker.ClaimWorkStreamMessage.claimedMessage:type_name -> jobworker.ClaimedQueueMessage
 	3,  // 9: jobworker.JobWorkerService.ClaimWork:input_type -> jobworker.ClaimWorkRequest
-	7,  // 10: jobworker.JobWorkerService.ClaimWork:output_type -> jobworker.ClaimWorkStreamMessage
-	10, // [10:11] is the sub-list for method output_type
-	9,  // [9:10] is the sub-list for method input_type
+	8,  // 10: jobworker.JobWorkerService.AckMessage:input_type -> jobworker.AckMessageRequest
+	7,  // 11: jobworker.JobWorkerService.ClaimWork:output_type -> jobworker.ClaimWorkStreamMessage
+	9,  // 12: jobworker.JobWorkerService.AckMessage:output_type -> jobworker.AckMessageResponse
+	11, // [11:13] is the sub-list for method output_type
+	9,  // [9:11] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -799,7 +917,7 @@ func file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

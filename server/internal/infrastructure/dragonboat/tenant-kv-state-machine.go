@@ -197,6 +197,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return dequeueCommand.Execute(uow, now)
 	}
 
+	ackMessageCommand, ok := cmd.(queue_command.AckMessageCommand)
+	if ok {
+		return ackMessageCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
