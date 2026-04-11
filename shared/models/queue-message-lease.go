@@ -16,7 +16,6 @@ type QueueMessageLease struct {
 	WorkerID       string
 	LeaseStatus    QueueMessageLeaseStatus
 	LeaseUntil     time.Time `orm:"data-only"`
-	TTL            int64     `orm:"ttl"`
 }
 
 func (QueueMessageLease) TableName() string {

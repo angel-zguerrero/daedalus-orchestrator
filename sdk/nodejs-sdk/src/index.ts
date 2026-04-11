@@ -24,12 +24,39 @@ export interface ClaimWorkCapacityPolicy {
     claimWorkFilter?: ClaimWorkFilter;
 }
 
+export interface QueueMessage {
+    id: string;
+    messageId: string;
+    content: string;
+    contentType: string;
+    headers: Record<string, string>;
+    queueId: string;
+    priority: number;
+    handler: string;
+    parameters: Record<string, string>;
+    vNamespace: string;
+    createdAt: string;
+}
+
+export interface QueueMessageLease {
+    id: string;
+    queueMessageId: string;
+    workerId: string;
+    leaseUntil: string;
+}
+
+export interface ClaimedMessage {
+    message: QueueMessage;
+    lease: QueueMessageLease;
+    tenantCode: string;
+}
+
 export interface WorkerOptions {
     workerName: string;
     information?: Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
     capacityPolicies: ClaimWorkCapacityPolicy[];
     intervalMs?: number;
-    onMessage?: (message: any) => Promise<void> | void;
+    onMessage?: (claimedMessage: ClaimedMessage) => Promise<void> | void;
 }
 
 export class DaedalusSDK {
@@ -132,40 +159,115 @@ export class DaedalusSDK {
                     await this.login();
                 }
 
-                let currentInformation: Record<string, string> = {};
-                if (typeof information === 'function') {
-                    currentInformation = await information();
-                } else if (information) {
-                    currentInformation = information;
-                }
+                // Create bidirectional stream
+                const call = this.jobWorkerClient.ClaimWork(this.getMetadata());
 
-                const request = {
-                    workerID: workerId,
-                    workerName: workerName,
-                    information: currentInformation,
-                    capacityPolicies: capacityPolicies
-                };
+                console.log(`🔌 Opening bidirectional stream for worker ${workerId}...`);
 
-                this.jobWorkerClient.ClaimWork(request, this.getMetadata(), async (err: any, response: any) => {
-                    if (err) {
-                        if (err.code === 16) { // UNAUTHENTICATED
-                            console.warn('🔄 Session expired (Error 16). Refreshing token...');
-                            this.token = null; // Clear token to trigger re-login on next run
-                        } else {
-                            console.error('❌ Error claiming work:', err.message);
+                // Handle incoming messages from server
+                call.on('data', async (streamMessage: any) => {
+                    if (streamMessage.ack) {
+                        console.log('✅ Connected to server:', streamMessage.ack.knowledge);
+                    } else if (streamMessage.claimedMessage) {
+                        const claimed = streamMessage.claimedMessage;
+                        console.log(`📬 Received message: ${claimed.message.ID} from tenant ${claimed.tenantCode}`);
+
+                        if (onMessage) {
+                            try {
+                                await onMessage({
+                                    message: {
+                                        id: claimed.message.ID,
+                                        messageId: claimed.message.MessageID,
+                                        content: claimed.message.Content,
+                                        contentType: claimed.message.ContentType,
+                                        headers: claimed.message.Headers || {},
+                                        queueId: claimed.message.QueueID,
+                                        priority: claimed.message.Priority,
+                                        handler: claimed.message.Handler,
+                                        parameters: claimed.message.Parameters || {},
+                                        vNamespace: claimed.message.VNamespace,
+                                        createdAt: claimed.message.CreatedAt
+                                    },
+                                    lease: {
+                                        id: claimed.lease.ID,
+                                        queueMessageId: claimed.lease.QueueMessageID,
+                                        workerId: claimed.lease.WorkerID,
+                                        leaseUntil: claimed.lease.LeaseUntil
+                                    },
+                                    tenantCode: claimed.tenantCode
+                                });
+                            } catch (handlerError: any) {
+                                console.error('❌ Error in onMessage handler:', handlerError.message);
+                            }
                         }
-                        return;
-                    }
-
-                    if (response && response.knowledge !== "ok") {
-                        console.log(`⚠️ ClaimWork unexpected response:`, response);
                     }
                 });
+
+                call.on('error', (err: any) => {
+                    if (err.code === 16) { // UNAUTHENTICATED
+                        console.warn('🔄 Session expired (Error 16). Refreshing token...');
+                        this.token = null;
+                    } else if (err.code === 1) { // CANCELLED
+                        console.log('🚫 Stream cancelled');
+                    } else {
+                        console.error('❌ Stream error:', err.message);
+                    }
+                });
+
+                call.on('end', () => {
+                    console.log('🔌 Stream ended, will reconnect...');
+                });
+
+                // Function to send claim request
+                const sendClaimRequest = async () => {
+                    let currentInformation: Record<string, string> = {};
+                    if (typeof information === 'function') {
+                        currentInformation = await information();
+                    } else if (information) {
+                        currentInformation = information;
+                    }
+
+                    const request = {
+                        workerID: workerId,
+                        workerName: workerName,
+                        information: currentInformation,
+                        capacityPolicies: capacityPolicies
+                    };
+
+                    call.write(request, (err: any) => {
+                        if (err) {
+                            console.error('❌ Error sending claim request:', err.message);
+                        }
+                    });
+                };
+
+                // Send initial claim request
+                await sendClaimRequest();
+
+                // Send claim requests periodically
+                const claimInterval = setInterval(async () => {
+                    await sendClaimRequest();
+                }, intervalMs);
+
+                // Wait for stream to end
+                await new Promise<void>((resolve) => {
+                    call.on('end', () => {
+                        clearInterval(claimInterval);
+                        resolve();
+                    });
+                    call.on('error', () => {
+                        clearInterval(claimInterval);
+                        resolve();
+                    });
+                });
+
             } catch (err: any) {
                 console.error('❌ Unexpected error in worker loop:', err.message);
-            } finally {
-                setTimeout(run, intervalMs);
             }
+
+            // Reconnect after delay
+            console.log(`⏳ Reconnecting in ${intervalMs}ms...`);
+            setTimeout(run, intervalMs);
         };
 
         console.log(`🚀 Starting worker ${workerName} (${workerId}) with ${intervalMs}ms interval...`);

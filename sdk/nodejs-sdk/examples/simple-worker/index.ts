@@ -45,8 +45,8 @@ async function main() {
             }
         ],
         onMessage: (message) => {
-            console.log('👷 Processing message:', message.ID);
-            console.log('📝 Content:', message.Content);
+            console.log('👷 Processing message:', message);
+            console.log('📝 Content:', message);
             // Simulate processing
             return new Promise(resolve => setTimeout(resolve, 1000));
         }

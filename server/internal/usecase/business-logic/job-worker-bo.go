@@ -7,12 +7,20 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"deadalus-orch/server/internal/pkg/config"
 	job_worker_command "deadalus-orch/server/internal/usecase/command/job-worker"
+	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 )
+
+// ClaimedMessage holds a dequeued message along with its lease and tenant info
+type ClaimedMessage struct {
+	Message    models.QueueMessage
+	Lease      models.QueueMessageLease
+	TenantCode string
+}
 
 type JobWorkerBO struct {
 	Config     *common.ServerConfing
@@ -27,7 +35,7 @@ func NewJobWorkerBO(Config *common.ServerConfing) *JobWorkerBO {
 	}
 }
 
-func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerName string, Information map[string]string, ClaimWorkCapacityPolicies map[string]models.ClaimWorkCapacityPolicy) ([]models.QueueMessage, error) {
+func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerName string, Information map[string]string, ClaimWorkCapacityPolicies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) error {
 	// Upsert the JobWorker: update LastHeartbeat and TTL on every ClaimWork call
 	upsertCmd := &job_worker_command.UpsertJobWorkerCommand{
 		JobWorkers: []models.JobWorker{
@@ -51,7 +59,7 @@ func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerNam
 		"upsert job worker",
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to upsert job worker: %w", err)
+		return fmt.Errorf("failed to upsert job worker: %w", err)
 	}
 
 	// Check if a stopper is already running for this worker.
@@ -60,7 +68,7 @@ func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerNam
 	if bo.stoppers[workerId] {
 		bo.stoppersMu.Unlock()
 		bo.Config.Logger.Debug().Str("workerID", workerId).Msg("ClaimWork stopper already running, skipping")
-		return nil, nil
+		return nil
 	}
 	bo.stoppers[workerId] = true
 	bo.stoppersMu.Unlock()
@@ -68,15 +76,15 @@ func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerNam
 	// Launch a dedicated stopper goroutine for this worker.
 	// It will iterate all ClaimWorkCapacityPolicies, paginate tenants → vnamespaces → queues,
 	// and dequeue messages until all policies are satisfied or pagination is exhausted.
-	go bo.runClaimWorkStopper(workerId, ClaimWorkCapacityPolicies)
+	go bo.runClaimWorkStopper(workerId, ClaimWorkCapacityPolicies, messageChan)
 
-	return nil, nil
+	return nil
 }
 
 // runClaimWorkStopper is the goroutine that drives the claim-work process for a single JobWorker.
 // It terminates when all ClaimWorkCapacityPolicies are satisfied or all pagination is exhausted,
 // after which a subsequent ClaimWork call is allowed to spawn a new stopper.
-func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]models.ClaimWorkCapacityPolicy) {
+func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) {
 	// Always release the stopper slot when the goroutine exits so the next ClaimWork call
 	// can spawn a new one.
 	defer func() {
@@ -219,8 +227,8 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 									continue
 								}
 
-								// ── Placeholder: actual dequeue logic goes here ──
-								bo.dequeueMessagePlaceholder(stopperCtx, workerID, policyCode, &queue, &tenant, tenantNode, cf, cfs)
+								// ── Dequeue message ──
+								bo.dequeueMessage(stopperCtx, workerID, policyCode, &queue, &tenant, tenantNode, cf, cfs, messageChan)
 
 								claimedByPolicy[policyCode]++
 							}
@@ -247,21 +255,75 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 	}
 }
 
-// dequeueMessagePlaceholder is a stub for the real Dequeue operation (not yet implemented).
-func (bo *JobWorkerBO) dequeueMessagePlaceholder(
-	_ context.Context,
+// dequeueMessage dequeues a message from the queue and sends it through the channel.
+func (bo *JobWorkerBO) dequeueMessage(
+	ctx context.Context,
 	workerID, policyCode string,
 	queue *models.Queue,
 	tenant *models.TenantInMaster,
-	_ *dragonboat.RaftNode,
-	_, _ string,
+	tenantNode *dragonboat.RaftNode,
+	cf, cfs string,
+	messageChan chan<- ClaimedMessage,
 ) {
 	bo.Config.Logger.Debug().
 		Str("workerID", workerID).
 		Str("policyCode", policyCode).
 		Str("queueCode", queue.Code).
 		Str("tenant", tenant.Code).
-		Msg("📭 [PLACEHOLDER] Dequeue message from queue")
+		Msg("📭 Dequeuing message from queue")
+
+	// Crear el comando de dequeue
+	dequeueCmd := &queue_command.DequeueCommand{
+		QueueID:       queue.ID,
+		JobWorkerID:   workerID,
+		LeaseDuration: config.GlobalConfiguration.MessageLeaseDuration,
+		CF:            cf,
+		CFS:           cfs,
+	}
+
+	// Ejecutar el comando en el nodo de tenant correspondiente
+	result, err := dragonboat.ExecuteRepositoryCommand[queue_command.DequeueResult](
+		tenantNode,
+		ctx,
+		dequeueCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"dequeue message",
+	)
+
+	if err != nil {
+		bo.Config.Logger.Error().Err(err).
+			Str("workerID", workerID).
+			Str("queueCode", queue.Code).
+			Str("tenant", tenant.Code).
+			Msg("❌ Failed to dequeue message")
+		return
+	}
+
+	fmt.Printf("✅ Dequeued message:\n")
+	fmt.Printf("   Queue: %s (Tenant: %s)\n", queue.Code, tenant.Code)
+	fmt.Printf("   Message ID: %s\n", result.Message.ID)
+	fmt.Printf("   Priority: %d\n", result.Message.Priority)
+	fmt.Printf("   Content: %s\n", string(result.Message.Content))
+	fmt.Printf("   Parameters: %v\n", result.Message.Parameters)
+	fmt.Printf("   Handler: %v\n", result.Message.Handler)
+	fmt.Printf("   Lease ID: %s\n", result.Lease.ID)
+	fmt.Printf("   Lease Until: %s\n", result.Lease.LeaseUntil.Format(time.RFC3339))
+	fmt.Printf("   Worker: %s\n\n", workerID)
+
+	// Send the claimed message through the channel
+	claimedMsg := ClaimedMessage{
+		Message:    result.Message,
+		Lease:      result.Lease,
+		TenantCode: tenant.Code,
+	}
+
+	select {
+	case messageChan <- claimedMsg:
+		bo.Config.Logger.Debug().Str("messageID", result.Message.ID).Msg("📤 Sent message to stream")
+	default:
+		bo.Config.Logger.Warn().Str("messageID", result.Message.ID).Msg("⚠️ Message channel full or closed, message not sent")
+	}
 }
 
 // getJobWorkerTenantNode resolves the RaftNode that owns the given tenant's shard.
