@@ -44,6 +44,7 @@ message QueueMessage {
   map<string, string> Parameters = 9;
   string VNamespace = 10;
   string CreatedAt = 11;
+  int32 Attempts = 12;
 }
 
 message ClaimWorkRequest {

@@ -132,6 +132,7 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 				Headers:     claimed.Message.Headers,
 				QueueID:     claimed.Message.QueueID,
 				Priority:    int32(claimed.Message.Priority),
+				Attempts:    int32(claimed.Message.Attempts),
 				Handler:     claimed.Message.Handler,
 				Parameters:  claimed.Message.Parameters,
 				VNamespace:  claimed.Message.VNamespace,

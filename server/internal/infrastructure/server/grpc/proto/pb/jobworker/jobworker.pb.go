@@ -226,6 +226,7 @@ type QueueMessage struct {
 	Parameters    map[string]string      `protobuf:"bytes,9,rep,name=Parameters,proto3" json:"Parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	VNamespace    string                 `protobuf:"bytes,10,opt,name=VNamespace,proto3" json:"VNamespace,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,11,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	Attempts      int32                  `protobuf:"varint,12,opt,name=Attempts,proto3" json:"Attempts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -335,6 +336,13 @@ func (x *QueueMessage) GetCreatedAt() string {
 		return x.CreatedAt
 	}
 	return ""
+}
+
+func (x *QueueMessage) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
 }
 
 type ClaimWorkRequest struct {
@@ -787,7 +795,7 @@ const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto
 	"\x17ClaimWorkCapacityPolicy\x12*\n" +
 	"\x10maxQueueMessages\x18\x01 \x01(\x05R\x10maxQueueMessages\x122\n" +
 	"\x14currentQueueMessages\x18\x02 \x01(\x05R\x14currentQueueMessages\x12D\n" +
-	"\x0fclaimWorkFilter\x18\x03 \x01(\v2\x1a.jobworker.ClaimWorkFilterR\x0fclaimWorkFilter\"\x8a\x04\n" +
+	"\x0fclaimWorkFilter\x18\x03 \x01(\v2\x1a.jobworker.ClaimWorkFilterR\x0fclaimWorkFilter\"\xa6\x04\n" +
 	"\fQueueMessage\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x1c\n" +
 	"\tMessageID\x18\x02 \x01(\tR\tMessageID\x12\x18\n" +
@@ -804,7 +812,8 @@ const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto
 	"VNamespace\x18\n" +
 	" \x01(\tR\n" +
 	"VNamespace\x12\x1c\n" +
-	"\tCreatedAt\x18\v \x01(\tR\tCreatedAt\x1a:\n" +
+	"\tCreatedAt\x18\v \x01(\tR\tCreatedAt\x12\x1a\n" +
+	"\bAttempts\x18\f \x01(\x05R\bAttempts\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a=\n" +

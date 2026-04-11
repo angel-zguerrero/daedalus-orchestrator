@@ -11,6 +11,8 @@ type QueueMessage struct {
 	QueuePartitionID string
 	Priority         int
 
+	Attempts int
+
 	NextQueueMessageID string
 
 	Parameters map[string]string `orm:"data-only"`

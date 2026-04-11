@@ -216,6 +216,14 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		return *commandResult
 	}
 
+	// ── 6.5. increment message attempts counter ──────────────────────────────────
+
+	message.Attempts++
+	if _, err = queueMessageRepo.UpdateQueueMessage(message, now); err != nil {
+		commandResult.Error = fmt.Sprintf("failed to update message %s attempts: %s", message.ID, err.Error())
+		return *commandResult
+	}
+
 	// ── 7. create the lease ──────────────────────────────────────────────────────
 
 	leaseID := strings.ReplaceAll(message.ID+"-"+cmd.JobWorkerID, "-", "") // deterministic but unique per (message, worker)

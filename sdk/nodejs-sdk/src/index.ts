@@ -32,6 +32,7 @@ export interface QueueMessage {
     headers: Record<string, string>;
     queueId: string;
     priority: number;
+    attempts: number;
     handler: string;
     parameters: Record<string, string>;
     vNamespace: string;
@@ -208,6 +209,7 @@ export class DaedalusSDK {
                                         headers: claimed.message.Headers || {},
                                         queueId: claimed.message.QueueID,
                                         priority: claimed.message.Priority,
+                                        attempts: claimed.message.Attempts || 0,
                                         handler: claimed.message.Handler,
                                         parameters: claimed.message.Parameters || {},
                                         vNamespace: claimed.message.VNamespace,

@@ -85,6 +85,7 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		}
 
 		message.ContentLength = int64(len(message.Content))
+		message.Attempts = 0 // Initialize attempts counter
 
 		// Group messages by QueueID
 		if messagesByQueue[message.QueueID] == nil {
