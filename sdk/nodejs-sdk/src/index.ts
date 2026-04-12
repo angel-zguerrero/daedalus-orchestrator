@@ -20,7 +20,6 @@ export interface ClaimWorkFilter {
 
 export interface ClaimWorkCapacityPolicy {
     maxQueueMessages: number;
-    currentQueueMessages: number;
     claimWorkFilter?: ClaimWorkFilter;
 }
 
@@ -50,6 +49,7 @@ export interface ClaimedMessage {
     message: QueueMessage;
     lease: QueueMessageLease;
     tenantCode: string;
+    capacityPolicyIndexMatch: number;
 }
 
 export interface AckCallback {
@@ -178,6 +178,11 @@ export class DaedalusSDK {
 
         const workerId = `${crypto.randomUUID()}-${Date.now()}`;
 
+        // Track in-flight message counts per capacity policy index.
+        // Incremented when a message is received, decremented when ack'd.
+        // Sent to the server on every heartbeat so it can enforce per-policy limits.
+        const currentCounts = new Array(capacityPolicies.length).fill(0) as number[];
+
         const run = async () => {
             try {
                 if (!this.token) {
@@ -221,11 +226,22 @@ export class DaedalusSDK {
                                         workerId: claimed.lease.WorkerID,
                                         leaseUntil: claimed.lease.LeaseUntil
                                     },
-                                    tenantCode: claimed.tenantCode
+                                    tenantCode: claimed.tenantCode,
+                                    capacityPolicyIndexMatch: claimed.capacityPolicyIndexMatch || 0
                                 };
+
+                                // Increment the in-flight count for the matched policy
+                                const policyIdx = claimedMessage.capacityPolicyIndexMatch;
+                                if (policyIdx >= 0 && policyIdx < currentCounts.length) {
+                                    currentCounts[policyIdx]++;
+                                }
 
                                 const ackCallback: AckCallback = async () => {
                                     await this.ackMessage(claimed.lease.ID, claimed.tenantCode);
+                                    // Decrement the in-flight count after ack
+                                    if (policyIdx >= 0 && policyIdx < currentCounts.length) {
+                                        currentCounts[policyIdx] = Math.max(0, currentCounts[policyIdx] - 1);
+                                    }
                                 };
 
                                 await onMessage(claimedMessage, ackCallback);
@@ -264,7 +280,10 @@ export class DaedalusSDK {
                         workerID: workerId,
                         workerName: workerName,
                         information: currentInformation,
-                        capacityPolicies: capacityPolicies
+                        capacityPolicies: capacityPolicies.map((p, i) => ({
+                            ...p,
+                            currentQueueMessages: currentCounts[i] ?? 0
+                        }))
                     };
 
                     call.write(request, (err: any) => {

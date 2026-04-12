@@ -127,6 +127,12 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 			continue
 		}
 
+		// Derive the numeric index from the policy code ("policy-N" → N).
+		policyIndex := 0
+		fmt.Sscanf(policyCode, "policy-%d", &policyIndex)
+		fmt.Printf(":::: Processing policy %s (index %d): maxQueueMessages=%d, currently claimed=%d\n",
+			policyCode, policyIndex, policy.MaxQueueMessages, claimedByPolicy[policyCode])
+
 		filter := policy.ClaimWorkFilter
 
 		// ── Tenant pagination (DB-filtered) ───────────────────────────────────
@@ -228,7 +234,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 								}
 
 								// ── Dequeue message ──
-								bo.dequeueMessage(stopperCtx, workerID, policyCode, &queue, &tenant, tenantNode, cf, cfs, messageChan)
+								bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, &queue, &tenant, tenantNode, cf, cfs, messageChan)
 
 								claimedByPolicy[policyCode]++
 							}
@@ -259,26 +265,22 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 func (bo *JobWorkerBO) dequeueMessage(
 	ctx context.Context,
 	workerID, policyCode string,
+	policyIndex int,
 	queue *models.Queue,
 	tenant *models.TenantInMaster,
 	tenantNode *dragonboat.RaftNode,
 	cf, cfs string,
 	messageChan chan<- ClaimedMessage,
 ) {
-	bo.Config.Logger.Debug().
-		Str("workerID", workerID).
-		Str("policyCode", policyCode).
-		Str("queueCode", queue.Code).
-		Str("tenant", tenant.Code).
-		Msg("📭 Dequeuing message from queue")
 
 	// Crear el comando de dequeue
 	dequeueCmd := &queue_command.DequeueCommand{
-		QueueID:       queue.ID,
-		JobWorkerID:   workerID,
-		LeaseDuration: config.GlobalConfiguration.MessageLeaseDuration,
-		CF:            cf,
-		CFS:           cfs,
+		QueueID:                      queue.ID,
+		JobWorkerID:                  workerID,
+		LeaseDuration:                config.GlobalConfiguration.MessageLeaseDuration,
+		JobWorkerCapacityPolicyIndex: policyIndex,
+		CF:                           cf,
+		CFS:                          cfs,
 	}
 
 	// Ejecutar el comando en el nodo de tenant correspondiente
@@ -299,17 +301,6 @@ func (bo *JobWorkerBO) dequeueMessage(
 			Msg("❌ Failed to dequeue message")
 		return
 	}
-
-	fmt.Printf("✅ Dequeued message:\n")
-	fmt.Printf("   Queue: %s (Tenant: %s)\n", queue.Code, tenant.Code)
-	fmt.Printf("   Message ID: %s\n", result.Message.ID)
-	fmt.Printf("   Priority: %d\n", result.Message.Priority)
-	fmt.Printf("   Content: %s\n", string(result.Message.Content))
-	fmt.Printf("   Parameters: %v\n", result.Message.Parameters)
-	fmt.Printf("   Handler: %v\n", result.Message.Handler)
-	fmt.Printf("   Lease ID: %s\n", result.Lease.ID)
-	fmt.Printf("   Lease Until: %s\n", result.Lease.LeaseUntil.Format(time.RFC3339))
-	fmt.Printf("   Worker: %s\n\n", workerID)
 
 	// Send the claimed message through the channel
 	claimedMsg := ClaimedMessage{

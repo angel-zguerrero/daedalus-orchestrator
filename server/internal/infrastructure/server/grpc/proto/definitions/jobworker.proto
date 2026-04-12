@@ -69,6 +69,7 @@ message ClaimedQueueMessage {
   QueueMessage message = 1;
   QueueMessageLease lease = 2;
   string tenantCode = 3;
+  int32 capacityPolicyIndexMatch = 4;
 }
 
 message ClaimWorkStreamMessage {

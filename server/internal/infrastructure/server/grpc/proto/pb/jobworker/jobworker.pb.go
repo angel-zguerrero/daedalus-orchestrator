@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.4
-// source: internal/infrastructure/server/grpc/proto/definitions/jobworker.proto
+// source: jobworker.proto
 
 package jobworker
 
@@ -41,7 +41,7 @@ type ClaimWorkFilter struct {
 
 func (x *ClaimWorkFilter) Reset() {
 	*x = ClaimWorkFilter{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[0]
+	mi := &file_jobworker_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -53,7 +53,7 @@ func (x *ClaimWorkFilter) String() string {
 func (*ClaimWorkFilter) ProtoMessage() {}
 
 func (x *ClaimWorkFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[0]
+	mi := &file_jobworker_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -66,7 +66,7 @@ func (x *ClaimWorkFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimWorkFilter.ProtoReflect.Descriptor instead.
 func (*ClaimWorkFilter) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{0}
+	return file_jobworker_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ClaimWorkFilter) GetTenantCodes() []string {
@@ -164,7 +164,7 @@ type ClaimWorkCapacityPolicy struct {
 
 func (x *ClaimWorkCapacityPolicy) Reset() {
 	*x = ClaimWorkCapacityPolicy{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[1]
+	mi := &file_jobworker_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -176,7 +176,7 @@ func (x *ClaimWorkCapacityPolicy) String() string {
 func (*ClaimWorkCapacityPolicy) ProtoMessage() {}
 
 func (x *ClaimWorkCapacityPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[1]
+	mi := &file_jobworker_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -189,7 +189,7 @@ func (x *ClaimWorkCapacityPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimWorkCapacityPolicy.ProtoReflect.Descriptor instead.
 func (*ClaimWorkCapacityPolicy) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{1}
+	return file_jobworker_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ClaimWorkCapacityPolicy) GetMaxQueueMessages() int32 {
@@ -233,7 +233,7 @@ type QueueMessage struct {
 
 func (x *QueueMessage) Reset() {
 	*x = QueueMessage{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[2]
+	mi := &file_jobworker_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -245,7 +245,7 @@ func (x *QueueMessage) String() string {
 func (*QueueMessage) ProtoMessage() {}
 
 func (x *QueueMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[2]
+	mi := &file_jobworker_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -258,7 +258,7 @@ func (x *QueueMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueMessage.ProtoReflect.Descriptor instead.
 func (*QueueMessage) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{2}
+	return file_jobworker_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *QueueMessage) GetID() string {
@@ -357,7 +357,7 @@ type ClaimWorkRequest struct {
 
 func (x *ClaimWorkRequest) Reset() {
 	*x = ClaimWorkRequest{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[3]
+	mi := &file_jobworker_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -369,7 +369,7 @@ func (x *ClaimWorkRequest) String() string {
 func (*ClaimWorkRequest) ProtoMessage() {}
 
 func (x *ClaimWorkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[3]
+	mi := &file_jobworker_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -382,7 +382,7 @@ func (x *ClaimWorkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimWorkRequest.ProtoReflect.Descriptor instead.
 func (*ClaimWorkRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{3}
+	return file_jobworker_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ClaimWorkRequest) GetWorkerID() string {
@@ -422,7 +422,7 @@ type ClaimWorkResponse struct {
 
 func (x *ClaimWorkResponse) Reset() {
 	*x = ClaimWorkResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[4]
+	mi := &file_jobworker_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -434,7 +434,7 @@ func (x *ClaimWorkResponse) String() string {
 func (*ClaimWorkResponse) ProtoMessage() {}
 
 func (x *ClaimWorkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[4]
+	mi := &file_jobworker_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -447,7 +447,7 @@ func (x *ClaimWorkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimWorkResponse.ProtoReflect.Descriptor instead.
 func (*ClaimWorkResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{4}
+	return file_jobworker_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ClaimWorkResponse) GetKnowledge() string {
@@ -469,7 +469,7 @@ type QueueMessageLease struct {
 
 func (x *QueueMessageLease) Reset() {
 	*x = QueueMessageLease{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[5]
+	mi := &file_jobworker_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -481,7 +481,7 @@ func (x *QueueMessageLease) String() string {
 func (*QueueMessageLease) ProtoMessage() {}
 
 func (x *QueueMessageLease) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[5]
+	mi := &file_jobworker_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -494,7 +494,7 @@ func (x *QueueMessageLease) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueMessageLease.ProtoReflect.Descriptor instead.
 func (*QueueMessageLease) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{5}
+	return file_jobworker_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *QueueMessageLease) GetID() string {
@@ -526,17 +526,18 @@ func (x *QueueMessageLease) GetLeaseUntil() string {
 }
 
 type ClaimedQueueMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       *QueueMessage          `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Lease         *QueueMessageLease     `protobuf:"bytes,2,opt,name=lease,proto3" json:"lease,omitempty"`
-	TenantCode    string                 `protobuf:"bytes,3,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Message                  *QueueMessage          `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Lease                    *QueueMessageLease     `protobuf:"bytes,2,opt,name=lease,proto3" json:"lease,omitempty"`
+	TenantCode               string                 `protobuf:"bytes,3,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	CapacityPolicyIndexMatch int32                  `protobuf:"varint,4,opt,name=capacityPolicyIndexMatch,proto3" json:"capacityPolicyIndexMatch,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *ClaimedQueueMessage) Reset() {
 	*x = ClaimedQueueMessage{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[6]
+	mi := &file_jobworker_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +549,7 @@ func (x *ClaimedQueueMessage) String() string {
 func (*ClaimedQueueMessage) ProtoMessage() {}
 
 func (x *ClaimedQueueMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[6]
+	mi := &file_jobworker_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +562,7 @@ func (x *ClaimedQueueMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimedQueueMessage.ProtoReflect.Descriptor instead.
 func (*ClaimedQueueMessage) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{6}
+	return file_jobworker_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ClaimedQueueMessage) GetMessage() *QueueMessage {
@@ -585,6 +586,13 @@ func (x *ClaimedQueueMessage) GetTenantCode() string {
 	return ""
 }
 
+func (x *ClaimedQueueMessage) GetCapacityPolicyIndexMatch() int32 {
+	if x != nil {
+		return x.CapacityPolicyIndexMatch
+	}
+	return 0
+}
+
 type ClaimWorkStreamMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Message:
@@ -598,7 +606,7 @@ type ClaimWorkStreamMessage struct {
 
 func (x *ClaimWorkStreamMessage) Reset() {
 	*x = ClaimWorkStreamMessage{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[7]
+	mi := &file_jobworker_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -610,7 +618,7 @@ func (x *ClaimWorkStreamMessage) String() string {
 func (*ClaimWorkStreamMessage) ProtoMessage() {}
 
 func (x *ClaimWorkStreamMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[7]
+	mi := &file_jobworker_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -623,7 +631,7 @@ func (x *ClaimWorkStreamMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimWorkStreamMessage.ProtoReflect.Descriptor instead.
 func (*ClaimWorkStreamMessage) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{7}
+	return file_jobworker_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ClaimWorkStreamMessage) GetMessage() isClaimWorkStreamMessage_Message {
@@ -677,7 +685,7 @@ type AckMessageRequest struct {
 
 func (x *AckMessageRequest) Reset() {
 	*x = AckMessageRequest{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[8]
+	mi := &file_jobworker_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -689,7 +697,7 @@ func (x *AckMessageRequest) String() string {
 func (*AckMessageRequest) ProtoMessage() {}
 
 func (x *AckMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[8]
+	mi := &file_jobworker_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -702,7 +710,7 @@ func (x *AckMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckMessageRequest.ProtoReflect.Descriptor instead.
 func (*AckMessageRequest) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{8}
+	return file_jobworker_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AckMessageRequest) GetLeaseID() string {
@@ -729,7 +737,7 @@ type AckMessageResponse struct {
 
 func (x *AckMessageResponse) Reset() {
 	*x = AckMessageResponse{}
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[9]
+	mi := &file_jobworker_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -741,7 +749,7 @@ func (x *AckMessageResponse) String() string {
 func (*AckMessageResponse) ProtoMessage() {}
 
 func (x *AckMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[9]
+	mi := &file_jobworker_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -754,7 +762,7 @@ func (x *AckMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckMessageResponse.ProtoReflect.Descriptor instead.
 func (*AckMessageResponse) Descriptor() ([]byte, []int) {
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP(), []int{9}
+	return file_jobworker_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AckMessageResponse) GetSuccess() bool {
@@ -771,11 +779,11 @@ func (x *AckMessageResponse) GetMessage() string {
 	return ""
 }
 
-var File_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto protoreflect.FileDescriptor
+var File_jobworker_proto protoreflect.FileDescriptor
 
-const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc = "" +
+const file_jobworker_proto_rawDesc = "" +
 	"\n" +
-	"Einternal/infrastructure/server/grpc/proto/definitions/jobworker.proto\x12\tjobworker\"\xa9\x04\n" +
+	"\x0fjobworker.proto\x12\tjobworker\"\xa9\x04\n" +
 	"\x0fClaimWorkFilter\x12 \n" +
 	"\vtenantCodes\x18\x01 \x03(\tR\vtenantCodes\x12.\n" +
 	"\x12excludeTenantCodes\x18\x02 \x03(\tR\x12excludeTenantCodes\x12&\n" +
@@ -838,13 +846,14 @@ const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto
 	"\bWorkerID\x18\x03 \x01(\tR\bWorkerID\x12\x1e\n" +
 	"\n" +
 	"LeaseUntil\x18\x04 \x01(\tR\n" +
-	"LeaseUntil\"\x9c\x01\n" +
+	"LeaseUntil\"\xd8\x01\n" +
 	"\x13ClaimedQueueMessage\x121\n" +
 	"\amessage\x18\x01 \x01(\v2\x17.jobworker.QueueMessageR\amessage\x122\n" +
 	"\x05lease\x18\x02 \x01(\v2\x1c.jobworker.QueueMessageLeaseR\x05lease\x12\x1e\n" +
 	"\n" +
 	"tenantCode\x18\x03 \x01(\tR\n" +
-	"tenantCode\"\x9f\x01\n" +
+	"tenantCode\x12:\n" +
+	"\x18capacityPolicyIndexMatch\x18\x04 \x01(\x05R\x18capacityPolicyIndexMatch\"\x9f\x01\n" +
 	"\x16ClaimWorkStreamMessage\x120\n" +
 	"\x03ack\x18\x01 \x01(\v2\x1c.jobworker.ClaimWorkResponseH\x00R\x03ack\x12H\n" +
 	"\x0eclaimedMessage\x18\x02 \x01(\v2\x1e.jobworker.ClaimedQueueMessageH\x00R\x0eclaimedMessageB\t\n" +
@@ -863,19 +872,19 @@ const file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto
 	"AckMessage\x12\x1c.jobworker.AckMessageRequest\x1a\x1d.jobworker.AckMessageResponseB\x18Z\x16pb/jobworker;jobworkerb\x06proto3"
 
 var (
-	file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescOnce sync.Once
-	file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescData []byte
+	file_jobworker_proto_rawDescOnce sync.Once
+	file_jobworker_proto_rawDescData []byte
 )
 
-func file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescGZIP() []byte {
-	file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescOnce.Do(func() {
-		file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc)))
+func file_jobworker_proto_rawDescGZIP() []byte {
+	file_jobworker_proto_rawDescOnce.Do(func() {
+		file_jobworker_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_jobworker_proto_rawDesc), len(file_jobworker_proto_rawDesc)))
 	})
-	return file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDescData
+	return file_jobworker_proto_rawDescData
 }
 
-var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
-var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_goTypes = []any{
+var file_jobworker_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_jobworker_proto_goTypes = []any{
 	(*ClaimWorkFilter)(nil),         // 0: jobworker.ClaimWorkFilter
 	(*ClaimWorkCapacityPolicy)(nil), // 1: jobworker.ClaimWorkCapacityPolicy
 	(*QueueMessage)(nil),            // 2: jobworker.QueueMessage
@@ -890,7 +899,7 @@ var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_g
 	nil,                             // 11: jobworker.QueueMessage.ParametersEntry
 	nil,                             // 12: jobworker.ClaimWorkRequest.InformationEntry
 }
-var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_depIdxs = []int32{
+var file_jobworker_proto_depIdxs = []int32{
 	0,  // 0: jobworker.ClaimWorkCapacityPolicy.claimWorkFilter:type_name -> jobworker.ClaimWorkFilter
 	10, // 1: jobworker.QueueMessage.Headers:type_name -> jobworker.QueueMessage.HeadersEntry
 	11, // 2: jobworker.QueueMessage.Parameters:type_name -> jobworker.QueueMessage.ParametersEntry
@@ -911,12 +920,12 @@ var file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_d
 	0,  // [0:9] is the sub-list for field type_name
 }
 
-func init() { file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_init() }
-func file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_init() {
-	if File_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto != nil {
+func init() { file_jobworker_proto_init() }
+func file_jobworker_proto_init() {
+	if File_jobworker_proto != nil {
 		return
 	}
-	file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes[7].OneofWrappers = []any{
+	file_jobworker_proto_msgTypes[7].OneofWrappers = []any{
 		(*ClaimWorkStreamMessage_Ack)(nil),
 		(*ClaimWorkStreamMessage_ClaimedMessage)(nil),
 	}
@@ -924,17 +933,17 @@ func file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc), len(file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobworker_proto_rawDesc), len(file_jobworker_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_goTypes,
-		DependencyIndexes: file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_depIdxs,
-		MessageInfos:      file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_msgTypes,
+		GoTypes:           file_jobworker_proto_goTypes,
+		DependencyIndexes: file_jobworker_proto_depIdxs,
+		MessageInfos:      file_jobworker_proto_msgTypes,
 	}.Build()
-	File_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto = out.File
-	file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_goTypes = nil
-	file_internal_infrastructure_server_grpc_proto_definitions_jobworker_proto_depIdxs = nil
+	File_jobworker_proto = out.File
+	file_jobworker_proto_goTypes = nil
+	file_jobworker_proto_depIdxs = nil
 }

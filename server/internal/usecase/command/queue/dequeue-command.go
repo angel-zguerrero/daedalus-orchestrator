@@ -34,8 +34,12 @@ type DequeueCommand struct {
 	// LeaseDuration defines how long the lease is valid. Calculated by the BO
 	// layer from config.GlobalConfiguration.MessageLeaseDuration.
 	LeaseDuration time.Duration
-	CF            string
-	CFS           string
+	// JobWorkerCapacityPolicyIndex is the index of the capacity policy (from the
+	// worker's capacityPolicies slice) that matched when this dequeue was triggered.
+	// Stored in the lease so the SDK can update its per-policy in-flight counter.
+	JobWorkerCapacityPolicyIndex int
+	CF                           string
+	CFS                          string
 }
 
 func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -228,11 +232,12 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 
 	leaseID := strings.ReplaceAll(message.ID+"-"+cmd.JobWorkerID, "-", "") // deterministic but unique per (message, worker)
 	lease := &models.QueueMessageLease{
-		ID:             leaseID,
-		QueueMessageID: message.ID,
-		WorkerID:       cmd.JobWorkerID,
-		LeaseStatus:    models.QueueMessageLeaseStatusActive,
-		LeaseUntil:     now.Add(cmd.LeaseDuration),
+		ID:                                leaseID,
+		QueueMessageID:                    message.ID,
+		WorkerID:                          cmd.JobWorkerID,
+		LeaseStatus:                       models.QueueMessageLeaseStatusActive,
+		LeaseUntil:                        now.Add(cmd.LeaseDuration),
+		JobWorkerCapacityPolicyIndexMatch: cmd.JobWorkerCapacityPolicyIndex,
 	}
 
 	if _, err = leaseRepo.CreateQueueMessageLease(lease, now); err != nil {

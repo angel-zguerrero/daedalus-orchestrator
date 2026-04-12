@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v6.33.4
-// source: internal/infrastructure/server/grpc/proto/definitions/jobworker.proto
+// source: jobworker.proto
 
 package jobworker
 
@@ -150,5 +150,5 @@ var JobWorkerService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "internal/infrastructure/server/grpc/proto/definitions/jobworker.proto",
+	Metadata: "jobworker.proto",
 }

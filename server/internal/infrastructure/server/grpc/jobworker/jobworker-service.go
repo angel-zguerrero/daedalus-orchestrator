@@ -147,9 +147,10 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 			}
 
 			claimedMsgProto := &pb.ClaimedQueueMessage{
-				Message:    pbMsg,
-				Lease:      pbLease,
-				TenantCode: claimed.TenantCode,
+				Message:                  pbMsg,
+				Lease:                    pbLease,
+				TenantCode:               claimed.TenantCode,
+				CapacityPolicyIndexMatch: int32(claimed.Lease.JobWorkerCapacityPolicyIndexMatch),
 			}
 
 			streamMsg := &pb.ClaimWorkStreamMessage{
@@ -180,11 +181,6 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 }
 
 func (s *JobWorkerService) AckMessage(ctx context.Context, req *pb.AckMessageRequest) (*pb.AckMessageResponse, error) {
-	s.Config.Logger.Debug().
-		Str("leaseID", req.LeaseID).
-		Str("tenantCode", req.TenantCode).
-		Msg("Received AckMessage request")
-
 	err := s.JobWorkerBO.AckMessage(ctx, req.LeaseID, req.TenantCode)
 	if err != nil {
 		s.Config.Logger.Error().Err(err).Msg("Failed to ack message")
