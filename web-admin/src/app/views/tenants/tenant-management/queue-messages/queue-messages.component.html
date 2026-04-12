@@ -117,67 +117,107 @@
 <!-- Message Details Modal -->
 <c-modal [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
   <c-modal-header>
-    <h5 cModalTitle>Message Details</h5>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-inbox" class="me-2"></svg>
+      Message Details
+    </h5>
+    <button (click)="detailsModalVisible = false" cButtonClose></button>
   </c-modal-header>
   <c-modal-body *ngIf="selectedMessage">
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>ID</strong></c-col>
-      <c-col [sm]="8"><code>{{ selectedMessage.ID }}</code></c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Message ID</strong></c-col>
-      <c-col [sm]="8"><code>{{ selectedMessage.MessageID }}</code></c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Queue ID</strong></c-col>
-      <c-col [sm]="8"><code>{{ selectedMessage.QueueID }}</code></c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Handler</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.Handler || '-' }}</c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Priority</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.Priority }}</c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Attempts</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.Attempts }}</c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>VNamespace</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.VNamespace || '-' }}</c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Content Type</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.ContentType || '-' }}</c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Content Length</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.ContentLength }} bytes</c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Content</strong></c-col>
-      <c-col [sm]="8">
-        <pre class="bg-light p-2 rounded" style="white-space: pre-wrap; word-break: break-all; font-size: 0.8em; max-height: 200px; overflow-y: auto;">{{ selectedMessage.Content || '-' }}</pre>
-      </c-col>
-    </c-row>
-    <c-row class="mb-2" *ngIf="selectedMessage.Parameters && getObjectKeys(selectedMessage.Parameters).length > 0">
-      <c-col [sm]="4"><strong>Parameters</strong></c-col>
-      <c-col [sm]="8">
-        <div *ngFor="let key of getObjectKeys(selectedMessage.Parameters)" class="mb-1">
-          <code>{{ key }}</code>: {{ selectedMessage.Parameters[key] }}
+
+    <div class="row">
+      <!-- Left column -->
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">ID</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedMessage.ID }}</code>
+          </div>
+          <div class="form-text">Internal unique identifier</div>
         </div>
-      </c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Created At</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.CreatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</c-col>
-    </c-row>
-    <c-row class="mb-2">
-      <c-col [sm]="4"><strong>Updated At</strong></c-col>
-      <c-col [sm]="8">{{ selectedMessage.UpdatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</c-col>
-    </c-row>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Message ID</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedMessage.MessageID }}</code>
+          </div>
+          <div class="form-text">Business message identifier</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Queue ID</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedMessage.QueueID }}</code>
+          </div>
+          <div class="form-text">Parent queue identifier</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Handler</label>
+          <div class="p-2 bg-dark rounded">{{ selectedMessage.Handler || '-' }}</div>
+          <div class="form-text">Worker handler responsible for processing</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Priority</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge color="secondary" shape="rounded-pill">{{ selectedMessage.Priority }}</c-badge>
+          </div>
+          <div class="form-text">Message priority level</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Attempts</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="selectedMessage.Attempts > 1 ? 'warning' : 'success'" shape="rounded-pill">
+              {{ selectedMessage.Attempts }}
+            </c-badge>
+          </div>
+          <div class="form-text">Number of processing attempts so far</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">VNamespace</label>
+          <div class="p-2 bg-dark rounded">{{ selectedMessage.VNamespace || '-' }}</div>
+          <div class="form-text">Virtual namespace for logical grouping</div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Content Type</label>
+          <div class="p-2 bg-dark rounded">{{ selectedMessage.ContentType || '-' }}</div>
+          <div class="form-text">MIME type of the message body</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Content Length</label>
+          <div class="p-2 bg-dark rounded">{{ selectedMessage.ContentLength }} bytes</div>
+          <div class="form-text">Size of the message content in bytes</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Content</label>
+          <div class="p-2 bg-dark rounded">
+            <pre style="white-space: pre-wrap; word-break: break-all; font-size: 0.8em; max-height: 180px; overflow-y: auto; margin: 0; color: inherit;">{{ selectedMessage.Content || '-' }}</pre>
+          </div>
+          <div class="form-text">Raw message body</div>
+        </div>
+        <div class="mb-3" *ngIf="selectedMessage.Parameters && getObjectKeys(selectedMessage.Parameters).length > 0">
+          <label class="form-label fw-bold">Parameters</label>
+          <div class="p-2 bg-dark rounded">
+            <div *ngFor="let key of getObjectKeys(selectedMessage.Parameters)" class="mb-1">
+              <code>{{ key }}</code>: {{ selectedMessage.Parameters[key] }}
+            </div>
+          </div>
+          <div class="form-text">Custom key-value parameters attached to the message</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Created At</label>
+          <div class="p-2 bg-dark rounded">{{ selectedMessage.CreatedAt | date:'full' }}</div>
+          <div class="form-text">Message creation timestamp</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Updated At</label>
+          <div class="p-2 bg-dark rounded">{{ selectedMessage.UpdatedAt | date:'full' }}</div>
+          <div class="form-text">Last modification timestamp</div>
+        </div>
+      </div>
+    </div>
+
   </c-modal-body>
   <c-modal-footer>
     <button cButton color="secondary" (click)="detailsModalVisible = false">Close</button>
