@@ -202,6 +202,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return ackMessageCommand.Execute(uow, now)
 	}
 
+	processExpiredLeasesCommand, ok := cmd.(queue_command.ProcessExpiredLeasesCommand)
+	if ok {
+		return processExpiredLeasesCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult

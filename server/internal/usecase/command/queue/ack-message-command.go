@@ -59,6 +59,12 @@ func (cmd *AckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) command
 		return *commandResult
 	}
 
+	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// ── 1. load lease ────────────────────────────────────────────────────────────
 
 	lease, err := leaseRepo.GetQueueMessageLeaseByID(cmd.LeaseID, now)
@@ -127,7 +133,15 @@ func (cmd *AckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) command
 		return *commandResult
 	}
 
-	// ── 7. return result ─────────────────────────────────────────────────────────
+	// ── 7. update tenant summary ─────────────────────────────────────────────────
+
+	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, -1, 0, 0, 0, now)
+	if err != nil {
+		commandResult.Error = fmt.Sprintf("failed to update tenant summary: %s", err.Error())
+		return *commandResult
+	}
+
+	// ── 8. return result ─────────────────────────────────────────────────────────
 
 	commandResult.Result = AckMessageResult{
 		Success: true,

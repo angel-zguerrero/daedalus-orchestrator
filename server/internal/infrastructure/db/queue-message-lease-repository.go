@@ -52,3 +52,22 @@ func (r *QueueMessageLeaseRepository) GetQueueMessageLeaseByMessageID(queueMessa
 func (r *QueueMessageLeaseRepository) UpdateQueueMessageLease(input *models.QueueMessageLease, now time.Time) (bool, error) {
 	return r.Update(input, now)
 }
+
+// FindExpiredLeases retrieves leases that have expired (LeaseUntil < now).
+// Only returns active leases that have not yet been marked as expired.
+// Results are paginated for efficient processing.
+func (r *QueueMessageLeaseRepository) FindExpiredLeases(limit int, offset int, now time.Time) (*FindResult[models.QueueMessageLease], error) {
+	query := fmt.Sprintf("LeaseStatus = '%s' & LeaseUntil < '%s'", models.QueueMessageLeaseStatusActive, now)
+
+	// For pagination with offset, we'll need to fetch limit + offset records and skip the first offset
+	// This is a limitation of the current Find implementation
+	result, err := r.Find(query, limit, "", now)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FindResult[models.QueueMessageLease]{
+		Entities: result.Entities,
+		Cursor:   result.Cursor,
+	}, nil
+}
