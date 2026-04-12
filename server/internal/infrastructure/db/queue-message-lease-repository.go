@@ -53,6 +53,22 @@ func (r *QueueMessageLeaseRepository) UpdateQueueMessageLease(input *models.Queu
 	return r.Update(input, now)
 }
 
+// FindLeasesByQueueMessageIDs fetches the most recent lease for each given message ID
+// and returns them as a map keyed by QueueMessageID.
+func (r *QueueMessageLeaseRepository) FindLeasesByQueueMessageIDs(messageIDs []string, now time.Time) (map[string]*models.QueueMessageLease, error) {
+	result := make(map[string]*models.QueueMessageLease, len(messageIDs))
+	for _, id := range messageIDs {
+		lease, err := r.GetQueueMessageLeaseByMessageID(id, now)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch lease for message %s: %w", id, err)
+		}
+		if lease != nil {
+			result[id] = lease
+		}
+	}
+	return result, nil
+}
+
 // FindExpiredLeases retrieves leases that have expired (LeaseUntil < now).
 // Only returns active leases that have not yet been marked as expired.
 // Results are paginated for efficient processing.

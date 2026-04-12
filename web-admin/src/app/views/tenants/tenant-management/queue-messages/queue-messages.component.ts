@@ -16,6 +16,13 @@ import { IconDirective } from '@coreui/icons-angular';
 import { QueueMessagesService } from '../services/queue-messages.service';
 import { ErrorUtil } from '../../../../shared/utils/error.util';
 
+interface QueueMessageLease {
+  ID: string;
+  WorkerID: string;
+  LeaseStatus: string;
+  LeaseUntil: string;
+}
+
 interface QueueMessage {
   ID: string;
   MessageID: string;
@@ -31,6 +38,7 @@ interface QueueMessage {
   VNamespace: string;
   CreatedAt: string;
   UpdatedAt: string;
+  Lease: QueueMessageLease | null;
 }
 
 @Component({
@@ -163,5 +171,18 @@ export class QueueMessagesComponent implements OnInit {
   truncateContent(content: string, maxLength: number = 80): string {
     if (!content) return '-';
     return content.length > maxLength ? content.substring(0, maxLength) + '…' : content;
+  }
+
+  getLeaseStatusColor(status: string): string {
+    switch (status) {
+      case 'active':   return 'warning';
+      case 'released': return 'success';
+      case 'expired':  return 'danger';
+      default:         return 'secondary';
+    }
+  }
+
+  isLeaseExpired(lease: QueueMessageLease): boolean {
+    return new Date(lease.LeaseUntil) < new Date();
   }
 }

@@ -37,7 +37,7 @@
 
         <!-- Table -->
         <div class="table-responsive" *ngIf="!loading">
-          <table cTable [hover]="true" class="mt-2" style="min-width: 900px;">
+          <table cTable [hover]="true" class="mt-2" style="min-width: 1050px;">
             <thead>
               <tr>
                 <th style="min-width: 120px;">Message ID</th>
@@ -47,6 +47,7 @@
                 <th style="min-width: 110px;">Content Type</th>
                 <th style="min-width: 200px;">Content</th>
                 <th style="min-width: 120px;">VNamespace</th>
+                <th style="min-width: 140px;">Lease</th>
                 <th style="min-width: 150px;">Created At</th>
                 <th style="min-width: 80px;">Actions</th>
               </tr>
@@ -76,6 +77,17 @@
                 <td class="text-truncate" style="max-width: 120px;" title="{{ msg.VNamespace || '-' }}">
                   {{ msg.VNamespace || '-' }}
                 </td>
+                <td>
+                  <ng-container *ngIf="msg.Lease; else noLease">
+                    <c-badge [color]="getLeaseStatusColor(msg.Lease.LeaseStatus)" shape="rounded-pill"
+                      [title]="'Until: ' + (msg.Lease.LeaseUntil | date:'yyyy-MM-dd HH:mm:ss') + ' · Worker: ' + msg.Lease.WorkerID">
+                      {{ msg.Lease.LeaseStatus }}
+                    </c-badge>
+                  </ng-container>
+                  <ng-template #noLease>
+                    <span class="text-muted" style="font-size: 0.8em;">—</span>
+                  </ng-template>
+                </td>
                 <td style="white-space: nowrap; font-size: 0.85em;">
                   {{ msg.CreatedAt | date:'yyyy-MM-dd HH:mm:ss' }}
                 </td>
@@ -86,7 +98,7 @@
                 </td>
               </tr>
               <tr *ngIf="messages.length === 0">
-                <td colspan="9" class="text-center py-5">
+                <td colspan="10" class="text-center py-5">
                   <div class="text-muted">
                     <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                     <h6>No messages found</h6>
@@ -205,6 +217,48 @@
           </div>
           <div class="form-text">Custom key-value parameters attached to the message</div>
         </div>
+
+        <!-- Lease section -->
+        <div class="mb-3">
+          <hr>
+          <h6 class="mb-3">
+            <svg cIcon name="cil-lock-locked" class="me-2"></svg>
+            Lease Information
+          </h6>
+          <ng-container *ngIf="selectedMessage.Lease; else noLeaseDetail">
+            <div class="mb-2">
+              <label class="form-label fw-bold">Lease ID</label>
+              <div class="p-2 bg-dark rounded"><code>{{ selectedMessage.Lease.ID }}</code></div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label fw-bold">Worker ID</label>
+              <div class="p-2 bg-dark rounded"><code>{{ selectedMessage.Lease.WorkerID }}</code></div>
+              <div class="form-text">Job Worker that holds the lease</div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label fw-bold">Status</label>
+              <div class="p-2 bg-dark rounded">
+                <c-badge [color]="getLeaseStatusColor(selectedMessage.Lease.LeaseStatus)" shape="rounded-pill">
+                  {{ selectedMessage.Lease.LeaseStatus }}
+                </c-badge>
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label fw-bold">Lease Until</label>
+              <div class="p-2 bg-dark rounded">
+                {{ selectedMessage.Lease.LeaseUntil | date:'full' }}
+                <c-badge *ngIf="isLeaseExpired(selectedMessage.Lease)" color="danger" shape="rounded-pill" class="ms-2">
+                  Expired
+                </c-badge>
+              </div>
+              <div class="form-text">Lease expiration timestamp</div>
+            </div>
+          </ng-container>
+          <ng-template #noLeaseDetail>
+            <div class="p-2 bg-dark rounded text-muted">No lease associated with this message</div>
+          </ng-template>
+        </div>
+
         <div class="mb-3">
           <label class="form-label fw-bold">Created At</label>
           <div class="p-2 bg-dark rounded">{{ selectedMessage.CreatedAt | date:'full' }}</div>

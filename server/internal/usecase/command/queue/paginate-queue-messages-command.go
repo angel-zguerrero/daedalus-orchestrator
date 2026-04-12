@@ -11,6 +11,14 @@ import (
 func init() {
 	gob.Register(PaginateQueueMessagesCommand{})
 	gob.Register(db.FindResult[models.QueueMessage]{})
+	gob.Register(QueueMessageWithLease{})
+	gob.Register(db.FindResult[QueueMessageWithLease]{})
+}
+
+// QueueMessageWithLease pairs a queue message with its most recent lease (nil if none).
+type QueueMessageWithLease struct {
+	Message models.QueueMessage
+	Lease   *models.QueueMessageLease
 }
 
 type PaginateQueueMessagesCommand struct {
@@ -25,6 +33,7 @@ func (cmd *PaginateQueueMessagesCommand) Execute(uow *db.UnitOfWork, now time.Ti
 	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
+
 	queueMessageRepo, err := db.NewQueueMessageRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -41,6 +50,36 @@ func (cmd *PaginateQueueMessagesCommand) Execute(uow *db.UnitOfWork, now time.Ti
 		findResult.Entities = []models.QueueMessage{}
 	}
 
-	commandResult.Result = *findResult
+	leaseRepo, err := db.NewQueueMessageLeaseRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	// Collect message IDs for batch lease lookup
+	messageIDs := make([]string, len(findResult.Entities))
+	for i, msg := range findResult.Entities {
+		messageIDs[i] = msg.ID
+	}
+
+	leasesMap, err := leaseRepo.FindLeasesByQueueMessageIDs(messageIDs, now)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	// Combine messages with their leases
+	combined := make([]QueueMessageWithLease, len(findResult.Entities))
+	for i, msg := range findResult.Entities {
+		combined[i] = QueueMessageWithLease{
+			Message: msg,
+			Lease:   leasesMap[msg.ID],
+		}
+	}
+
+	commandResult.Result = db.FindResult[QueueMessageWithLease]{
+		Entities: combined,
+		Cursor:   findResult.Cursor,
+	}
 	return *commandResult
 }

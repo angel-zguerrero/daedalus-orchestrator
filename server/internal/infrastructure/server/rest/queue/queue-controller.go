@@ -325,6 +325,13 @@ func isValidQueueType(queueType string) bool {
 	}
 }
 
+type leaseResponse struct {
+	ID          string    `json:"ID"`
+	WorkerID    string    `json:"WorkerID"`
+	LeaseStatus string    `json:"LeaseStatus"`
+	LeaseUntil  time.Time `json:"LeaseUntil"`
+}
+
 type queueMessageResponse struct {
 	ID               string            `json:"ID"`
 	MessageID        string            `json:"MessageID"`
@@ -340,6 +347,7 @@ type queueMessageResponse struct {
 	VNamespace       string            `json:"VNamespace"`
 	CreatedAt        time.Time         `json:"CreatedAt"`
 	UpdatedAt        time.Time         `json:"UpdatedAt"`
+	Lease            *leaseResponse    `json:"Lease"`
 }
 
 type queueMessagesPageResponse struct {
@@ -369,8 +377,9 @@ func (ctrl *QueueController) GetQueueMessagesHandler(c *gin.Context) {
 	}
 
 	responses := make([]queueMessageResponse, len(findResult.Entities))
-	for i, msg := range findResult.Entities {
-		responses[i] = queueMessageResponse{
+	for i, item := range findResult.Entities {
+		msg := item.Message
+		resp := queueMessageResponse{
 			ID:               msg.ID,
 			MessageID:        msg.MessageID,
 			QueueID:          msg.QueueID,
@@ -386,6 +395,15 @@ func (ctrl *QueueController) GetQueueMessagesHandler(c *gin.Context) {
 			CreatedAt:        msg.CreatedAt,
 			UpdatedAt:        msg.UpdatedAt,
 		}
+		if item.Lease != nil {
+			resp.Lease = &leaseResponse{
+				ID:          item.Lease.ID,
+				WorkerID:    item.Lease.WorkerID,
+				LeaseStatus: string(item.Lease.LeaseStatus),
+				LeaseUntil:  item.Lease.LeaseUntil,
+			}
+		}
+		responses[i] = resp
 	}
 
 	c.JSON(http.StatusOK, gin.H{

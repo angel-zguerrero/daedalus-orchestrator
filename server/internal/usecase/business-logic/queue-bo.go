@@ -492,10 +492,10 @@ func (bo *QueueBO) batchPopulateSupervisorFields(ctx context.Context, queues []m
 // where MessageLeaseDuration follows the same precedence as all other configuration
 // values: command-line flag > environment variable (MESSAGE_LEASE_DURATION) >
 // configuration file (message_lease_duration key, in seconds) > built-in default (30 s).
-func (bo *QueueBO) GetQueueMessages(ctx context.Context, queueCode, vnamespace string, cursor string, pageSize int, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.QueueMessage], error) {
+func (bo *QueueBO) GetQueueMessages(ctx context.Context, queueCode, vnamespace string, cursor string, pageSize int, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[queue_command.QueueMessageWithLease], error) {
 	queue, err := bo.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs, tenant, tenantNode)
 	if err != nil {
-		return db.FindResult[models.QueueMessage]{}, fmt.Errorf("failed to get queue: %w", err)
+		return db.FindResult[queue_command.QueueMessageWithLease]{}, fmt.Errorf("failed to get queue: %w", err)
 	}
 
 	paginateCmd := &queue_command.PaginateQueueMessagesCommand{
@@ -506,7 +506,7 @@ func (bo *QueueBO) GetQueueMessages(ctx context.Context, queueCode, vnamespace s
 		CFS:      cfs,
 	}
 
-	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.QueueMessage]](
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[queue_command.QueueMessageWithLease]](
 		tenantNode,
 		ctx,
 		paginateCmd,
@@ -515,11 +515,11 @@ func (bo *QueueBO) GetQueueMessages(ctx context.Context, queueCode, vnamespace s
 		"paginate queue messages",
 	)
 	if err != nil {
-		return db.FindResult[models.QueueMessage]{}, fmt.Errorf("paginate queue messages failed: %w", err)
+		return db.FindResult[queue_command.QueueMessageWithLease]{}, fmt.Errorf("paginate queue messages failed: %w", err)
 	}
 
 	if findResult.Entities == nil {
-		findResult.Entities = []models.QueueMessage{}
+		findResult.Entities = []queue_command.QueueMessageWithLease{}
 	}
 
 	return findResult, nil
