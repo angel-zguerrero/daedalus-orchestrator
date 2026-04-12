@@ -34,22 +34,25 @@ async function main() {
 
     await daedalusSDK.createWorker({
         workerName: 'Simple Node.js Worker 2',
-        intervalMs: 10000,
+        intervalMs: 500,
         information: getSystemInfo,
         capacityPolicies: [
             {
                 maxQueueMessages: 10,
-                currentQueueMessages: 0,
                 claimWorkFilter: {
-                    tenantCodes: ['default']
                 }
             }
         ],
-        onMessage: (message) => {
-            console.log('👷 Processing message:', message.ID);
-            console.log('📝 Content:', message.Content);
+        onMessage: async (message, ack) => {
+            console.log('👷 Processing message:', message);
+            console.log('📝 Content:', message);
+            
             // Simulate processing
-            return new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
+            // Acknowledge the message after processing
+            console.log('✅ Message processed, sending ACK...');
+            await ack();
         }
     });
 

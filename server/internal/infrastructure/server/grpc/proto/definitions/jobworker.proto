@@ -5,7 +5,8 @@ package jobworker;
 option go_package = "pb/jobworker;jobworker";
 
 service JobWorkerService {
-  rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
+  rpc ClaimWork(stream ClaimWorkRequest) returns (stream ClaimWorkStreamMessage);
+  rpc AckMessage(AckMessageRequest) returns (AckMessageResponse);
 }
 
 message ClaimWorkFilter {
@@ -43,6 +44,7 @@ message QueueMessage {
   map<string, string> Parameters = 9;
   string VNamespace = 10;
   string CreatedAt = 11;
+  int32 Attempts = 12;
 }
 
 message ClaimWorkRequest {
@@ -54,6 +56,37 @@ message ClaimWorkRequest {
 
 message ClaimWorkResponse {
   string knowledge = 1;
+}
+
+message QueueMessageLease {
+  string ID = 1;
+  string QueueMessageID = 2;
+  string WorkerID = 3;
+  string LeaseUntil = 4;
+}
+
+message ClaimedQueueMessage {
+  QueueMessage message = 1;
+  QueueMessageLease lease = 2;
+  string tenantCode = 3;
+  int32 capacityPolicyIndexMatch = 4;
+}
+
+message ClaimWorkStreamMessage {
+  oneof message {
+    ClaimWorkResponse ack = 1;
+    ClaimedQueueMessage claimedMessage = 2;
+  }
+}
+
+message AckMessageRequest {
+  string leaseID = 1;
+  string tenantCode = 2;
+}
+
+message AckMessageResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/jobworker.proto

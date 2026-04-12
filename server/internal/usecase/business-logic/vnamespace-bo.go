@@ -48,3 +48,34 @@ func (bo *VNamespaceBO) GetVNamespaces(ctx context.Context, q string, cursor str
 
 	return findResult, nil
 }
+
+// GetVNamespacesWithFilter paginates vnamespaces using DB-level filter rules derived from a
+// ClaimWorkFilter. Inclusion lists, exact exclusions, and LIKE patterns are pushed to the
+// repository; ExcludeVNamespacePatterns are applied in memory inside the repository.
+func (bo *VNamespaceBO) GetVNamespacesWithFilter(ctx context.Context, filter models.ClaimWorkFilter, cursor string, pageSize int, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.VNamespace], error) {
+	cmd := &vnamespace_command.PaginateVNamespacesWithFilterCommand{
+		Filter:   filter,
+		Cursor:   cursor,
+		PageSize: pageSize,
+		CF:       cf,
+		CFS:      cfs,
+	}
+
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.VNamespace]](
+		tenantNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate vnamespaces with filter",
+	)
+	if err != nil {
+		return db.FindResult[models.VNamespace]{}, fmt.Errorf("paginate vnamespaces with filter failed: %w", err)
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.VNamespace{}
+	}
+
+	return findResult, nil
+}

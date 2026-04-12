@@ -49,6 +49,15 @@ func (r *TenantInMasterRepository) PaginateTenant(q string, pageSize int, cursor
 	}
 }
 
+// PaginateWithClaimWorkFilter paginates tenants applying the DB-level rules derived from the
+// ClaimWorkFilter. Inclusion lists, exact exclusions, and NOT LIKE pattern exclusions are all
+// pushed to the DB query.
+func (r *TenantInMasterRepository) PaginateWithClaimWorkFilter(f models.ClaimWorkFilter, pageSize int, cursor string, now time.Time) (*FindResult[models.TenantInMaster], error) {
+	fq := BuildTenantFilterQuery(f)
+
+	return r.repo.Find(fq.DBQuery, pageSize, cursor, now)
+}
+
 func (r *TenantInMasterRepository) DeleteTenantInMasterByCode(code string, now time.Time) (bool, error) {
 	rootTenantInMaster, err := r.repo.FindByField("Code", code, now)
 	if err != nil || rootTenantInMaster == nil {

@@ -15,6 +15,11 @@ type QueueMessageLease struct {
 	QueueMessageID string
 	WorkerID       string
 	LeaseStatus    QueueMessageLeaseStatus
-	LeaseUntil     time.Time `orm:"data-only"`
-	TTL            int64     `orm:"ttl"`
+	LeaseUntil     time.Time
+
+	JobWorkerCapacityPolicyIndexMatch int // Index of the capacity policy that matched when the lease was created, used for worker capacity management and scheduling decisions.
+}
+
+func (QueueMessageLease) TableName() string {
+	return "queue_message_leases"
 }

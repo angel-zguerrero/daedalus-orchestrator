@@ -254,6 +254,39 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 	return findResult, nil
 }
 
+// GetQueuesWithFilter paginates queues using DB-level filter rules derived from a ClaimWorkFilter.
+// Only queues with MessagesCount > 0 are returned. The vNamespace filter and exact code
+// exclusions are pushed to the repository; ExcludeQueuePatterns are applied in memory inside
+// the repository.
+func (bo *QueueBO) GetQueuesWithFilter(ctx context.Context, filter models.ClaimWorkFilter, cursor string, pageSize int, vNamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Queue], error) {
+	cmd := &queue_command.PaginateQueuesWithFilterCommand{
+		Filter:     filter,
+		VNamespace: vNamespace,
+		Cursor:     cursor,
+		PageSize:   pageSize,
+		CF:         cf,
+		CFS:        cfs,
+	}
+
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Queue]](
+		tenantNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate queues with filter",
+	)
+	if err != nil {
+		return db.FindResult[models.Queue]{}, fmt.Errorf("paginate queues with filter failed: %w", err)
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.Queue{}
+	}
+
+	return findResult, nil
+}
+
 func (bo *QueueBO) GetQueuesBySupervisionState(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode, supervisionState models.QueueSupervisionState, includeSupervisorInfo bool) (db.FindResult[models.Queue], error) {
 	paginateQueuesCommand := &queue_command.PaginateQueuesCommand{
 		Query:            q,
@@ -446,4 +479,57 @@ func (bo *QueueBO) batchPopulateSupervisorFields(ctx context.Context, queues []m
 			}
 		}
 	}
+}
+
+// DequeueMessage removes the next available message from the queue according to the
+// threshold-based fair priority queue algorithm, creates a QueueMessageLease bound to
+// jobWorkerID, and returns both the message and the lease.
+//
+// The lease expiry (LeaseUntil) is calculated as:
+//
+//	now + config.GlobalConfiguration.MessageLeaseDuration
+//
+// where MessageLeaseDuration follows the same precedence as all other configuration
+// values: command-line flag > environment variable (MESSAGE_LEASE_DURATION) >
+// configuration file (message_lease_duration key, in seconds) > built-in default (30 s).
+func (bo *QueueBO) DequeueMessage(
+	ctx context.Context,
+	queueCode string,
+	vnamespace string,
+	jobWorkerID string,
+	cf, cfs string,
+	tenant *models.TenantInMaster,
+	tenantNode *dragonboat.RaftNode,
+) (queue_command.DequeueResult, error) {
+	if jobWorkerID == "" {
+		return queue_command.DequeueResult{}, errors.New("jobWorkerID is required")
+	}
+
+	// Resolve the queue to obtain its internal ID.
+	queue, err := bo.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs, tenant, tenantNode)
+	if err != nil {
+		return queue_command.DequeueResult{}, fmt.Errorf("failed to get queue: %w", err)
+	}
+
+	dequeueCmd := &queue_command.DequeueCommand{
+		QueueID:       queue.ID,
+		JobWorkerID:   jobWorkerID,
+		LeaseDuration: config.GlobalConfiguration.MessageLeaseDuration,
+		CF:            cf,
+		CFS:           cfs,
+	}
+
+	result, err := dragonboat.ExecuteRepositoryCommand[queue_command.DequeueResult](
+		tenantNode,
+		ctx,
+		dequeueCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"dequeue message",
+	)
+	if err != nil {
+		return queue_command.DequeueResult{}, fmt.Errorf("dequeue command failed: %w", err)
+	}
+
+	return result, nil
 }

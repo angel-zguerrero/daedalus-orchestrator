@@ -83,7 +83,7 @@ func TestSessionRepository_RegisterAndSessionExists(t *testing.T) {
 	// The GetSessionByUsername is a helper, assuming it's added to the repo
 	// Alternatively, can use repo.repo.FindByField directly if GetSessionByUsername is not present
 
-	storedSession, err := repo.GetSessionByUsername(username, now)
+	storedSession, err := repo.GetSessionByUsername(username, tokenShortLived, now)
 	require.NoError(t, err, "Failed to get session by username")
 	require.NotNil(t, storedSession, "Stored session should not be nil")
 	assert.Equal(t, username, storedSession.UserName)
@@ -105,7 +105,7 @@ func TestSessionRepository_RegisterAndSessionExists(t *testing.T) {
 	require.NoError(t, err, "SessionExists failed after update")
 	assert.True(t, exists, "Session should still exist after update")
 
-	storedSessionUpdated, err := repo.GetSessionByUsername(username, now)
+	storedSessionUpdated, err := repo.GetSessionByUsername(username, tokenLongLived, now)
 	require.NoError(t, err, "Failed to get updated session by username")
 	require.NotNil(t, storedSessionUpdated, "Updated stored session should not be nil")
 	assert.Equal(t, tokenLongLived, storedSessionUpdated.CurrentToken, "Token should be updated")

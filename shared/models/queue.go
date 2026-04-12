@@ -49,6 +49,14 @@ type Queue struct {
 	PriorityThresholds           map[int]int       `orm:"data-only"`
 	Headers                      map[string]string `orm:"virtual"` // Virtual field for queue headers, not stored in DB
 
+	// PQ scheduler state — persisted so consecutive DequeueCommand calls share
+	// one logical cycling scheduler across transactions.
+	// PQProcessedCounts: per-priority served-message counters for the current cycle.
+	// PQCurrentPriority: the actual priority VALUE (not index) to serve next.
+	// nil PQProcessedCounts means the queue has never been dequeued.
+	PQProcessedCounts map[int]int `orm:"data-only"`
+	PQCurrentPriority int
+
 	MaxQueueSize int
 
 	DeadLetterExchangeId                  string

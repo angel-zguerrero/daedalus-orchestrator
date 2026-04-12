@@ -48,6 +48,15 @@ func (r *VNamespaceRepository) Paginate(q string, pageSize int, cursor string, n
 	}
 }
 
+// PaginateWithClaimWorkFilter paginates vnamespaces applying the DB-level rules derived from the
+// ClaimWorkFilter. Inclusion lists, exact exclusions, and NOT LIKE pattern exclusions are all
+// pushed to the DB query.
+func (r *VNamespaceRepository) PaginateWithClaimWorkFilter(f models.ClaimWorkFilter, pageSize int, cursor string, now time.Time) (*FindResult[models.VNamespace], error) {
+	fq := BuildVNamespaceFilterQuery(f)
+
+	return r.Find(fq.DBQuery, pageSize, cursor, now)
+}
+
 func (r *VNamespaceRepository) DeleteVNamespaceById(id string, now time.Time) (bool, error) {
 	return r.Delete(id, now)
 }

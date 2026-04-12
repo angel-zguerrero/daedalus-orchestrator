@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v6.33.4
-// source: internal/infrastructure/server/grpc/proto/definitions/jobworker.proto
+// source: jobworker.proto
 
 package jobworker
 
@@ -19,14 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	JobWorkerService_ClaimWork_FullMethodName = "/jobworker.JobWorkerService/ClaimWork"
+	JobWorkerService_ClaimWork_FullMethodName  = "/jobworker.JobWorkerService/ClaimWork"
+	JobWorkerService_AckMessage_FullMethodName = "/jobworker.JobWorkerService/AckMessage"
 )
 
 // JobWorkerServiceClient is the client API for JobWorkerService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type JobWorkerServiceClient interface {
-	ClaimWork(ctx context.Context, in *ClaimWorkRequest, opts ...grpc.CallOption) (*ClaimWorkResponse, error)
+	ClaimWork(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClaimWorkRequest, ClaimWorkStreamMessage], error)
+	AckMessage(ctx context.Context, in *AckMessageRequest, opts ...grpc.CallOption) (*AckMessageResponse, error)
 }
 
 type jobWorkerServiceClient struct {
@@ -37,10 +39,23 @@ func NewJobWorkerServiceClient(cc grpc.ClientConnInterface) JobWorkerServiceClie
 	return &jobWorkerServiceClient{cc}
 }
 
-func (c *jobWorkerServiceClient) ClaimWork(ctx context.Context, in *ClaimWorkRequest, opts ...grpc.CallOption) (*ClaimWorkResponse, error) {
+func (c *jobWorkerServiceClient) ClaimWork(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClaimWorkRequest, ClaimWorkStreamMessage], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ClaimWorkResponse)
-	err := c.cc.Invoke(ctx, JobWorkerService_ClaimWork_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &JobWorkerService_ServiceDesc.Streams[0], JobWorkerService_ClaimWork_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ClaimWorkRequest, ClaimWorkStreamMessage]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type JobWorkerService_ClaimWorkClient = grpc.BidiStreamingClient[ClaimWorkRequest, ClaimWorkStreamMessage]
+
+func (c *jobWorkerServiceClient) AckMessage(ctx context.Context, in *AckMessageRequest, opts ...grpc.CallOption) (*AckMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AckMessageResponse)
+	err := c.cc.Invoke(ctx, JobWorkerService_AckMessage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +66,8 @@ func (c *jobWorkerServiceClient) ClaimWork(ctx context.Context, in *ClaimWorkReq
 // All implementations must embed UnimplementedJobWorkerServiceServer
 // for forward compatibility.
 type JobWorkerServiceServer interface {
-	ClaimWork(context.Context, *ClaimWorkRequest) (*ClaimWorkResponse, error)
+	ClaimWork(grpc.BidiStreamingServer[ClaimWorkRequest, ClaimWorkStreamMessage]) error
+	AckMessage(context.Context, *AckMessageRequest) (*AckMessageResponse, error)
 	mustEmbedUnimplementedJobWorkerServiceServer()
 }
 
@@ -62,8 +78,11 @@ type JobWorkerServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedJobWorkerServiceServer struct{}
 
-func (UnimplementedJobWorkerServiceServer) ClaimWork(context.Context, *ClaimWorkRequest) (*ClaimWorkResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ClaimWork not implemented")
+func (UnimplementedJobWorkerServiceServer) ClaimWork(grpc.BidiStreamingServer[ClaimWorkRequest, ClaimWorkStreamMessage]) error {
+	return status.Error(codes.Unimplemented, "method ClaimWork not implemented")
+}
+func (UnimplementedJobWorkerServiceServer) AckMessage(context.Context, *AckMessageRequest) (*AckMessageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AckMessage not implemented")
 }
 func (UnimplementedJobWorkerServiceServer) mustEmbedUnimplementedJobWorkerServiceServer() {}
 func (UnimplementedJobWorkerServiceServer) testEmbeddedByValue()                          {}
@@ -86,20 +105,27 @@ func RegisterJobWorkerServiceServer(s grpc.ServiceRegistrar, srv JobWorkerServic
 	s.RegisterService(&JobWorkerService_ServiceDesc, srv)
 }
 
-func _JobWorkerService_ClaimWork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClaimWorkRequest)
+func _JobWorkerService_ClaimWork_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(JobWorkerServiceServer).ClaimWork(&grpc.GenericServerStream[ClaimWorkRequest, ClaimWorkStreamMessage]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type JobWorkerService_ClaimWorkServer = grpc.BidiStreamingServer[ClaimWorkRequest, ClaimWorkStreamMessage]
+
+func _JobWorkerService_AckMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AckMessageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(JobWorkerServiceServer).ClaimWork(ctx, in)
+		return srv.(JobWorkerServiceServer).AckMessage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: JobWorkerService_ClaimWork_FullMethodName,
+		FullMethod: JobWorkerService_AckMessage_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(JobWorkerServiceServer).ClaimWork(ctx, req.(*ClaimWorkRequest))
+		return srv.(JobWorkerServiceServer).AckMessage(ctx, req.(*AckMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -112,10 +138,17 @@ var JobWorkerService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*JobWorkerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ClaimWork",
-			Handler:    _JobWorkerService_ClaimWork_Handler,
+			MethodName: "AckMessage",
+			Handler:    _JobWorkerService_AckMessage_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/infrastructure/server/grpc/proto/definitions/jobworker.proto",
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ClaimWork",
+			Handler:       _JobWorkerService_ClaimWork_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
+	Metadata: "jobworker.proto",
 }

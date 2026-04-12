@@ -36,6 +36,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return paginateTenantsCommand.Execute(uow, now)
 	}
 
+	paginateTenantsWithFilterCommand, ok := input.(tenant_command.PaginateTenantsWithFilterCommand)
+	if ok {
+		return paginateTenantsWithFilterCommand.Execute(uow, now)
+	}
+
 	findTenantCommand, ok := input.(tenant_command.FindTenantCommand)
 	if ok {
 		return findTenantCommand.Execute(uow, now)

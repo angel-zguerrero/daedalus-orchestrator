@@ -155,3 +155,73 @@ func (pq *PriorityQueue) Len() int {
 	}
 	return count
 }
+
+// RestoreState re-hydrates the scheduler position from a previously persisted
+// snapshot.  Call this AFTER all tasks have been Enqueue()-ed so that the
+// priorities slice is fully populated.
+//
+//   - processedCounts: copy of PQProcessedCounts from the queue record.
+//     nil means the queue has never been dequeued; in that case no restoration
+//     is performed and the scheduler starts at the highest priority (index 0).
+//   - currentPriority: the actual priority VALUE the scheduler was about to
+//     serve next.  Ignored when processedCounts is nil.
+func (pq *PriorityQueue) RestoreState(processedCounts map[int]int, currentPriority int) {
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
+	if processedCounts == nil {
+		// Fresh queue — start from the highest priority (default index 0).
+		return
+	}
+
+	for k, v := range processedCounts {
+		pq.processedCounts[k] = v
+	}
+
+	if len(pq.priorities) == 0 {
+		return
+	}
+
+	// Find the exact slice index for currentPriority.
+	for i, p := range pq.priorities {
+		if p == currentPriority {
+			pq.currentIndex = i
+			return
+		}
+	}
+
+	// currentPriority is no longer in the PQ (its partition was fully drained).
+	// Advance to the first priority that is strictly less than currentPriority.
+	for i, p := range pq.priorities {
+		if p < currentPriority {
+			pq.currentIndex = i
+			return
+		}
+	}
+
+	// All remaining priorities are higher (can happen after a cycle reset).
+	// Wrap back to the start.
+	pq.currentIndex = 0
+}
+
+// GetState returns a snapshot of the scheduler's mutable state to be persisted
+// after every Dequeue() call.
+//
+// Returns:
+//   - processedCounts: a copy of the per-priority processed-message counters.
+//   - currentPriority: the actual priority VALUE the scheduler will serve next.
+func (pq *PriorityQueue) GetState() (processedCounts map[int]int, currentPriority int) {
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
+	counts := make(map[int]int, len(pq.processedCounts))
+	for k, v := range pq.processedCounts {
+		counts[k] = v
+	}
+
+	cp := 0
+	if len(pq.priorities) > 0 {
+		cp = pq.priorities[pq.currentIndex]
+	}
+	return counts, cp
+}

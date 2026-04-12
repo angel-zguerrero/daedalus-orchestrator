@@ -59,11 +59,6 @@
             <th style="min-width: 100px;">Type</th>
             <th style="min-width: 100px;">State</th>
             <th style="min-width: 120px;">VNamespace</th>
-            <th style="min-width: 100px;">Message TTL (s)</th>
-            <th style="min-width: 100px;">Delay Time (s)</th>
-            <th style="min-width: 100px;">Queue Expires (s)</th>
-            <th style="min-width: 150px;">Expiration Status</th>
-            <th style="min-width: 100px;">Max Attempts</th>
             <th style="min-width: 100px;">Messages</th>
             <th style="min-width: 150px;">Queue Size</th>
             <th style="min-width: 150px;">Delivering Messages</th>
@@ -100,36 +95,6 @@
             <td class="text-truncate" style="max-width: 120px;" title="{{ queue.VNamespace || '-' }}">
               {{ queue.VNamespace || '-' }}
             </td>
-            <td class="text-center">
-              {{ queue.DefaultQueueMessageTTL || 0 }}s
-            </td>
-            <td class="text-center">
-              {{ queue.DefaultQueueMessageDelayTime || 0 }}s
-            </td>
-            <td class="text-center">
-              {{ queue.QueueExpires || 0 }}s
-            </td>
-            <td class="text-center">
-              <div *ngIf="getExpirationInfo(queue).show">
-                <div class="d-flex align-items-center mb-1">
-                  <small
-                    [class]="getExpirationInfo(queue).isExpired ? 'text-danger fw-bold' : getExpirationInfo(queue).isNearExpiry ? 'text-warning fw-bold' : 'text-muted'">
-                    {{ getExpirationInfo(queue).text }}
-                  </small>
-                </div>
-                <div *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).progressPercentage >= 0">
-                  <c-progress height="8" class="mb-1">
-                    <c-progress-bar [value]="getExpirationInfo(queue).progressPercentage"
-                      [color]="getExpirationInfo(queue).isNearExpiry ? 'warning' : 'success'">
-                    </c-progress-bar>
-                  </c-progress>
-                  <small class="text-muted">{{ getExpirationInfo(queue).progressPercentage.toFixed(1) }}%
-                    remaining</small>
-                </div>
-              </div>
-              <small *ngIf="!getExpirationInfo(queue).show" class="text-muted">No expiration</small>
-            </td>
-            <td class="text-center">{{ queue.MaxAttempts || 1 }}</td>
             <td class="text-center">
               <c-badge [color]="getMessagesCountColor(queue)" shape="rounded-pill">
                 {{ queue.MessagesCount || 0 }}

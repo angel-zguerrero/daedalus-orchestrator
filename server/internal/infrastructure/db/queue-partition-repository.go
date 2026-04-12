@@ -44,3 +44,17 @@ func (r *QueuePartitionRepository) GetQueuePartitionByQueueIDAndPriority(queueID
 	}
 	return &result.Entities[0], nil
 }
+
+// GetNonEmptyPartitionsByQueueID returns all partitions that belong to queueID and
+// have at least one message (MessagesCount > 0). The result is unbounded in page size
+// so callers should be aware that a queue may have many priority levels.
+func (r *QueuePartitionRepository) GetNonEmptyPartitionsByQueueID(queueID string, now time.Time) ([]models.QueuePartition, error) {
+	query := fmt.Sprintf("QueueID = '%s' & MessagesCount > 0", queueID)
+	// Use a generous page size; real deployments rarely have more than a few hundred
+	// distinct priority levels per queue.
+	result, err := r.Find(query, 1000, "", now)
+	if err != nil {
+		return nil, err
+	}
+	return result.Entities, nil
+}

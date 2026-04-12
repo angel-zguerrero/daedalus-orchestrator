@@ -69,6 +69,11 @@ type Config struct {
 	Env string
 
 	DeploymentID uint64
+
+	// MessageLeaseDuration is the duration a dequeued message is locked to the
+	// requesting JobWorker before the lease automatically expires.
+	// Default: 30 seconds. Minimum: 5 seconds.
+	MessageLeaseDuration time.Duration
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
@@ -103,6 +108,7 @@ type ConfigFromMap struct {
 	max_headers                        int   // Maximum number of headers
 	node_scheduler_balancing_wait_time int64 // Wait time in seconds
 	deployment_id                      uint64
+	message_lease_duration             int64 // Duration in seconds
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -143,6 +149,7 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		MaxHeaders:                     configFromMapInstance.max_headers,
 		NodeSchedulerBalancingWaitTime: time.Duration(configFromMapInstance.node_scheduler_balancing_wait_time) * time.Second,
 		DeploymentID:                   configFromMapInstance.deployment_id,
+		MessageLeaseDuration:           time.Duration(configFromMapInstance.message_lease_duration) * time.Second,
 
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
 		// after considering flags and env vars. We need to pass the raw string from the config file if present.
