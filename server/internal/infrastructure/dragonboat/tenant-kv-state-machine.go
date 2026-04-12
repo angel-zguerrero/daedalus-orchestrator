@@ -55,6 +55,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return paginateQueuesWithFilterCommand.Execute(uow, now)
 	}
 
+	paginateQueueMessagesCommand, ok := cmd.(queue_command.PaginateQueueMessagesCommand)
+	if ok {
+		return paginateQueueMessagesCommand.Execute(uow, now)
+	}
+
 	findBindingCommand, ok := cmd.(binding_command.FindBindingCommand)
 	if ok {
 		return findBindingCommand.Execute(uow, now)

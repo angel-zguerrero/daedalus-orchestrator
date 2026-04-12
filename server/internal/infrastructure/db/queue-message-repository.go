@@ -36,3 +36,8 @@ func (r *QueueMessageRepository) UpdateQueueMessage(input *models.QueueMessage, 
 func (r *QueueMessageRepository) GetQueueMessageById(id string, now time.Time) (*models.QueueMessage, error) {
 	return r.FindByField("ID", id, now)
 }
+
+func (r *QueueMessageRepository) PaginateByQueueID(queueID string, pageSize int, cursor string, now time.Time) (*FindResult[models.QueueMessage], error) {
+	filter := fmt.Sprintf("QueueID = '%s'", queueID)
+	return r.Find(filter, pageSize, cursor, now)
+}

@@ -1,5 +1,6 @@
 import { Component, OnInit, Input } from '@angular/core';
 import { CommonModule, AsyncPipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { QueuesService } from '../services/queues.service';
 import { ExchangesService } from '../services/exchanges.service';
 import { VNamespacesService } from '../services/vnamespaces.service';
@@ -185,7 +186,8 @@ export class QueuesComponent implements OnInit {
     private queuesService: QueuesService,
     private exchangesService: ExchangesService,
     private vNamespacesService: VNamespacesService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private router: Router
   ) {
     this.queueForm = this.fb.group({
       name: ['', Validators.required],
@@ -435,6 +437,13 @@ export class QueuesComponent implements OnInit {
     this.selectedQueue = queue;
     this.detailsModalVisible = true;
     this.showAlert = false; // Clear any previous alerts
+  }
+
+  viewMessages(queue: Queue): void {
+    this.router.navigate(
+      ['/tenants', this.tenantCode, 'queues', queue.Code, queue.VNamespace, 'messages'],
+      { queryParams: { queueName: queue.Name } }
+    );
   }
 
   createQueue(): void {

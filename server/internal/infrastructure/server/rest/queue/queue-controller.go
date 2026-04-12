@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -322,4 +323,76 @@ func isValidQueueType(queueType string) bool {
 	default:
 		return false
 	}
+}
+
+type queueMessageResponse struct {
+	ID               string            `json:"ID"`
+	MessageID        string            `json:"MessageID"`
+	QueueID          string            `json:"QueueID"`
+	QueuePartitionID string            `json:"QueuePartitionID"`
+	Priority         int               `json:"Priority"`
+	Attempts         int               `json:"Attempts"`
+	ContentType      string            `json:"ContentType"`
+	ContentLength    int64             `json:"ContentLength"`
+	Content          string            `json:"Content"`
+	Handler          string            `json:"Handler"`
+	Parameters       map[string]string `json:"Parameters"`
+	VNamespace       string            `json:"VNamespace"`
+	CreatedAt        time.Time         `json:"CreatedAt"`
+	UpdatedAt        time.Time         `json:"UpdatedAt"`
+}
+
+type queueMessagesPageResponse struct {
+	Entities []queueMessageResponse `json:"Entities"`
+	Cursor   string                 `json:"Cursor"`
+}
+
+// GetQueueMessagesHandler handles GET /rest-api/tenants/:code/queue/:queueCode/:vnamespace/messages
+func (ctrl *QueueController) GetQueueMessagesHandler(c *gin.Context) {
+	queueCode := c.Param("queueCode")
+	vnamespace := c.Param("vnamespace")
+
+	pageParam := c.Query("pageSize")
+	page, err := strconv.Atoi(pageParam)
+	if err != nil || page < 1 {
+		page = 20
+	} else if page > 200 {
+		page = 200
+	}
+
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
+	findResult, err := ctrl.QueueBO.GetQueueMessages(c.Request.Context(), queueCode, vnamespace, c.Query("cursor"), page, cf, cfs, tenant, tenantNode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	responses := make([]queueMessageResponse, len(findResult.Entities))
+	for i, msg := range findResult.Entities {
+		responses[i] = queueMessageResponse{
+			ID:               msg.ID,
+			MessageID:        msg.MessageID,
+			QueueID:          msg.QueueID,
+			QueuePartitionID: msg.QueuePartitionID,
+			Priority:         msg.Priority,
+			Attempts:         msg.Attempts,
+			ContentType:      msg.ContentType,
+			ContentLength:    msg.ContentLength,
+			Content:          string(msg.Content),
+			Handler:          msg.Handler,
+			Parameters:       msg.Parameters,
+			VNamespace:       msg.VNamespace,
+			CreatedAt:        msg.CreatedAt,
+			UpdatedAt:        msg.UpdatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Queue message list",
+		"result": queueMessagesPageResponse{
+			Entities: responses,
+			Cursor:   findResult.Cursor,
+		},
+	})
 }

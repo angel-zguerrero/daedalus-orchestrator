@@ -1,0 +1,185 @@
+<c-row>
+  <c-col xs="12">
+
+    <!-- Breadcrumb / Back navigation -->
+    <div class="d-flex align-items-center mb-3 text-muted" style="font-size: 0.875rem;">
+      <a [routerLink]="['/tenants']" class="text-muted text-decoration-none">Tenants</a>
+      <svg cIcon name="cil-chevron-right" size="sm" class="mx-1"></svg>
+      <a (click)="goBackToQueues()" class="text-muted text-decoration-none" style="cursor:pointer;">
+        {{ tenantName || tenantCode }} – Queues
+      </a>
+      <svg cIcon name="cil-chevron-right" size="sm" class="mx-1"></svg>
+      <span>{{ queueName || queueCode }} Messages</span>
+    </div>
+
+    <c-card class="mb-4">
+      <c-card-header class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <svg cIcon name="cil-inbox" class="me-2"></svg>
+          Messages in queue:
+          <code class="ms-1">{{ queueCode }}</code>
+          <span *ngIf="vnamespace" class="text-muted ms-2" style="font-size: 0.85em;">({{ vnamespace }})</span>
+        </h5>
+        <button cButton color="secondary" variant="outline" size="sm" (click)="goBackToQueues()">
+          <svg cIcon name="cil-arrow-left" class="me-1"></svg>
+          Back to Queues
+        </button>
+      </c-card-header>
+
+      <c-card-body>
+        <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+
+        <!-- Loading -->
+        <div class="text-center py-4" *ngIf="loading">
+          <c-spinner></c-spinner>
+          <p class="mt-2 text-muted">Loading messages…</p>
+        </div>
+
+        <!-- Table -->
+        <div class="table-responsive" *ngIf="!loading">
+          <table cTable [hover]="true" class="mt-2" style="min-width: 900px;">
+            <thead>
+              <tr>
+                <th style="min-width: 120px;">Message ID</th>
+                <th style="min-width: 130px;">Handler</th>
+                <th style="min-width: 80px;">Priority</th>
+                <th style="min-width: 80px;">Attempts</th>
+                <th style="min-width: 110px;">Content Type</th>
+                <th style="min-width: 200px;">Content</th>
+                <th style="min-width: 120px;">VNamespace</th>
+                <th style="min-width: 150px;">Created At</th>
+                <th style="min-width: 80px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let msg of messages" class="align-middle">
+                <td class="text-truncate" style="max-width: 120px;" title="{{ msg.MessageID }}">
+                  <code>{{ msg.MessageID | slice:0:12 }}…</code>
+                </td>
+                <td class="text-truncate" style="max-width: 130px;" title="{{ msg.Handler }}">
+                  {{ msg.Handler || '-' }}
+                </td>
+                <td class="text-center">
+                  <c-badge color="secondary" shape="rounded-pill">{{ msg.Priority }}</c-badge>
+                </td>
+                <td class="text-center">
+                  <c-badge [color]="msg.Attempts > 1 ? 'warning' : 'success'" shape="rounded-pill">
+                    {{ msg.Attempts }}
+                  </c-badge>
+                </td>
+                <td class="text-truncate" style="max-width: 110px;" title="{{ msg.ContentType }}">
+                  {{ msg.ContentType || '-' }}
+                </td>
+                <td class="text-truncate" style="max-width: 200px;" title="{{ msg.Content }}">
+                  <code class="text-muted" style="font-size: 0.8em;">{{ truncateContent(msg.Content) }}</code>
+                </td>
+                <td class="text-truncate" style="max-width: 120px;" title="{{ msg.VNamespace || '-' }}">
+                  {{ msg.VNamespace || '-' }}
+                </td>
+                <td style="white-space: nowrap; font-size: 0.85em;">
+                  {{ msg.CreatedAt | date:'yyyy-MM-dd HH:mm:ss' }}
+                </td>
+                <td>
+                  <button cButton color="info" size="sm" (click)="openDetailsModal(msg)" title="View Details">
+                    <svg cIcon name="cil-info"></svg>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="messages.length === 0">
+                <td colspan="9" class="text-center py-5">
+                  <div class="text-muted">
+                    <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                    <h6>No messages found</h6>
+                    <p class="mb-0">This queue has no messages stored in the database.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="d-flex justify-content-end mt-3" *ngIf="messages.length > 0 || cursors.length > 1">
+          <button cButton color="secondary" [disabled]="cursors.length <= 1" (click)="previousPage()">
+            <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+            Previous
+          </button>
+          <button cButton color="secondary" [disabled]="!cursor" (click)="nextPage()" class="ms-2">
+            Next
+            <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+          </button>
+        </div>
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>
+
+<!-- Message Details Modal -->
+<c-modal [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>Message Details</h5>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedMessage">
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>ID</strong></c-col>
+      <c-col [sm]="8"><code>{{ selectedMessage.ID }}</code></c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Message ID</strong></c-col>
+      <c-col [sm]="8"><code>{{ selectedMessage.MessageID }}</code></c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Queue ID</strong></c-col>
+      <c-col [sm]="8"><code>{{ selectedMessage.QueueID }}</code></c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Handler</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.Handler || '-' }}</c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Priority</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.Priority }}</c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Attempts</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.Attempts }}</c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>VNamespace</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.VNamespace || '-' }}</c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Content Type</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.ContentType || '-' }}</c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Content Length</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.ContentLength }} bytes</c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Content</strong></c-col>
+      <c-col [sm]="8">
+        <pre class="bg-light p-2 rounded" style="white-space: pre-wrap; word-break: break-all; font-size: 0.8em; max-height: 200px; overflow-y: auto;">{{ selectedMessage.Content || '-' }}</pre>
+      </c-col>
+    </c-row>
+    <c-row class="mb-2" *ngIf="selectedMessage.Parameters && getObjectKeys(selectedMessage.Parameters).length > 0">
+      <c-col [sm]="4"><strong>Parameters</strong></c-col>
+      <c-col [sm]="8">
+        <div *ngFor="let key of getObjectKeys(selectedMessage.Parameters)" class="mb-1">
+          <code>{{ key }}</code>: {{ selectedMessage.Parameters[key] }}
+        </div>
+      </c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Created At</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.CreatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</c-col>
+    </c-row>
+    <c-row class="mb-2">
+      <c-col [sm]="4"><strong>Updated At</strong></c-col>
+      <c-col [sm]="8">{{ selectedMessage.UpdatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</c-col>
+    </c-row>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" (click)="detailsModalVisible = false">Close</button>
+  </c-modal-footer>
+</c-modal>

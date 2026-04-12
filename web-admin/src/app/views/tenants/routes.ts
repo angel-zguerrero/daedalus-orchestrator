@@ -14,5 +14,12 @@ export const routes: Routes = [
     data: {
       title: 'Tenant Management'
     }
+  },
+  {
+    path: ':tenantCode/queues/:queueCode/:vnamespace/messages',
+    loadComponent: () => import('./tenant-management/queue-messages/queue-messages.component').then(m => m.QueueMessagesComponent),
+    data: {
+      title: 'Queue Messages'
+    }
   }
 ];

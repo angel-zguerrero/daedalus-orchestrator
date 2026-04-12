@@ -492,6 +492,39 @@ func (bo *QueueBO) batchPopulateSupervisorFields(ctx context.Context, queues []m
 // where MessageLeaseDuration follows the same precedence as all other configuration
 // values: command-line flag > environment variable (MESSAGE_LEASE_DURATION) >
 // configuration file (message_lease_duration key, in seconds) > built-in default (30 s).
+func (bo *QueueBO) GetQueueMessages(ctx context.Context, queueCode, vnamespace string, cursor string, pageSize int, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.QueueMessage], error) {
+	queue, err := bo.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs, tenant, tenantNode)
+	if err != nil {
+		return db.FindResult[models.QueueMessage]{}, fmt.Errorf("failed to get queue: %w", err)
+	}
+
+	paginateCmd := &queue_command.PaginateQueueMessagesCommand{
+		QueueID:  queue.ID,
+		Cursor:   cursor,
+		PageSize: pageSize,
+		CF:       cf,
+		CFS:      cfs,
+	}
+
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.QueueMessage]](
+		tenantNode,
+		ctx,
+		paginateCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"paginate queue messages",
+	)
+	if err != nil {
+		return db.FindResult[models.QueueMessage]{}, fmt.Errorf("paginate queue messages failed: %w", err)
+	}
+
+	if findResult.Entities == nil {
+		findResult.Entities = []models.QueueMessage{}
+	}
+
+	return findResult, nil
+}
+
 func (bo *QueueBO) DequeueMessage(
 	ctx context.Context,
 	queueCode string,

@@ -66,6 +66,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", queueController.EnqueueMessageHandler)
 				tenantsGroup.GET("/:code/queue", queueController.GetQueuesHandler)
 				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace", queueController.GetQueueHandler)
+				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace/messages", queueController.GetQueueMessagesHandler)
 				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", queueController.DeleteQueueHandler)
 
 				tenantsGroup.POST("/:code/binding", bindingController.CreateBindingHandler)
