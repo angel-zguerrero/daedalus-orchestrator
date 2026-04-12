@@ -130,8 +130,6 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 		// Derive the numeric index from the policy code ("policy-N" → N).
 		policyIndex := 0
 		fmt.Sscanf(policyCode, "policy-%d", &policyIndex)
-		fmt.Printf(":::: Processing policy %s (index %d): maxQueueMessages=%d, currently claimed=%d\n",
-			policyCode, policyIndex, policy.MaxQueueMessages, claimedByPolicy[policyCode])
 
 		filter := policy.ClaimWorkFilter
 
