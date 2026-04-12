@@ -240,9 +240,6 @@ func (app *Application) Run() {
 
 	app.StartNodeClearExpiredLeasesWorker(30*time.Second, 50)
 
-	//app.StartNodeSchedulerProcessWorkers(1 * time.Second)
-	//app.StartNodeSchedulerHeartbeat(1 * time.Second)
-
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
 	app.StartNodeSchedulerBalancingWorker(10 * time.Second)
