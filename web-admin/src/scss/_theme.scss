@@ -52,8 +52,8 @@
   --cui-body-color:          var(--daedalus-text-primary);
   --cui-secondary-color:     var(--daedalus-text-secondary);
   --cui-tertiary-color:      var(--daedalus-text-muted);
-  --cui-tertiary-bg:         var(--daedalus-bg-base);
-  --cui-secondary-bg:        var(--daedalus-bg-elevated);
+  --cui-secondary-bg:        var(--daedalus-bg-surface);
+  --cui-tertiary-bg:         var(--daedalus-bg-elevated);
 
   --cui-primary:             var(--daedalus-primary);
   --cui-primary-rgb:         0, 229, 255;
@@ -99,7 +99,7 @@
 
   --cui-footer-bg:           var(--daedalus-bg-base);
   --cui-footer-color:        var(--daedalus-text-muted);
-  --cui-footer-border-color: rgba(0, 229, 255, 0.06);
+  --cui-footer-border-color: var(--daedalus-primary-trace);
 
   --cui-input-bg:            var(--daedalus-bg-surface);
   --cui-input-color:         var(--daedalus-text-primary);
@@ -108,7 +108,7 @@
   --cui-input-placeholder-color: var(--daedalus-text-muted);
 
   --cui-dropdown-bg:         var(--daedalus-bg-elevated);
-  --cui-dropdown-border-color: rgba(0, 229, 255, 0.12);
+  --cui-dropdown-border-color: var(--daedalus-primary-border);
   --cui-dropdown-link-color: var(--daedalus-text-primary);
   --cui-dropdown-link-hover-bg: var(--daedalus-primary-trace);
   --cui-dropdown-link-hover-color: var(--daedalus-text-primary);
@@ -125,11 +125,6 @@
 }
 
 // ─── Layout structural styles (unchanged from original) ────────────────────
-
-body {
-  background-color: var(--daedalus-bg-base);
-  font-family: var(--daedalus-font-body);
-}
 
 .wrapper {
   width: 100%;
@@ -180,10 +175,6 @@ body {
 }
 
 @include color-mode(dark) {
-  body {
-    background-color: var(--daedalus-bg-base);
-  }
-
   .footer {
     --cui-footer-bg: var(--daedalus-bg-base);
   }
@@ -209,5 +200,6 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
