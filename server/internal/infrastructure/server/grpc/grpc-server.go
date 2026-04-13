@@ -10,12 +10,14 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/auth"      // Import new auth service
+	"deadalus-orch/server/internal/infrastructure/server/grpc/binding"   // Import binding service
 	"deadalus-orch/server/internal/infrastructure/server/grpc/exchange"  // Import new exchange service
 	"deadalus-orch/server/internal/infrastructure/server/grpc/jobworker" // Import jobworker service
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/nodescheduler" // Import nodescheduler service
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth"                   // Import new auth pb
+	pbBinding "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/binding"             // Import binding pb
 	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"           // Import new exchange pb
 	pbJobWorker "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/jobworker"         // Import jobworker pb
 	pbNodeScheduler "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/nodescheduler" // Import nodescheduler pb
@@ -70,6 +72,10 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	// Register new QueueService
 	queueSvc := queue.NewQueueService(cfg)
 	pbQueue.RegisterQueueServiceServer(server, queueSvc)
+
+	// Register BindingService
+	bindingSvc := binding.NewBindingService(cfg)
+	pbBinding.RegisterBindingServiceServer(server, bindingSvc)
 
 	// Register new NodeSchedulerService
 	nodeSchedulerSvc := nodescheduler.NewNodeSchedulerService(cfg)

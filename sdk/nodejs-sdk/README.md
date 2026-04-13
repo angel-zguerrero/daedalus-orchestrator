@@ -39,3 +39,25 @@ Or manually:
 cd sdk/nodejs-sdk
 npx ts-node examples/simple-worker/index.ts
 ```
+
+### Assert Resources
+
+To run the assert resources example:
+
+```bash
+nx run server:run-nodejs-assert-resources
+```
+
+Demonstrates how to upsert a tenant, exchange, queue, and binding using the `assertTenant`, `assertExchange`, `assertQueue`, and `assertBinding` methods.
+
+```bash
+cd sdk/nodejs-sdk
+npm run example:assert-resources
+```
+
+Or manually:
+
+```bash
+cd sdk/nodejs-sdk
+npx ts-node examples/assert-resources/index.ts
+```

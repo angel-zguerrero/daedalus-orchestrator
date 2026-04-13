@@ -36,7 +36,17 @@ import (
 
 // UnaryTenantInterceptor returns a new unary server interceptor that extracts tenant information and injects it into the context
 func UnaryTenantInterceptor(tenantBO *bo.TenantBO, serverConfig *common.ServerConfing, logger zerolog.Logger) grpc.UnaryServerInterceptor {
+	// Methods that create tenants must bypass tenant lookup (tenant doesn't exist yet)
+	skipTenantLookup := map[string]bool{
+		"/tenant.TenantService/AssertTenant":     true,
+		"/tenant.TenantService/AssertBulkTenant": true,
+	}
+
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		if skipTenantLookup[info.FullMethod] {
+			return handler(ctx, req)
+		}
+
 		// Extract tenant code from the request using reflection
 		tenantCode := extractTenantCodeFromRequest(req)
 		if tenantCode == "" {

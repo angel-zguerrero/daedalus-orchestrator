@@ -92,6 +92,18 @@
                 "parallel": false,
                 "cwd": "sdk/nodejs-sdk"
             }
+        },
+        "run-nodejs-assert-resources": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "npx ts-node examples/assert-resources/index.ts"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/nodejs-sdk"
+            }
         }
     }
 }

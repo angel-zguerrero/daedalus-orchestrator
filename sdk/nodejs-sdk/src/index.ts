@@ -86,16 +86,76 @@ export interface WorkerOptions {
   onMessage?: (claimedMessage: ClaimedMessage, ack: AckCallback) => Promise<void> | void;
 }
 
+export interface AssertTenantInput {
+  code: string;
+  name: string;
+}
+
+export interface AssertExchangeInput {
+  tenantCode: string;
+  code: string;
+  name: string;
+  type: string;
+  vnamespace?: string;
+  headers?: Record<string, string>;
+}
+
+export interface AssertQueueInput {
+  tenantCode: string;
+  code: string;
+  name: string;
+  type?: string;
+  state?: string;
+  vnamespace?: string;
+  defaultQueueMessageTTL?: number;
+  defaultQueueMessageDelayTime?: number;
+  queueExpires?: number;
+  allowDuplicated?: boolean;
+  maxAttempts?: number;
+  maxQueueSize?: number;
+  maxDeliveringMessages?: number;
+  headers?: Record<string, string>;
+}
+
+export interface AssertBindingInput {
+  tenantCode: string;
+  code: string;
+  exchangeCode: string;
+  queueCode?: string;
+  targetExchangeCode?: string;
+  alternateExchangeCode?: string;
+  vnamespace?: string;
+  routingKey?: string;
+  pattern?: string;
+  xMatch?: string;
+  bindingType?: string;
+  targetExchangeType?: string;
+  headers?: Record<string, string>;
+}
+
 export class DaedalusSDK {
   private jobWorkerClient: any;
   private authClient: any;
+  private tenantClient: any;
+  private exchangeClient: any;
+  private queueClient: any;
+  private bindingClient: any;
   private token: string | null = null;
   private jobWorkerProtoPath: string;
   private authProtoPath: string;
+  private tenantProtoPath: string;
+  private exchangeProtoPath: string;
+  private queueProtoPath: string;
+  private bindingProtoPath: string;
 
   constructor(private config: { uri: string, username: string, password: string }) {
-    this.jobWorkerProtoPath = path.resolve(__dirname, '../../../server/internal/infrastructure/server/grpc/proto/definitions/jobworker.proto');
-    this.authProtoPath = path.resolve(__dirname, '../../../server/internal/infrastructure/server/grpc/proto/definitions/auth.proto');
+    const protoBase = path.resolve(__dirname, '../../../server/internal/infrastructure/server/grpc/proto/definitions');
+    this.jobWorkerProtoPath = path.join(protoBase, 'jobworker.proto');
+    this.authProtoPath = path.join(protoBase, 'auth.proto');
+    this.tenantProtoPath = path.join(protoBase, 'tenant.proto');
+    this.exchangeProtoPath = path.join(protoBase, 'exchange.proto');
+    this.queueProtoPath = path.join(protoBase, 'queue.proto');
+    this.bindingProtoPath = path.join(protoBase, 'binding.proto');
   }
 
   private loadProto(protoPath: string) {
@@ -125,6 +185,31 @@ export class DaedalusSDK {
     // Load JobWorker Proto and create client
     const jobWorkerProtoDescriptor = this.loadProto(this.jobWorkerProtoPath) as any;
     this.jobWorkerClient = new jobWorkerProtoDescriptor.jobworker.JobWorkerService(
+      target,
+      grpc.credentials.createInsecure()
+    );
+
+    // Load resource management clients
+    const tenantProtoDescriptor = this.loadProto(this.tenantProtoPath) as any;
+    this.tenantClient = new tenantProtoDescriptor.tenant.TenantService(
+      target,
+      grpc.credentials.createInsecure()
+    );
+
+    const exchangeProtoDescriptor = this.loadProto(this.exchangeProtoPath) as any;
+    this.exchangeClient = new exchangeProtoDescriptor.exchange.ExchangeService(
+      target,
+      grpc.credentials.createInsecure()
+    );
+
+    const queueProtoDescriptor = this.loadProto(this.queueProtoPath) as any;
+    this.queueClient = new queueProtoDescriptor.queue.QueueService(
+      target,
+      grpc.credentials.createInsecure()
+    );
+
+    const bindingProtoDescriptor = this.loadProto(this.bindingProtoPath) as any;
+    this.bindingClient = new bindingProtoDescriptor.binding.BindingService(
       target,
       grpc.credentials.createInsecure()
     );
@@ -158,6 +243,18 @@ export class DaedalusSDK {
     if (this.authClient) {
       this.authClient.close();
     }
+    if (this.tenantClient) {
+      this.tenantClient.close();
+    }
+    if (this.exchangeClient) {
+      this.exchangeClient.close();
+    }
+    if (this.queueClient) {
+      this.queueClient.close();
+    }
+    if (this.bindingClient) {
+      this.bindingClient.close();
+    }
   }
 
   private getMetadata(): grpc.Metadata {
@@ -184,6 +281,110 @@ export class DaedalusSDK {
           }
           console.log('✅ Message acknowledged successfully');
           resolve();
+        }
+      );
+    });
+  }
+
+  async assertTenant(input: AssertTenantInput): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.tenantClient.AssertTenant(
+        { code: input.code, name: input.name },
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to assert tenant:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Tenant asserted: ${input.code}`);
+          resolve(response.result);
+        }
+      );
+    });
+  }
+
+  async assertExchange(input: AssertExchangeInput): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.exchangeClient.CreateExchange(
+        {
+          tenantCode: input.tenantCode,
+          code: input.code,
+          name: input.name,
+          type: input.type,
+          vnamespace: input.vnamespace ?? '',
+          headers: input.headers ?? {}
+        },
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to assert exchange:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Exchange asserted: ${input.code}`);
+          resolve(response.result);
+        }
+      );
+    });
+  }
+
+  async assertQueue(input: AssertQueueInput): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.queueClient.CreateQueue(
+        {
+          tenantCode: input.tenantCode,
+          code: input.code,
+          name: input.name,
+          type: input.type ?? 'standard',
+          state: input.state ?? 'active',
+          vnamespace: input.vnamespace ?? '',
+          defaultQueueMessageTTL: input.defaultQueueMessageTTL ?? 0,
+          defaultQueueMessageDelayTime: input.defaultQueueMessageDelayTime ?? 0,
+          queueExpires: input.queueExpires ?? 0,
+          allowDuplicated: input.allowDuplicated ?? false,
+          maxAttempts: input.maxAttempts ?? 0,
+          maxQueueSize: input.maxQueueSize ?? 0,
+          maxDeliveringMessages: input.maxDeliveringMessages ?? 0,
+          headers: input.headers ?? {}
+        },
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to assert queue:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Queue asserted: ${input.code}`);
+          resolve(response.result);
+        }
+      );
+    });
+  }
+
+  async assertBinding(input: AssertBindingInput): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.bindingClient.CreateBinding(
+        {
+          tenantCode: input.tenantCode,
+          code: input.code,
+          exchangeCode: input.exchangeCode,
+          queueCode: input.queueCode ?? '',
+          targetExchangeCode: input.targetExchangeCode ?? '',
+          alternateExchangeCode: input.alternateExchangeCode ?? '',
+          vnamespace: input.vnamespace ?? '',
+          routingKey: input.routingKey ?? '',
+          pattern: input.pattern ?? '',
+          xMatch: input.xMatch ?? '',
+          bindingType: input.bindingType ?? 'classic',
+          targetExchangeType: input.targetExchangeType ?? '',
+          headers: input.headers ?? {}
+        },
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to assert binding:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Binding asserted: ${input.code}`);
+          resolve(response.result);
         }
       );
     });
