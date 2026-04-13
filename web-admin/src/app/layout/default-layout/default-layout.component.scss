@@ -1,34 +1,68 @@
+// ─── Scanline wrapper ───────────────────────────────────────────────────────
+// The ::after pseudo-element creates a CRT-like texture over the sidebar.
+// pointer-events: none ensures it doesn't block sidebar interactions.
+
+.daedalus-sidebar-wrap {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--cui-sidebar-width, 256px);
+    height: 100vh;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 1px,
+      rgba(0, 0, 0, 0.12) 1px,
+      rgba(0, 0, 0, 0.12) 2px
+    );
+    pointer-events: none;
+    z-index: 1100;
+    transition: width 0.15s;
+  }
+}
+
+// ─── Sidebar nav active indicator ──────────────────────────────────────────
+
 :host::ng-deep {
+  .sidebar-nav .nav-link {
+    position: relative;
+    font-family: var(--daedalus-font-body);
+    font-size: 0.875rem;
+    transition: color 120ms ease, background-color 120ms ease;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 0;
+      background-color: var(--daedalus-primary);
+      transition: width 80ms ease;
+      border-radius: 0 1px 1px 0;
+    }
+
+    &.active::before {
+      width: 3px;
+    }
+  }
+
+  // Scrollbar theming
   .ng-scrollbar {
     --scrollbar-padding: 1px;
-    --scrollbar-size: 5px;
-    --scrollbar-thumb-color: var(--cui-gray-500, #aab3c5);
-    --scrollbar-thumb-hover-color: var(--cui-gray-400, #cfd4de);
+    --scrollbar-size: 4px;
+    --scrollbar-thumb-color: rgba(0, 229, 255, 0.20);
+    --scrollbar-thumb-hover-color: rgba(0, 229, 255, 0.40);
     --scrollbar-hover-size: calc(var(--scrollbar-size) * 1.5);
-    --scrollbar-border-radius: 5px;
+    --scrollbar-border-radius: 2px;
   }
 
   .ng-scroll-content {
     display: flex;
     min-height: 100%;
   }
-
-  //.sidebar-nav {
-  //  scrollbar-color: var(--cui-gray-500, #444) transparent;
-  //}
 }
-
-// ng-scrollbar css variables
-//.cui-scrollbar {
-//  --scrollbar-border-radius: 7px;
-//  --scrollbar-padding: 1px;
-//  --scrollbar-viewport-margin: 0;
-//  --scrollbar-track-color: transparent;
-//  --scrollbar-wrapper-color: transparent;
-//  --scrollbar-thumb-color: rgba(0, 0, 0, 0.2);
-//  --scrollbar-thumb-hover-color: var(--scrollbar-thumb-color);
-//  --scrollbar-size: 5px;
-//  --scrollbar-hover-size: var(--scrollbar-size);
-//  --scrollbar-thumb-transition: height ease-out 150ms, width ease-out 150ms;
-//  --scrollbar-track-transition: height ease-out 150ms, width ease-out 150ms;
-//}

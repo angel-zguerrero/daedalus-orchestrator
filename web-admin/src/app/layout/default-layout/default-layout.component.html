@@ -1,28 +1,30 @@
 <!--sidebar-->
-<c-sidebar
-  #sidebar1="cSidebar"
-  class="d-print-none sidebar sidebar-fixed border-end"
-  colorScheme="dark"
-  id="sidebar1"
-  visible
->
-  <c-sidebar-header class="border-bottom">
-    <c-sidebar-brand [routerLink]="[]">
-      <img class="sidebar-brand-full" src="assets/brand/Daedalous.svg" height="32" alt="Daedalus Logo" />
-      <img class="sidebar-brand-narrow" src="assets/brand/Daedalous.svg" height="32" alt="Daedalus Logo" />
-    </c-sidebar-brand>
-  </c-sidebar-header>
+<div class="daedalus-sidebar-wrap">
+  <c-sidebar
+    #sidebar1="cSidebar"
+    class="d-print-none sidebar sidebar-fixed border-end"
+    colorScheme="dark"
+    id="sidebar1"
+    visible
+  >
+    <c-sidebar-header class="border-bottom">
+      <c-sidebar-brand [routerLink]="[]">
+        <img class="sidebar-brand-full" src="assets/brand/Daedalous.svg" height="32" alt="Daedalus Logo" />
+        <img class="sidebar-brand-narrow" src="assets/brand/Daedalous.svg" height="32" alt="Daedalus Logo" />
+      </c-sidebar-brand>
+    </c-sidebar-header>
 
-  <ng-scrollbar pointerEventsMethod="scrollbar" visibility="hover">
-    <c-sidebar-nav [navItems]="navItems" dropdownMode="close" compact />
-  </ng-scrollbar>
+    <ng-scrollbar pointerEventsMethod="scrollbar" visibility="hover">
+      <c-sidebar-nav [navItems]="navItems" dropdownMode="close" compact />
+    </ng-scrollbar>
 
-  @if (!sidebar1.narrow) {
-    <c-sidebar-footer cSidebarToggle="sidebar1" class="border-top d-none d-lg-flex" toggle="unfoldable" style="cursor: pointer;">
-      <button cSidebarToggler aria-label="Toggle sidebar fold"></button>
-    </c-sidebar-footer>
-  }
-</c-sidebar>
+    @if (!sidebar1.narrow) {
+      <c-sidebar-footer cSidebarToggle="sidebar1" class="border-top d-none d-lg-flex" toggle="unfoldable" style="cursor: pointer;">
+        <button cSidebarToggler aria-label="Toggle sidebar fold"></button>
+      </c-sidebar-footer>
+    }
+  </c-sidebar>
+</div>
 
 <!--main-->
 <div class="wrapper d-flex flex-column min-vh-100">
