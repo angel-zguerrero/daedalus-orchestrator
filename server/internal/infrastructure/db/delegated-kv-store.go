@@ -14,8 +14,22 @@ func NewDelegatedKVStore(base KVStore, batch *WriteBatch) *DelegatedKVStore {
 	}
 }
 
-// Get simplemente delega
+// Get checks the pending batch first (last write wins), then falls through to base.
+// This ensures that multiple commands executing within the same Dragonboat Update batch
+// see each other's pending writes, avoiding lost-update anomalies on shared counters
+// (e.g. CurrentDeliveringMessages).
 func (d *DelegatedKVStore) Get(cf, cfs, key string, now time.Time) ([]byte, error) {
+	// Walk backwards so the most-recent pending operation wins.
+	for i := len(d.batch.Data) - 1; i >= 0; i-- {
+		entry := d.batch.Data[i]
+		if entry.CF == cf && entry.CFS == cfs && entry.Key == key {
+			if entry.Type == "delete" {
+				return nil, nil // key was deleted in this batch
+			}
+			// "put" — return the pending value
+			return entry.Value, nil
+		}
+	}
 	return d.base.Get(cf, cfs, key, now)
 }
 
@@ -72,6 +86,13 @@ func (d *DelegatedKVStore) SearchByPatternPaginatedKV(cfName, cfs, pattern, curs
 }
 
 func (d *DelegatedKVStore) Exists(cfName, cfs, key string, now time.Time) (bool, error) {
+	// Check pending batch first.
+	for i := len(d.batch.Data) - 1; i >= 0; i-- {
+		entry := d.batch.Data[i]
+		if entry.CF == cfName && entry.CFS == cfs && entry.Key == key {
+			return entry.Type != "delete", nil
+		}
+	}
 	return d.base.Exists(cfName, cfs, key, now)
 }
 
