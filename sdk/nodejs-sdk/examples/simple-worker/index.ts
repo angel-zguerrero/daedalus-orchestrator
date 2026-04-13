@@ -1,27 +1,4 @@
 import { DaedalusSDK } from '../../src/index';
-import * as si from 'systeminformation';
-
-async function getSystemInfo(): Promise<Record<string, string>> {
-    try {
-        const cpu = await si.currentLoad();
-        const mem = await si.mem();
-        const disk = await si.fsSize();
-
-        const info: Record<string, string> = {
-            "CPU": cpu.currentLoad.toFixed(2),
-            "Memory": ((mem.active / mem.total) * 100).toFixed(2),
-            "Disk": disk[0].use.toFixed(2),
-            "OS": String(process.platform),
-            "Hostname": await si.osInfo().then(info => String(info.hostname))
-        };
-        return info;
-    } catch (err) {
-        console.error('❌ Error gathering system info:', err);
-        return {
-            "Error": "Failed to gather system info"
-        };
-    }
-}
 
 async function main() {
     const daedalusSDK = new DaedalusSDK({
@@ -35,7 +12,6 @@ async function main() {
     await daedalusSDK.createWorker({
         workerName: 'Simple Node.js Worker 2',
         intervalMs: 500,
-        information: getSystemInfo,
         capacityPolicies: [
             {
                 maxQueueMessages: 10,

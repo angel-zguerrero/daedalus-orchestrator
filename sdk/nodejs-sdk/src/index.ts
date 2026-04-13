@@ -1,7 +1,30 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
+import * as si from 'systeminformation';
 const crypto = require('crypto');
+
+export async function getSystemInfo(): Promise<Record<string, string>> {
+    try {
+        const cpu = await si.currentLoad();
+        const mem = await si.mem();
+        const disk = await si.fsSize();
+
+        const info: Record<string, string> = {
+            "CPU": cpu.currentLoad.toFixed(2),
+            "Memory": ((mem.active / mem.total) * 100).toFixed(2),
+            "Disk": disk[0].use.toFixed(2),
+            "OS": String(process.platform),
+            "Hostname": await si.osInfo().then(i => String(i.hostname))
+        };
+        return info;
+    } catch (err) {
+        console.error('❌ Error gathering system info:', err);
+        return {
+            "Error": "Failed to gather system info"
+        };
+    }
+}
 
 export interface ClaimWorkFilter {
     tenantCodes?: string[];
@@ -58,7 +81,6 @@ export interface AckCallback {
 
 export interface WorkerOptions {
     workerName: string;
-    information?: Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
     capacityPolicies: ClaimWorkCapacityPolicy[];
     intervalMs?: number;
     onMessage?: (claimedMessage: ClaimedMessage, ack: AckCallback) => Promise<void> | void;
@@ -168,9 +190,9 @@ export class DaedalusSDK {
     }
 
     async createWorker(options: WorkerOptions) {
+     
         const {
             workerName,
-            information,
             capacityPolicies,
             intervalMs = 10000, // 10 seconds
             onMessage
@@ -270,11 +292,7 @@ export class DaedalusSDK {
                 // Function to send claim request
                 const sendClaimRequest = async () => {
                     let currentInformation: Record<string, string> = {};
-                    if (typeof information === 'function') {
-                        currentInformation = await information();
-                    } else if (information) {
-                        currentInformation = information;
-                    }
+                    currentInformation = await getSystemInfo();
 
                     const request = {
                         workerID: workerId,
