@@ -75,26 +75,52 @@ async function main() {
         }
     });
 
-    // 5. Enqueue 1000 messages directly to the queue
-    console.log('📤 Enqueueing 1000 messages...');
+    // 5. Enqueue 1000 messages directly to the queue (batches of 50)
+    console.log('📤 Enqueueing 1000 messages directly to the queue (batch size: 50)...');
     const total = 1000;
+    const batchSize = 50;
     let succeeded = 0;
-    for (let i = 0; i < total; i++) {
-        const result = await sdk.enqueueMessage({
-            tenantCode: 'my-tenant',
-            queueCode: 'my-queue',
-            vnamespace: 'default',
-            content: JSON.stringify({ index: i, msg: `Hello from message ${i}` }),
-            contentType: 'application/json',
-            priority: 0,
-            handler: 'my-handler'
+    for (let i = 0; i < total; i += batchSize) {
+        const batch = Array.from({ length: Math.min(batchSize, total - i) }, (_, j) => {
+            const idx = i + j;
+            return sdk.enqueueMessage({
+                tenantCode: 'my-tenant',
+                queueCode: 'my-queue',
+                vnamespace: 'default',
+                content: JSON.stringify({ index: idx, msg: `Hello from message ${idx}` }),
+                contentType: 'application/json',
+                priority: 0,
+                handler: 'my-handler'
+            });
         });
-        succeeded++;
-        if (succeeded % 100 === 0) {
-            console.log(`  ✅ ${succeeded}/${total} messages enqueued (last id: ${result.messageId})`);
-        }
+        await Promise.all(batch);
+        succeeded += batch.length;
+        console.log(`  ✅ ${succeeded}/${total} messages enqueued`);
     }
-    console.log(`✅ Done. ${succeeded} messages enqueued to 'my-queue'.`);
+    console.log(`✅ Done. ${succeeded} messages enqueued directly to 'my-queue'.`);
+
+    // 6. Publish 1000 messages via exchange (batches of 50)
+    console.log('📨 Publishing 1000 messages via exchange (batch size: 50)...');
+    let published = 0;
+    for (let i = 0; i < total; i += batchSize) {
+        const batch = Array.from({ length: Math.min(batchSize, total - i) }, (_, j) => {
+            const idx = i + j;
+            return sdk.publishMessage({
+                tenantCode: 'my-tenant',
+                exchangeCode: 'my-exchange',
+                routingKeyOrPatternOrQueueCode: 'my.routing.key',
+                vnamespace: 'default',
+                content: JSON.stringify({ index: idx, msg: `Published message ${idx}` }),
+                contentType: 'application/json',
+                priority: 0,
+                handler: 'my-handler'
+            });
+        });
+        await Promise.all(batch);
+        published += batch.length;
+        console.log(`  ✅ ${published}/${total} messages published`);
+    }
+    console.log(`✅ Done. ${published} messages published via 'my-exchange'.`);
 
     //await sdk.disconnect();
 
