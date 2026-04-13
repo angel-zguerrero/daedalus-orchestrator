@@ -1,17 +1,13 @@
-// ─── Scanline wrapper ───────────────────────────────────────────────────────
-// The ::after pseudo-element creates a CRT-like texture over the sidebar.
-// pointer-events: none ensures it doesn't block sidebar interactions.
+// ─── Sidebar scanline + nav styles ─────────────────────────────────────────
+// Applied directly to sidebar internals via ::ng-deep to avoid wrapper divs
+// that break CoreUI's --cui-sidebar-occupy-start layout mechanism.
 
-.daedalus-sidebar-wrap {
-  position: relative;
-
-  &::after {
+:host::ng-deep {
+  // CRT scanline texture — pointer-events: none so it never blocks nav clicks
+  c-sidebar::after {
     content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: var(--cui-sidebar-width, 256px);
-    height: 100vh;
+    position: absolute;
+    inset: 0;
     background: repeating-linear-gradient(
       0deg,
       transparent,
@@ -20,14 +16,11 @@
       rgba(0, 0, 0, 0.12) 2px
     );
     pointer-events: none;
-    z-index: 1100;
-    transition: width 0.15s;
+    z-index: 10;
   }
-}
 
-// ─── Sidebar nav active indicator ──────────────────────────────────────────
+  // ─── Sidebar nav active indicator ────────────────────────────────────────
 
-:host::ng-deep {
   .sidebar-nav .nav-link {
     position: relative;
     font-family: var(--daedalus-font-body);
