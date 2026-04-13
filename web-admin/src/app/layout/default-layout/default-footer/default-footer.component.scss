@@ -1,0 +1,36 @@
+:host {
+  display: block;
+  background-color: var(--daedalus-bg-base);
+  border-top: 1px solid rgba(0, 229, 255, 0.06);
+}
+
+.daedalus-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 0.75rem 1.5rem;
+  min-height: calc(3rem + 1px);
+}
+
+.daedalus-footer__brand {
+  font-family: var(--daedalus-font-body);
+  font-size: var(--daedalus-text-sm);
+  color: var(--daedalus-text-muted);
+}
+
+.daedalus-footer__copy {
+  font-family: var(--daedalus-font-body);
+  font-size: var(--daedalus-text-sm);
+  color: var(--daedalus-text-muted);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.daedalus-footer__version {
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-xs);
+  color: var(--daedalus-primary);
+  letter-spacing: 0.08em;
+}
