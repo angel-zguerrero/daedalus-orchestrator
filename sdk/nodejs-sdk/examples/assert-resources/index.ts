@@ -36,7 +36,7 @@ async function main() {
         vnamespace: 'default',
         maxAttempts: 3,
         maxQueueSize: 10000,
-        desiredPriorityThresholds: { 0: 0 }
+        priorityType: 'normal'
     });
     console.log('Queue:', queue);
 

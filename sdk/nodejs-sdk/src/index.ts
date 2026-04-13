@@ -114,6 +114,8 @@ export interface AssertQueueInput {
   maxAttempts?: number;
   maxQueueSize?: number;
   maxDeliveringMessages?: number;
+  /** 'normal' = strict priority order, server sets thresholds automatically. 'fair' = provide desiredPriorityThresholds. */
+  priorityType?: 'normal' | 'fair';
   desiredPriorityThresholds?: Record<number, number>;
   headers?: Record<string, string>;
 }
@@ -371,7 +373,9 @@ export class DaedalusSDK {
           maxAttempts: input.maxAttempts ?? 0,
           maxQueueSize: input.maxQueueSize ?? 0,
           maxDeliveringMessages: input.maxDeliveringMessages ?? 0,
-          desiredPriorityThresholds: input.desiredPriorityThresholds ?? { 0: 0 },
+          desiredPriorityThresholds: input.priorityType === 'normal'
+            ? {}
+            : (input.desiredPriorityThresholds ?? {}),
           headers: input.headers ?? {}
         },
         this.getMetadata(),

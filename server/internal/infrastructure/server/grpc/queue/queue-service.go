@@ -81,6 +81,11 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 		queue.MaxAttempts = 1
 	}
 
+	// Default to normal priority (single level, drain all) when no thresholds configured
+	if len(queue.DesiredPriorityThresholds) == 0 {
+		queue.DesiredPriorityThresholds = map[int]int{0: 0}
+	}
+
 	queuesResult, err := s.QueueBO.BulkCreateQueue(ctx, []*models.Queue{queue}, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return nil, err
