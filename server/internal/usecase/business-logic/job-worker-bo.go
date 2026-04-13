@@ -105,9 +105,13 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 	}
 
 	// Returns true when every policy with a positive cap has been satisfied.
+	// MaxQueueMessages == 0 means unlimited, so that policy is never considered satisfied.
 	allPoliciesSatisfied := func() bool {
 		for code, policy := range policies {
-			if policy.MaxQueueMessages > 0 && claimedByPolicy[code] < policy.MaxQueueMessages {
+			if policy.MaxQueueMessages == 0 {
+				return false // unlimited policy is never satisfied
+			}
+			if claimedByPolicy[code] < policy.MaxQueueMessages {
 				return false
 			}
 		}
