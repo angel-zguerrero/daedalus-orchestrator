@@ -106,10 +106,6 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 			}
 
 			// Process the claim work request
-			s.Config.Logger.Debug().
-				Str("workerID", req.WorkerID).
-				Str("workerName", req.WorkerName).
-				Msg("Processing claim work request")
 
 			err := s.JobWorkerBO.ClaimWork(stream.Context(), req.WorkerID, req.WorkerName, req.Information, capacityPolicies, messageChan)
 			if err != nil {

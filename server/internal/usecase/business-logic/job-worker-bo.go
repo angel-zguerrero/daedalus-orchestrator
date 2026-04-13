@@ -91,7 +91,6 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 		bo.stoppersMu.Lock()
 		bo.stoppers[workerID] = false
 		bo.stoppersMu.Unlock()
-		bo.Config.Logger.Debug().Str("workerID", workerID).Msg("✅ ClaimWork stopper finished")
 	}()
 
 	stopperCtx, stopperCancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -196,33 +195,42 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 							break vnsLoop
 						}
 
-						// ── Queue pagination (DB-filtered; MessagesCount > 0 guaranteed) ──
-						queueCursor := ""
-						const queuePageSize = 50
+						// ── Collect all queues for this vnamespace ───────────────────────────
+						var allQueues []models.Queue
+						{
+							queueCursor := ""
+							const queuePageSize = 50
+							for {
+								qCtx, qCancel := context.WithTimeout(stopperCtx, 10*time.Second)
+								queuesResult, err := queueBO.GetQueuesWithFilter(qCtx, filter, queueCursor, queuePageSize, vns.Name, cf, cfs, &tenant, tenantNode)
+								qCancel()
+								if err != nil {
+									logger.Error().Err(err).
+										Str("policy", policyCode).
+										Str("tenant", tenant.Code).
+										Str("vnamespace", vns.Name).
+										Msg("❌ Failed to paginate queues during ClaimWork")
+									break
+								}
+								allQueues = append(allQueues, queuesResult.Entities...)
+								if queuesResult.Cursor == "" || len(queuesResult.Entities) < queuePageSize {
+									break
+								}
+								queueCursor = queuesResult.Cursor
+							}
+						}
 
-					queueLoop:
+						// ── Round-robin drain: cycle through all queues until the policy
+						// is satisfied or a full round yields no new messages. ─────────────
 						for {
 							if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
 								break
 							}
-
-							qCtx, qCancel := context.WithTimeout(stopperCtx, 10*time.Second)
-							queuesResult, err := queueBO.GetQueuesWithFilter(qCtx, filter, queueCursor, queuePageSize, vns.Name, cf, cfs, &tenant, tenantNode)
-							qCancel()
-							if err != nil {
-								logger.Error().Err(err).
-									Str("policy", policyCode).
-									Str("tenant", tenant.Code).
-									Str("vnamespace", vns.Name).
-									Msg("❌ Failed to paginate queues during ClaimWork")
-								break
-							}
-
-							for _, queue := range queuesResult.Entities {
-								fmt.Printf("Policy %s: evaluating queue %s (MessagesCount=%d, CurrentDeliveringMessages=%d, MaxDeliveringMessages=%d) in vnamespace %s for tenant %s\n",
-									policyCode, queue.Code, queue.MessagesCount, queue.CurrentDeliveringMessages, queue.MaxDeliveringMessages, vns.Name, tenant.Code)
+							claimedInRound := 0
+							for i := range allQueues {
+								queue := &allQueues[i]
 								if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
-									break queueLoop
+									break
 								}
 
 								// Respect the queue's own delivering-message cap (0 = unlimited).
@@ -232,15 +240,15 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 								}
 
 								// ── Dequeue message ──
-								bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, &queue, &tenant, tenantNode, cf, cfs, messageChan)
-
-								claimedByPolicy[policyCode]++
+								if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, queue, &tenant, tenantNode, cf, cfs, messageChan) {
+									queue.CurrentDeliveringMessages++
+									claimedByPolicy[policyCode]++
+									claimedInRound++
+								}
 							}
-
-							if queuesResult.Cursor == "" || len(queuesResult.Entities) < queuePageSize {
-								break
+							if claimedInRound == 0 {
+								break // No queue delivered a message this round; all queues exhausted.
 							}
-							queueCursor = queuesResult.Cursor
 						}
 					}
 
@@ -269,7 +277,7 @@ func (bo *JobWorkerBO) dequeueMessage(
 	tenantNode *dragonboat.RaftNode,
 	cf, cfs string,
 	messageChan chan<- ClaimedMessage,
-) {
+) bool {
 
 	// Crear el comando de dequeue
 	dequeueCmd := &queue_command.DequeueCommand{
@@ -297,7 +305,7 @@ func (bo *JobWorkerBO) dequeueMessage(
 			Str("queueCode", queue.Code).
 			Str("tenant", tenant.Code).
 			Msg("❌ Failed to dequeue message")
-		return
+		return false
 	}
 
 	// Send the claimed message through the channel
@@ -313,6 +321,7 @@ func (bo *JobWorkerBO) dequeueMessage(
 	default:
 		bo.Config.Logger.Warn().Str("messageID", result.Message.ID).Msg("⚠️ Message channel full or closed, message not sent")
 	}
+	return true
 }
 
 // getJobWorkerTenantNode resolves the RaftNode that owns the given tenant's shard.
