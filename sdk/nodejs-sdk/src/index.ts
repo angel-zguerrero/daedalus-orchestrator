@@ -114,6 +114,7 @@ export interface AssertQueueInput {
   maxAttempts?: number;
   maxQueueSize?: number;
   maxDeliveringMessages?: number;
+  desiredPriorityThresholds?: Record<number, number>;
   headers?: Record<string, string>;
 }
 
@@ -131,6 +132,32 @@ export interface AssertBindingInput {
   bindingType?: string;
   targetExchangeType?: string;
   headers?: Record<string, string>;
+}
+
+export interface EnqueueMessageInput {
+  tenantCode: string;
+  queueCode: string;
+  content: string;
+  contentType?: string;
+  vnamespace?: string;
+  priority?: number;
+  handler?: string;
+  headers?: Record<string, string>;
+  parameters?: Record<string, string>;
+}
+
+export interface PublishMessageInput {
+  tenantCode: string;
+  exchangeCode: string;
+  routingKeyOrPatternOrQueueCode?: string;
+  vnamespace?: string;
+  content: string | Buffer;
+  contentType?: string;
+  priority?: number;
+  handler?: string;
+  headers?: Record<string, string>;
+  parameters?: Record<string, string>;
+  messageId?: string;
 }
 
 export class DaedalusSDK {
@@ -344,6 +371,7 @@ export class DaedalusSDK {
           maxAttempts: input.maxAttempts ?? 0,
           maxQueueSize: input.maxQueueSize ?? 0,
           maxDeliveringMessages: input.maxDeliveringMessages ?? 0,
+          desiredPriorityThresholds: input.desiredPriorityThresholds ?? { 0: 0 },
           headers: input.headers ?? {}
         },
         this.getMetadata(),
@@ -354,6 +382,66 @@ export class DaedalusSDK {
           }
           console.log(`✅ Queue asserted: ${input.code}`);
           resolve(response.result);
+        }
+      );
+    });
+  }
+
+  async enqueueMessage(input: EnqueueMessageInput): Promise<{ messageId: string }> {
+    return new Promise((resolve, reject) => {
+      this.queueClient.EnqueueMessage(
+        {
+          tenantCode: input.tenantCode,
+          queueCode: input.queueCode,
+          content: input.content,
+          contentType: input.contentType ?? 'text/plain',
+          vnamespace: input.vnamespace ?? '',
+          priority: input.priority ?? 0,
+          handler: input.handler ?? '',
+          headers: input.headers ?? {},
+          parameters: input.parameters ?? {}
+        },
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to enqueue message:', err.message);
+            return reject(err);
+          }
+          resolve({ messageId: response.messageId });
+        }
+      );
+    });
+  }
+
+  async publishMessage(input: PublishMessageInput): Promise<Record<string, string>> {
+    const contentBytes = Buffer.isBuffer(input.content)
+      ? input.content
+      : Buffer.from(input.content);
+
+    return new Promise((resolve, reject) => {
+      this.exchangeClient.PublishMessage(
+        {
+          tenantCode: input.tenantCode,
+          exchangeCode: input.exchangeCode,
+          routingKeyOrPatternOrQueueCode: input.routingKeyOrPatternOrQueueCode ?? '',
+          vnamespace: input.vnamespace ?? '',
+          message: {
+            messageId: input.messageId ?? '',
+            handler: input.handler ?? '',
+            priority: input.priority ?? 0,
+            parameters: input.parameters ?? {},
+            headers: input.headers ?? {},
+            contentType: input.contentType ?? 'text/plain',
+            content: contentBytes
+          }
+        },
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to publish message:', err.message);
+            return reject(err);
+          }
+          resolve(response.queueMessages ?? {});
         }
       );
     });
