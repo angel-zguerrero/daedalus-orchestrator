@@ -1,0 +1,33 @@
+:host {
+  background-color: var(--daedalus-bg-surface);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.08);
+}
+
+:host::ng-deep {
+  .daedalus-header-toggler {
+    color: var(--daedalus-text-secondary);
+    transition: color 120ms ease;
+
+    &:hover {
+      color: var(--daedalus-primary);
+      background: transparent;
+    }
+  }
+
+  .daedalus-avatar-btn {
+    c-avatar {
+      outline: 2px solid rgba(0, 229, 255, 0.0);
+      border-radius: 4px;
+      transition: outline-color 150ms ease;
+    }
+
+    &:hover c-avatar {
+      outline-color: rgba(0, 229, 255, 0.40);
+    }
+  }
+
+  .breadcrumb {
+    padding: 0.5rem 0;
+    margin-bottom: 0;
+  }
+}

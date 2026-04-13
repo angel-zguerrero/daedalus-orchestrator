@@ -1,10 +1,9 @@
-<!--<c-header class="mb-4 d-print-none" position="sticky">-->
 <ng-container>
   <c-container [fluid]="true" class="border-bottom px-4">
     <button
       [cSidebarToggle]="sidebarId()"
       cHeaderToggler
-      class="btn"
+      class="btn daedalus-header-toggler"
       toggle="visible"
       style="margin-inline-start: -14px;"
       aria-label="Toggle sidebar navigation"
@@ -12,21 +11,19 @@
       <svg cIcon name="cilMenu" size="lg"></svg>
     </button>
 
-
     <c-header-nav class="mx-0">
       <ng-container *ngTemplateOutlet="userDropdown" />
     </c-header-nav>
-
   </c-container>
+
   <c-container [fluid]="true" class="px-4">
     <c-breadcrumb-router />
   </c-container>
 </ng-container>
-<!--</c-header>-->
 
 <ng-template #userDropdown>
   <c-dropdown [popperOptions]="{ placement: 'bottom-start' }" variant="nav-item">
-    <button [caret]="false" cDropdownToggle class="py-0 pe-0" aria-label="Open user menu">
+    <button [caret]="false" cDropdownToggle class="py-0 pe-0 daedalus-avatar-btn" aria-label="Open user menu">
       <c-avatar
         shape="rounded-1"
         size="md"
@@ -46,5 +43,3 @@
     </ul>
   </c-dropdown>
 </ng-template>
-
-
