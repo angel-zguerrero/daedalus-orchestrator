@@ -1,17 +1,321 @@
-// Here you can add other styles
+// ─── Keep existing partials ─────────────────────────────────────────────────
 
-// custom .chartjs-tooltip-body-item padding
 @use "charts";
-
-// custom tweaks for scrollbar styling (wip)
 @use "scrollbar";
 
- // custom calendar today cell color
 .calendar-cell.today {
   --cui-calendar-cell-today-color: var(--cui-info) !important;
 }
 
-// custom select week cursor pointer
 .select-week .calendar-row.current {
   cursor: pointer;
+}
+
+// ─── Daedalus Component Overrides ───────────────────────────────────────────
+
+// Cards
+.card {
+  border-radius: 2px;
+  border: 1px solid rgba(0, 229, 255, 0.10);
+  background-color: var(--daedalus-bg-surface);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+
+  &:hover {
+    border-color: rgba(0, 229, 255, 0.30);
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.05);
+  }
+
+  .card-header {
+    border-radius: 2px 2px 0 0;
+    background-color: var(--daedalus-bg-elevated);
+    border-bottom: 1px solid rgba(0, 229, 255, 0.08);
+    font-family: var(--daedalus-font-display);
+    font-size: var(--daedalus-text-sm);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--daedalus-text-secondary);
+  }
+
+  .card-body {
+    font-family: var(--daedalus-font-body);
+  }
+}
+
+// Tables
+.table {
+  color: var(--daedalus-text-primary);
+
+  thead th,
+  th {
+    font-family: var(--daedalus-font-display);
+    font-size: var(--daedalus-text-xs);
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--daedalus-text-secondary);
+    border-bottom: 1px solid rgba(0, 229, 255, 0.15) !important;
+    padding-top: 0.875rem;
+    padding-bottom: 0.875rem;
+  }
+
+  tbody tr {
+    transition: background-color 120ms ease;
+
+    &:nth-child(even) {
+      background-color: rgba(0, 229, 255, 0.02);
+    }
+
+    &:hover {
+      background-color: rgba(0, 229, 255, 0.06);
+      cursor: pointer;
+    }
+  }
+
+  td {
+    border-color: rgba(0, 229, 255, 0.05);
+    vertical-align: middle;
+    font-family: var(--daedalus-font-body);
+    font-size: var(--daedalus-text-base);
+  }
+}
+
+// Buttons
+.btn {
+  border-radius: 2px;
+  font-family: var(--daedalus-font-body);
+  font-size: var(--daedalus-text-sm);
+  letter-spacing: 0.02em;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.btn-primary {
+  background: transparent;
+  border: 1px solid var(--daedalus-primary);
+  color: var(--daedalus-primary);
+
+  &:hover,
+  &:focus {
+    background: rgba(0, 229, 255, 0.12);
+    border-color: var(--daedalus-primary);
+    color: var(--daedalus-primary);
+  }
+
+  &:active {
+    background: rgba(0, 229, 255, 0.20);
+    border-color: var(--daedalus-primary);
+    color: var(--daedalus-primary);
+  }
+}
+
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--daedalus-brand);
+  color: var(--daedalus-brand);
+
+  &:hover,
+  &:focus {
+    background: rgba(207, 47, 76, 0.12);
+    border-color: var(--daedalus-brand);
+    color: var(--daedalus-brand);
+  }
+
+  &:active {
+    background: rgba(207, 47, 76, 0.20);
+    border-color: var(--daedalus-brand);
+    color: var(--daedalus-brand);
+  }
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--daedalus-text-muted);
+  color: var(--daedalus-text-secondary);
+
+  &:hover,
+  &:focus {
+    background: var(--daedalus-bg-overlay);
+    border-color: var(--daedalus-text-secondary);
+    color: var(--daedalus-text-primary);
+  }
+}
+
+// Form inputs
+.form-control,
+.form-select {
+  border-radius: 2px;
+  background-color: var(--daedalus-bg-surface);
+  border: 1px solid var(--daedalus-text-muted);
+  color: var(--daedalus-text-primary);
+  font-family: var(--daedalus-font-body);
+
+  &::placeholder {
+    color: var(--daedalus-text-muted);
+  }
+
+  &:focus {
+    background-color: var(--daedalus-bg-surface);
+    border-color: var(--daedalus-primary);
+    color: var(--daedalus-text-primary);
+    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.10);
+  }
+}
+
+.form-label {
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--daedalus-text-secondary);
+  margin-bottom: 0.375rem;
+}
+
+// Status badges
+.badge-running,
+.badge-healthy {
+  background: rgba(0, 200, 150, 0.15);
+  color: #00C896;
+  border: 1px solid rgba(0, 200, 150, 0.30);
+  border-radius: 2px;
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.2em 0.6em;
+}
+
+.badge-failed,
+.badge-critical {
+  background: rgba(207, 47, 76, 0.15);
+  color: #CF2F4C;
+  border: 1px solid rgba(207, 47, 76, 0.30);
+  border-radius: 2px;
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.2em 0.6em;
+}
+
+.badge-pending,
+.badge-degraded {
+  background: rgba(255, 179, 0, 0.15);
+  color: #FFB300;
+  border: 1px solid rgba(255, 179, 0, 0.30);
+  border-radius: 2px;
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.2em 0.6em;
+}
+
+.badge-info,
+.badge-syncing {
+  background: rgba(68, 138, 255, 0.15);
+  color: #448AFF;
+  border: 1px solid rgba(68, 138, 255, 0.30);
+  border-radius: 2px;
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.2em 0.6em;
+}
+
+// Dashboard stagger animation
+.dashboard-widget {
+  animation: fadeSlideUp 300ms ease both;
+
+  &:nth-child(1) { animation-delay: 0ms; }
+  &:nth-child(2) { animation-delay: 60ms; }
+  &:nth-child(3) { animation-delay: 120ms; }
+  &:nth-child(4) { animation-delay: 180ms; }
+  &:nth-child(5) { animation-delay: 240ms; }
+  &:nth-child(6) { animation-delay: 300ms; }
+}
+
+// Modals
+.modal-content {
+  border-radius: 2px;
+  background-color: var(--daedalus-bg-elevated);
+  border: 1px solid rgba(0, 229, 255, 0.12);
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(0, 229, 255, 0.10);
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-sm);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.modal-footer {
+  border-top: 1px solid rgba(0, 229, 255, 0.10);
+}
+
+// Dropdowns
+.dropdown-menu {
+  border-radius: 2px;
+  background-color: var(--daedalus-bg-elevated);
+  border: 1px solid rgba(0, 229, 255, 0.12);
+}
+
+.dropdown-item {
+  font-family: var(--daedalus-font-body);
+  color: var(--daedalus-text-primary);
+  font-size: var(--daedalus-text-sm);
+
+  &:hover,
+  &:focus {
+    background-color: var(--daedalus-primary-trace);
+    color: var(--daedalus-text-primary);
+  }
+}
+
+// Breadcrumbs
+.breadcrumb {
+  font-family: var(--daedalus-font-body);
+  font-size: var(--daedalus-text-sm);
+
+  .breadcrumb-item {
+    color: var(--daedalus-text-muted);
+
+    &.active {
+      color: var(--daedalus-text-primary);
+    }
+
+    + .breadcrumb-item::before {
+      color: var(--daedalus-primary-dim);
+    }
+  }
+
+  a {
+    color: var(--daedalus-text-secondary);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--daedalus-primary);
+    }
+  }
+}
+
+// Pagination
+.page-link {
+  background-color: var(--daedalus-bg-surface);
+  border: 1px solid rgba(0, 229, 255, 0.10);
+  color: var(--daedalus-text-secondary);
+  border-radius: 2px;
+  font-family: var(--daedalus-font-display);
+  font-size: var(--daedalus-text-xs);
+
+  &:hover {
+    background-color: var(--daedalus-primary-trace);
+    color: var(--daedalus-primary);
+    border-color: rgba(0, 229, 255, 0.20);
+  }
+}
+
+.page-item.active .page-link {
+  background-color: transparent;
+  border-color: var(--daedalus-primary);
+  color: var(--daedalus-primary);
 }
