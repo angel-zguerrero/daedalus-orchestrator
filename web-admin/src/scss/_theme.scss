@@ -1,8 +1,134 @@
 @use "@coreui/coreui/scss/mixins/transition" as *;
 @use "@coreui/coreui/scss/mixins/color-mode" as *;
 
+// ─── Daedalus Design Tokens ──────────────────────────────────────────────────
+
+:root,
+[data-coreui-theme="dark"] {
+  // Background stack
+  --daedalus-bg-base:      #080C0F;
+  --daedalus-bg-surface:   #0D1317;
+  --daedalus-bg-elevated:  #111A20;
+  --daedalus-bg-overlay:   #162028;
+
+  // Primary accent — cian eléctrico
+  --daedalus-primary:        #00E5FF;
+  --daedalus-primary-dim:    #00B8CC;
+  --daedalus-primary-glow:   rgba(0, 229, 255, 0.15);
+  --daedalus-primary-trace:  rgba(0, 229, 255, 0.06);
+  --daedalus-primary-border: rgba(0, 229, 255, 0.12);
+
+  // Brand accent — crimson del logo
+  --daedalus-brand:      #CF2F4C;
+  --daedalus-brand-dim:  #A8253C;
+  --daedalus-brand-glow: rgba(207, 47, 76, 0.20);
+
+  // Text stack
+  --daedalus-text-primary:   #E8F4F8;
+  --daedalus-text-secondary: #7A9BA8;
+  --daedalus-text-muted:     #3D5A66;
+  --daedalus-text-accent:    #00E5FF;
+
+  // Semantic status colors
+  --daedalus-success: #00C896;
+  --daedalus-warning: #FFB300;
+  --daedalus-danger:  #CF2F4C;
+  --daedalus-info:    #448AFF;
+
+  // Typography
+  --daedalus-font-display: 'Geist Mono', monospace;
+  --daedalus-font-body:    'IBM Plex Sans', system-ui, sans-serif;
+
+  // Type scale
+  --daedalus-text-xs:   0.6875rem;  // 11px — table headers
+  --daedalus-text-sm:   0.8125rem;  // 13px — badges, metadata
+  --daedalus-text-base: 0.9375rem;  // 15px — body
+  --daedalus-text-lg:   1.0625rem;  // 17px — card titles
+  --daedalus-text-xl:   1.25rem;    // 20px — page headings
+  --daedalus-text-2xl:  1.625rem;   // 26px — dashboard numbers
+
+  // ─── CoreUI token overrides ───────────────────────────────────────────────
+  --cui-body-bg:             var(--daedalus-bg-base);
+  --cui-body-color:          var(--daedalus-text-primary);
+  --cui-secondary-color:     var(--daedalus-text-secondary);
+  --cui-tertiary-color:      var(--daedalus-text-muted);
+  --cui-tertiary-bg:         var(--daedalus-bg-base);
+  --cui-secondary-bg:        var(--daedalus-bg-elevated);
+
+  --cui-primary:             var(--daedalus-primary);
+  --cui-primary-rgb:         0, 229, 255;
+  --cui-link-color:          var(--daedalus-primary);
+  --cui-link-hover-color:    var(--daedalus-primary-dim);
+
+  --cui-border-color:        rgba(0, 229, 255, 0.10);
+  --cui-border-color-translucent: rgba(0, 229, 255, 0.08);
+
+  --cui-card-bg:             var(--daedalus-bg-surface);
+  --cui-card-border-color:   rgba(0, 229, 255, 0.10);
+  --cui-card-cap-bg:         var(--daedalus-bg-elevated);
+
+  --cui-dark-bg-subtle:      var(--daedalus-bg-base);
+
+  --cui-success:             var(--daedalus-success);
+  --cui-success-rgb:         0, 200, 150;
+  --cui-warning:             var(--daedalus-warning);
+  --cui-warning-rgb:         255, 179, 0;
+  --cui-danger:              var(--daedalus-danger);
+  --cui-danger-rgb:          207, 47, 76;
+  --cui-info:                var(--daedalus-info);
+  --cui-info-rgb:            68, 138, 255;
+
+  --cui-font-sans-serif:     var(--daedalus-font-body);
+  --cui-font-monospace:      var(--daedalus-font-display);
+
+  --cui-sidebar-bg:          var(--daedalus-bg-base);
+  --cui-sidebar-nav-link-color: var(--daedalus-text-secondary);
+  --cui-sidebar-nav-link-hover-color: var(--daedalus-text-primary);
+  --cui-sidebar-nav-link-active-color: var(--daedalus-primary);
+  --cui-sidebar-nav-link-hover-bg: var(--daedalus-primary-trace);
+  --cui-sidebar-nav-link-active-bg: rgba(0, 229, 255, 0.10);
+  --cui-sidebar-nav-icon-color: var(--daedalus-text-muted);
+  --cui-sidebar-nav-icon-hover-color: var(--daedalus-text-secondary);
+  --cui-sidebar-nav-icon-active-color: var(--daedalus-primary);
+  --cui-sidebar-brand-color: var(--daedalus-text-primary);
+  --cui-sidebar-border-color: var(--daedalus-primary-border);
+
+  --cui-header-bg:           var(--daedalus-bg-surface);
+  --cui-header-color:        var(--daedalus-text-primary);
+  --cui-header-border-color: rgba(0, 229, 255, 0.08);
+
+  --cui-footer-bg:           var(--daedalus-bg-base);
+  --cui-footer-color:        var(--daedalus-text-muted);
+  --cui-footer-border-color: rgba(0, 229, 255, 0.06);
+
+  --cui-input-bg:            var(--daedalus-bg-surface);
+  --cui-input-color:         var(--daedalus-text-primary);
+  --cui-input-border-color:  var(--daedalus-text-muted);
+  --cui-input-focus-border-color: var(--daedalus-primary);
+  --cui-input-placeholder-color: var(--daedalus-text-muted);
+
+  --cui-dropdown-bg:         var(--daedalus-bg-elevated);
+  --cui-dropdown-border-color: rgba(0, 229, 255, 0.12);
+  --cui-dropdown-link-color: var(--daedalus-text-primary);
+  --cui-dropdown-link-hover-bg: var(--daedalus-primary-trace);
+  --cui-dropdown-link-hover-color: var(--daedalus-text-primary);
+
+  --cui-table-bg:            transparent;
+  --cui-table-striped-bg:    rgba(0, 229, 255, 0.02);
+  --cui-table-hover-bg:      rgba(0, 229, 255, 0.06);
+  --cui-table-border-color:  rgba(0, 229, 255, 0.08);
+  --cui-table-color:         var(--daedalus-text-primary);
+
+  --cui-modal-bg:            var(--daedalus-bg-elevated);
+  --cui-modal-header-border-color: rgba(0, 229, 255, 0.10);
+  --cui-modal-footer-border-color: rgba(0, 229, 255, 0.10);
+}
+
+// ─── Layout structural styles (unchanged from original) ────────────────────
+
 body {
-  background-color: var(--cui-tertiary-bg);
+  background-color: var(--daedalus-bg-base);
+  font-family: var(--daedalus-font-body);
 }
 
 .wrapper {
@@ -55,10 +181,33 @@ body {
 
 @include color-mode(dark) {
   body {
-    background-color: var(--cui-dark-bg-subtle);
+    background-color: var(--daedalus-bg-base);
   }
 
   .footer {
-    --cui-footer-bg: var(--cui-body-bg);
+    --cui-footer-bg: var(--daedalus-bg-base);
+  }
+}
+
+// ─── Motion ────────────────────────────────────────────────────────────────
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
