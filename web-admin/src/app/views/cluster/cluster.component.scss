@@ -1,3 +1,20 @@
+// Shard card headers — subtle cian accent, no harsh bg-primary fill
+.daedalus-shard-header {
+  background: rgba(0, 229, 255, 0.08);
+  border-left: 3px solid var(--daedalus-primary, #00E5FF);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.15);
+  color: var(--daedalus-text-primary, #E8F4F8);
+  font-family: var(--daedalus-font-display, 'Geist Mono', monospace);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  strong {
+    color: var(--daedalus-primary, #00E5FF);
+    font-weight: 500;
+  }
+}
+
 .cluster-overview-card {
   .card-body {
     padding: 1.5rem;
