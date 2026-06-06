@@ -1,38 +1,51 @@
 {
-    "name": "@omicron-x/daedalus-sdk",
-    "version": "1.0.2",
-    "description": "Daedalus Orchestrator Node.js Worker",
-    "homepage": "https://github.com/angel-zguerrero/daedalus-orchestrator/tree/main/sdk/nodejs-sdk",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/angel-zguerrero/daedalus-orchestrator.git",
-        "directory": "sdk/nodejs-sdk"
-    },
-    "bugs": {
-        "url": "https://github.com/angel-zguerrero/daedalus-orchestrator/issues"
-    },
-    "main": "dist/src/index.js",
-    "types": "dist/src/index.d.ts",
-    "files": [
-        "dist"
-    ],
-    "license": "Apache-2.0",
-    "publishConfig": {
-        "access": "public"
-    },
-    "scripts": {
-        "build": "tsc",
-        "example:simple-worker": "ts-node examples/simple-worker/index.ts",
-        "example:assert-resources": "ts-node examples/assert-resources/index.ts"
-    },
-    "dependencies": {
-        "@grpc/grpc-js": "^1.9.0",
-        "@grpc/proto-loader": "^0.7.8",
-        "systeminformation": "^5.21.0"
-    },
-    "devDependencies": {
-        "typescript": "^5.0.0",
-        "ts-node": "^10.9.0",
-        "@types/node": "^20.0.0"
-    }
+  "name": "@omicron-x/daedalus-sdk",
+  "version": "1.0.3",
+  "description": "Daedalus Orchestrator Node.js Worker",
+  "homepage": "https://github.com/angel-zguerrero/daedalus-orchestrator/tree/main/sdk/nodejs-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/angel-zguerrero/daedalus-orchestrator.git",
+    "directory": "sdk/nodejs-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/angel-zguerrero/daedalus-orchestrator/issues"
+  },
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "example:simple-worker": "ts-node examples/simple-worker/index.ts",
+    "example:assert-resources": "ts-node examples/assert-resources/index.ts"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.9.0",
+    "@grpc/proto-loader": "^0.7.8",
+    "systeminformation": "^5.21.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.0.0"
+  },
+  "keywords": [
+    "daedalus",
+    "workflow",
+    "orchestration",
+    "workflow-engine",
+    "distributed",
+    "worker",
+    "task-queue",
+    "grpc",
+    "microservices",
+    "durable-execution",
+    "automation"
+  ]
 }
