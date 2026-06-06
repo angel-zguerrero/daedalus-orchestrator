@@ -3,8 +3,24 @@
 Node.js/TypeScript SDK for interacting with the **Daedalus Orchestrator**.
 
 > [!IMPORTANT]
-> This SDK acts as a worker/client to execute tasks. In order to use it, you must have the **Daedalus Orchestrator Server** running. 
-> If you haven't set up the server yet, please follow the [Daedalus Server Running Instructions](../../README.md#-running-the-server) in the main project README.
+> This SDK acts as a worker/client to execute tasks. In order to use it, you must have the **Daedalus Orchestrator Server** running.
+> 
+> ### 🐳 Running the Server with Docker (Recommended)
+> The easiest way to run the Daedalus server is using Docker. You can pull the official multi-architecture image from the **GitHub Container Registry (GHCR)**:
+> 
+> ```bash
+> docker run -d \
+>   -p 3000:3000 \
+>   -p 4000:4000 \
+>   -p 17000:17000 \
+>   --name daedalus \
+>   ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
+> ```
+> Once the container is running, the gRPC connector is available at `http://localhost:4000` (which is the default port the SDK uses) and the Web Admin UI at `http://localhost:3000/admin/`.
+> 
+> ### 🚀 GitHub Releases & Advanced Setup
+> - **Pre-built Binaries & Source Code**: You can download compiled releases from the [GitHub Releases](https://github.com/angel-zguerrero/daedalus-orchestrator/releases) page.
+> - **Advanced Configuration**: For multi-node setup, custom database engines (PebbleDB/RocksDB), or detailed environment variables, check out the [Daedalus Server Running Instructions](https://github.com/angel-zguerrero/daedalus-orchestrator/blob/main/README.md#-running-the-server) in the main project README.
 
 ---
 
