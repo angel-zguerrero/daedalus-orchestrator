@@ -38,6 +38,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	restAPIGroup := engine.Group("/rest-api")
 	{
 
+		restAPIGroup.GET("/auth/status", adminController.AuthStatusHandler)
+		restAPIGroup.POST("/auth/setup", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.AuthSetupHandler)
 		restAPIGroup.POST("/login", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.LoginHandler)
 		restAPIGroup.POST("/logout",
 			authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey),

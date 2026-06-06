@@ -125,3 +125,35 @@ func (bo *AuthBO) generateJWT(username string) (string, error) {
 	}
 	return tokenString, nil
 }
+
+func (bo *AuthBO) CheckRootExists(ctx context.Context) (bool, error) {
+	cmd := &auth_command.CheckRootUserExistsCommand{}
+	exists, err := dragonboat.ExecuteRepositoryQuery[bool](
+		bo.MasterNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"check root user exists",
+	)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func (bo *AuthBO) SetupRootUser(ctx context.Context, username, password string) error {
+	cmd := &auth_command.SetupRootUserCommand{
+		Username: username,
+		Password: password,
+	}
+	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
+		bo.MasterNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"setup root user",
+	)
+	return err
+}

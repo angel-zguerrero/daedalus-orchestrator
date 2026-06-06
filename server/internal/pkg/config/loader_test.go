@@ -53,8 +53,8 @@ default_root_password=secret
 	err := LoadDefaultConfiguration()
 	require.NoError(t, err)
 
-	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootUser)
-	assert.Equal(t, "secret", GlobalConfiguration.DefaultRootPassword)
+	assert.Equal(t, "", GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "", GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestLoadDefault_ConfigFileOverwriteWithEnv(t *testing.T) {
@@ -118,8 +118,8 @@ func TestLoadDefault_NoFile_NoEnv_DefaultFallback(t *testing.T) {
 	err := LoadDefaultConfiguration()
 	require.NoError(t, err)
 
-	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootUser)
-	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootPassword)
+	assert.Equal(t, "", GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "", GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestLoadConfigFromPath_InvalidConnectorPortValue(t *testing.T) {
@@ -242,8 +242,8 @@ func TestLoadDefault_DefaultRootFallbacks(t *testing.T) {
 
 	err := LoadDefaultConfiguration()
 	require.NoError(t, err)
-	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootUser)
-	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootPassword)
+	assert.Equal(t, "", GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "", GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestValidateClusterBasePort_PortTooLow(t *testing.T) {

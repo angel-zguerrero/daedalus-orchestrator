@@ -43,3 +43,28 @@ export const authGuardFn: CanActivateFn = (
     ? true
     : router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 };
+
+export const setupGuardFn: CanActivateFn = (
+  route: ActivatedRouteSnapshot,
+  state: RouterStateSnapshot
+): Observable<boolean | UrlTree> => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  return authService.checkRootExists().pipe(
+    map(hasRoot => {
+      const isSetupRoute = state.url.startsWith('/setup');
+      if (!hasRoot) {
+        if (!isSetupRoute) {
+          return router.createUrlTree(['/setup']);
+        }
+        return true;
+      } else {
+        if (isSetupRoute) {
+          return router.createUrlTree(['/login']);
+        }
+        return true;
+      }
+    })
+  );
+};

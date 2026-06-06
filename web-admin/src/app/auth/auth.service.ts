@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, BehaviorSubject, tap, catchError, of } from 'rxjs';
+import { Observable, BehaviorSubject, tap, catchError, of, map } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -10,13 +10,41 @@ export class AuthService {
   private apiUrl = '/rest-api/login'; // Corrected API endpoint
   private tokenKey = 'authToken';
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
+  private rootExistsSubject = new BehaviorSubject<boolean | null>(null);
 
   public isAuthenticated$: Observable<boolean> = this.isAuthenticatedSubject.asObservable();
+  public rootExists$: Observable<boolean | null> = this.rootExistsSubject.asObservable();
 
   constructor(private http: HttpClient, private router: Router) {}
 
   private hasToken(): boolean {
     return !!localStorage.getItem(this.tokenKey);
+  }
+
+  checkRootExists(): Observable<boolean> {
+    if (this.rootExistsSubject.value === true) {
+      return of(true);
+    }
+    return this.http.get<{ hasRoot: boolean }>('/rest-api/auth/status').pipe(
+      tap(res => this.rootExistsSubject.next(res.hasRoot)),
+      map(res => res.hasRoot),
+      catchError(err => {
+        console.error('Failed checking root status:', err);
+        return of(true); // default to true on error to fail secure
+      })
+    );
+  }
+
+  setupRoot(credentials: { username?: string, password?: string }): Observable<any> {
+    const payload = {
+      username: credentials.username,
+      password: credentials.password
+    };
+    return this.http.post<any>('/rest-api/auth/setup', payload).pipe(
+      tap(() => {
+        this.rootExistsSubject.next(true);
+      })
+    );
   }
 
   login(credentials: { username?: string, password?: string }): Observable<any> {

@@ -1,0 +1,97 @@
+<div class="bg-light dark:bg-transparent min-vh-100 d-flex flex-row align-items-center">
+  <c-container breakpoint="md">
+    <c-row class="justify-content-center">
+      <c-col md="6">
+        <c-card-group>
+          <c-card class="p-4">
+            <c-card-body>
+              <form cForm #setupForm="ngForm" (ngSubmit)="onSetup(setupForm)">
+                <h1>Setup</h1>
+                <p class="text-body-secondary">Create your administrative account</p>
+
+                <c-alert color="danger" *ngIf="setupError" class="mt-3">
+                  {{ setupError }}
+                </c-alert>
+
+                <!-- Username -->
+                <c-input-group class="mb-3">
+                  <span cInputGroupText>
+                    <svg cIcon name="cilUser"></svg>
+                  </span>
+                  <input
+                    autoComplete="username"
+                    cFormControl
+                    placeholder="Username"
+                    name="username"
+                    ngModel
+                    required
+                    #username="ngModel"
+                  />
+                </c-input-group>
+                <div *ngIf="username.invalid && (username.dirty || username.touched || setupForm.submitted)"
+                     cTextColor="danger" class="form-text mb-3">
+                  <small *ngIf="username.errors?.['required']">Username is required.</small>
+                </div>
+
+                <!-- Password -->
+                <c-input-group class="mb-3">
+                  <span cInputGroupText>
+                    <svg cIcon name="cilLockLocked"></svg>
+                  </span>
+                  <input
+                    autoComplete="new-password"
+                    cFormControl
+                    placeholder="Password"
+                    type="password"
+                    name="password"
+                    ngModel
+                    required
+                    minlength="6"
+                    #password="ngModel"
+                  />
+                </c-input-group>
+                <div *ngIf="password.invalid && (password.dirty || password.touched || setupForm.submitted)"
+                     cTextColor="danger" class="form-text mb-3">
+                  <small *ngIf="password.errors?.['required']">Password is required.</small>
+                  <small *ngIf="password.errors?.['minlength']">Password must be at least 6 characters.</small>
+                </div>
+
+                <!-- Repeat Password -->
+                <c-input-group class="mb-4">
+                  <span cInputGroupText>
+                    <svg cIcon name="cilLockLocked"></svg>
+                  </span>
+                  <input
+                    autoComplete="new-password"
+                    cFormControl
+                    placeholder="Repeat password"
+                    type="password"
+                    name="repeatPassword"
+                    ngModel
+                    required
+                    #repeatPassword="ngModel"
+                  />
+                </c-input-group>
+                <div *ngIf="repeatPassword.invalid && (repeatPassword.dirty || repeatPassword.touched || setupForm.submitted)"
+                     cTextColor="danger" class="form-text mb-3">
+                  <small *ngIf="repeatPassword.errors?.['required']">Please repeat the password.</small>
+                </div>
+
+                <!-- Submit Button -->
+                <c-row>
+                  <c-col xs="12">
+                    <button cButton class="px-4 w-100" color="success" type="submit" [disabled]="isLoading || setupForm.invalid">
+                      <span *ngIf="isLoading" cSpinner component="span" size="sm" aria-hidden="true"></span>
+                      <span *ngIf="isLoading"> Creating account...</span>
+                      <span *ngIf="!isLoading">Create Admin Account</span>
+                    </button>
+                  </c-col>
+                </c-row>
+              </form>
+            </c-card-body>
+          </c-card>
+        </c-card-group>
+      </c-col>
+    </c-row>
+  </c-container>
+</div>

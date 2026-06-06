@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuardFn } from './auth/auth.guard'; // Import the functional auth guard
+import { authGuardFn, setupGuardFn } from './auth/auth.guard'; // Import the functional guards
 
 export const routes: Routes = [
   {
@@ -13,7 +13,7 @@ export const routes: Routes = [
   {
     path: '', // This route group contains all authenticated pages
     loadComponent: () => import('./layout').then(m => m.DefaultLayoutComponent),
-    canActivate: [authGuardFn], // Apply AuthGuard here
+    canActivate: [setupGuardFn, authGuardFn], // Apply SetupGuard and AuthGuard here
     data: {
       title: 'Home'
     },
@@ -43,6 +43,7 @@ export const routes: Routes = [
   {
     path: '404',
     loadComponent: () => import('./views/pages/page404/page404.component').then(m => m.Page404Component),
+    canActivate: [setupGuardFn],
     data: {
       title: 'Page 404'
     }
@@ -50,6 +51,7 @@ export const routes: Routes = [
   {
     path: '500',
     loadComponent: () => import('./views/pages/page500/page500.component').then(m => m.Page500Component),
+    canActivate: [setupGuardFn],
     data: {
       title: 'Page 500'
     }
@@ -57,8 +59,17 @@ export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () => import('./views/pages/login/login.component').then(m => m.LoginComponent),
+    canActivate: [setupGuardFn],
     data: {
       title: 'Login Page'
+    }
+  },
+  {
+    path: 'setup',
+    loadComponent: () => import('./views/pages/setup/setup.component').then(m => m.SetupComponent),
+    canActivate: [setupGuardFn],
+    data: {
+      title: 'Setup Root User'
     }
   },
   { path: '**', redirectTo: 'dashboard' } // If not logged in, guard on 'dashboard' (via DefaultLayout) will redirect to login.

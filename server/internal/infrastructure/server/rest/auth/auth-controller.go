@@ -73,3 +73,58 @@ func (ctrl *AdminController) LogoutHandler(c *gin.Context) {
 		"message": "Logout successful",
 	})
 }
+
+type setupRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// AuthStatusHandler handles the GET /rest-api/auth/status endpoint.
+func (ctrl *AdminController) AuthStatusHandler(c *gin.Context) {
+	authBO := bo.NewAuthBO(ctrl.Config.MasterNode, ctrl.Config.JwtKey, ctrl.Config.JwtDuration, &ctrl.Config.Logger)
+	exists, err := authBO.CheckRootExists(c.Request.Context())
+	if err != nil {
+		ctrl.Config.Logger.Error().Err(err).Msg("Failed to check if root user exists")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check root user: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"hasRoot": exists,
+	})
+}
+
+// AuthSetupHandler handles the POST /rest-api/auth/setup endpoint.
+func (ctrl *AdminController) AuthSetupHandler(c *gin.Context) {
+	var req setupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ctrl.Config.Logger.Warn().Err(err).Msg("Setup attempt with invalid payload")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	authBO := bo.NewAuthBO(ctrl.Config.MasterNode, ctrl.Config.JwtKey, ctrl.Config.JwtDuration, &ctrl.Config.Logger)
+
+	// Verify if root already exists first to fail fast
+	exists, err := authBO.CheckRootExists(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify root status: " + err.Error()})
+		return
+	}
+	if exists {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Root user already exists. Setup is locked."})
+		return
+	}
+
+	err = authBO.SetupRootUser(c.Request.Context(), req.Username, req.Password)
+	if err != nil {
+		ctrl.Config.Logger.Error().Err(err).Str("username", req.Username).Msg("Root user setup failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Setup failed: " + err.Error()})
+		return
+	}
+
+	ctrl.Config.Logger.Info().Str("username", req.Username).Msg("Root user setup successful")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Root user setup successful",
+	})
+}

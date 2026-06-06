@@ -31,7 +31,8 @@ func BootstrapRootUser(userRepository UserRepository, config config.Config) erro
 		password := config.DefaultRootPassword
 
 		if username == "" || password == "" {
-			return fmt.Errorf("missing default root user/password")
+			log.Info().Msg("ℹ️ Default root user credentials not provided in env. Initial setup required via UI.")
+			return nil
 		}
 
 		log.Info().

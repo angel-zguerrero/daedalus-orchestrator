@@ -203,8 +203,7 @@ func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(1)
 	err = db.BootstrapRootUser(*repo, cfg)
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "missing default root user/password")
+	assert.NoError(t, err)
 
 	store.AssertExpectations(t)
 }
@@ -223,7 +222,6 @@ func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(1)
 	err = db.BootstrapRootUser(*repo, cfg)
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "missing default root user/password")
+	assert.NoError(t, err)
 	store.AssertExpectations(t)
 }

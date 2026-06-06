@@ -577,12 +577,6 @@ func LoadDefaultConfiguration() error {
 	}
 
 	// Apply defaults if values are not set by any source
-	if config.DefaultRootUser == "" {
-		config.DefaultRootUser = "admin"
-	}
-	if config.DefaultRootPassword == "" {
-		config.DefaultRootPassword = "admin"
-	}
 	if config.MasterDBEngine == "" {
 		config.MasterDBEngine = "pebble"
 	}
@@ -861,13 +855,6 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.connector_port = p
-
-		case constants.ConfigDefaultRootUser:
-			cfg.default_root_user = v
-
-		case constants.ConfigDefaultRootPassword:
-			cfg.default_root_password = v
-
 		case constants.ConfigReplicaIDKey:
 			id, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {

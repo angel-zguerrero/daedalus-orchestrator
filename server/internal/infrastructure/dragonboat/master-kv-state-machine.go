@@ -27,6 +27,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return loginCmd.Execute(uow, now)
 	}
 
+	checkRootUserExistsCommand, ok := input.(auth_command.CheckRootUserExistsCommand)
+	if ok {
+		return checkRootUserExistsCommand.Execute(uow, now)
+	}
+
 	checkSessionExistsCommand, ok := input.(auth_command.CheckSessionExistsCommand)
 	if ok {
 		return checkSessionExistsCommand.Execute(uow, now)
@@ -86,6 +91,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	bootstrapRootUserCmd, ok := cmd.(auth_command.BootstrapRootUserCommand)
 	if ok {
 		return bootstrapRootUserCmd.Execute(uow, now)
+	}
+
+	setupRootUserCmd, ok := cmd.(auth_command.SetupRootUserCommand)
+	if ok {
+		return setupRootUserCmd.Execute(uow, now)
 	}
 
 	registerSessionCommand, ok := cmd.(auth_command.RegisterSessionCommand)
