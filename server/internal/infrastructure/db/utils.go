@@ -6,38 +6,71 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 )
 
 var (
 	getEnv         = os.Getenv
 	getCurrentUser = user.Current
 	mkdirAll       = os.MkdirAll
+	goos           = runtime.GOOS
+	userHomeDir    = os.UserHomeDir
 )
 
-// GetDatabasePath returns the appropriate database storage path based on the environment.
-// For development, it's typically `~/.daedalus/data`.
-// For production or other environments, it's `/var/lib/daedalus/data`.
-// It creates the directory if it doesn't exist (for non-development environments).
-// Returns an error if the user's home directory cannot be found (in development)
-// or if the directory cannot be created.
+// GetDatabasePath returns the appropriate database storage path based on the environment and operating system.
+// It creates the directory if it doesn't exist and returns an error if the directory cannot be created.
 func (d DefaultPathProvider) GetDatabasePath() (string, error) {
+	path, err := d.getDefaultDataPath()
+	if err != nil {
+		return "", err
+	}
+
+	if err := mkdirAll(path, 0755); err != nil {
+		return "", fmt.Errorf("could not create database directory at %q: %w", path, err)
+	}
+
+	return path, nil
+}
+
+// getDefaultDataPath resolves the default data directory path based on environment and OS.
+func (d DefaultPathProvider) getDefaultDataPath() (string, error) {
 	env := getEnv(constants.EnvVarEnvKey)
 	if env == "" {
 		env = string(constants.DEVELOPMENT)
 	}
 
 	if env == string(constants.DEVELOPMENT) {
-		usr, err := getCurrentUser()
+		home, err := userHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("could not get user: %v", err)
+			usr, err2 := getCurrentUser()
+			if err2 != nil {
+				return "", fmt.Errorf("could not get user home directory: %w", err)
+			}
+			home = usr.HomeDir
 		}
-		return filepath.Join(usr.HomeDir, ".daedalus", "data"), nil
+		return filepath.Join(home, ".daedalus", "data"), nil
 	}
 
-	path := "/var/lib/daedalus/data"
-	if err := mkdirAll(path, 0755); err != nil {
-		return "", fmt.Errorf("could not create path: %v", err)
+	// Non-development environments (e.g. production, staging)
+	switch goos {
+	case "windows":
+		programData := getEnv("ProgramData")
+		if programData == "" {
+			programData = `C:\ProgramData`
+		}
+		return filepath.Join(programData, "Daedalus", "data"), nil
+	case "darwin": // macOS
+		home, err := userHomeDir()
+		if err != nil {
+			usr, err2 := getCurrentUser()
+			if err2 != nil {
+				return "", fmt.Errorf("could not get user home directory for macOS: %w", err)
+			}
+			home = usr.HomeDir
+		}
+		return filepath.Join(home, "Library", "Application Support", "Daedalus", "data"), nil
+	default: // Linux and others
+		return filepath.Join("/", "var", "lib", "daedalus", "data"), nil
 	}
-
-	return path, nil
 }
+

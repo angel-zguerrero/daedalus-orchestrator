@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user" // Added
 	"path/filepath"
+	"runtime"
 	"strings" // Added
 	"testing"
 
@@ -49,17 +50,47 @@ func TestDefaultPathProvider_DevelopmentEnv(t *testing.T) {
 func TestDefaultPathProvider_ProductionEnv(t *testing.T) {
 	t.Setenv(constants.EnvVarEnvKey, string(constants.PRODUCTION))
 
+	currentUser, err := user.Current()
+	require.NoError(t, err, "Failed to get current user")
+
 	provider := db.DefaultPathProvider{}
 	path, err := provider.GetDatabasePath()
 
+	var expectedPath string
+	switch osName := runtime.GOOS; osName {
+	case "darwin":
+		expectedPath = filepath.Join(currentUser.HomeDir, "Library", "Application Support", "Daedalus", "data")
+	case "windows":
+		programData := os.Getenv("ProgramData")
+		if programData == "" {
+			programData = `C:\ProgramData`
+		}
+		expectedPath = filepath.Join(programData, "Daedalus", "data")
+	default:
+		expectedPath = "/var/lib/daedalus/data"
+	}
+
 	if err != nil {
 		if os.IsPermission(err) {
-			assert.Equal(t, "/var/lib/daedalus/data", path, "Path should be /var/lib/daedalus/data")
+			assert.Equal(t, expectedPath, path)
 		} else {
-			assert.Error(t, err, "mkdir /var/lib/daedalus: permission denied")
+			assert.Fail(t, "unexpected error: %v", err)
 		}
 	} else {
-		assert.Equal(t, "/var/lib/daedalus/data", path, "Path should be /var/lib/daedalus/data")
-		os.RemoveAll("/var/lib/daedalus")
+		assert.Equal(t, expectedPath, path)
+		// Clean up created path
+		if runtime.GOOS == "darwin" {
+			os.RemoveAll(filepath.Join(currentUser.HomeDir, "Library", "Application Support", "Daedalus"))
+		} else if runtime.GOOS == "windows" {
+			// standard program data path clean
+			programData := os.Getenv("ProgramData")
+			if programData == "" {
+				programData = `C:\ProgramData`
+			}
+			os.RemoveAll(filepath.Join(programData, "Daedalus"))
+		} else {
+			os.RemoveAll("/var/lib/daedalus")
+		}
 	}
 }
+
