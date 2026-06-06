@@ -174,6 +174,89 @@ nx run server:serve-rocksdb-admin
 
 ---
 
+### Option 5 — Run with Docker
+
+You can run Daedalus Orchestrator using our pre-built multi-architecture Docker images.
+
+**Quickstart (Single Node):**
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -p 4000:4000 \
+  -p 5000:5000 \
+  --name daedalus \
+  ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
+```
+
+Once started, the Web UI is available at `http://localhost:3000/admin/`.
+
+**Persistent Storage:**
+By default, the container writes data to `/var/lib/daedalus/data`. Use a Docker volume to persist this data:
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -p 4000:4000 \
+  -p 5000:5000 \
+  -v daedalus-data:/var/lib/daedalus/data \
+  --name daedalus \
+  ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
+```
+
+You can override the data directory path inside the container using the `DAEDALUS_DATA_DIR` environment variable:
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -p 4000:4000 \
+  -p 5000:5000 \
+  -e DAEDALUS_DATA_DIR=/custom/data/path \
+  -v daedalus-data:/custom/data/path \
+  --name daedalus \
+  ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
+```
+
+**Environment Variables Configuration:**
+The container is fully configurable using environment variables. Any configuration parameter can be overridden.
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -p 4000:4000 \
+  -p 5000:5000 \
+  -e ENV=production \
+  -e DEFAULT_ROOT_USER=admin \
+  -e DEFAULT_ROOT_PASSWORD=secret \
+  -e REPLICA_ID=1 \
+  -e DEPLOYMENT_ID=0 \
+  -v daedalus-data:/var/lib/daedalus/data \
+  --name daedalus \
+  ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
+```
+
+**Docker Compose:**
+Here is a complete `docker-compose.yml` example:
+```yaml
+services:
+  daedalus:
+    image: ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
+    container_name: daedalus-orchestrator
+    ports:
+      - "3000:3000"   # Web UI & REST API
+      - "4000:4000"   # gRPC Server
+      - "5000:5000"   # Cluster Communication
+    environment:
+      - ENV=production
+      - DEFAULT_ROOT_USER=admin
+      - DEFAULT_ROOT_PASSWORD=secret
+      - REPLICA_ID=1
+      - DEPLOYMENT_ID=0
+    volumes:
+      - daedalus-data:/var/lib/daedalus/data
+
+volumes:
+  daedalus-data:
+```
+
+---
+
 ## 🧪 Running Tests
 
 **Default build (PebbleDB):**

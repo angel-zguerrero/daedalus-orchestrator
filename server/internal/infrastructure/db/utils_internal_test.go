@@ -159,4 +159,26 @@ func TestDefaultPathProvider_OSPaths(t *testing.T) {
 		assert.Equal(t, expected, path)
 		assert.Equal(t, expected, createdPath)
 	})
+
+	t.Run("DAEDALUS_DATA_DIR override", func(t *testing.T) {
+		goos = "linux"
+		userHomeDir = func() (string, error) { return "/home/testuser", nil }
+		getEnv = func(key string) string {
+			if key == "DAEDALUS_DATA_DIR" {
+				return "/custom/data/dir"
+			}
+			return ""
+		}
+		var createdPath string
+		mkdirAll = func(path string, perm os.FileMode) error {
+			createdPath = path
+			return nil
+		}
+
+		path, err := provider.GetDatabasePath()
+		assert.NoError(t, err)
+		assert.Equal(t, "/custom/data/dir", path)
+		assert.Equal(t, "/custom/data/dir", createdPath)
+	})
 }
+

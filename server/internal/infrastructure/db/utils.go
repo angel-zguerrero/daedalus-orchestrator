@@ -34,6 +34,10 @@ func (d DefaultPathProvider) GetDatabasePath() (string, error) {
 
 // getDefaultDataPath resolves the default data directory path based on environment and OS.
 func (d DefaultPathProvider) getDefaultDataPath() (string, error) {
+	if dataDir := getEnv("DAEDALUS_DATA_DIR"); dataDir != "" {
+		return dataDir, nil
+	}
+
 	env := getEnv(constants.EnvVarEnvKey)
 	if env == "" {
 		env = string(constants.DEVELOPMENT)
