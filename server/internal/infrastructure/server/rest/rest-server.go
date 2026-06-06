@@ -45,6 +45,10 @@ func NewRestServer(config *common.ServerConfing) *RestServer {
 	staticPath := resolveAngularDistPath(config)
 	engine.Static("/admin/", staticPath)
 
+	engine.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/admin/")
+	})
+
 	engine.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/rest-api/") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "REST API route not found"})
