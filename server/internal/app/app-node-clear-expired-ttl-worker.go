@@ -86,15 +86,16 @@ func (app *Application) clearMasterNodeTTL() {
 			},
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-		defer cancel()
 
 		resultChan, err := app.MasterNode.Write(ctx, cmd)
 		if err != nil {
+			cancel()
 			log.Err(err).Msg("❌ Failed to start TTL clear operation on master node")
 			return
 		}
 
-		go func() {
+		go func(ctx context.Context, cancel context.CancelFunc) {
+			defer cancel()
 			select {
 			case writeResult := <-resultChan:
 				if writeResult.Error != nil {
@@ -105,7 +106,7 @@ func (app *Application) clearMasterNodeTTL() {
 			case <-ctx.Done():
 				log.Warn().Msg("⏱️ TTL clear operation timed out on master node")
 			}
-		}()
+		}(ctx, cancel)
 	}
 }
 
@@ -119,17 +120,18 @@ func (app *Application) clearTenantBatchTTL(batch []*dragonboat.RaftNode) {
 			},
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-		defer cancel()
 
 		resultChan, err := node.Write(ctx, cmd)
 		if err != nil {
+			cancel()
 			log.Err(err).
 				Str("node", strconv.FormatUint(node.ShardID, 10)).
 				Msg("❌ Failed to start TTL clear operation on tenant node")
-			return
+			continue
 		}
 
-		go func(nodeID uint64) {
+		go func(nodeID uint64, ctx context.Context, cancel context.CancelFunc) {
+			defer cancel()
 			select {
 			case writeResult := <-resultChan:
 				if writeResult.Error != nil {
@@ -146,6 +148,6 @@ func (app *Application) clearTenantBatchTTL(batch []*dragonboat.RaftNode) {
 					Str("node", strconv.FormatUint(nodeID, 10)).
 					Msg("⏱️ TTL clear operation timed out on tenant node")
 			}
-		}(node.ShardID)
+		}(node.ShardID, ctx, cancel)
 	}
 }
