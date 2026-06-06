@@ -1,5 +1,5 @@
 {
-    "name": "@daedalus/nodejs-sdk",
+    "name": "@omicron-x/daedalus-sdk",
     "version": "1.0.0",
     "description": "Daedalus Orchestrator Node.js Worker",
     "main": "dist/src/index.js",
