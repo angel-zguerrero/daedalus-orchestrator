@@ -8,6 +8,7 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -91,17 +92,38 @@ func resolveAngularDistPath(restServerConfing *common.ServerConfing) string {
 		}
 
 		return absPath
-	} else {
-		base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
-		if err != nil {
-			restServerConfing.Logger.Fatal().
-				Err(err).
-				Str("package", "rest_server").
-				Str("func", "resolveAngularDistPath").
-				Msgf("❌ Getting Rest web application path")
-		}
-		return base_path
 	}
+
+	// Production / release binary:
+	// 1st priority — look for a 'web-admin' folder next to the executable.
+	//   This covers the release tarball layout:
+	//     daedalus-orchestrator_vX.Y.Z_<os>_<arch>/
+	//       daedalus-orchestrator   (binary)
+	//       web-admin/              (Angular assets)
+	if execPath, err := os.Executable(); err == nil {
+		execDir := filepath.Dir(execPath)
+		candidate := filepath.Join(execDir, "web-admin")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			restServerConfing.Logger.Info().
+				Str("path", candidate).
+				Msg("📂 Serving web-admin from directory next to binary")
+			return candidate
+		}
+	}
+
+	// 2nd priority — system-wide install path (/var/lib/daedalus/data).
+	base_path, err := db.DefaultPathProvider{}.GetDatabasePath()
+	if err != nil {
+		restServerConfing.Logger.Fatal().
+			Err(err).
+			Str("package", "rest_server").
+			Str("func", "resolveAngularDistPath").
+			Msgf("❌ Getting Rest web application path")
+	}
+	restServerConfing.Logger.Info().
+		Str("path", base_path).
+		Msg("📂 Serving web-admin from system path")
+	return base_path
 
 }
 
