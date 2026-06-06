@@ -68,6 +68,15 @@ The primary storage engine is [PebbleDB](https://github.com/cockroachdb/pebble) 
 
 ---
 
+## 🔌 Worker Integration (SDK)
+
+To connect workers, register task handlers, publish/enqueue messages, and interact with the **Daedalus Orchestrator Server**, you need to use a client SDK.
+
+Currently, we provide:
+- **[Node.js / TypeScript SDK](sdk/nodejs-sdk/README.md)**: A client library built to establish persistent gRPC connections with the orchestrator, manage topologies (tenants, exchanges, queues, bindings), and process queued tasks. For installation, usage examples, and configuration guides, refer to the [Node.js SDK README](sdk/nodejs-sdk/README.md).
+
+---
+
 ## 🚀 Running the Server
 
 ### Prerequisites
