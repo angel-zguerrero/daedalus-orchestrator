@@ -23,7 +23,7 @@ func TestIsValidPort(t *testing.T) {
 		},
 		{
 			name:     "Port in valid range",
-			port:     5000,
+			port:     17000,
 			expected: true,
 		},
 		{

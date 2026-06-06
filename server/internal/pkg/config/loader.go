@@ -28,7 +28,7 @@ Available Flags:
   --replica			 Unique identifier (positive integer) for this node within the cluster. Required when creating a new cluster or joining an existing one.
   --role			 Comma-separated list of roles for this node (e.g., 'consensus,scheduler,connector'). Defines the node's responsibilities within the cluster.
   --self-member-host The IP address or hostname that this node will use for communication with other members in the cluster. (e.g., 127.0.0.1)
-  --cluster-base-port The base port number that this node will use for communication with other members in the cluster. (e.g., 5000)
+  --cluster-base-port The base port number that this node will use for communication with other members in the cluster. (e.g., 17000)
   --master-db-engine         The database engine for the master database (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --tenant-db-engine         The database engine for tenant databases (e.g., "pebble", "rocksdb"). Defaults to "pebble".
   --rest-api-jwt-expiration-hours JWT expiration time in hours for the Rest API. Default is 3 hours.
@@ -55,7 +55,7 @@ Environment Variables:
   REPLICA_ID                   Node's replica ID.
   ROLES                        Comma-separated node roles.
   SELF_MEMBER_HOST             Node's own member host (e.g., 127.0.0.1). (Corresponds to ` + constants.EnvVarSelfMemberHost + `)
-  CLUSTER_BASE_PORT            Node's own cluster base port (e.g., 5000). (Corresponds to ` + constants.EnvVarClusterBasePort + `)
+  CLUSTER_BASE_PORT            Node's own cluster base port (e.g., 17000). (Corresponds to ` + constants.EnvVarClusterBasePort + `)
   INITIAL_MEMBERS              Initial members of the cluster (ip:port,ip:port,...).
   JOIN                         Set to "true" if the node is joining an existing cluster.
   CONNECTOR_PORT               Port for the connector service.
@@ -695,7 +695,7 @@ func LoadDefaultConfiguration() error {
 			config.SelfMemberHost = "127.0.0.1"
 		}
 		if config.ClusterBasePort == 0 {
-			config.ClusterBasePort = 5000
+			config.ClusterBasePort = 17000
 		}
 		config.ReplicaID = 1
 		// Construct InitialMembers from SelfMemberHost and ClusterBasePort if not specified

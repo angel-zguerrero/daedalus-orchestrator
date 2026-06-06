@@ -246,7 +246,7 @@
           <c-form-feedback *ngIf="addNodeForm.get('port')?.invalid && addNodeForm.get('port')?.touched" [valid]="false">
             Port is required and must be between 1024 and 65535
           </c-form-feedback>
-          <small class="text-muted">Port is automatically calculated as 5000 + Replica ID (but can be edited)</small>
+          <small class="text-muted">Port is automatically calculated as 17000 + Replica ID (but can be edited)</small>
         </c-col>
       </c-row>
 
@@ -272,12 +272,12 @@
 
             <strong>Option 1: Same machine</strong> (each node on different port):
             <br>
-            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ (enhancedClusterInfo?.port_configuration?.rest_port || 3000) + (addNodeForm.get('replica_id')?.value || 0) }} -grpc-port {{ (enhancedClusterInfo?.port_configuration?.grpc_port || 4000) + (addNodeForm.get('replica_id')?.value || 0) }} -join --role=scheduler,connector</code>
+            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '17000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ (enhancedClusterInfo?.port_configuration?.rest_port || 3000) + (addNodeForm.get('replica_id')?.value || 0) }} -grpc-port {{ (enhancedClusterInfo?.port_configuration?.grpc_port || 4000) + (addNodeForm.get('replica_id')?.value || 0) }} -join --role=scheduler,connector</code>
             <br><br>
 
             <strong>Option 2: Separate machines</strong> (can use same ports since they are on different hosts):
             <br>
-            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '5000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ enhancedClusterInfo?.port_configuration?.rest_port || '3000' }} -grpc-port {{ enhancedClusterInfo?.port_configuration?.grpc_port || '4000' }} -join --role=scheduler,connector</code>
+            <code>go run . -self-member-host {{ addNodeForm.get('host')?.value }} -cluster-base-port {{ enhancedClusterInfo?.port_configuration?.cluster_base_port || '17000' }} -replica {{ addNodeForm.get('replica_id')?.value }} -rest-port {{ enhancedClusterInfo?.port_configuration?.rest_port || '3000' }} -grpc-port {{ enhancedClusterInfo?.port_configuration?.grpc_port || '4000' }} -join --role=scheduler,connector</code>
             <br><br>
 
           </c-alert>

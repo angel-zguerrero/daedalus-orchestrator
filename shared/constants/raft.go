@@ -10,7 +10,7 @@ const MaxShardsInNonProduction = 10
 const MaxReplicationInProduction = 100
 const MaxReplicationInNonProduction = 10
 
-const MinSafePort = 5000
+const MinSafePort = 17000
 const MaxPort = 65535
 
 const RestPortSafeDistance = 1000

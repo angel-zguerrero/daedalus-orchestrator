@@ -29,8 +29,8 @@ WORKDIR /app
 COPY --from=go-builder /app/server/daedalus-orchestrator /usr/local/bin/daedalus-orchestrator
 COPY --from=web-builder /app/web-admin/dist/daedalus-web-admin/browser /usr/local/bin/web-admin
 
-# Expose Web UI & REST API (3000), gRPC (4000), Raft / Cluster communication (5000)
-EXPOSE 3000 4000 5000
+# Expose Web UI & REST API (3000), gRPC (4000), Raft / Cluster communication (17000)
+EXPOSE 3000 4000 17000
 
 # Declare persistent data volume
 VOLUME ["/var/lib/daedalus/data"]

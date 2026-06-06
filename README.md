@@ -81,7 +81,7 @@ The primary storage engine is [PebbleDB](https://github.com/cockroachdb/pebble) 
 
 ### Option 1 — Quickstart: Single node (zero config)
 
-If no cluster flags are provided, the server bootstraps a single-node cluster automatically using sensible defaults (`127.0.0.1:5000`, replica `1`, PebbleDB).
+If no cluster flags are provided, the server bootstraps a single-node cluster automatically using sensible defaults (`127.0.0.1:17000`, replica `1`, PebbleDB).
 
 ```bash
 cd server
@@ -114,31 +114,31 @@ From the `server/` directory, open separate terminals for each node:
 
 **Consensus nodes (form the Raft quorum — start these first):**
 ```bash
-go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 5000 \
+go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 \
   -replica 1 -rest-port 3001 -grpc-port 4001 --role=admin,consensus
 
-go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 5000 \
+go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 \
   -replica 2 -rest-port 3002 -grpc-port 4002 --role=admin,consensus
 
-go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 5000 \
+go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -initial-members=127.0.0.1:r1,127.0.0.1:r2,127.0.0.1:r3 \
   -replica 3 -rest-port 3003 -grpc-port 4003 --role=admin,consensus
 ```
 
 **Scheduler/Connector nodes (join the existing cluster):**
 ```bash
-go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 5000 \
+go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -replica 4 -rest-port 3004 -grpc-port 4004 -join --role=scheduler,connector
 
-go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 5000 \
+go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -replica 5 -rest-port 3005 -grpc-port 4005 -join --role=scheduler,connector
 
-go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 5000 \
+go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -replica 6 -rest-port 3006 -grpc-port 4006 -join --role=scheduler,connector
 
-go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 5000 \
+go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -replica 7 -rest-port 3007 -grpc-port 4007 -join --role=scheduler,connector
 ```
 
@@ -183,7 +183,7 @@ You can run Daedalus Orchestrator using our pre-built multi-architecture Docker 
 docker run -d \
   -p 3000:3000 \
   -p 4000:4000 \
-  -p 5000:5000 \
+  -p 17000:17000 \
   --name daedalus \
   ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
 ```
@@ -196,7 +196,7 @@ By default, the container writes data to `/var/lib/daedalus/data`. Use a Docker 
 docker run -d \
   -p 3000:3000 \
   -p 4000:4000 \
-  -p 5000:5000 \
+  -p 17000:17000 \
   -v daedalus-data:/var/lib/daedalus/data \
   --name daedalus \
   ghcr.io/angel-zguerrero/daedalus-orchestrator:latest
@@ -207,7 +207,7 @@ You can override the data directory path inside the container using the `DAEDALU
 docker run -d \
   -p 3000:3000 \
   -p 4000:4000 \
-  -p 5000:5000 \
+  -p 17000:17000 \
   -e DAEDALUS_DATA_DIR=/custom/data/path \
   -v daedalus-data:/custom/data/path \
   --name daedalus \
@@ -220,7 +220,7 @@ The container is fully configurable using environment variables. Any configurati
 docker run -d \
   -p 3000:3000 \
   -p 4000:4000 \
-  -p 5000:5000 \
+  -p 17000:17000 \
   -e ENV=production \
   -e DEFAULT_ROOT_USER=admin \
   -e DEFAULT_ROOT_PASSWORD=secret \
@@ -241,7 +241,7 @@ services:
     ports:
       - "3000:3000"   # Web UI & REST API
       - "4000:4000"   # gRPC Server
-      - "5000:5000"   # Cluster Communication
+      - "17000:17000"   # Cluster Communication
     environment:
       - ENV=production
       - DEFAULT_ROOT_USER=admin
@@ -295,7 +295,7 @@ Configuration is loaded from three sources, in order of precedence (highest → 
 | `REPLICA_ID` | Unique numeric ID for this node in the cluster. | *(required)* |
 | `ROLES` | Comma-separated roles for this node (e.g., `consensus,scheduler,connector`). | *(all roles)* |
 | `SELF_MEMBER_HOST` | IP/hostname this node advertises to cluster peers. | `127.0.0.1` |
-| `CLUSTER_BASE_PORT` | Base port for Raft cluster communication. | `5000` |
+| `CLUSTER_BASE_PORT` | Base port for Raft cluster communication. | `17000` |
 | `INITIAL_MEMBERS` | Comma-separated list of initial member addresses for cluster bootstrap (e.g., `127.0.0.1:r1,127.0.0.1:r2`). | *(auto-derived)* |
 | `JOIN` | Set to `true` to join an existing cluster instead of bootstrapping. | `false` |
 | `CONNECTOR_PORT` | Port for the connector service (worker connections). | *(optional)* |

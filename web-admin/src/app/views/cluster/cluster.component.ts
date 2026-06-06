@@ -69,7 +69,7 @@ export class ClusterComponent implements OnInit {
     // Watch replica_id changes to auto-calculate port
     this.addNodeForm.get('replica_id')?.valueChanges.subscribe(replicaId => {
       if (replicaId && !isNaN(replicaId)) {
-        const calculatedPort = 5000 + parseInt(replicaId);
+        const calculatedPort = 17000 + parseInt(replicaId);
         this.addNodeForm.get('port')?.setValue(calculatedPort);
       } else {
         this.addNodeForm.get('port')?.setValue('');

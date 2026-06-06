@@ -437,7 +437,7 @@ func TestValidateClusterBasePort_PortTooHigh(t *testing.T) {
 
 func TestValidateClusterBasePort_ValidInProduction(t *testing.T) {
 	cfg := &Config{
-		ClusterBasePort: 5000,
+		ClusterBasePort: 17000,
 		Env:             string(constants.PRODUCTION),
 		MaxShards:      100,
 	}
@@ -461,7 +461,7 @@ func TestValidateClusterBasePort_ExceedsMaxInProduction(t *testing.T) {
 
 func TestValidateClusterBasePort_ValidInNonProduction(t *testing.T) {
 	cfg := &Config{
-		ClusterBasePort: 5000,
+		ClusterBasePort: 17000,
 		Env:             string(constants.DEVELOPMENT),
 		MaxShards:      10,
 	}
