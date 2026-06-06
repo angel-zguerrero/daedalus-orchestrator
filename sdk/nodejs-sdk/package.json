@@ -1,7 +1,16 @@
 {
     "name": "@omicron-x/daedalus-sdk",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "description": "Daedalus Orchestrator Node.js Worker",
+    "homepage": "https://github.com/angel-zguerrero/daedalus-orchestrator/tree/main/sdk/nodejs-sdk",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/angel-zguerrero/daedalus-orchestrator.git",
+        "directory": "sdk/nodejs-sdk"
+    },
+    "bugs": {
+        "url": "https://github.com/angel-zguerrero/daedalus-orchestrator/issues"
+    },
     "main": "dist/src/index.js",
     "types": "dist/src/index.d.ts",
     "files": [
