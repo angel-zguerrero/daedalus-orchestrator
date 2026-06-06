@@ -100,7 +100,7 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           go build \
-            -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
+            -ldflags="-s -w -X main.Version=${{ github.ref_name }} -X deadalus-orch/server/internal/pkg/utils.DefaultEnv=production" \
             -o daedalus-orchestrator${{ matrix.suffix }} \
             ./cmd/main.go
 

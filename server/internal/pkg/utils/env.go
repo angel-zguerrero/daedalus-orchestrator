@@ -9,9 +9,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// DefaultEnv can be overridden at build time using ldflags (e.g. -X deadalus-orch/server/internal/pkg/utils.DefaultEnv=production)
+var DefaultEnv = string(constants.DEVELOPMENT)
+
 // ValidateEnvVar checks critical environment variables for the application.
 // It ensures that `ENV` (or its equivalent `constants.EnvVarEnvKey`) is set to one of
-// "development", "staging", or "production". If not set, it defaults to "development".
+// "development", "staging", or "production". If not set, it defaults to DefaultEnv.
 // It also ensures that `OTEL_ACTIVED` (or `constants.EnvVarOtelActived`) is set to "true" or "false".
 // If not set, it defaults to "true" (enabling OpenTelemetry).
 // For any invalid value, it logs an error and returns an error.
@@ -24,9 +27,9 @@ func ValidateEnvVar() error {
 	// Validate ENV (constants.EnvVarEnvKey)
 	env := os.Getenv(constants.EnvVarEnvKey)
 	if env == "" {
-		env = string(constants.DEVELOPMENT) // Default to "development"
+		env = DefaultEnv
 		os.Setenv(constants.EnvVarEnvKey, env)
-		log.Info().Str(constants.EnvVarEnvKey, env).Msg("Defaulted to development environment")
+		log.Info().Str(constants.EnvVarEnvKey, env).Msgf("Defaulted to %s environment", env)
 	}
 
 	switch constants.Env(env) { // Cast to constants.Env for direct comparison with typed constants
