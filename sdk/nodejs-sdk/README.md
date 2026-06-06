@@ -2,6 +2,10 @@
 
 Node.js/TypeScript SDK for interacting with the **Daedalus Orchestrator**.
 
+> [!IMPORTANT]
+> This SDK acts as a worker/client to execute tasks. In order to use it, you must have the **Daedalus Orchestrator Server** running. 
+> If you haven't set up the server yet, please follow the [Daedalus Server Running Instructions](../../README.md#-running-the-server) in the main project README.
+
 ---
 
 ## 📦 Installation
