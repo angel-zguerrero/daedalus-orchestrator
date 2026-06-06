@@ -66,6 +66,16 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return paginateJobWorkersCommand.Execute(uow, now)
 	}
 
+	getTenantSummaryCommand, ok := input.(tenant_command.GetTenantSummaryCommand)
+	if ok {
+		return getTenantSummaryCommand.Execute(uow, now)
+	}
+
+	getDashboardSummaryCommand, ok := input.(tenant_command.GetDashboardSummaryCommand)
+	if ok {
+		return getDashboardSummaryCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 
@@ -136,6 +146,11 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	upsertJobWorkerCommand, ok := cmd.(job_worker_command.UpsertJobWorkerCommand)
 	if ok {
 		return upsertJobWorkerCommand.Execute(uow, now)
+	}
+
+	updateDashboardSummaryCommand, ok := cmd.(tenant_command.UpdateDashboardSummaryCommand)
+	if ok {
+		return updateDashboardSummaryCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

@@ -64,14 +64,15 @@ type Application struct {
 	TenantNodesDictionary         map[string]*dragonboat.RaftNode
 	RestAPI                       *rest_server.RestServer
 	GrpcAPI                       *grpc_server.GrpcServer
-	NodeReadyWatcherStopper       *syncutil.Stopper
-	NodeClearExpiredTTLStopper    *syncutil.Stopper
-	NodeClearExpiredLeasesStopper *syncutil.Stopper
-	NodeSchedulerProcessStopper   *syncutil.Stopper
-	AssignTenantsStopper          *syncutil.Stopper
-	TenantSummaryWorkerStopper    *syncutil.Stopper
-	NodeSchedulerBalancingStopper *syncutil.Stopper
-	JobWorkerHeartbeatStopper     *syncutil.Stopper
+	NodeReadyWatcherStopper        *syncutil.Stopper
+	NodeClearExpiredTTLStopper     *syncutil.Stopper
+	NodeClearExpiredLeasesStopper  *syncutil.Stopper
+	NodeSchedulerProcessStopper    *syncutil.Stopper
+	AssignTenantsStopper           *syncutil.Stopper
+	TenantSummaryWorkerStopper     *syncutil.Stopper
+	DashboardSummaryWorkerStopper  *syncutil.Stopper
+	NodeSchedulerBalancingStopper  *syncutil.Stopper
+	JobWorkerHeartbeatStopper      *syncutil.Stopper
 
 	ApiLock  sync.Mutex
 	GrpcLock sync.Mutex
@@ -242,6 +243,8 @@ func (app *Application) Run() {
 
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
+	app.StartDashboardSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
+
 	app.StartNodeSchedulerBalancingWorker(10 * time.Second)
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
@@ -376,6 +379,14 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ TenantSummaryWorkerStopper stopped.")
 	}()
 
+	// Stop Dashboard Summary Worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.DashboardSummaryWorkerStopper.Stop()
+		log.Info().Msg("✅ DashboardSummaryWorkerStopper stopped.")
+	}()
+
 	// Stop Node Scheduler Balancing Worker
 	wg.Add(1)
 	go func() {
@@ -430,6 +441,7 @@ func NewApplication() *Application {
 		NodeSchedulerProcessStopper:   syncutil.NewStopper(),
 		AssignTenantsStopper:          syncutil.NewStopper(),
 		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
+		DashboardSummaryWorkerStopper: syncutil.NewStopper(),
 		NodeSchedulerBalancingStopper: syncutil.NewStopper(),
 		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
 

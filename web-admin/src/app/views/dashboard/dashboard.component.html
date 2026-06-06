@@ -1,2 +1,109 @@
-<app-widgets-dropdown />
+<c-row>
+  <c-col xs="12">
+    <c-card class="mb-4">
+      <c-card-header>
+        <h4 class="mb-0">
+          <svg cIcon name="cil-speedometer" class="me-2"></svg>
+          System Dashboard
+        </h4>
+      </c-card-header>
+      <c-card-body>
 
+        <!-- Loading state -->
+        <div *ngIf="dashboardLoading" class="text-center py-5">
+          <svg cIcon name="cil-speedometer" size="4xl" class="text-primary mb-3"></svg>
+          <h4 class="text-muted">Loading dashboard metrics...</h4>
+          <p class="text-body-secondary">
+            Fetching the latest system-wide statistics.
+          </p>
+        </div>
+
+        <!-- Error state -->
+        <div *ngIf="dashboardError && !dashboardLoading" class="text-center py-5">
+          <svg cIcon name="cil-info" size="4xl" class="text-muted mb-3"></svg>
+          <h4 class="text-muted">No metrics available yet</h4>
+          <p class="text-body-secondary">
+            The dashboard summary is still being computed. Please try again in a moment.
+          </p>
+          <button cButton color="primary" variant="outline" size="sm" (click)="loadDashboardSummary()">
+            <svg cIcon name="cil-reload" class="me-1"></svg>
+            Retry
+          </button>
+        </div>
+
+        <!-- Metrics cards -->
+        <div *ngIf="dashboardSummary && !dashboardLoading" class="row">
+
+          <!-- Tenants -->
+          <div class="col-md-4 col-lg-2dot4 mb-3">
+            <div class="card border-primary h-100">
+              <div class="card-body text-center">
+                <svg cIcon name="cil-people" size="3xl" class="text-primary mb-2"></svg>
+                <h3 class="card-title text-primary">{{ dashboardSummary.TenantsCount || 0 }}</h3>
+                <p class="card-text text-muted mb-0">Tenants</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Exchanges -->
+          <div class="col-md-4 col-lg-2dot4 mb-3">
+            <div class="card border-success h-100">
+              <div class="card-body text-center">
+                <svg cIcon name="cil-share" size="3xl" class="text-success mb-2"></svg>
+                <h3 class="card-title text-success">{{ dashboardSummary.ExchangesCount || 0 }}</h3>
+                <p class="card-text text-muted mb-0">Exchanges</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Queues -->
+          <div class="col-md-4 col-lg-2dot4 mb-3">
+            <div class="card border-warning h-100">
+              <div class="card-body text-center">
+                <svg cIcon name="cil-list" size="3xl" class="text-warning mb-2"></svg>
+                <h3 class="card-title text-warning">{{ dashboardSummary.QueuesCount || 0 }}</h3>
+                <p class="card-text text-muted mb-0">Queues</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bindings -->
+          <div class="col-md-4 col-lg-2dot4 mb-3">
+            <div class="card border-info h-100">
+              <div class="card-body text-center">
+                <svg cIcon name="cil-link" size="3xl" class="text-info mb-2"></svg>
+                <h3 class="card-title text-info">{{ dashboardSummary.BindingsCount || 0 }}</h3>
+                <p class="card-text text-muted mb-0">Bindings</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div class="col-md-4 col-lg-2dot4 mb-3">
+            <div class="card border-danger h-100">
+              <div class="card-body text-center">
+                <svg cIcon name="cil-envelope-letter" size="3xl" class="text-danger mb-2"></svg>
+                <h3 class="card-title text-danger">{{ dashboardSummary.MessagesCount || 0 }}</h3>
+                <p class="card-text text-muted mb-0">Messages</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Last updated -->
+        <div *ngIf="dashboardSummary && !dashboardLoading" class="mt-4">
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3">
+                <label class="form-label fw-bold">Last Updated</label>
+                <div class="p-2 bg-dark rounded">{{ dashboardSummary.UpdatedAt | date:'medium' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </c-card-body>
+    </c-card>
+  </c-col>
+</c-row>

@@ -1,53 +1,49 @@
-import { NgStyle } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 import {
-  AvatarComponent,
-  ButtonDirective,
-  ButtonGroupComponent,
-  CardBodyComponent,
-  CardComponent,
-  CardFooterComponent,
-  CardHeaderComponent,
-  ColComponent,
-  FormCheckLabelDirective,
-  GutterDirective,
-  ProgressComponent,
-  RowComponent,
-  TableDirective
+  CardModule,
+  GridModule,
 } from '@coreui/angular';
-import { ChartjsComponent } from '@coreui/angular-chartjs';
 import { IconDirective } from '@coreui/icons-angular';
-
-import { WidgetsBrandComponent } from '../widgets/widgets-brand/widgets-brand.component';
-import { WidgetsDropdownComponent } from '../widgets/widgets-dropdown/widgets-dropdown.component';
-
-interface IUser {
-  name: string;
-  state: string;
-  registered: string;
-  country: string;
-  usage: number;
-  period: string;
-  payment: string;
-  activity: string;
-  avatar: string;
-  status: string;
-  color: string;
-}
+import { DashboardService } from './services/dashboard.service';
 
 @Component({
+  selector: 'app-dashboard',
   templateUrl: 'dashboard.component.html',
   styleUrls: ['dashboard.component.scss'],
-  imports: [WidgetsDropdownComponent, CardComponent, CardBodyComponent, RowComponent, ColComponent, ButtonDirective, IconDirective, ReactiveFormsModule, ButtonGroupComponent, FormCheckLabelDirective, ChartjsComponent, NgStyle, CardFooterComponent, GutterDirective, ProgressComponent, WidgetsBrandComponent, CardHeaderComponent, TableDirective, AvatarComponent]
+  standalone: true,
+  imports: [
+    CommonModule,
+    CardModule,
+    GridModule,
+    IconDirective,
+  ]
 })
 export class DashboardComponent implements OnInit {
+  dashboardSummary: any = null;
+  dashboardLoading: boolean = false;
+  dashboardError: boolean = false;
 
-
+  constructor(private dashboardService: DashboardService) {}
 
   ngOnInit(): void {
-  
+    this.loadDashboardSummary();
   }
 
-
+  loadDashboardSummary(): void {
+    this.dashboardLoading = true;
+    this.dashboardError = false;
+    this.dashboardService.getDashboardSummary().subscribe({
+      next: (response) => {
+        this.dashboardSummary = response.result;
+        this.dashboardLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading dashboard summary:', error);
+        this.dashboardSummary = null;
+        this.dashboardLoading = false;
+        this.dashboardError = true;
+      }
+    });
+  }
 }

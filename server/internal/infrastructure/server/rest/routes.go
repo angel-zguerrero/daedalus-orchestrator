@@ -4,6 +4,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
 	"deadalus-orch/server/internal/infrastructure/server/rest/cluster"
+	"deadalus-orch/server/internal/infrastructure/server/rest/dashboard"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
@@ -29,6 +30,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	nodeSchedulerController := nodescheduler.NewNodeSchedulerController(s.Config)
 	jobWorkerController := jobworker.NewJobWorkerController(s.Config)
 	clusterController := cluster.NewClusterController(s.Config)
+	dashboardController := dashboard.NewDashboardController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -100,6 +102,14 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		apiV1Group.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 30))
 		{
 			clusterController.RegisterRoutes(apiV1Group)
+		}
+
+		// Dashboard endpoints
+		dashboardGroup := restAPIGroup.Group("/dashboard")
+		dashboardGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		dashboardGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
+		{
+			dashboardGroup.GET("/summary", dashboardController.GetDashboardSummaryHandler)
 		}
 
 	}
