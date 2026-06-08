@@ -213,7 +213,10 @@ func (app *Application) Run() {
 			Msgf("❌ Staring node host")
 	}
 
-	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, NH)
+	// Create the shared database provider — one DB instance for all shards.
+	sharedDBProvider := db.NewSharedDBProvider()
+
+	masterNode, err := dragonboat.InitMasterNode(config.GlobalConfiguration.ReplicaID, selfMember, initialMembers, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, sharedDBProvider, NH)
 	app.MasterNode = masterNode
 	if err != nil {
 		log.Fatal().
@@ -223,7 +226,7 @@ func (app *Application) Run() {
 			Msgf("❌ Failed Init raft Master node")
 	}
 
-	tenantNodes, err := dragonboat.StartTentantNodes(config.GlobalConfiguration.ReplicaID, selfMember, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, initialMembers, NH)
+	tenantNodes, err := dragonboat.StartTentantNodes(config.GlobalConfiguration.ReplicaID, selfMember, config.GlobalConfiguration.Join, roles, db.DefaultPathProvider{}, sharedDBProvider, initialMembers, NH)
 	if err != nil {
 		log.Fatal().
 			Err(err).

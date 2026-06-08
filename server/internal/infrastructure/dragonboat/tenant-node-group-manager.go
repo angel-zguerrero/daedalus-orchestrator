@@ -14,6 +14,7 @@ func StartTentantNodes(
 	join bool,
 	roles []NodeRole,
 	pathProvider db.PathProvider,
+	sharedDBProvider *db.SharedDBProvider,
 	initialMembers []Member,
 	NH *dragonboat.NodeHost,
 ) ([]*RaftNode, error) {
@@ -45,6 +46,7 @@ func StartTentantNodes(
 				roles,
 				NH,
 				pathProvider,
+				sharedDBProvider,
 			)
 			if err != nil {
 				errOnce.Do(func() {

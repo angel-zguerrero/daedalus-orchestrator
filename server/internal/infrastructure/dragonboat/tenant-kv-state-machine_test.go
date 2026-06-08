@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"deadalus-orch/server/internal/usecase/command"
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,8 @@ func setupTenantKV(t *testing.T) *dragonboat.KVBaseStateMachine {
 	err := config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup")
 
-	kv := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	createStateMachine := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, db.NewSharedDBProvider())
+	kv := createStateMachine(1, 2).(*dragonboat.KVBaseStateMachine) 
 	stopc := make(chan struct{})
 	_, err = kv.Open(stopc)
 	require.NoError(t, err)
@@ -163,6 +165,23 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	kv := setupTenantKV(t)
 
 	var buf bytes.Buffer
+	
+	// Create the column family cf-n-1 first
+	ddlCmd := general_command.FSM_Command{
+		Type: general_command.REPOSITORY_COMMAND,
+		CMD: general_command.CreateColumnFamilyCommand{
+			Name:  "cf-n-1",
+			IsTTL: false,
+		},
+	}
+	require.NoError(t, gob.NewEncoder(&buf).Encode(ddlCmd))
+	_, err := kv.Update([]statemachine.Entry{
+		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
+	})
+	require.NoError(t, err)
+	// We can't check res[0].Result.Data > 0 because it's a gob encoded CommandResult
+
+	buf.Reset()
 	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: general_command.RW,
@@ -171,19 +190,33 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 			CMD: general_command.WK_Command{
 				Key:                "snap_key",
 				Value:              []byte("snap_value"),
-				ColumnFamilyName:   db.DefaultFC,
-				ColumnFamilySector: db.DefaultFCSector,
+				ColumnFamilyName:   "cf-n-1",
+				ColumnFamilySector: "cf-n-1-sector",
 				Op:                 general_command.PutOp,
 			},
 		},
 	}
 
 	require.NoError(t, gob.NewEncoder(&buf).Encode(cmd))
-
-	_, err := kv.Update([]statemachine.Entry{
+	res, err := kv.Update([]statemachine.Entry{
 		{Cmd: buf.Bytes(), Index: kv.GetLastApplied() + 1},
 	})
 	require.NoError(t, err)
+
+	// Decode CommandResult to see if DDL failed
+	var ddlCmdRes command.CommandResult
+	err = gob.NewDecoder(bytes.NewReader(res[0].Result.Data)).Decode(&ddlCmdRes)
+	if err == nil && ddlCmdRes.Error != "" {
+		t.Fatalf("DDL Update failed with command result error: %s", ddlCmdRes.Error)
+	}
+	
+	// Decode CommandResult to see if it failed
+	var cmdRes command.CommandResult
+	err = gob.NewDecoder(bytes.NewReader(res[0].Result.Data)).Decode(&cmdRes)
+	if err == nil && cmdRes.Error != "" {
+		t.Fatalf("RW Update failed with command result error: %s", cmdRes.Error)
+	}
+	// We can't check res[0].Result.Data > 0 because it's a gob encoded CommandResult
 
 	var snap bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -197,7 +230,7 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	// Also ensure config is loaded for the second instance if it's path dependent
 	err = config.LoadDefaultConfiguration()
 	require.NoError(t, err, "Failed to load default configuration for test setup (kv2)")
-	kv2 := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv2 := dragonboat.NewTenantKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, db.NewSharedDBProvider())(1, 2).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewTenantKVStateMachine to NewTenantKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -210,8 +243,8 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
 			Key:                "snap_key",
-			ColumnFamilyName:   db.DefaultFC,
-			ColumnFamilySector: db.DefaultFCSector,
+			ColumnFamilyName:   "cf-n-1",
+			ColumnFamilySector: "cf-n-1-sector",
 		},
 	}
 	var bufQ bytes.Buffer
@@ -224,16 +257,17 @@ func TestTenantSaveSnapshotAndRecover(t *testing.T) {
 	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:                dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
+			Key:                dragonboat.AppliedIndexKey + ":1", // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName:   db.MetaFC,
 			ColumnFamilySector: db.MetaFCSector,
 		},
 	}
-	var bufQ2 bytes.Buffer
-	gob.NewEncoder(&bufQ2).Encode(query2)
-	val, err = kv2.Lookup(bufQ2.Bytes())
-
+	var buf2 bytes.Buffer
+	err = gob.NewEncoder(&buf2).Encode(query2)
+	require.NoError(t, err, "failed to encode query2")
+	val, err = kv2.Lookup(buf2.Bytes())
 	require.NoError(t, err)
+	require.NotNil(t, val, "val should not be nil")
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
 

@@ -11,6 +11,7 @@ import (
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
+	"strings"
 	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -19,13 +20,34 @@ import (
 type TenantKVBaseStateMachine struct {
 }
 
-// OpenTenantDBFunc is a function variable that points to db.OpenTenantDB by default.
+// OpenTenantDBFunc is a function variable that points to the shared DB acquisition by default.
 // It allows for replacing the actual tenant database opening logic with a mock
 // implementation during testing. This is a common pattern for dependency injection.
-var OpenTenantDBFunc = db.OpenTenantDB
+var OpenTenantDBFunc func(sharedProvider *db.SharedDBProvider, pathProvider db.PathProvider) (db.KVStore, error) = func(sharedProvider *db.SharedDBProvider, pathProvider db.PathProvider) (db.KVStore, error) {
+	return sharedProvider.Acquire(pathProvider)
+}
 
-func (r *TenantKVBaseStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
-	return OpenTenantDBFunc(dbPath)
+func (r *TenantKVBaseStateMachine) OpenDB(sharedProvider *db.SharedDBProvider, pathProvider db.PathProvider) (db.KVStore, error) {
+	return OpenTenantDBFunc(sharedProvider, pathProvider)
+}
+
+// BelongsToShard returns true if the given column family belongs to a tenant shard.
+// Tenant shards own dynamic CFs with the "cf-n-" prefix and "cf-ttl-" prefix,
+// as well as the tenant-events CF.
+// The admin CF and master-events CF belong to the master shard, NOT to tenant shards.
+func (r *TenantKVBaseStateMachine) BelongsToShard(cfName string) bool {
+	// Dynamic tenant column families: cf-n-X (normal) and cf-ttl-X (TTL)
+	if strings.HasPrefix(cfName, db.ColumnFamilyPrefix) {
+		return true
+	}
+	if strings.HasPrefix(cfName, db.ColumnFamilyTTLPrefix) {
+		return true
+	}
+	// Tenant events CF
+	if cfName == db.TenantEventFC {
+		return true
+	}
+	return false
 }
 
 func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
@@ -217,11 +239,12 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	return *commandResult
 }
 
-func NewTenantKVStateMachine(pathProvider db.PathProvider) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
+func NewTenantKVStateMachine(pathProvider db.PathProvider, sharedDBProvider *db.SharedDBProvider) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
 	return func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
 		return NewKVStateMachine(clusterID, nodeID, &TenantKVBaseStateMachine{}, KVBaseStateMachineConfig{
 			TTLInternalError: config.GlobalConfiguration.TTLInternalError,
 			PathProvider:     pathProvider,
+			SharedDBProvider: sharedDBProvider,
 		})
 	}
 

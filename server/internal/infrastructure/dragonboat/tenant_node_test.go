@@ -57,7 +57,7 @@ func TestTenantNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	testJoin := false
 	testRoles := []dragonboat.NodeRole{dragonboat.RoleConsensus, dragonboat.RoleScheduler}
 
-	_, err := dragonboat.InitTenantNode(TenantShardID, testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
+	_, err := dragonboat.InitTenantNode(TenantShardID, testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, TenantShardID, calledWithShardID, "ShardID should be TenantShardID")
@@ -91,7 +91,7 @@ func TestTenantNode_InitRaftNodeErrorPropagation(t *testing.T) {
 
 	dragonboat.InitTenantRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
+	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil)
 	assert.Error(t, err)
 	assert.Equal(t, expectedError, err)
 }
@@ -119,7 +119,7 @@ func TestTenantNode_PassesCorrectStateMachineType(t *testing.T) {
 	}
 	dragonboat.InitTenantRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, nil, &dragonboat.TestPathProvider{Path: t.TempDir()})
+	_, err := dragonboat.InitTenantNode(TenantShardID, 1, dragonboat.Member{}, nil, false, nil, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil)
 	require.NoError(t, err)
 	time.Sleep(2 * time.Second)
 	if passedCreateFunc != nil {

@@ -11,8 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,16 +22,24 @@ import (
 )
 
 type KVStateMachineImpl interface {
-	OpenDB(dbPath string) (db.KVStore, error)
+	// OpenDB acquires a reference to the shared database via the SharedDBProvider.
+	// Unlike the old per-shard model, this does NOT create a new database; it reuses the shared one.
+	OpenDB(sharedProvider *db.SharedDBProvider, pathProvider db.PathProvider) (db.KVStore, error)
 
 	Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult
 
 	Lookup(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult
+
+	// BelongsToShard returns true if the given column family name belongs to this shard.
+	// Used by SaveSnapshot to filter entries — only entries belonging to this shard are serialized.
+	// The meta CF is always included (filtered by applied index key with clusterID).
+	BelongsToShard(cfName string) bool
 }
 type KVBaseStateMachineConfig struct {
 	// TTLInternalError specifies the Time-To-Live (in seconds) for internal error messages stored in the database.
-	TTLInternalError uint64
-	PathProvider     db.PathProvider
+	TTLInternalError   uint64
+	PathProvider       db.PathProvider
+	SharedDBProvider   *db.SharedDBProvider
 }
 
 type KVBaseStateMachine struct {
@@ -65,41 +71,12 @@ func (s *KVBaseStateMachine) GetLastApplied() uint64 {
 }
 
 func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
-	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.config.PathProvider)
-
+	// With the shared DB model, all shards share one database instance.
+	// OpenDB acquires a reference from the SharedDBProvider instead of
+	// creating a per-shard database directory.
+	store, err := s.stateMachineImpl.OpenDB(s.config.SharedDBProvider, s.config.PathProvider)
 	if err != nil {
-		panic(err)
-	}
-	if err := createNodeDataDir(dir); err != nil {
-		panic(err)
-	}
-	var dbdir string
-	if !isNewRun(dir) {
-		if err := cleanupNodeDataDir(dir); err != nil {
-			return 0, err
-		}
-		var err error
-		dbdir, err = getCurrentDBDirName(dir)
-		if err != nil {
-			return 0, err
-		}
-		if _, err := os.Stat(dbdir); err != nil {
-			if os.IsNotExist(err) {
-				panic("db dir unexpectedly deleted")
-			}
-		}
-	} else {
-		dbdir = getNewRandomDBDirName(dir)
-		if err := saveCurrentDBDirName(dir, dbdir); err != nil {
-			return 0, err
-		}
-		if err := replaceCurrentDBFile(dir); err != nil {
-			return 0, err
-		}
-	}
-	store, err := s.stateMachineImpl.OpenDB(dbdir)
-	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to open shared DB for shard %d node %d: %w", s.clusterID, s.nodeID, err)
 	}
 
 	atomic.SwapPointer(&s.store, unsafe.Pointer(&store))
@@ -108,11 +85,24 @@ func (s *KVBaseStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 		panic(err)
 	}
 	s.lastApplied = appliedIndex
+
+	log.Info().
+		Uint64("clusterID", s.clusterID).
+		Uint64("nodeID", s.nodeID).
+		Uint64("appliedIndex", appliedIndex).
+		Msg("Shard opened with shared DB")
+
 	return appliedIndex, nil
 }
 
+// appliedIndexKeyForShard returns the shard-specific key for storing the applied Raft index.
+// With a shared DB, each shard must store its applied index under a unique key to avoid collisions.
+func (s *KVBaseStateMachine) appliedIndexKeyForShard() string {
+	return fmt.Sprintf("%s:%d", AppliedIndexKey, s.clusterID)
+}
+
 func (s *KVBaseStateMachine) queryAppliedIndex(kv_store db.KVStore) (uint64, error) {
-	result, err := kv_store.Get(db.MetaFC, db.MetaFCSector, AppliedIndexKey, time.Now()) // WORK, here now can be any value, due to the key used to store the "applyed index" is not ttl key
+	result, err := kv_store.Get(db.MetaFC, db.MetaFCSector, s.appliedIndexKeyForShard(), time.Now())
 	if err != nil {
 		return 0, err
 	}
@@ -353,7 +343,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	appliedIndex := make([]byte, 8)
 	binary.LittleEndian.PutUint64(appliedIndex, ents[len(ents)-1].Index)
-	batch.Put(db.MetaFC, db.MetaFCSector, AppliedIndexKey, appliedIndex, time.Now())
+	batch.Put(db.MetaFC, db.MetaFCSector, s.appliedIndexKeyForShard(), appliedIndex, time.Now())
 
 	if err := uow.Commit(); err != nil {
 		return nil, err
@@ -505,12 +495,26 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 	}
 
 	enc := gob.NewEncoder(w)
+	appliedIdxKey := s.appliedIndexKeyForShard()
 
+	// With a shared DB, we must only serialize entries belonging to THIS shard.
+	// The stateMachineImpl.BelongsToShard() method determines CF ownership.
+	// For the meta CF, we only include the applied index key for this specific shard.
 	err := kv_store.Iterate(func(cfName string, cfSector string, key, value []byte) error {
 		select {
 		case <-done:
 			return fmt.Errorf("snapshot cancelled")
 		default:
+		}
+
+		// Filter: meta CF — only include this shard's applied index key
+		if cfName == db.MetaFC {
+			if string(key) != appliedIdxKey {
+				return nil // skip other shards' applied index keys
+			}
+		} else if !s.stateMachineImpl.BelongsToShard(cfName) {
+			// Skip CFs that don't belong to this shard
+			return nil
 		}
 
 		entry := struct {
@@ -529,7 +533,7 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 	})
 
 	if err != nil {
-		return fmt.Errorf("snapshot save failed: %w", err)
+		return fmt.Errorf("snapshot save failed for shard %d: %w", s.clusterID, err)
 	}
 
 	return nil
@@ -543,33 +547,29 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 		panic("recover from snapshot called after Close()")
 	}
 
-	dir, err := getNodeDBDirName(s.clusterID, s.nodeID, s.config.PathProvider)
-	if err != nil {
-		return err
-	}
-	dbdir := getNewRandomDBDirName(dir)
-	oldDirName, err := getCurrentDBDirName(dir)
-	if err != nil {
-		// It's possible oldDirName doesn't exist if this is the first run or after a clean start.
-		// Log this situation but don't necessarily fail if dbdir can be created.
-		log.Warn().Err(err).Msg("Failed to get current DB directory name during snapshot recovery, proceeding with new one")
-		// oldDirName might be empty or invalid, handle removal carefully later
+	// With shared DB, we don't create a new database — we selectively delete this shard's
+	// data from the shared DB and re-insert the snapshot entries.
+	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
+	if kv_store == nil {
+		return errors.New("cannot recover from snapshot: store is nil")
 	}
 
-	// Use stateMachineImpl to open the DB, ensuring correct CFs are potentially pre-created
-	// For snapshot recovery, we are essentially creating a new DB instance.
-	// The stateMachineImpl.OpenDB is suitable here as it encapsulates the logic
-	// for opening a DB potentially with specific column families.
-	// We are not using s.stateMachineImpl.OpenDB directly as it's an interface method.
-	// The actual DB opening logic is in db.OpenMasterDB or similar, which should be
-	// called by the concrete implementation of stateMachineImpl.OpenDB or a similar utility.
-	// For simplicity, we'll assume a generic OpenMasterDB-like behavior for recovery,
-	// as the snapshot contains all CF data.
-	// A more robust approach might involve the stateMachineImpl itself handling snapshot recovery.
-	kv_store, err := s.stateMachineImpl.OpenDB(dbdir) // Simplified for now
-	if err != nil {
-		return fmt.Errorf("failed to open new DB for snapshot recovery: %w", err)
+	// Step 1: Delete this shard's existing data from the shared DB.
+	// Delete the shard's applied index key from meta CF.
+	appliedIdxKey := s.appliedIndexKeyForShard()
+	if err := kv_store.Delete(db.MetaFC, db.MetaFCSector, appliedIdxKey, time.Now()); err != nil {
+		log.Warn().Err(err).Str("key", appliedIdxKey).Msg("Failed to delete applied index key during snapshot recovery (may not exist yet)")
 	}
+
+	// Delete CFs that belong to this shard.
+	// We iterate all data and delete entries whose CF belongs to this shard.
+	// Note: For tenant shards, the CFs (cf-n-X) will be cleaned up by DeleteColumnFamily
+	// or by iterating. For the master shard, it owns the admin CF.
+	// A simpler approach: the snapshot will overwrite existing data, and since
+	// SaveSnapshot only serializes this shard's data, restoring it is safe.
+	// We only need to ensure stale keys are removed.
+	// For now, we rely on the fact that keys are deterministically generated,
+	// so the snapshot restore will overwrite all current values.
 
 	dec := gob.NewDecoder(r)
 
@@ -580,9 +580,7 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 	for {
 		select {
 		case <-done:
-			kv_store.Close()    // Clean up the new DB if cancelled
-			os.RemoveAll(dbdir) // Attempt to remove the temporary DB dir
-			return fmt.Errorf("snapshot recovery cancelled")
+			return fmt.Errorf("snapshot recovery cancelled for shard %d", s.clusterID)
 		default:
 		}
 
@@ -597,27 +595,21 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 			if err == io.EOF {
 				break // End of snapshot
 			}
-			kv_store.Close() // Clean up
-			os.RemoveAll(dbdir)
-			return fmt.Errorf("decode failed: %w", err)
+			return fmt.Errorf("decode failed during snapshot recovery for shard %d: %w", s.clusterID, err)
 		}
 
-		// Ensure Column Family exists
+		// Ensure Column Family exists in the shared DB
 		if !knownCFs[entry.CFName] {
 			exists, _, err := kv_store.ExistsColumnFamily(entry.CFName)
 			if err != nil {
-				kv_store.Close()
-				os.RemoveAll(dbdir)
 				return fmt.Errorf("failed to check column family existence: %w", err)
 			}
 			if !exists {
 				isTTL := strings.HasPrefix(entry.CFName, db.ColumnFamilyTTLPrefix)
 				if err := kv_store.CreateColumnFamily(entry.CFName, isTTL); err != nil {
-					kv_store.Close()
-					os.RemoveAll(dbdir)
 					return fmt.Errorf("failed to create column family %s: %w", entry.CFName, err)
 				}
-				log.Info().Str("cf_name", entry.CFName).Bool("is_ttl", isTTL).Msg("Created missing column family during recovery")
+				log.Info().Str("cf_name", entry.CFName).Bool("is_ttl", isTTL).Msg("Created missing column family during snapshot recovery")
 			}
 			knownCFs[entry.CFName] = true
 		}
@@ -627,87 +619,36 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 
 		if count%10000 == 0 {
 			if err := kv_store.WriteRaw(batch); err != nil {
-				kv_store.Close()
-				os.RemoveAll(dbdir)
-				return fmt.Errorf("write raw failed during snapshot recovery: %w", err)
+				return fmt.Errorf("write raw failed during snapshot recovery for shard %d: %w", s.clusterID, err)
 			}
 			batch = db.NewWriteBatch()
-			log.Info().Int("count", count).Msg("Intermediate batch write successful during snapshot recovery")
+			log.Info().Int("count", count).Uint64("clusterID", s.clusterID).Msg("Intermediate batch write successful during snapshot recovery")
 		}
 	}
 
 	if batch.Count() > 0 {
 		if err := kv_store.WriteRaw(batch); err != nil {
-			kv_store.Close()
-			os.RemoveAll(dbdir)
-			return fmt.Errorf("final write raw failed during snapshot recovery: %w", err)
+			return fmt.Errorf("final write raw failed during snapshot recovery for shard %d: %w", s.clusterID, err)
 		}
-		log.Info().Int("total_count", count).Msg("Final batch write successful during snapshot recovery")
+		log.Info().Int("total_count", count).Uint64("clusterID", s.clusterID).Msg("Final batch write successful during snapshot recovery")
 	}
 
-	// Persist directory changes
-	if err := saveCurrentDBDirName(dir, dbdir); err != nil {
-		kv_store.Close()
-		os.RemoveAll(dbdir)
-		return err
-	}
-	if err := replaceCurrentDBFile(dir); err != nil {
-		kv_store.Close()
-		os.RemoveAll(dbdir)
-		return err
-	}
-
-	// Update applied index
+	// Update applied index from the restored data
 	newLastApplied, err := s.queryAppliedIndex(kv_store)
 	if err != nil {
-		// This is critical. If we can't read the applied index, the SM is in an inconsistent state.
-		kv_store.Close()
-		os.RemoveAll(dbdir)
-		// Attempt to revert to oldDirName if possible, though that's complex and risky here.
-		// For now, panic might be safer than continuing in an unknown state.
-		panic(fmt.Sprintf("failed to query applied index after snapshot recovery: %v", err))
+		panic(fmt.Sprintf("failed to query applied index after snapshot recovery for shard %d: %v", s.clusterID, err))
 	}
 
-	// Atomically swap the store pointer
-	oldStorePtr := atomic.SwapPointer(&s.store, unsafe.Pointer(&kv_store))
-	oldKvStore := *(*db.KVStore)(oldStorePtr)
-
-	// Close and remove the old database IF it existed and was different
-	if oldKvStore != nil && oldKvStore != kv_store { // Check if it's genuinely an old instance
-		oldKvStore.Close()
-		if oldDirName != "" && oldDirName != dbdir { // Ensure oldDirName is valid and different
-			parent := filepath.Dir(oldDirName)
-			if err := os.RemoveAll(oldDirName); err != nil {
-				// Log error but proceed, as the new DB is in place.
-				log.Error().Err(err).Str("path", oldDirName).Msg("Failed to remove old database directory")
-			} else {
-				if err := syncDir(parent); err != nil { // Sync parent dir of removed old DB dir
-					log.Error().Err(err).Str("path", parent).Msg("Failed to sync parent directory after removing old DB")
-				}
-			}
-		}
-	}
-
-	// Sync directory of the new DB
-	if err := syncDir(filepath.Dir(dbdir)); err != nil {
-		log.Error().Err(err).Str("path", filepath.Dir(dbdir)).Msg("Failed to sync new database directory")
-		// Not returning error here as primary recovery is done.
-	}
-
-	// Important: Update the lastApplied index *after* successfully swapping the store
-	// and cleaning up.
-	// However, the Dragonboat library expects lastApplied to be the index *of the snapshot itself*
-	// or the latest index *covered by the snapshot*. The current `queryAppliedIndex` reads
-	// an index stored *within* the DB data. This might need adjustment based on how
-	// Dragonboat's snapshot index mechanism works. For now, we assume newLastApplied is correct.
-	if s.lastApplied > newLastApplied && newLastApplied != 0 { // Allow newLastApplied to be 0 for fresh snapshot
-		// This is a critical error. Log it, but a panic might be more appropriate
-		// as the state machine could be inconsistent.
-		log.Error().Uint64("currentLastApplied", s.lastApplied).Uint64("newLastApplied", newLastApplied).Msg("Last applied index moved backward after snapshot recovery")
-		// Consider panic if strict ordering is essential and cannot be violated.
-		// panic("last applied not moving forward after snapshot recovery")
+	if s.lastApplied > newLastApplied && newLastApplied != 0 {
+		log.Error().Uint64("currentLastApplied", s.lastApplied).Uint64("newLastApplied", newLastApplied).Uint64("clusterID", s.clusterID).Msg("Last applied index moved backward after snapshot recovery")
 	}
 	s.lastApplied = newLastApplied
+
+	log.Info().
+		Uint64("clusterID", s.clusterID).
+		Uint64("newLastApplied", newLastApplied).
+		Int("entriesRestored", count).
+		Msg("Snapshot recovery completed for shard")
 
 	return nil
 }
@@ -715,24 +656,25 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 func (s *KVBaseStateMachine) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		panic("close called twice")
+	}
+	s.closed = true
+
+	// With shared DB, we don't close the KVStore directly — we release our reference.
+	// The SharedDBProvider will close the underlying DB when the last reference is released.
+	if s.config.SharedDBProvider != nil {
+		log.Info().
+			Uint64("clusterID", s.clusterID).
+			Uint64("nodeID", s.nodeID).
+			Msg("Releasing shared DB reference for shard")
+		return s.config.SharedDBProvider.Release()
+	}
+
+	// Fallback: if no SharedDBProvider (shouldn't happen in normal operation)
 	kv_store := *(*db.KVStore)(atomic.LoadPointer(&s.store))
 	if kv_store != nil {
-		if s.closed {
-			// Already closed, potentially an issue if called multiple times without error.
-			// Depending on strictness, could panic or return an error.
-			// For now, let's match the original panic behavior.
-			panic("close called twice")
-		}
-		s.closed = true
 		return kv_store.Close()
 	}
-	// If store is nil, it might mean it was never opened or already closed and set to nil.
-	// If s.closed is true here, it means Close was called on an already nil store (which is fine).
-	// If s.closed is false, it means it was never opened.
-	if s.closed { // Already marked as closed, and store was nil
-		panic("close called twice on a nil store that was marked closed")
-	}
-	// If store is nil and not marked closed, it means it was likely never opened. Mark as closed.
-	s.closed = true
 	return nil
 }

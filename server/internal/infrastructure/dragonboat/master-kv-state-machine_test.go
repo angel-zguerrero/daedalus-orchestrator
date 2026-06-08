@@ -34,7 +34,7 @@ func setupKVMaster(t *testing.T, engine string) *dragonboat.KVBaseStateMachine {
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine)
+	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, db.NewSharedDBProvider())(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine)
+	kv2 := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, db.NewSharedDBProvider())(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -226,16 +226,18 @@ func TestSaveSnapshotAndRecover(t *testing.T) {
 	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:                dragonboat.AppliedIndexKey,
+			Key:                dragonboat.AppliedIndexKey + ":1",
 			ColumnFamilyName:   db.MetaFC,
 			ColumnFamilySector: db.MetaFCSector,
 		},
 	}
 
 	var buf2 bytes.Buffer
-	gob.NewEncoder(&buf2).Encode(query2)
+	err = gob.NewEncoder(&buf2).Encode(query2)
+	require.NoError(t, err, "failed to encode query2")
 	val, err = kv2.Lookup(buf2.Bytes())
 	require.NoError(t, err)
+	require.NotNil(t, val, "val should not be nil")
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
 
@@ -1175,7 +1177,7 @@ func TestSaveSnapshotAndRecoverRocksToPebble(t *testing.T) {
 	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:                dragonboat.AppliedIndexKey,
+			Key:                dragonboat.AppliedIndexKey + ":1",
 			ColumnFamilyName:   db.MetaFC,
 			ColumnFamilySector: db.MetaFCSector,
 		},

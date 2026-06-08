@@ -24,7 +24,7 @@ func setupKVMasterPebble(t *testing.T, engine string) *dragonboat.KVBaseStateMac
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine)
+	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, db.NewSharedDBProvider())(1, 1).(*dragonboat.KVBaseStateMachine)
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -34,7 +34,7 @@ func setupKV(t *testing.T, engine string) *dragonboat.KVBaseStateMachine { // Ch
 	t.Helper()
 	t.Setenv(constants.EnvVarMasterDBEngine, engine)
 	config.LoadDefaultConfiguration()
-	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, db.NewSharedDBProvider())(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err := kv.Open(stopc)
 	require.NoError(t, err)
@@ -196,7 +196,7 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 
 	_ = kv.Close()
 
-	kv2 := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()})(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
+	kv2 := dragonboat.NewMasterKVStateMachine(dragonboat.TestPathProvider{Path: t.TempDir()}, db.NewSharedDBProvider())(1, 1).(*dragonboat.KVBaseStateMachine) // Changed dragonboat.NewMasterKVStateMachine to NewMasterKVStateMachine and dragonboat.KVBaseStateMachine to KVBaseStateMachine
 	stopc := make(chan struct{})
 	_, err = kv2.Open(stopc)
 	require.NoError(t, err)
@@ -224,16 +224,19 @@ func TestPebble_SaveSnapshotAndRecover(t *testing.T) {
 	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:                dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
+			Key:                dragonboat.AppliedIndexKey + ":1", // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName:   db.MetaFC,
 			ColumnFamilySector: db.MetaFCSector,
 		},
 	}
 
 	var buf2 bytes.Buffer
-	gob.NewEncoder(&buf2).Encode(query2)
+	err = gob.NewEncoder(&buf2).Encode(query2)
+	require.NoError(t, err, "failed to encode query2")
 	val, err = kv2.Lookup(buf2.Bytes())
 	require.NoError(t, err)
+	t.Logf("val: %v, key: %s, clusterID: 1", val, query2.Command.(general_command.RK_Command).Key)
+	require.NotNil(t, val, "val should not be nil")
 	require.Equal(t, kv2.GetLastApplied(), binary.LittleEndian.Uint64(val.([]byte)))
 }
 
@@ -986,7 +989,7 @@ func TestSaveSnapshotAndRecoverPebbleToPebbleDB(t *testing.T) {
 	query2 := general_command.Query_Command{
 		Now: utils.GetNowInInt(),
 		Command: general_command.RK_Command{
-			Key:                dragonboat.AppliedIndexKey, // This refers to a const in the non-moved dragonboat package
+			Key:                dragonboat.AppliedIndexKey + ":1", // This refers to a const in the non-moved dragonboat package
 			ColumnFamilyName:   db.MetaFC,
 			ColumnFamilySector: db.MetaFCSector,
 		},
