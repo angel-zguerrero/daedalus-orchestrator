@@ -58,7 +58,7 @@ func TestMasterNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	testJoin := false
 	testRoles := []dragonboat.NodeRole{dragonboat.RoleConsensus, dragonboat.RoleScheduler}
 
-	_, err := dragonboat.InitMasterNode(testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil)
+	_, err := dragonboat.InitMasterNode(testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(dragonboat.MasterShardID), calledWithShardID, "ShardID should be MasterShardID")
@@ -92,7 +92,7 @@ func TestMasterNode_InitRaftNodeErrorPropagation(t *testing.T) {
 
 	dragonboat.InitRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil)
+	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil, nil)
 	assert.Error(t, err)
 	assert.Equal(t, expectedError, err)
 }
@@ -120,7 +120,7 @@ func TestMasterNode_PassesCorrectStateMachineType(t *testing.T) {
 	}
 	dragonboat.InitRaftNodeFunc = mockInitRaftNode
 
-	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil)
+	_, err := dragonboat.InitMasterNode(1, dragonboat.Member{}, nil, false, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil, nil)
 	require.NoError(t, err)
 	time.Sleep(2 * time.Second)
 	if passedCreateFunc != nil {

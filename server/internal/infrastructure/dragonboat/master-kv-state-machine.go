@@ -16,8 +16,20 @@ import (
 type MasterKVDBStateMachine struct {
 }
 
-func (r *MasterKVDBStateMachine) OpenDB(dbPath string) (db.KVStore, error) {
-	return db.OpenMasterDB(dbPath)
+func (r *MasterKVDBStateMachine) OpenDB(sharedProvider *db.SharedDBProvider, pathProvider db.PathProvider) (db.KVStore, error) {
+	return sharedProvider.Acquire(pathProvider)
+}
+
+// BelongsToShard returns true if the given column family belongs to the master shard.
+// The master shard owns the "admin" CF and event CFs (master-events).
+// Dynamic tenant CFs (cf-n-X) do NOT belong to the master shard.
+func (r *MasterKVDBStateMachine) BelongsToShard(cfName string) bool {
+	switch cfName {
+	case db.AdminFC, db.MasterEventFC, db.DefaultFC:
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
@@ -168,11 +180,12 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	return *commandResult
 }
 
-func NewMasterKVStateMachine(pathProvider db.PathProvider) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
+func NewMasterKVStateMachine(pathProvider db.PathProvider, sharedDBProvider *db.SharedDBProvider) func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
 	return func(clusterID uint64, nodeID uint64) statemachine.IOnDiskStateMachine {
 		return NewKVStateMachine(clusterID, nodeID, &MasterKVDBStateMachine{}, KVBaseStateMachineConfig{
 			TTLInternalError: config.GlobalConfiguration.TTLInternalError,
 			PathProvider:     pathProvider,
+			SharedDBProvider: sharedDBProvider,
 		})
 	}
 

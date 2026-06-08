@@ -14,7 +14,7 @@ var InitRaftNodeFunc = InitRaftNode
 // InitMasterNode initializes a RaftNode specifically configured to act as the master node/shard in the cluster.
 // The master shard has a predefined ID (MasterShardID).
 // It utilizes the generic InitRaftNodeFunc (which defaults to InitRaftNode) to perform the actual
-// Raft node setup, passing NewMasterKVRocksDBStateMachine as the factory for the state machine.
+// Raft node setup, passing NewMasterKVStateMachine as the factory for the state machine.
 //
 // Parameters:
 //   - ReplicaID: The unique ID for this replica within the Raft group for the master shard.
@@ -24,10 +24,12 @@ var InitRaftNodeFunc = InitRaftNode
 //   - join: A boolean flag indicating whether this node should attempt to join an existing Raft group (true)
 //     or participate in creating a new one (false).
 //   - roles: A slice of NodeRole defining the roles this node will fulfill (e.g., consensus, scheduler).
+//   - pathProvider: The PathProvider for determining database storage paths.
+//   - sharedDBProvider: The SharedDBProvider instance shared across all shards.
 //
 // Returns:
 //   - A pointer to the initialized RaftNode for the master shard.
 //   - An error if the Raft node initialization fails.
-func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, pathProvider db.PathProvider, NH *dragonboat.NodeHost) (*RaftNode, error) {
-	return InitRaftNodeFunc(uint64(MasterShardID), ReplicaID, selfMember, initialMembers, join, roles, NH, NewMasterKVStateMachine(pathProvider))
+func InitMasterNode(ReplicaID uint64, selfMember Member, initialMembers []Member, join bool, roles []NodeRole, pathProvider db.PathProvider, sharedDBProvider *db.SharedDBProvider, NH *dragonboat.NodeHost) (*RaftNode, error) {
+	return InitRaftNodeFunc(uint64(MasterShardID), ReplicaID, selfMember, initialMembers, join, roles, NH, NewMasterKVStateMachine(pathProvider, sharedDBProvider))
 }
