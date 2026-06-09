@@ -273,7 +273,6 @@ func replaceCurrentDBFile(dir string) error {
 func ParseRolesList(list []string) ([]NodeRole, error) {
 	var validRoles = map[string]bool{
 		string(RoleConsensus): true,
-		string(RoleScheduler): true,
 		string(RoleConnector): true,
 		string(RoleAdmin):     true,
 	}
@@ -282,7 +281,7 @@ func ParseRolesList(list []string) ([]NodeRole, error) {
 	for _, r := range list {
 		role := strings.TrimSpace(r)
 		if !validRoles[role] {
-			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, scheduler, connector, admin", role)
+			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, connector, admin", role)
 		}
 		roles = append(roles, NodeRole(role))
 	}
@@ -310,7 +309,6 @@ func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 	if *roleSeparateComma == "" {
 		return ParseRolesList([]string{
 			string(RoleConsensus),
-			string(RoleScheduler),
 			string(RoleConnector),
 			string(RoleAdmin),
 		})

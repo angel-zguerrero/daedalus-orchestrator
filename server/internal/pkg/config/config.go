@@ -54,14 +54,8 @@ type Config struct {
 	GrpcServerListenAddrHost string
 	// GrpcServerListenAddrPort is the port for the gRPC server.
 	GrpcServerListenAddrPort int
-	// NodeSchedulerHeartbeatTimeout is the timeout duration for node scheduler heartbeats.
-	NodeSchedulerHeartbeatTimeout time.Duration
-	// NodeSchedulerTTL is the Time-To-Live (in minutes) for node scheduler entries.
-	NodeSchedulerTTL int64
 	// TenantSummaryWorkerInterval specifies the interval for tenant summary worker in seconds. Minimum 10. Default 30.
 	TenantSummaryWorkerInterval int64
-	// NodeSchedulerBalancingWaitTime is the duration the system waits after the last node scheduler is created before balancing.
-	NodeSchedulerBalancingWaitTime time.Duration
 
 	// MaxHeaders specifies the maximum number of headers allowed. Minimum 5, maximum 1000. Default 100.
 	MaxHeaders int
@@ -102,11 +96,8 @@ type ConfigFromMap struct {
 	max_column_families                int
 	grpc_server_listen_addr_host       string
 	grpc_server_listen_addr_port       int
-	node_scheduler_heartbeat_timeout   int64 // Timeout in seconds
-	node_scheduler_ttl                 int64 // TTL in minutes
 	tenant_summary_worker_interval     int64 // Interval in seconds
 	max_headers                        int   // Maximum number of headers
-	node_scheduler_balancing_wait_time int64 // Wait time in seconds
 	deployment_id                      uint64
 	message_lease_duration             int64 // Duration in seconds
 }
@@ -143,11 +134,8 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		MaxColumnFamilies:              configFromMapInstance.max_column_families,
 		GrpcServerListenAddrHost:       configFromMapInstance.grpc_server_listen_addr_host,
 		GrpcServerListenAddrPort:       configFromMapInstance.grpc_server_listen_addr_port,
-		NodeSchedulerHeartbeatTimeout:  time.Duration(configFromMapInstance.node_scheduler_heartbeat_timeout) * time.Second,
-		NodeSchedulerTTL:               configFromMapInstance.node_scheduler_ttl,
 		TenantSummaryWorkerInterval:    configFromMapInstance.tenant_summary_worker_interval,
 		MaxHeaders:                     configFromMapInstance.max_headers,
-		NodeSchedulerBalancingWaitTime: time.Duration(configFromMapInstance.node_scheduler_balancing_wait_time) * time.Second,
 		DeploymentID:                   configFromMapInstance.deployment_id,
 		MessageLeaseDuration:           time.Duration(configFromMapInstance.message_lease_duration) * time.Second,
 

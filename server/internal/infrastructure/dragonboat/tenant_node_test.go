@@ -55,7 +55,7 @@ func TestTenantNode_CallsInitRaftNodeCorrectly(t *testing.T) {
 	testSelfMember := dragonboat.Member{IP: "127.0.0.1", Port: 1234}
 	testInitialMembers := []dragonboat.Member{{IP: "127.0.0.1", Port: 1234}, {IP: "127.0.0.2", Port: 1235}}
 	testJoin := false
-	testRoles := []dragonboat.NodeRole{dragonboat.RoleConsensus, dragonboat.RoleScheduler}
+	testRoles := []dragonboat.NodeRole{dragonboat.RoleConsensus}
 
 	_, err := dragonboat.InitTenantNode(TenantShardID, testReplicaID, testSelfMember, testInitialMembers, testJoin, testRoles, nil, &dragonboat.TestPathProvider{Path: t.TempDir()}, nil)
 	require.NoError(t, err)

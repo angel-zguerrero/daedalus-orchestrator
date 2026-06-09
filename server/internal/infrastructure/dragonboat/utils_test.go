@@ -157,19 +157,17 @@ func TestParseRolesFlag(t *testing.T) {
 	all := ""
 	roles, err := ParseRolesFlag(&all)
 	assert.NoError(t, err)
-	assert.Len(t, roles, 4, "Expected all default roles including admin")
+	assert.Len(t, roles, 3, "Expected all default roles including admin")
 	assert.Contains(t, roles, RoleConsensus)
-	assert.Contains(t, roles, RoleScheduler)
 	assert.Contains(t, roles, RoleConnector)
 	assert.Contains(t, roles, RoleAdmin)
 
 	// Test case 2: Custom roles
-	custom := "consensus,scheduler"
+	custom := "consensus"
 	roles, err = ParseRolesFlag(&custom)
 	assert.NoError(t, err)
-	assert.Len(t, roles, 2, "Expected 2 custom roles")
+	assert.Len(t, roles, 1, "Expected 1 custom roles")
 	assert.Contains(t, roles, RoleConsensus)
-	assert.Contains(t, roles, RoleScheduler)
 
 	// Test case 3: Only admin role
 	adminOnly := "admin"
@@ -190,7 +188,7 @@ func TestParseRolesFlag(t *testing.T) {
 	bad := "foo"
 	_, err = ParseRolesFlag(&bad)
 	assert.Error(t, err, "Expected error for invalid role")
-	assert.Contains(t, err.Error(), "invalid role: foo. Valid roles are: consensus, scheduler, connector, admin", "Error message should list valid roles including admin")
+	assert.Contains(t, err.Error(), "invalid role: foo. Valid roles are: consensus, connector, admin", "Error message should list valid roles including admin")
 }
 
 func TestParseMember(t *testing.T) {
@@ -278,7 +276,7 @@ func TestParseRolesList_ExtendedCases(t *testing.T) {
 		},
 		{
 			name:        "invalid role with valid ones",
-			input:       []string{"consensus", "invalid_role", "scheduler"},
+			input:       []string{"consensus", "invalid_role"},
 			expected:    nil,
 			expectError: true,
 		},
@@ -290,8 +288,8 @@ func TestParseRolesList_ExtendedCases(t *testing.T) {
 		},
 		{
 			name:        "all valid roles",
-			input:       []string{"consensus", "scheduler", "connector", "admin"},
-			expected:    []NodeRole{RoleConsensus, RoleScheduler, RoleConnector, RoleAdmin},
+			input:       []string{"consensus", "connector", "admin"},
+			expected:    []NodeRole{RoleConsensus, RoleConnector, RoleAdmin},
 			expectError: false,
 		},
 		{
@@ -314,7 +312,7 @@ func TestParseRolesList_ExtendedCases(t *testing.T) {
 				} else {
 					assert.NoError(t, err)
 					// For an empty input string, ParseRolesFlag should return all default roles
-					assert.ElementsMatch(t, []NodeRole{RoleConsensus, RoleScheduler, RoleConnector, RoleAdmin}, roles, "ParseRolesFlag with empty string should yield all default roles")
+					assert.ElementsMatch(t, []NodeRole{RoleConsensus, RoleConnector, RoleAdmin}, roles, "ParseRolesFlag with empty string should yield all default roles")
 				}
 				return // Skip further processing for this specific test case
 			}

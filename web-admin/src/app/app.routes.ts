@@ -30,10 +30,7 @@ export const routes: Routes = [
         path: 'cluster',
         loadChildren: () => import('./views/cluster/routes').then((m) => m.routes)
       },
-      {
-        path: 'node-schedulers',
-        loadChildren: () => import('./views/node-schedulers/routes').then((m) => m.routes)
-      },
+
       {
         path: 'job-workers',
         loadChildren: () => import('./views/job-workers/routes').then((m) => m.routes)

@@ -18,8 +18,6 @@ const (
 const (
 	// RoleConsensus indicates that the node participates in Raft consensus for data replication and leadership.
 	RoleConsensus NodeRole = "consensus"
-	// RoleScheduler indicates that the node is responsible for scheduling tasks or operations.
-	RoleScheduler NodeRole = "scheduler"
 	// RoleConnector indicates that the node acts as a connector or gateway to external systems or services.
 	RoleConnector NodeRole = "connector"
 	// RoleAdmin indicates that the node should expose administrator-level APIs.

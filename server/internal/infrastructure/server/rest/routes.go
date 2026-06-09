@@ -8,7 +8,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
-	"deadalus-orch/server/internal/infrastructure/server/rest/nodescheduler"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
@@ -27,7 +26,6 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	queueController := queue.NewQueueController(s.Config)
 	bindingController := binding.NewBindingController(s.Config)
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
-	nodeSchedulerController := nodescheduler.NewNodeSchedulerController(s.Config)
 	jobWorkerController := jobworker.NewJobWorkerController(s.Config)
 	clusterController := cluster.NewClusterController(s.Config)
 	dashboardController := dashboard.NewDashboardController(s.Config)
@@ -82,13 +80,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			}
 		}
 
-		nodeSchedulersGroup := restAPIGroup.Group("/node-schedulers")
-		nodeSchedulersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
-		nodeSchedulersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
-		{
-			nodeSchedulersGroup.GET("", nodeSchedulerController.GetNodeSchedulersHandler)
-			nodeSchedulersGroup.GET("/:id", nodeSchedulerController.GetNodeSchedulerHandler)
-		}
+
 
 		jobWorkersGroup := restAPIGroup.Group("/job-workers")
 		jobWorkersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))

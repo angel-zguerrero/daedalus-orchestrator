@@ -2,7 +2,7 @@ package job_worker
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/pkg/config"
+
 	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -48,8 +48,8 @@ func (cmd *UpsertJobWorkerCommand) Execute(uow *db.UnitOfWork, now time.Time) co
 		}
 
 		// Set TTL from configuration (converted to seconds)
-		// Using NodeSchedulerTTL as the shared TTL until a dedicated JobWorkerTTL is defined
-		jobWorker.TTL = config.GlobalConfiguration.NodeSchedulerTTL * 60
+		// Hardcoded to 24h until a dedicated JobWorkerTTL is defined
+		jobWorker.TTL = 1440 * 60
 
 		if existing != nil {
 			// Keep immutable fields from existing record

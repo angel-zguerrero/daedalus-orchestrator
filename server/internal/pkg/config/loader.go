@@ -39,11 +39,8 @@ Available Flags:
   --max-column-families       Maximum number of column families (default 10, max 100 in production, 10 in non-production). Overrides config file and environment variable.
   --grpc-host                  Host address for the gRPC server. Overrides config file and environment variable.
   --grpc-port                  Port for the gRPC server. Default 4000. Overrides config file and environment variable.
-  --node-scheduler-heartbeat-timeout  Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Default 3s. Overrides config file and environment variable.
-  --node-scheduler-ttl         TTL for node scheduler entries in minutes. Minimum 60. Default 1440. Overrides config file and environment variable.
   --tenant-summary-worker-interval  Interval for tenant summary worker in seconds. Minimum 10. Default 30. Overrides config file and environment variable.
   --max-headers                Maximum number of headers. Default 100, minimum 5, maximum 1000. Overrides config file and environment variable.
-  --node-scheduler-balancing-wait-time  Wait time after the last node scheduler is created before balancing (in seconds). Minimum 10. Default 30. Overrides config file and environment variable.
   --deployment-id              Unique identifier for cluster isolation (default 1). Overrides config file and environment variable.
 
 
@@ -71,11 +68,8 @@ Environment Variables:
   MAX_COLUMN_FAMILIES         Maximum number of column families. (Corresponds to ` + constants.EnvVarMaxColumnFamilies + `)
   GRPC_SERVER_LISTEN_ADDR_HOST Host address for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrHost + `)
   GRPC_SERVER_LISTEN_ADDR_PORT Port for the gRPC server. (Corresponds to ` + constants.EnvVarGrpcServerListenAddrPort + `)
-  NODE_SCHEDULER_HEARTBEAT_TIMEOUT Timeout for node scheduler heartbeats (e.g., "3m", "5m"). (Corresponds to ` + constants.EnvVarNodeSchedulerHeartbeatTimeout + `)
-  NODE_SCHEDULER_TTL          TTL for node scheduler entries in minutes. (Corresponds to ` + constants.EnvVarNodeSchedulerTTL + `)
   TENANT_SUMMARY_WORKER_INTERVAL  Interval for tenant summary worker in seconds. (Corresponds to ` + constants.EnvVarTenantSummaryWorkerInterval + `)
   MAX_HEADERS                 Maximum number of headers. (Corresponds to ` + constants.EnvVarMaxHeaders + `)
-  NODE_SCHEDULER_BALANCING_WAIT_TIME Wait time after last node scheduler is created (in seconds). (Corresponds to ` + constants.EnvVarNodeSchedulerBalancingWaitTime + `)
   DEPLOYMENT_ID                Unique identifier for cluster isolation. (Corresponds to ` + constants.EnvVarDeploymentID + `)
 
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
@@ -109,11 +103,8 @@ Configuration File:
     max_column_families           Maximum number of column families.
     grpc_server_listen_addr_host   Host address for the gRPC server.
     grpc_server_listen_addr_port   Port for the gRPC server.
-    node_scheduler_heartbeat_timeout  Timeout for node scheduler heartbeats in seconds (e.g., 3 for 3s).
-    node_scheduler_ttl            TTL for node scheduler entries in minutes.
     tenant_summary_worker_interval  Interval for tenant summary worker in seconds.
     max_headers                   Maximum number of headers.
-    node_scheduler_balancing_wait_time Wait time after last node scheduler is created in seconds.
     deployment_id                 Unique identifier for cluster isolation.
 
 
@@ -202,20 +193,11 @@ var GrpcServerListenAddrHostFlag = flag.String(constants.GrpcServerListenAddrHos
 // GrpcServerListenAddrPortFlag defines the --grpc-port command-line flag for specifying the gRPC server listen port.
 var GrpcServerListenAddrPortFlag = flag.Int(constants.GrpcServerListenAddrPortFlagName, 0, "Port for the gRPC server. Default 4000. Overrides config file and environment variable.")
 
-// NodeSchedulerHeartbeatTimeoutFlag defines the --node-scheduler-heartbeat-timeout command-line flag for specifying the node scheduler heartbeat timeout.
-var NodeSchedulerHeartbeatTimeoutFlag = flag.Duration(constants.NodeSchedulerHeartbeatTimeoutFlagName, 15*time.Second, "Timeout for node scheduler heartbeats (e.g., 3s, 5m). Minimum 3 seconds. Overrides config file and environment variable.")
-
-// NodeSchedulerTTLFlag defines the --node-scheduler-ttl command-line flag for specifying the node scheduler TTL.
-var NodeSchedulerTTLFlag = flag.Int64(constants.NodeSchedulerTTLFlagName, 1440, "TTL for node scheduler entries in minutes. Minimum 60. Overrides config file and environment variable.")
-
 // TenantSummaryWorkerIntervalFlag defines the --tenant-summary-worker-interval command-line flag for specifying the tenant summary worker interval.
 var TenantSummaryWorkerIntervalFlag = flag.Int64(constants.TenantSummaryWorkerIntervalFlagName, 30, "Interval for tenant summary worker in seconds. Minimum 10. Overrides config file and environment variable.")
 
 // MaxHeadersFlag defines the --max-headers command-line flag for specifying the maximum number of headers.
 var MaxHeadersFlag = flag.Int(constants.MaxHeadersFlagName, 0, "Maximum number of headers (default 100, minimum 5, maximum 1000). Overrides config file and environment variable.")
-
-// NodeSchedulerBalancingWaitTimeFlag defines the --node-scheduler-balancing-wait-time command-line flag.
-var NodeSchedulerBalancingWaitTimeFlag = flag.Int64(constants.NodeSchedulerBalancingWaitTimeFlagName, 30, "Wait time after the last node scheduler is created before balancing (in seconds). Minimum 10. Overrides config file and environment variable.")
 
 // DeploymentIDFlag defines the --deployment-id command-line flag.
 var DeploymentIDFlag = flag.Uint64(constants.DeploymentIDFlagName, 0, "Unique identifier for cluster isolation. Overrides config file and environment variable.")
@@ -424,22 +406,6 @@ func LoadDefaultConfiguration() error {
 		config.GrpcServerListenAddrPort = grpcPort
 	}
 
-	if envVal := os.Getenv(constants.EnvVarNodeSchedulerHeartbeatTimeout); envVal != "" {
-		nodeSchedulerHeartbeatTimeout, err := time.ParseDuration(envVal)
-		if err != nil {
-			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarNodeSchedulerHeartbeatTimeout, err)
-		}
-		config.NodeSchedulerHeartbeatTimeout = nodeSchedulerHeartbeatTimeout
-	}
-
-	if envVal := os.Getenv(constants.EnvVarNodeSchedulerTTL); envVal != "" {
-		nodeSchedulerTTL, err := strconv.ParseInt(envVal, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarNodeSchedulerTTL, err)
-		}
-		config.NodeSchedulerTTL = nodeSchedulerTTL
-	}
-
 	if envVal := os.Getenv(constants.EnvVarTenantSummaryWorkerInterval); envVal != "" {
 		tenantSummaryWorkerInterval, err := strconv.ParseInt(envVal, 10, 64)
 		if err != nil {
@@ -454,13 +420,6 @@ func LoadDefaultConfiguration() error {
 			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarMaxHeaders, err)
 		}
 		config.MaxHeaders = maxHeaders
-	}
-	if envVal := os.Getenv(constants.EnvVarNodeSchedulerBalancingWaitTime); envVal != "" {
-		waitTime, err := strconv.ParseInt(envVal, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarNodeSchedulerBalancingWaitTime, err)
-		}
-		config.NodeSchedulerBalancingWaitTime = time.Duration(waitTime) * time.Second
 	}
 
 	if envVal := os.Getenv(constants.EnvVarDeploymentID); envVal != "" {
@@ -549,12 +508,6 @@ func LoadDefaultConfiguration() error {
 		config.GrpcServerListenAddrPort = *GrpcServerListenAddrPortFlag
 	}
 
-	// NodeScheduler flags
-	config.NodeSchedulerHeartbeatTimeout = *NodeSchedulerHeartbeatTimeoutFlag
-	if *NodeSchedulerTTLFlag != 1440 { // Only override if different from default
-		config.NodeSchedulerTTL = *NodeSchedulerTTLFlag
-	}
-
 	// TenantSummaryWorker flag
 	if *TenantSummaryWorkerIntervalFlag != 30 { // Only override if different from default
 		config.TenantSummaryWorkerInterval = *TenantSummaryWorkerIntervalFlag
@@ -563,9 +516,6 @@ func LoadDefaultConfiguration() error {
 	// MaxHeaders flag
 	if *MaxHeadersFlag != 0 {
 		config.MaxHeaders = *MaxHeadersFlag
-	}
-	if *NodeSchedulerBalancingWaitTimeFlag != 30 { // Only override if different from default
-		config.NodeSchedulerBalancingWaitTime = time.Duration(*NodeSchedulerBalancingWaitTimeFlag) * time.Second
 	}
 
 	if *DeploymentIDFlag != 0 { // Only override if different from default
@@ -604,23 +554,6 @@ func LoadDefaultConfiguration() error {
 		config.GrpcServerListenAddrPort = 4000 // Default gRPC port
 	}
 
-	// Apply defaults and validations for NodeScheduler settings
-	if config.NodeSchedulerHeartbeatTimeout == 0 {
-		config.NodeSchedulerHeartbeatTimeout = 15 * time.Second // Default to 15 seconds
-	}
-	if config.NodeSchedulerHeartbeatTimeout < 15*time.Second {
-		log.Warn().Msgf("NodeSchedulerHeartbeatTimeout (%v) is less than minimum 15 seconds. Setting to 15 seconds.", config.NodeSchedulerHeartbeatTimeout)
-		config.NodeSchedulerHeartbeatTimeout = 15 * time.Second
-	}
-
-	if config.NodeSchedulerTTL == 0 {
-		config.NodeSchedulerTTL = 1440 // Default to 1440 minutes (24 hours)
-	}
-	if config.NodeSchedulerTTL < 60 {
-		log.Warn().Msgf("NodeSchedulerTTL (%d minutes) is less than minimum 60 minutes. Setting to 60 minutes.", config.NodeSchedulerTTL)
-		config.NodeSchedulerTTL = 60
-	}
-
 	if config.TenantSummaryWorkerInterval == 0 {
 		config.TenantSummaryWorkerInterval = 30 // Default to 30 seconds
 	}
@@ -639,13 +572,6 @@ func LoadDefaultConfiguration() error {
 	if config.MaxHeaders > 1000 {
 		log.Warn().Msgf("MaxHeaders (%d) exceeds maximum 1000. Setting to 1000.", config.MaxHeaders)
 		config.MaxHeaders = 1000
-	}
-	if config.NodeSchedulerBalancingWaitTime == 0 {
-		config.NodeSchedulerBalancingWaitTime = 30 * time.Second // Default to 30 seconds
-	}
-	if config.NodeSchedulerBalancingWaitTime < 10*time.Second {
-		log.Warn().Msgf("NodeSchedulerBalancingWaitTime (%v) is less than minimum 10 seconds. Setting to 10 seconds.", config.NodeSchedulerBalancingWaitTime)
-		config.NodeSchedulerBalancingWaitTime = 10 * time.Second
 	}
 
 	if config.DeploymentID == 0 {
@@ -725,7 +651,7 @@ func LoadDefaultConfiguration() error {
 		config.MaxShards = MaxShards
 	}
 	if config.MaxShards <= 0 {
-		config.MaxShards = 10
+		config.MaxShards = 100
 	}
 
 	// Apply default for MaxColumnFamilies if not set by any source
@@ -940,18 +866,7 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.grpc_server_listen_addr_port = p
-		case constants.ConfigNodeSchedulerHeartbeatTimeoutKey:
-			p, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("error parsing %s: %w", k, err)
-			}
-			cfg.node_scheduler_heartbeat_timeout = p
-		case constants.ConfigNodeSchedulerTTLKey:
-			p, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("error parsing %s: %w", k, err)
-			}
-			cfg.node_scheduler_ttl = p
+
 		case constants.ConfigTenantSummaryWorkerIntervalKey:
 			p, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
@@ -964,12 +879,7 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.max_headers = p
-		case constants.ConfigNodeSchedulerBalancingWaitTimeKey:
-			w, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("error parsing %s: %w", k, err)
-			}
-			cfg.node_scheduler_balancing_wait_time = w
+
 		case constants.ConfigDeploymentIDKey:
 			id, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {

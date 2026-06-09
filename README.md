@@ -117,7 +117,7 @@ nx run server:serve-admin
 
 ### Option 3 — Run a local multi-node cluster (manual)
 
-For a realistic cluster setup, start three consensus nodes (they form the Raft quorum) and then join scheduler/connector nodes.
+For a realistic cluster setup, start three consensus nodes (they form the Raft quorum) and then join connector nodes.
 
 From the `server/` directory, open separate terminals for each node:
 
@@ -136,19 +136,19 @@ go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
   -replica 3 -rest-port 3003 -grpc-port 4003 --role=admin,consensus
 ```
 
-**Scheduler/Connector nodes (join the existing cluster):**
+**Connector nodes (join the existing cluster):**
 ```bash
 go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
-  -replica 4 -rest-port 3004 -grpc-port 4004 -join --role=scheduler,connector
+  -replica 4 -rest-port 3004 -grpc-port 4004 -join --role=connector
 
 go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
-  -replica 5 -rest-port 3005 -grpc-port 4005 -join --role=scheduler,connector
+  -replica 5 -rest-port 3005 -grpc-port 4005 -join --role=connector
 
 go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
-  -replica 6 -rest-port 3006 -grpc-port 4006 -join --role=scheduler,connector
+  -replica 6 -rest-port 3006 -grpc-port 4006 -join --role=connector
 
 go run cmd/main.go -self-member-host 127.0.0.1 -cluster-base-port 17000 \
-  -replica 7 -rest-port 3007 -grpc-port 4007 -join --role=scheduler,connector
+  -replica 7 -rest-port 3007 -grpc-port 4007 -join --role=connector
 ```
 
 ---
@@ -302,7 +302,7 @@ Configuration is loaded from three sources, in order of precedence (highest → 
 | `DEFAULT_ROOT_PASSWORD` | Password for the default root user. | `admin` |
 | `LOGGER_FORMAT` | Log output format. Use `pretty` for dev, `json` for production. | `pretty` |
 | `REPLICA_ID` | Unique numeric ID for this node in the cluster. | *(required)* |
-| `ROLES` | Comma-separated roles for this node (e.g., `consensus,scheduler,connector`). | *(all roles)* |
+| `ROLES` | Comma-separated roles for this node (e.g., `consensus,connector,admin`). | *(all roles)* |
 | `SELF_MEMBER_HOST` | IP/hostname this node advertises to cluster peers. | `127.0.0.1` |
 | `CLUSTER_BASE_PORT` | Base port for Raft cluster communication. | `17000` |
 | `INITIAL_MEMBERS` | Comma-separated list of initial member addresses for cluster bootstrap (e.g., `127.0.0.1:r1,127.0.0.1:r2`). | *(auto-derived)* |
@@ -320,9 +320,7 @@ Configuration is loaded from three sources, in order of precedence (highest → 
 | `API_RAFT_TIMEOUT` | Timeout for API → Raft node requests (e.g., `5s`, `1m`). | `30s` |
 | `MAX_SHARDS` | Maximum number of Raft shards. Capped by environment limits. | `10` |
 | `MAX_COLUMN_FAMILIES` | Maximum number of column families per shard. | `10` |
-| `NODE_SCHEDULER_HEARTBEAT_TIMEOUT` | Heartbeat timeout for scheduler nodes (e.g., `15s`, `1m`). | `15s` |
-| `NODE_SCHEDULER_TTL` | TTL for node scheduler entries in minutes. Minimum 60. | `1440` (24h) |
-| `NODE_SCHEDULER_BALANCING_WAIT_TIME` | Seconds to wait after last scheduler node appears before rebalancing. | `30` |
+
 | `TENANT_SUMMARY_WORKER_INTERVAL` | Interval in seconds for the tenant summary background worker. | `30` |
 | `MAX_HEADERS` | Maximum number of custom headers allowed. Range: 5–1000. | `100` |
 | `DEPLOYMENT_ID` | Cluster isolation ID — useful when multiple clusters share infrastructure. | `0` |
@@ -343,7 +341,7 @@ Configuration is loaded from three sources, in order of precedence (highest → 
 | `--initial-members` | string | Comma-separated member list for new cluster bootstrap. | *(required for new cluster)* |
 | `--replica` | uint64 | Unique replica ID for this node. | *(required)* |
 | `--join` | bool | Join an existing cluster instead of bootstrapping. | `false` |
-| `--role` | string | Comma-separated node roles (e.g., `consensus,scheduler,connector`). | *(all roles)* |
+| `--role` | string | Comma-separated node roles (e.g., `consensus,connector,admin`). | *(all roles)* |
 | `--rest-host` | string | REST API listen host. | `0.0.0.0` |
 | `--rest-port` | int | REST API listen port. | `3000` |
 | `--grpc-host` | string | gRPC server listen host. | `0.0.0.0` |
@@ -356,9 +354,7 @@ Configuration is loaded from three sources, in order of precedence (highest → 
 | `--api-raft-timeout` | duration | Timeout for API → Raft requests. | `30s` |
 | `--max-shards` | int | Max number of Raft shards. | `10` |
 | `--max-column-families` | int | Max column families per shard. | `10` |
-| `--node-scheduler-heartbeat-timeout` | duration | Heartbeat timeout for scheduler nodes. | `15s` |
-| `--node-scheduler-ttl` | int64 | TTL for scheduler entries in minutes. | `1440` |
-| `--node-scheduler-balancing-wait-time` | int64 | Seconds to wait before rebalancing. | `30` |
+
 | `--tenant-summary-worker-interval` | int64 | Tenant summary worker interval in seconds. | `30` |
 | `--max-headers` | int | Max allowed custom headers. | `100` |
 | `--deployment-id` | uint64 | Cluster isolation identifier. | `0` |

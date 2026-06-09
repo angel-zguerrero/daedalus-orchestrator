@@ -12,7 +12,6 @@ import (
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
-	node_scheduler_command "deadalus-orch/server/internal/usecase/command/node-scheduler"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -163,8 +162,6 @@ func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, i
 		return models.Queue{}, fmt.Errorf("find queue command failed: %w", err)
 	}
 
-	// Para queues globales no hay nodo específico
-	bo.populateSupervisorFields(ctx, &queue)
 	return queue, nil
 }
 
@@ -247,9 +244,7 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 		findResult.Entities = []models.Queue{}
 	}
 
-	if includeSupervisorInfo {
-		bo.batchPopulateSupervisorFields(ctx, findResult.Entities)
-	}
+
 
 	return findResult, nil
 }
@@ -315,9 +310,7 @@ func (bo *QueueBO) GetQueuesBySupervisionState(ctx context.Context, q string, cu
 		findResult.Entities = []models.Queue{}
 	}
 
-	if includeSupervisorInfo {
-		bo.batchPopulateSupervisorFields(ctx, findResult.Entities)
-	}
+
 
 	return findResult, nil
 }
@@ -381,105 +374,6 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 	return "", fmt.Errorf("no message was created")
 }
 
-func (bo *QueueBO) AssignNodeSchedulerToQueues(ctx context.Context, queues []models.Queue, cf, cfs string, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
-	if len(queues) == 0 {
-		return nil, errors.New("no queues provided")
-	}
-
-	assignNodeSchedulerToQueuesCommand := &queue_command.AssignNodeSchedulerToQueuesCommand{
-		Queues: queues,
-		CF:     cf,
-		CFS:    cfs,
-	}
-
-	updated, err := dragonboat.ExecuteRepositoryCommand[[]models.Queue](
-		tenantNode,
-		ctx,
-		assignNodeSchedulerToQueuesCommand,
-		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(queues)),
-		bo.Config.Logger,
-		"bulk update queues",
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return updated, nil
-}
-
-func (bo *QueueBO) populateSupervisorFields(ctx context.Context, queue *models.Queue) {
-	if queue.NodeSchedulerSupervisorId == "" {
-		return
-	}
-
-	findNodeSchedulerCommand := &node_scheduler_command.FindNodeSchedulerCommand{
-		NodeSchedulerID: queue.NodeSchedulerSupervisorId,
-	}
-
-	nodeScheduler, err := dragonboat.ExecuteRepositoryQuery[models.NodeScheduler](
-		bo.Config.MasterNode,
-		ctx,
-		findNodeSchedulerCommand,
-		config.GlobalConfiguration.ApiRaftTimeout,
-		bo.Config.Logger,
-		"find nodeScheduler for supervisor",
-	)
-
-	if err == nil {
-		queue.NodeSchedulerSupervisorCode = nodeScheduler.ID
-		queue.NodeSchedulerSupervisorName = nodeScheduler.Name
-	}
-}
-
-func (bo *QueueBO) batchPopulateSupervisorFields(ctx context.Context, queues []models.Queue) {
-	if len(queues) == 0 {
-		return
-	}
-
-	// Collect unique supervisor IDs
-	nodeSchedulerIds := make(map[string]bool)
-	for _, q := range queues {
-		if q.NodeSchedulerSupervisorId != "" {
-			nodeSchedulerIds[q.NodeSchedulerSupervisorId] = true
-		}
-	}
-
-	if len(nodeSchedulerIds) == 0 {
-		return
-	}
-
-	// Fetch unique NodeSchedulers and cache them in a map
-	nodeSchedulerMap := make(map[string]*models.NodeScheduler)
-	for id := range nodeSchedulerIds {
-		findNodeSchedulerCommand := &node_scheduler_command.FindNodeSchedulerCommand{
-			NodeSchedulerID: id,
-		}
-
-		nodeScheduler, err := dragonboat.ExecuteRepositoryQuery[models.NodeScheduler](
-			bo.Config.MasterNode,
-			ctx,
-			findNodeSchedulerCommand,
-			config.GlobalConfiguration.ApiRaftTimeout,
-			bo.Config.Logger,
-			"find nodeScheduler for supervisor",
-		)
-
-		if err == nil {
-			nodeSchedulerMap[id] = &nodeScheduler
-		}
-	}
-
-	// Populate virtual fields
-	for i := range queues {
-		q := &queues[i]
-		if q.NodeSchedulerSupervisorId != "" {
-			if ns, exists := nodeSchedulerMap[q.NodeSchedulerSupervisorId]; exists {
-				q.NodeSchedulerSupervisorCode = ns.ID
-				q.NodeSchedulerSupervisorName = ns.Name
-			}
-		}
-	}
-}
 
 // DequeueMessage removes the next available message from the queue according to the
 // threshold-based fair priority queue algorithm, creates a QueueMessageLease bound to

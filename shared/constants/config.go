@@ -68,11 +68,7 @@ const ConfigGrpcServerListenAddrHostKey = "grpc_server_listen_addr_host"
 // ConfigGrpcServerListenAddrPortKey is the key for the gRPC server listen port setting in the configuration file.
 const ConfigGrpcServerListenAddrPortKey = "grpc_server_listen_addr_port"
 
-// ConfigNodeSchedulerHeartbeatTimeoutKey is the key for the node scheduler heartbeat timeout setting in the configuration file (in seconds).
-const ConfigNodeSchedulerHeartbeatTimeoutKey = "node_scheduler_heartbeat_timeout"
 
-// ConfigNodeSchedulerTTLKey is the key for the node scheduler TTL setting in the configuration file (in minutes).
-const ConfigNodeSchedulerTTLKey = "node_scheduler_ttl"
 
 // ConfigTenantSummaryWorkerIntervalKey is the key for the tenant summary worker interval setting in the configuration file (in seconds).
 const ConfigTenantSummaryWorkerIntervalKey = "tenant_summary_worker_interval"
@@ -80,8 +76,7 @@ const ConfigTenantSummaryWorkerIntervalKey = "tenant_summary_worker_interval"
 // ConfigMaxHeadersKey is the key for the maximum number of headers setting in the configuration file.
 const ConfigMaxHeadersKey = "max_headers"
 
-// ConfigNodeSchedulerBalancingWaitTimeKey is the key for the node scheduler balancing wait time setting in the configuration file (in seconds).
-const ConfigNodeSchedulerBalancingWaitTimeKey = "node_scheduler_balancing_wait_time"
+
 
 // ConfigDeploymentIDKey is the key for the deployment ID setting in the configuration file.
 const ConfigDeploymentIDKey = "deployment_id"
@@ -166,11 +161,7 @@ const EnvVarGrpcServerListenAddrHost = "GRPC_SERVER_LISTEN_ADDR_HOST"
 // EnvVarGrpcServerListenAddrPort is the environment variable name for the gRPC server listen port.
 const EnvVarGrpcServerListenAddrPort = "GRPC_SERVER_LISTEN_ADDR_PORT"
 
-// EnvVarNodeSchedulerHeartbeatTimeout is the environment variable name for the node scheduler heartbeat timeout (e.g., "3m", "5m").
-const EnvVarNodeSchedulerHeartbeatTimeout = "NODE_SCHEDULER_HEARTBEAT_TIMEOUT"
 
-// EnvVarNodeSchedulerTTL is the environment variable name for the node scheduler TTL (in minutes).
-const EnvVarNodeSchedulerTTL = "NODE_SCHEDULER_TTL"
 
 // EnvVarTenantSummaryWorkerInterval is the environment variable name for the tenant summary worker interval (in seconds).
 const EnvVarTenantSummaryWorkerInterval = "TENANT_SUMMARY_WORKER_INTERVAL"
@@ -178,8 +169,7 @@ const EnvVarTenantSummaryWorkerInterval = "TENANT_SUMMARY_WORKER_INTERVAL"
 // EnvVarMaxHeaders is the environment variable name for the maximum number of headers.
 const EnvVarMaxHeaders = "MAX_HEADERS"
 
-// EnvVarNodeSchedulerBalancingWaitTime is the environment variable name for the node scheduler balancing wait time (in seconds).
-const EnvVarNodeSchedulerBalancingWaitTime = "NODE_SCHEDULER_BALANCING_WAIT_TIME"
+
 
 // EnvVarDeploymentID is the environment variable name for the deployment ID.
 const EnvVarDeploymentID = "DEPLOYMENT_ID"
@@ -254,11 +244,7 @@ const GrpcServerListenAddrHostFlagName = "grpc-host"
 // GrpcServerListenAddrPortFlagName is the command-line flag name for the gRPC server listen port.
 const GrpcServerListenAddrPortFlagName = "grpc-port"
 
-// NodeSchedulerHeartbeatTimeoutFlagName is the command-line flag name for the node scheduler heartbeat timeout.
-const NodeSchedulerHeartbeatTimeoutFlagName = "node-scheduler-heartbeat-timeout"
 
-// NodeSchedulerTTLFlagName is the command-line flag name for the node scheduler TTL (in minutes).
-const NodeSchedulerTTLFlagName = "node-scheduler-ttl"
 
 // TenantSummaryWorkerIntervalFlagName is the command-line flag name for the tenant summary worker interval (in seconds).
 const TenantSummaryWorkerIntervalFlagName = "tenant-summary-worker-interval"
@@ -266,8 +252,7 @@ const TenantSummaryWorkerIntervalFlagName = "tenant-summary-worker-interval"
 // MaxHeadersFlagName is the command-line flag name for the maximum number of headers.
 const MaxHeadersFlagName = "max-headers"
 
-// NodeSchedulerBalancingWaitTimeFlagName is the command-line flag name for the node scheduler balancing wait time (in seconds).
-const NodeSchedulerBalancingWaitTimeFlagName = "node-scheduler-balancing-wait-time"
+
 
 // DeploymentIDFlagName is the command-line flag name for the deployment ID.
 const DeploymentIDFlagName = "deployment-id"

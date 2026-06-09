@@ -214,10 +214,7 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return markQueuesAsDrainCommand.Execute(uow, now)
 	}
 
-	assignNodeSchedulerToQueuesCommand, ok := cmd.(queue_command.AssignNodeSchedulerToQueuesCommand)
-	if ok {
-		return assignNodeSchedulerToQueuesCommand.Execute(uow, now)
-	}
+
 
 	dequeueCommand, ok := cmd.(queue_command.DequeueCommand)
 	if ok {

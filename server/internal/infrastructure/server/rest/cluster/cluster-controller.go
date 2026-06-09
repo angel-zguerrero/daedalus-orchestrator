@@ -11,8 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
-	business_logic "deadalus-orch/server/internal/usecase/business-logic"
-	"deadalus-orch/shared/models"
+
 )
 
 // ClusterController handles cluster management operations like adding/removing nodes
@@ -213,8 +212,7 @@ type EnhancedClusterInfo struct {
 		TenantNodes []gin.H `json:"tenant_nodes"`
 	} `json:"node_configuration"`
 
-	BalancingState *models.NodeSchedulerBalancingState `json:"balancing_state"`
-	
+
 	// Port configuration information
 	PortConfiguration ClusterPortInfo `json:"port_configuration"`
 }
@@ -352,16 +350,7 @@ func (cc *ClusterController) GetClusterInfo(c *gin.Context) {
 		Int("cluster_shards", len(response.ClusterConfig)).
 		Msg("✅ Retrieved enhanced cluster information")
 
-	// Get balancing state information
-	balancingBO := business_logic.NewNodeSchedulerBalancingBO(cc.Config)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	state, err := balancingBO.GetState(ctx)
-	if err != nil {
-		log.Error().Err(err).Msg("❌ Failed to get balancing state")
-	} else if state != nil {
-		response.BalancingState = state
-	}
+
 
 	// Add port configuration information
 	response.PortConfiguration = ClusterPortInfo{

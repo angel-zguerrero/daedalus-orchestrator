@@ -62,16 +62,7 @@ func (cmd *FindQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.
 		}
 	}
 
-	// Populate NodeScheduler supervisor fields
-	if queue.NodeSchedulerSupervisorId != "" {
-		nodeSchedulerRepo, err := db.NewNodeSchedulerRepository(uow, idFactory)
-		if err == nil {
-			if ns, err := nodeSchedulerRepo.GetNodeSchedulerById(queue.NodeSchedulerSupervisorId, now); err == nil && ns != nil {
-				queue.NodeSchedulerSupervisorCode = ns.ID
-				queue.NodeSchedulerSupervisorName = ns.Name
-			}
-		}
-	}
+
 
 	commandResult.Result = *queue
 	return *commandResult

@@ -5,7 +5,7 @@ package constants
 // tenant-specific data.
 const MasterTenant = "master-tenant"
 const MaxShardsInProduction = 1000
-const MaxShardsInNonProduction = 10
+const MaxShardsInNonProduction = 100
 
 const MaxReplicationInProduction = 100
 const MaxReplicationInNonProduction = 10

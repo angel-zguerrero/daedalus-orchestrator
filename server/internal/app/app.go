@@ -4,12 +4,11 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
-	"deadalus-orch/server/internal/infrastructure/server/common"
+
 	grpc_server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	rest_server "deadalus-orch/server/internal/infrastructure/server/rest"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/telemetry"
-	business_logic "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
@@ -67,11 +66,9 @@ type Application struct {
 	NodeReadyWatcherStopper        *syncutil.Stopper
 	NodeClearExpiredTTLStopper     *syncutil.Stopper
 	NodeClearExpiredLeasesStopper  *syncutil.Stopper
-	NodeSchedulerProcessStopper    *syncutil.Stopper
 	AssignTenantsStopper           *syncutil.Stopper
 	TenantSummaryWorkerStopper     *syncutil.Stopper
 	DashboardSummaryWorkerStopper  *syncutil.Stopper
-	NodeSchedulerBalancingStopper  *syncutil.Stopper
 	JobWorkerHeartbeatStopper      *syncutil.Stopper
 
 	ApiLock  sync.Mutex
@@ -248,7 +245,6 @@ func (app *Application) Run() {
 
 	app.StartDashboardSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
-	app.StartNodeSchedulerBalancingWorker(10 * time.Second)
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
 }
@@ -259,19 +255,6 @@ func (app *Application) Stop() {
 	defer cancel()
 
 	// Request Rebalancing if node is scheduler
-	if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleScheduler) {
-		log.Info().Msg("🔄 Requesting cluster rebalance before shutdown...")
-		serverConfig := &common.ServerConfing{
-			Logger:     log.Logger,
-			MasterNode: app.MasterNode,
-		}
-		balancingBO := business_logic.NewNodeSchedulerBalancingBO(serverConfig)
-		rebalanceCtx, rebalanceCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		if err := balancingBO.RequestRebalance(rebalanceCtx); err != nil {
-			log.Warn().Err(err).Msg("⚠️ Failed to request rebalance on shutdown")
-		}
-		rebalanceCancel()
-	}
 
 	// Stop Master Node
 	wg.Add(1)
@@ -353,14 +336,6 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ NodeClearExpiredLeasesStopper stopped.")
 	}()
 
-	// Stop NodeSchedulerProcess Worker
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		app.NodeSchedulerProcessStopper.Stop()
-		log.Info().Msg("✅ NodeSchedulerProcessStopper stopped.")
-	}()
-
 	// Stop Assign Tenants Worker
 	wg.Add(1)
 	go func() {
@@ -388,14 +363,6 @@ func (app *Application) Stop() {
 		defer wg.Done()
 		app.DashboardSummaryWorkerStopper.Stop()
 		log.Info().Msg("✅ DashboardSummaryWorkerStopper stopped.")
-	}()
-
-	// Stop Node Scheduler Balancing Worker
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		app.NodeSchedulerBalancingStopper.Stop()
-		log.Info().Msg("✅ NodeSchedulerBalancingStopper stopped.")
 	}()
 
 	// Stop Job Worker Heartbeat Monitor
@@ -441,11 +408,9 @@ func NewApplication() *Application {
 		NodeReadyWatcherStopper:       syncutil.NewStopper(),
 		NodeClearExpiredTTLStopper:    syncutil.NewStopper(),
 		NodeClearExpiredLeasesStopper: syncutil.NewStopper(),
-		NodeSchedulerProcessStopper:   syncutil.NewStopper(),
 		AssignTenantsStopper:          syncutil.NewStopper(),
 		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
 		DashboardSummaryWorkerStopper: syncutil.NewStopper(),
-		NodeSchedulerBalancingStopper: syncutil.NewStopper(),
 		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),
