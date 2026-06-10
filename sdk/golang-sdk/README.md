@@ -122,6 +122,42 @@ func main() {
 > [!NOTE]
 > **Protobuf Dependency Note:** The SDK includes pre-generated Go protobuf stubs under the `proto/` directory. If the `.proto` definitions in the server change, you can regenerate them with `make proto` (requires `protoc`, `protoc-gen-go`, and `protoc-gen-go-grpc`).
 
+### 🔌 Reconnection & Configuration Parameters
+
+When initializing `DaedalusSDK`, you can configure gRPC and worker stream reconnection behavior using pointers in the `Config` struct (where `nil` resolves to the default setting):
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `AutoReconnect` | `*bool` | `true` | When `true` (or `nil`), automatically retries gRPC connection and worker stream reconnection on failure. |
+| `MaxReconnectAttempts` | `*int` | `nil` (infinite) | The maximum number of consecutive reconnection attempts. If `nil` (or negative), the SDK will retry indefinitely. |
+| `ReconnectIntervalMs` | `*int` | `5000` | The delay in milliseconds between connection retry attempts. |
+
+Example setup with custom reconnection parameters:
+
+```go
+package main
+
+import (
+    daedalus "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk"
+)
+
+func main() {
+    autoReconnect := true
+    maxAttempts := 10
+    interval := 3000
+
+    sdk := daedalus.NewDaedalusSDK(daedalus.Config{
+        URI:                  "http://localhost:4000",
+        Username:             "admin",
+        Password:             "admin",
+        AutoReconnect:        &autoReconnect,
+        MaxReconnectAttempts: &maxAttempts,
+        ReconnectIntervalMs:  &interval,
+    })
+    // ...
+}
+```
+
 ---
 
 ## 🛠️ Monorepo Development & Contribution

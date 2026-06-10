@@ -15,7 +15,7 @@ func main() {
 	sdk := daedalus.NewDaedalusSDK(daedalus.Config{
 		URI:      "http://localhost:4000",
 		Username: "admin",
-		Password: "admin",
+		Password: "123456",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -162,6 +162,15 @@ export interface PublishMessageInput {
   messageId?: string;
 }
 
+export interface SDKConfig {
+  uri: string;
+  username: string;
+  password: string;
+  autoReconnect?: boolean;
+  maxReconnectAttempts?: number;
+  reconnectIntervalMs?: number;
+}
+
 export class DaedalusSDK {
   private jobWorkerClient: any;
   private authClient: any;
@@ -177,7 +186,7 @@ export class DaedalusSDK {
   private queueProtoPath: string;
   private bindingProtoPath: string;
 
-  constructor(private config: { uri: string, username: string, password: string }) {
+  constructor(private config: SDKConfig) {
     const protoBase = path.resolve(__dirname, '../../../server/internal/infrastructure/server/grpc/proto/definitions');
     this.jobWorkerProtoPath = path.join(protoBase, 'jobworker.proto');
     this.authProtoPath = path.join(protoBase, 'auth.proto');
@@ -199,6 +208,36 @@ export class DaedalusSDK {
   }
 
   async connect() {
+    const autoReconnect = this.config.autoReconnect !== false;
+    const maxAttempts = this.config.maxReconnectAttempts;
+    const interval = this.config.reconnectIntervalMs ?? 5000;
+
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      try {
+        await this._connectOnce();
+        return;
+      } catch (err: any) {
+        if (!autoReconnect) {
+          throw err;
+        }
+        if (maxAttempts !== undefined && attempt >= maxAttempts) {
+          console.error(`❌ Connection failed after ${attempt} attempts. Giving up.`);
+          throw err;
+        }
+
+        if (maxAttempts === undefined) {
+          console.warn(`⚠️ Connection failed: ${err.message}. Reconnecting indefinitely (attempt ${attempt})...`);
+        } else {
+          console.warn(`⚠️ Connection failed: ${err.message}. Reconnecting (attempt ${attempt}/${maxAttempts})...`);
+        }
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+    }
+  }
+
+  private async _connectOnce() {
     const target = this.config.uri.replace('http://', '').replace('https://', '');
 
     // Load Auth Proto and create client
@@ -498,6 +537,7 @@ export class DaedalusSDK {
     // Sent to the server on every heartbeat so it can enforce per-policy limits.
     const currentCounts = new Array(capacityPolicies.length).fill(0) as number[];
 
+    let consecutiveFailures = 0;
     const run = async () => {
       try {
         if (!this.token) {
@@ -510,10 +550,24 @@ export class DaedalusSDK {
 
         console.log(`🔌 Opening bidirectional stream for worker ${workerId}...`);
 
+        let connected = false;
+        let streamResolved = false;
+        let resolveStreamPromise: () => void;
+        const streamPromise = new Promise<void>((resolve) => {
+          resolveStreamPromise = () => {
+            if (!streamResolved) {
+              streamResolved = true;
+              resolve();
+            }
+          };
+        });
+
         // Handle incoming messages from server
         call.on('data', async (streamMessage: any) => {
           if (streamMessage.ack) {
             console.log('✅ Connected to server:', streamMessage.ack.knowledge);
+            connected = true;
+            consecutiveFailures = 0; // Reset failures on successful connection/ack
           } else if (streamMessage.claimedMessage) {
             const claimed = streamMessage.claimedMessage;
             console.log(`📬 Received message: ${claimed.message.ID} from tenant ${claimed.tenantCode}`);
@@ -576,10 +630,12 @@ export class DaedalusSDK {
           } else {
             console.error('❌ Stream error:', err.message);
           }
+          resolveStreamPromise();
         });
 
         call.on('end', () => {
           console.log('🔌 Stream ended, will reconnect...');
+          resolveStreamPromise();
         });
 
         // Function to send claim request
@@ -613,19 +669,41 @@ export class DaedalusSDK {
         }, intervalMs);
 
         // Wait for stream to end
-        await new Promise<void>((resolve) => {
-          call.on('end', () => {
-            clearInterval(claimInterval);
-            resolve();
-          });
-          call.on('error', () => {
-            clearInterval(claimInterval);
-            resolve();
-          });
-        });
+        await streamPromise;
+
+        clearInterval(claimInterval);
+
+        if (!connected) {
+          throw new Error('Failed to establish stream connection');
+        }
 
       } catch (err: any) {
         console.error('❌ Unexpected error in worker loop:', err.message);
+        consecutiveFailures++;
+
+        const autoReconnect = this.config.autoReconnect !== false;
+        const maxAttempts = this.config.maxReconnectAttempts;
+        if (!autoReconnect) {
+          console.log('🛑 Auto reconnect is disabled. Worker will exit.');
+          return;
+        }
+        if (maxAttempts !== undefined && consecutiveFailures >= maxAttempts) {
+          console.error(`❌ Worker reconnection failed after ${consecutiveFailures} attempts. Worker will exit.`);
+          return;
+        }
+
+        if (maxAttempts === undefined) {
+          console.warn(`⚠️ Worker connection failed. Reconnecting indefinitely (attempt ${consecutiveFailures})...`);
+        } else {
+          console.warn(`⚠️ Worker connection failed. Reconnecting (attempt ${consecutiveFailures}/${maxAttempts})...`);
+        }
+      }
+
+      // Check autoReconnect configuration before scheduling reconnection
+      const autoReconnect = this.config.autoReconnect !== false;
+      if (!autoReconnect) {
+        console.log('🛑 Auto reconnect is disabled. Worker will exit.');
+        return;
       }
 
       // Reconnect after delay

@@ -2,9 +2,12 @@ package daedalus
 
 // Config holds the connection settings for the Daedalus Orchestrator.
 type Config struct {
-	URI      string
-	Username string
-	Password string
+	URI                  string
+	Username             string
+	Password             string
+	AutoReconnect        *bool
+	MaxReconnectAttempts *int
+	ReconnectIntervalMs  *int
 }
 
 // ClaimWorkFilter defines filter criteria for claiming work from queues.
