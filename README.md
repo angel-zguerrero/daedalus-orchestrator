@@ -140,6 +140,18 @@ await sdk.createWorker({
 | Worker assignment | Random/round-robin | Explicit policies + consensus|
 
 ---
+## 🌟 Real-World Scenarios
+
+### Scenario 1: SaaS Multi-Tenant Application
+You have 1000+ customers, each with 10-50 resource types (orders, payments, notifications, etc.).
+- Traditional: 50,000 queues in RAM = massive server
+- Daedalus: 50,000 queues on disk = one modest server, no memory penalty
+
+### Scenario 2: Priority Tasks with Fairness
+Order processing with priorities: VIP (P3), Premium (P2), Standard (P1).
+- Traditional: VIP orders processed 100%, Standard orders starve
+- Daedalus: VIP gets 4/9 of capacity, Premium gets 3/9, Standard gets 2/9 = fairness
+---
 
 ## 📦 Structure
 
