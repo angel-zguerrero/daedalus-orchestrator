@@ -46,8 +46,68 @@ func NewDaedalusSDK(config Config) *DaedalusSDK {
 	}
 }
 
+// GetAutoReconnect returns AutoReconnect status (defaults to true if nil)
+func (c Config) GetAutoReconnect() bool {
+	if c.AutoReconnect == nil {
+		return true
+	}
+	return *c.AutoReconnect
+}
+
+// GetMaxReconnectAttempts returns the maximum number of reconnection attempts (defaults to -1, which means infinite)
+func (c Config) GetMaxReconnectAttempts() int {
+	if c.MaxReconnectAttempts == nil {
+		return -1
+	}
+	return *c.MaxReconnectAttempts
+}
+
+// GetReconnectInterval returns the interval between reconnections (defaults to 5000ms if nil)
+func (c Config) GetReconnectInterval() time.Duration {
+	if c.ReconnectIntervalMs == nil {
+		return 5000 * time.Millisecond
+	}
+	return time.Duration(*c.ReconnectIntervalMs) * time.Millisecond
+}
+
 // Connect establishes the gRPC connection and performs initial authentication.
 func (sdk *DaedalusSDK) Connect(ctx context.Context) error {
+	autoReconnect := sdk.config.GetAutoReconnect()
+	maxAttempts := sdk.config.GetMaxReconnectAttempts()
+	interval := sdk.config.GetReconnectInterval()
+
+	attempt := 0
+	for {
+		attempt++
+		err := sdk.connectOnce(ctx)
+		if err == nil {
+			return nil
+		}
+
+		if !autoReconnect {
+			return err
+		}
+
+		if maxAttempts >= 0 && attempt >= maxAttempts {
+			log.Printf("❌ Connection failed after %d attempts. Giving up.", attempt)
+			return fmt.Errorf("connection failed after %d attempts: %w", attempt, err)
+		}
+
+		if maxAttempts < 0 {
+			log.Printf("⚠️ Connection failed: %v. Reconnecting indefinitely (attempt %d)...", err, attempt)
+		} else {
+			log.Printf("⚠️ Connection failed: %v. Reconnecting (attempt %d/%d)...", err, attempt, maxAttempts)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(interval):
+		}
+	}
+}
+
+func (sdk *DaedalusSDK) connectOnce(ctx context.Context) error {
 	target := sdk.config.URI
 	target = strings.TrimPrefix(target, "http://")
 	target = strings.TrimPrefix(target, "https://")
@@ -317,6 +377,10 @@ func (sdk *DaedalusSDK) CreateWorker(ctx context.Context, options WorkerOptions)
 
 	log.Printf("🚀 Starting worker %s (%s) with %dms interval...", options.WorkerName, workerID, intervalMs)
 
+	autoReconnect := sdk.config.GetAutoReconnect()
+	maxAttempts := sdk.config.GetMaxReconnectAttempts()
+	consecutiveFailures := 0
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -331,6 +395,31 @@ func (sdk *DaedalusSDK) CreateWorker(ctx context.Context, options WorkerOptions)
 				return ctx.Err()
 			}
 			log.Printf("❌ Unexpected error in worker loop: %v", err)
+			consecutiveFailures++
+
+			if !autoReconnect {
+				log.Println("🛑 Auto reconnect is disabled. Worker will exit.")
+				return err
+			}
+
+			if maxAttempts >= 0 && consecutiveFailures >= maxAttempts {
+				log.Printf("❌ Worker reconnection failed after %d attempts. Worker will exit.", consecutiveFailures)
+				return fmt.Errorf("worker reconnection failed after %d attempts: %w", consecutiveFailures, err)
+			}
+
+			if maxAttempts < 0 {
+				log.Printf("⚠️ Worker connection failed. Reconnecting indefinitely (attempt %d)...", consecutiveFailures)
+			} else {
+				log.Printf("⚠️ Worker connection failed. Reconnecting (attempt %d/%d)...", consecutiveFailures, maxAttempts)
+			}
+		} else {
+			// Successful run of worker stream
+			consecutiveFailures = 0
+		}
+
+		if !autoReconnect {
+			log.Println("🛑 Auto reconnect is disabled. Worker will exit.")
+			return nil
 		}
 
 		log.Printf("⏳ Reconnecting in %dms...", intervalMs)
@@ -371,6 +460,7 @@ func (sdk *DaedalusSDK) runWorkerStream(
 
 	// Channel to signal stream is done
 	streamDone := make(chan struct{})
+	connected := false
 
 	// Handle incoming messages from server in a goroutine
 	go func() {
@@ -399,6 +489,7 @@ func (sdk *DaedalusSDK) runWorkerStream(
 			switch m := msg.Message.(type) {
 			case *jobworkerpb.ClaimWorkStreamMessage_Ack:
 				log.Printf("✅ Connected to server: %s", m.Ack.Knowledge)
+				connected = true
 
 			case *jobworkerpb.ClaimWorkStreamMessage_ClaimedMessage:
 				claimed := m.ClaimedMessage
@@ -474,6 +565,9 @@ func (sdk *DaedalusSDK) runWorkerStream(
 			stream.CloseSend()
 			return ctx.Err()
 		case <-streamDone:
+			if !connected {
+				return fmt.Errorf("failed to establish stream connection")
+			}
 			return nil
 		case <-ticker.C:
 			if err := sdk.sendClaimRequest(stream, workerID, options, currentCounts, countsMu); err != nil {

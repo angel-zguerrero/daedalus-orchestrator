@@ -97,6 +97,29 @@ main().catch(err => {
 > [!NOTE]
 > **Protobuf Dependency Note:** Currently, the SDK resolves gRPC protobuf definitions relative to the monorepo directory structure (looking for `server/internal/infrastructure/server/grpc/proto/definitions` three levels up from the package folder). If you use this package standalone outside the monorepo, make sure to place or symlink the protobuf definitions at the expected relative path, or install the package within the monorepo context.
 
+### 🔌 Reconnection & Configuration Parameters
+
+When initializing `DaedalusSDK`, you can pass additional parameters to control reconnection behavior:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `autoReconnect` | `boolean` | `true` | When `true`, automatically retries gRPC connection and worker stream reconnection on failure. |
+| `maxReconnectAttempts` | `number` | `undefined` (infinite) | The maximum number of consecutive reconnection attempts. If not set, it will attempt to reconnect indefinitely. |
+| `reconnectIntervalMs` | `number` | `5000` | The delay in milliseconds between connection retry attempts. |
+
+Example setup with custom reconnection parameters:
+
+```typescript
+const sdk = new DaedalusSDK({
+    uri: 'http://localhost:4000',
+    username: 'admin',
+    password: 'admin',
+    autoReconnect: true,
+    maxReconnectAttempts: 10,
+    reconnectIntervalMs: 3000
+});
+```
+
 ---
 
 ## 🛠️ Monorepo Development & Contribution
