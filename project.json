@@ -104,6 +104,42 @@
                 "parallel": false,
                 "cwd": "sdk/nodejs-sdk"
             }
+        },
+        "build-sdk-golang": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "go build ./..."
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/golang-sdk"
+            }
+        },
+        "run-golang-simple-worker": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "go run examples/simple-worker/main.go"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/golang-sdk"
+            }
+        },
+        "run-golang-assert-resources": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "go run examples/assert-resources/main.go"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/golang-sdk"
+            }
         }
     }
 }

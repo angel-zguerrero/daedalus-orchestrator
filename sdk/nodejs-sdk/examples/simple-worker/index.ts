@@ -22,10 +22,10 @@ async function main() {
         onMessage: async (message, ack) => {
             console.log('👷 Processing message:', message);
             console.log('📝 Content:', message);
-            
+
             // Simulate processing
             await new Promise(resolve => setTimeout(resolve, 10000));
-            
+
             // Acknowledge the message after processing
             console.log('✅ Message processed, sending ACK...');
             await ack();
