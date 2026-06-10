@@ -1,44 +1,136 @@
 # DaedalusOrchestrator 🧠⚙️
 
-**Welcome to the brain of your distributed system.**
-DaedalusOrchestrator is not your typical task runner — this is where *you* call the shots, and the system listens.
+**Consensus-Driven, Fair-Queued, Disk-Backed Multi-Tenant Messaging.**
 
-Forget throwing tasks into a black box and *hoping* the right worker catches it.
-This is deterministic orchestration. Precision. Order. No chaos allowed.
+Control. Fairness. Isolation. No compromises.
+
+- **🎯 Deterministic Control**: Raft-based consensus decides task assignments, not randomness
+- **⚖️ Fair Queues**: Multiple priorities in one queue without starvation
+- **🏝️ Noise Isolation**: Per-tenant queues mean one customer's spike doesn't starve another
+- **💾 Disk-Backed**: Thousands of queues without RAM penalties
+- **🚀 Flexible Workers**: One worker handles many queues via smart policies
 
 ---
 
 ## 🧬 What is it?
 
-**DaedalusOrchestrator** is a distributed task orchestration system designed for ultimate control.
-You get centralized scheduling with decentralized execution — perfect for multi-tenant setups where noise is not welcome.
+**DaedalusOrchestrator** is a consensus-driven, fair-queued message orchestrator for multi-tenant systems.
+
+Unlike traditional brokers that struggle with noisy neighbors and starvation, Daedalus gives you:
+- **Complete Noise Isolation**: Each tenant has separate queues per resource
+- **Fair Queue Scheduling**: Priorities without starvation (threshold-based fairness)
+- **Disk-Backed Scalability**: Thousands of queues on modest hardware
+- **Deterministic Control**: Raft consensus, not random distribution
+- **Consensus-based Leadership**: A Raft-elected leader determines all task assignments
+- **Deterministic Task Routing**: Workers declare their capabilities via `ClaimWorkCapacityPolicies`, and the system matches tasks to workers based on explicit rules, not luck
+- **Policy-driven Filtering**: Specify exactly which tenants, namespaces, and queues a worker can handle — down to pattern matching and exclusions
 
 Built on top of [Dragonboat](https://github.com/lni/dragonboat) (Raft consensus), gRPC persistent connections, and a pluggable storage layer, it gives you a rock-solid foundation for orchestrating work at scale.
 
 ---
 
-## 🧰 Key Features
+### 🏗️ True Multi-Tenancy with Noise Isolation
+**The Noisy Neighbor Problem: Solved.**
 
-🔄 **Custom Load Balancing**
-No shared queues. No random workers grabbing tasks. The orchestrator decides — every time.
+Most brokers use **one queue per resource with all tenants inside** — meaning if one tenant floods the queue, it starves everyone else. **Daedalus is different**:
 
-🕸️ **Persistent Connections**
-Long-lived gRPC or TCP. Your workers stay visible. You always know who's online.
+❌ Traditional Broker: Queue: "orders" ├─ Tenant A: 1000 msgs ├─ Tenant B: 1 msg ← Starved, waiting... Tenant C: 500 msgs
 
-🧩 **Cluster Aware by Design**
-Nodes declare their roles at startup: `consensus`, `connector`, or `admin`. No guesswork. Everyone knows their place.
+✅ Daedalus: Queue: "orders|tenant-A" → 1000 msgs (Tenant A's resources) Queue: "orders|tenant-B" → 1 msg (Tenant B's resources — isolated!) Queue: "orders|tenant-C" → 500 msgs (Tenant C's resources).
 
-⚖️ **Resilient & Reactive**
-When a node drops out? The system pauses, breathes, and rebalances gracefully.
 
-🧭 **Consensus-based Leadership**
-Consensus nodes elect a Raft leader who calls the shots. No split brains here.
+**Result**: Each tenant has its own queue per resource. One tenant's traffic spike doesn't affect another's SLA. Complete noise isolation.
 
-💡 **Built for Multi-Tenancy**
-Keep tenants in check. Avoid noisy neighbors. Deliver predictable performance.
+---
 
-🗄️ **PebbleDB by Default**
-The primary storage engine is [PebbleDB](https://github.com/cockroachdb/pebble) — fast, embeddable, and CGO-free. RocksDB is supported as an optional alternative for advanced use cases (see below).
+### ⚖️ Fair Queues: Beyond Priority
+**Most message brokers give you priority or nothing. Daedalus gives you fairness.**
+
+Traditional systems with multiple priorities suffer from **starvation**: higher-priority tasks consume all CPU, lower-priority tasks never run. **Daedalus implements Fair Queues with threshold-based scheduling**:
+
+```go
+// Example: Queue with 3 priority levels
+Thresholds: {
+    Priority 3 (highest): 4 tasks,
+    Priority 2 (medium):  3 tasks,
+    Priority 1 (low):     2 tasks
+}
+
+// Dequeue order:
+// Cycle 1: P3×4, P2×3, P1×2
+// Cycle 2: P3×4, P2×3, P1×2  (repeats fairly)
+```
+
+How it works:
+
+- Higher priorities are always served first
+- But once a priority threshold is met, the scheduler moves to the next priority level
+- This prevents starvation: low-priority tasks always get a turn
+- Thresholds can be 0 (drain all) or any positive number (fairness ratio).
+
+**Why others don’t do this**: Requires persistent state on disk to track scheduling position across crashes. Daedalus has it built-in.
+
+---
+
+### 💾 Disk-Backed Queues by Default
+**RAM doesn’t scale. Disk does.**
+
+Most brokers require explicit configuration to persist queues to disk (and warn you it's "expensive"). **Daedalus inverts this**:
+
+- All queues live on disk (PebbleDB or RocksDB) by default
+- RAM footprint is minimal: Daedalus only caches metadata, not message data
+- Minimal memory overhead per shard: MemTableSize tuned to 32KB (vs. 4MB default)
+
+**What this means:**
+
+- You can create thousands of queues without paying a RAM penalty
+- No "queue creation limits" due to memory constraints
+- Scales to massive deployments without requiring massive servers
+
+---
+### 🚀 Workers as Flexible Consumers
+**You don't need 1 worker per queue. You can't afford it.**
+
+With thousands of queues per tenant across hundreds of tenants, dedicated workers-per-queue becomes impractical. **Daedalus workers are smart consumers**:
+
+
+```typescript
+
+// One worker handles MANY queues via policies
+await sdk.createWorker({
+    capacityPolicies: [
+        {
+            maxQueueMessages: 50,
+            claimWorkFilter: {
+                tenantPatterns: ['prod-*'],           // Match tenant prefixes
+                excludeTenantCodes: ['prod-debug'],  // But not this one
+                queueCodes: ['orders', 'payments'],  // Focus on these
+                vnamespaces: ['primary']             // Within this namespace
+            }
+        },
+        {
+            maxQueueMessages: 100,
+            claimWorkFilter: {
+                tenantCodes: ['staging-demo']        // Different policy for staging
+            }
+        }
+    ]
+});
+
+```
+**Result**: One worker can intelligently handle 100+ queues by declaring what it can handle. The orchestrator dispatches work based on the policy, not arbitrary distribution.
+
+---
+
+### 📊 Comparison Table
+
+| Feature | Traditional Broker | Daedalus |
+|---|---|---|
+| Multi-tenant isolation | Shared queue → noisy neighbors | Per-tenant queue per resource → isolated|
+| Priority handling | Starvation-prone | Fair Queues with thresholds → no starvation|
+| Queue persistence | RAM-based, optional disk | Disk-backed by default, minimal RAM|
+| Scalability | Limited by queue memory | Thousands of queues, same RAM footprint|
+| Worker assignment | Random/round-robin | Explicit policies + consensus|
 
 ---
 
@@ -64,6 +156,32 @@ The primary storage engine is [PebbleDB](https://github.com/cockroachdb/pebble) 
 └── 🔄 shared/                   # Code shared across packages
     ├── 📦 models/               # Shared DTOs and domain models
     └── 🏷️  constants/           # Shared constants (env var names, config keys…)
+```
+
+---
+
+## 🏗️ Architecture
+```
+┌─────────────────────────────────────────┐
+│   Consensus Layer (Raft)                │
+│   ├─ Leader election                    │
+│   └─ Deterministic task assignment      │
+├─────────────────────────────────────────┤
+│   Fair Queue System                     │
+│   ├─ Threshold-based priority           │
+│   ├─ Starvation prevention              │
+│   └─ Stateful scheduling                │
+├─────────────────────────────────────────┤
+│   Disk Storage (PebbleDB/RocksDB)       │
+│   ├─ Queue metadata                     │
+│   ├─ Messages (on-disk, not in-memory)  │
+│   └─ Fair queue state (persistent)      │
+├─────────────────────────────────────────┤
+│   Worker Orchestration                  │
+│   ├─ Policy-based assignment            │
+│   ├─ Capacity-aware distribution        │
+│   └─ Flexible multi-queue handling      │
+└─────────────────────────────────────────┘
 ```
 
 ---
