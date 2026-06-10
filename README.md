@@ -169,7 +169,8 @@ Order processing with priorities: VIP (P3), Premium (P2), Standard (P1).
 │
 ├── 🌐 web-admin/                # Angular admin dashboard (built and served by the server)
 │
-├── 🔌 sdk/
+├── 🔌  sdk/
+│   ├── golang-sdk/              # Go SDK for connecting workers
 │   └── nodejs-sdk/              # Node.js SDK for connecting workers
 │
 └── 🔄 shared/                   # Code shared across packages
@@ -210,6 +211,7 @@ Order processing with priorities: VIP (P3), Premium (P2), Standard (P1).
 To connect workers, register task handlers, publish/enqueue messages, and interact with the **Daedalus Orchestrator Server**, you need to use a client SDK.
 
 Currently, we provide:
+- **[Go SDK](sdk/golang-sdk/README.md)**: A native Go client library designed to establish persistent gRPC connections with the orchestrator, manage topologies (tenants, exchanges, queues, bindings), and process queued tasks. For installation, usage examples, and configuration guides, refer to the [Go SDK README](sdk/golang-sdk/README.md).
 - **[Node.js / TypeScript SDK](sdk/nodejs-sdk/README.md)**: A client library built to establish persistent gRPC connections with the orchestrator, manage topologies (tenants, exchanges, queues, bindings), and process queued tasks. For installation, usage examples, and configuration guides, refer to the [Node.js SDK README](sdk/nodejs-sdk/README.md).
 
 ---
@@ -521,6 +523,12 @@ To switch engines at runtime, set `MASTER_DB_ENGINE` and `TENANT_DB_ENGINE` (or 
 | `nx run server:serve-rocksdb` | Run the server with RocksDB (advanced) |
 | `nx run server:serve-rocksdb-admin` | Build the admin UI then run the server with RocksDB (advanced) |
 | `nx run daedalus-web-admin:build:development` | Build the admin UI only |
+| `nx run server:build-sdk-golang` | Build the Go SDK |
+| `nx run server:run-golang-simple-worker` | Run the Go SDK simple worker example |
+| `nx run server:run-golang-assert-resources` | Run the Go SDK assert resources example |
+| `nx run server:build-sdk-nodejs` | Build the Node.js SDK |
+| `nx run server:run-nodejs-simple-worker` | Run the Node.js SDK simple worker example |
+| `nx run server:run-nodejs-assert-resources` | Run the Node.js SDK assert resources example |
 
 ---
 
