@@ -32,6 +32,20 @@ To install the SDK as a dependency in your project:
 npm install @omicron-x/daedalus-sdk
 ```
 
+### 🏷️ Monorepo Versioning & Git Tags
+While this SDK is primarily distributed and installed via the npm registry, we follow the same monorepo tagging convention as the Go SDK to track releases and allow direct Git installations:
+
+To tag a version of this SDK (for example, `v0.1.0`):
+```bash
+git tag sdk/nodejs-sdk/v0.1.0
+git push origin sdk/nodejs-sdk/v0.1.0
+```
+
+This allows installing the package directly from the Git repository at a specific tag:
+```bash
+npm install github:angel-zguerrero/daedalus-orchestrator#sdk/nodejs-sdk/v0.1.0
+```
+
 ---
 
 ## 🚀 Quick Start (Usage Example)
