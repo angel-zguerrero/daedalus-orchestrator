@@ -34,9 +34,16 @@ Built on top of [Dragonboat](https://github.com/lni/dragonboat) (Raft consensus)
 
 Most brokers use **one queue per resource with all tenants inside** — meaning if one tenant floods the queue, it starves everyone else. **Daedalus is different**:
 
-❌ Traditional Broker: Queue: "orders" ├─ Tenant A: 1000 msgs ├─ Tenant B: 1 msg ← Starved, waiting... Tenant C: 500 msgs
+❌ **Traditional Broker:**
+   Queue: "orders"
+   ├─ Tenant A: 1000 msgs
+   ├─ Tenant B: 1 msg ← Starved
+   └─ Tenant C: 500 msgs
 
-✅ Daedalus: Queue: "orders|tenant-A" → 1000 msgs (Tenant A's resources) Queue: "orders|tenant-B" → 1 msg (Tenant B's resources — isolated!) Queue: "orders|tenant-C" → 500 msgs (Tenant C's resources).
+✅ **Daedalus:**
+   Queue: "orders|tenant-A" → 1000 msgs
+   Queue: "orders|tenant-B" → 1 msg (isolated!)
+   Queue: "orders|tenant-C" → 500 msgs
 
 
 **Result**: Each tenant has its own queue per resource. One tenant's traffic spike doesn't affect another's SLA. Complete noise isolation.
