@@ -32,6 +32,20 @@ To install the SDK as a dependency in your Go project:
 go get github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk
 ```
 
+### 🏷️ Monorepo Versioning & Publishing
+Because this SDK resides in a subdirectory within a monorepo, Go requires Git version tags to be prefixed with the relative path of the module.
+
+To publish a version of this SDK (for example, `v0.1.0`), you must tag the repository as follows:
+```bash
+git tag sdk/golang-sdk/v0.1.0
+git push origin sdk/golang-sdk/v0.1.0
+```
+
+Without this prefix, the Go toolchain will not associate the tag with this sub-module. If you want to fetch the latest commit from the `main` branch without a published tag, you can run:
+```bash
+go get github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk@main
+```
+
 ---
 
 ## 🚀 Quick Start (Usage Example)
