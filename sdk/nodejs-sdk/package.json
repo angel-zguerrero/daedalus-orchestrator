@@ -1,6 +1,6 @@
 {
   "name": "@omicron-x/daedalus-sdk",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Daedalus Orchestrator Node.js Worker",
   "homepage": "https://github.com/angel-zguerrero/daedalus-orchestrator/tree/main/sdk/nodejs-sdk",
   "repository": {
