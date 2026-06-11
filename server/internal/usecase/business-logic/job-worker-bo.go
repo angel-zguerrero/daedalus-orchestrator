@@ -8,7 +8,10 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	job_worker_command "deadalus-orch/server/internal/usecase/command/job-worker"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
+	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"deadalus-orch/shared/models"
+	"deadalus-orch/server/internal/pkg/utils"
 	"errors"
 	"fmt"
 	"strings"
@@ -297,6 +300,18 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 							}
 
 							var allQueues []models.Queue = queuesResult.Entities
+
+							if len(allQueues) == 0 && queueCursor == "" {
+								// No queues match this policy. Let's check if the tenant is completely empty.
+								emptyFilter := models.ClaimWorkFilter{}
+								qCtx2, qCancel2 := context.WithTimeout(stopperCtx, 2*time.Second)
+								allActive, err2 := queueBO.GetQueuesWithFilter(qCtx2, emptyFilter, "", 1, cf, cfs, &tenant, g.node)
+								qCancel2()
+								
+								if err2 == nil && (allActive.Entities == nil || len(allActive.Entities) == 0) {
+									bo.deactivateTenant(tenant.ID, g.node, cf, cfs)
+								}
+							}
 
 							// ── Round-robin drain: cycle through all queues until the policy
 							// is satisfied or a full round yields no new messages. ─────────────
@@ -625,4 +640,48 @@ func (bo *JobWorkerBO) AckMessage(ctx context.Context, leaseID, tenantCode strin
 		Msg("✅ Message acknowledged successfully")
 
 	return nil
+}
+
+func (bo *JobWorkerBO) deactivateTenant(tenantID string, tenantNode *dragonboat.RaftNode, cf string, cfs string) {
+	// 1. Send MarkTenantInactiveCommand to Master Node
+	inactiveCmd := &tentant_command.MarkTenantInactiveCommand{
+		TenantID: tenantID,
+	}
+	fsmCmd := general_command.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: general_command.REPOSITORY_COMMAND,
+		CMD:  inactiveCmd,
+	}
+
+	// Fire and forget to Master
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err := bo.Config.MasterNode.Write(ctx, fsmCmd)
+		if err != nil {
+			bo.Config.Logger.Debug().Err(err).Str("tenant", tenantID).Msg("Failed to mark tenant inactive in Master")
+		}
+	}()
+
+	// 2. Send ResetTenantShardStateCommand to Shard Node
+	resetCmd := &tentant_command.ResetTenantShardStateCommand{
+		TenantID: tenantID,
+		CF:       cf,
+		CFS:      cfs,
+	}
+	fsmResetCmd := general_command.FSM_Command{
+		Now:  utils.GetNowInInt(),
+		Type: general_command.REPOSITORY_COMMAND,
+		CMD:  resetCmd,
+	}
+
+	// Fire and forget to Shard
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err := tenantNode.Write(ctx, fsmResetCmd)
+		if err != nil {
+			bo.Config.Logger.Debug().Err(err).Str("tenant", tenantID).Msg("Failed to reset tenant shard state")
+		}
+	}()
 }

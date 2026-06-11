@@ -65,6 +65,18 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		return *commandResult
 	}
 
+	stateRepo, err := db.NewTenantShardStateRepository(uow, idFactory, cmd.CF, cmd.CFS, "tenant_schema")
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
+	outboxRepo, err := db.NewOutboxEventRepository(uow, idFactory)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// First pass: Group messages by QueueID and validate QueueIDs
 	messagesByQueue := make(map[string][]models.QueueMessage)
 	queuesCache := make(map[string]*models.Queue)
@@ -289,6 +301,44 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult
+		}
+	}
+
+	// Eighth pass: Update Tenant Shard State and generate Outbox Event if needed
+	if totalMessagesCreated > 0 {
+		tenantState, err := stateRepo.GetByTenantID(cmd.CFS, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+
+		if tenantState == nil || !tenantState.HasMessages {
+			// Create or update state
+			if tenantState == nil {
+				tenantState = &models.TenantShardState{
+					ID:          cmd.CFS,
+					HasMessages: true,
+				}
+			} else {
+				tenantState.HasMessages = true
+			}
+			_, err = stateRepo.CreateOrUpdate(tenantState, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
+
+			// Generate Outbox Event
+			event := &models.OutboxEvent{
+				ID:        fmt.Sprintf("outbox_%s_%d", cmd.CFS, now.UnixNano()),
+				EventType: models.EventTypeTenantActivated,
+				TenantID:  cmd.CFS,
+			}
+			_, err = outboxRepo.CreateEvent(event, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
 		}
 	}
 

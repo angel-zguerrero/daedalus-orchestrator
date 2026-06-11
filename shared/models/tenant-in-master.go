@@ -22,6 +22,7 @@ type TenantInMaster struct {
 	QueuesCount    int
 	BindingsCount  int
 	MessagesCount  int
+	HasMessages    bool
 
 	Status TenantInMasterStatus
 

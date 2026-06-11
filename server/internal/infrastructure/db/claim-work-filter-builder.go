@@ -36,6 +36,9 @@ func BuildTenantFilterQuery(f models.ClaimWorkFilter) ClaimWorkFilterQuery {
 		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Code NOT LIKE %s", pat))
 	}
 
+	// Strictly require HasMessages == true to only iterate active tenants
+	exclusionClauses = append(exclusionClauses, "HasMessages = true")
+
 	return buildFilterQuery(inclusionClauses, exclusionClauses)
 }
 

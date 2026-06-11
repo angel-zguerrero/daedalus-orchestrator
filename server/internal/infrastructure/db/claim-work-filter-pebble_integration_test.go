@@ -51,8 +51,9 @@ func setupCWFStore(t *testing.T) db.KVStore {
 		require.NoError(t, err)
 		for _, code := range cwfTenants {
 			_, err := repo.CreateTenantInMaster(&models.TenantInMaster{
-				Code: code,
-				Name: fmt.Sprintf("Tenant %s", code),
+				Code:        code,
+				Name:        fmt.Sprintf("Tenant %s", code),
+				HasMessages: true,
 			}, now)
 			require.NoError(t, err, "create tenant %s", code)
 		}

@@ -9,6 +9,7 @@ type TenantSummary struct {
 	QueuesCount    int
 	BindingsCount  int
 	MessagesCount  int
+	HasMessages    bool
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

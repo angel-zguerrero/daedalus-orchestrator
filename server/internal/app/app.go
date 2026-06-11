@@ -69,6 +69,7 @@ type Application struct {
 	AssignTenantsStopper           *syncutil.Stopper
 	TenantSummaryWorkerStopper     *syncutil.Stopper
 	DashboardSummaryWorkerStopper  *syncutil.Stopper
+	OutboxRelayWorkerStopper       *syncutil.Stopper
 	JobWorkerHeartbeatStopper      *syncutil.Stopper
 
 	ApiLock  sync.Mutex
@@ -245,6 +246,9 @@ func (app *Application) Run() {
 
 	app.StartDashboardSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
+	// Outbox worker should run frequently, e.g. every 1 second
+	app.StartOutboxRelayWorker(1 * time.Second)
+
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
 }
@@ -365,6 +369,14 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ DashboardSummaryWorkerStopper stopped.")
 	}()
 
+	// Stop Outbox Relay Worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.OutboxRelayWorkerStopper.Stop()
+		log.Info().Msg("✅ OutboxRelayWorkerStopper stopped.")
+	}()
+
 	// Stop Job Worker Heartbeat Monitor
 	wg.Add(1)
 	go func() {
@@ -411,6 +423,7 @@ func NewApplication() *Application {
 		AssignTenantsStopper:          syncutil.NewStopper(),
 		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
 		DashboardSummaryWorkerStopper: syncutil.NewStopper(),
+		OutboxRelayWorkerStopper:      syncutil.NewStopper(),
 		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),
