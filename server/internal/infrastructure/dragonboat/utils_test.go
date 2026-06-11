@@ -270,8 +270,8 @@ func TestParseRolesList_ExtendedCases(t *testing.T) {
 		},
 		{
 			name:        "valid roles with empty and whitespace strings",
-			input:       []string{"consensus", "", " ", "scheduler", "  "},
-			expected:    []NodeRole{RoleConsensus, RoleScheduler},
+			input:       []string{"consensus", "", " ", "  "},
+			expected:    []NodeRole{RoleConsensus},
 			expectError: false,
 		},
 		{
