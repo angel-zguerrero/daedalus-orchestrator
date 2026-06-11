@@ -22,17 +22,76 @@ type ClaimedMessage struct {
 	TenantCode string
 }
 
+// claimCursorKey identifies a pagination cursor stored in the registry.
+// tenantID is empty for the tenant-level cursor; it is set for vnamespace-level cursors.
+type claimCursorKey struct {
+	workerID   string
+	policyCode string
+	tenantID   string
+}
+
+// claimCursorRegistry stores pagination cursors between successive ClaimWork cycles.
+// It is local to the connector node (not persisted in Raft) and safe for concurrent use.
+type claimCursorRegistry struct {
+	mu      sync.Mutex
+	cursors map[claimCursorKey]string
+}
+
+func newClaimCursorRegistry() *claimCursorRegistry {
+	return &claimCursorRegistry{
+		cursors: make(map[claimCursorKey]string),
+	}
+}
+
+// get returns the stored cursor for key, or "" if none is recorded.
+func (r *claimCursorRegistry) get(key claimCursorKey) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cursors[key]
+}
+
+// set persists cursor for key. An empty cursor means the list was exhausted;
+// in that case the entry is deleted so the next cycle starts from the beginning.
+func (r *claimCursorRegistry) set(key claimCursorKey, cursor string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if cursor == "" {
+		delete(r.cursors, key)
+	} else {
+		r.cursors[key] = cursor
+	}
+}
+
+// evictWorker removes all cursors belonging to workerID.
+func (r *claimCursorRegistry) evictWorker(workerID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key := range r.cursors {
+		if key.workerID == workerID {
+			delete(r.cursors, key)
+		}
+	}
+}
+
 type JobWorkerBO struct {
-	Config     *common.ServerConfing
-	stoppers   map[string]bool
-	stoppersMu sync.Mutex
+	Config         *common.ServerConfing
+	stoppers        map[string]bool
+	stoppersMu      sync.Mutex
+	cursorRegistry  *claimCursorRegistry
 }
 
 func NewJobWorkerBO(Config *common.ServerConfing) *JobWorkerBO {
 	return &JobWorkerBO{
-		Config:   Config,
-		stoppers: make(map[string]bool),
+		Config:         Config,
+		stoppers:        make(map[string]bool),
+		cursorRegistry:  newClaimCursorRegistry(),
 	}
+}
+
+// EvictWorkerCursors removes all cached pagination cursors for the given worker.
+// Call this when a worker's gRPC stream closes so stale cursors don't accumulate.
+func (bo *JobWorkerBO) EvictWorkerCursors(workerID string) {
+	bo.cursorRegistry.evictWorker(workerID)
 }
 
 func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerName string, Information map[string]string, ClaimWorkCapacityPolicies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) error {
@@ -137,7 +196,10 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 		filter := policy.ClaimWorkFilter
 
 		// ── Tenant pagination (DB-filtered) ───────────────────────────────────
-		tenantCursor := ""
+		// Resume from the cursor saved by the previous ClaimWork cycle for this
+		// worker+policy pair, enabling fair round-robin rotation across all tenants.
+		tenantKey := claimCursorKey{workerID: workerID, policyCode: policyCode}
+		tenantCursor := bo.cursorRegistry.get(tenantKey)
 		const tenantPageSize = 50
 
 	tenantLoop:
@@ -171,7 +233,9 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 				cfs := tenant.ID
 
 				// ── VNamespace pagination (DB-filtered) ───────────────────────
-				vnsCursor := ""
+				// Likewise resume vnamespace iteration from the last saved position.
+				vnsKey := claimCursorKey{workerID: workerID, policyCode: policyCode, tenantID: tenant.ID}
+				vnsCursor := bo.cursorRegistry.get(vnsKey)
 				const vnsPageSize = 50
 
 			vnsLoop:
@@ -256,6 +320,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 						}
 					}
 
+					bo.cursorRegistry.set(vnsKey, vnsResult.Cursor)
 					if vnsResult.Cursor == "" || len(vnsResult.Entities) < vnsPageSize {
 						break
 					}
@@ -263,6 +328,9 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 				}
 			}
 
+			// Persist the cursor so the next cycle resumes from here.
+			// set("") automatically removes the entry, causing the next cycle to wrap around.
+			bo.cursorRegistry.set(tenantKey, tenantsResult.Cursor)
 			if tenantsResult.Cursor == "" || len(tenantsResult.Entities) < tenantPageSize {
 				break
 			}

@@ -35,6 +35,9 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 	// Track if we've sent the initial ACK
 	ackSent := false
 
+	// workerID is captured from the first request and used for cursor cleanup on disconnect.
+	workerID := ""
+
 	// Goroutine to receive claim requests from client
 	requestChan := make(chan *pb.ClaimWorkRequest, 10)
 	errChan := make(chan error, 1)
@@ -60,12 +63,16 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 		select {
 		case req, ok := <-requestChan:
 			if !ok {
-				// Client closed the stream
+				// Client closed the stream — clean up cursors if we know the worker.
+				if workerID != "" {
+					s.JobWorkerBO.EvictWorkerCursors(workerID)
+				}
 				return nil
 			}
 
-			// Send ACK on first request
+			// Send ACK on first request and capture workerID for lifecycle management.
 			if !ackSent {
+				workerID = req.WorkerID
 				ackMsg := &pb.ClaimWorkStreamMessage{
 					Message: &pb.ClaimWorkStreamMessage_Ack{
 						Ack: &pb.ClaimWorkResponse{
@@ -169,8 +176,11 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 			return fmt.Errorf("error receiving from client: %w", err)
 
 		case <-stream.Context().Done():
-			// Client disconnected
-			s.Config.Logger.Info().Msg("Client disconnected")
+			// Client disconnected — evict cursors to prevent registry memory leaks.
+			if workerID != "" {
+				s.JobWorkerBO.EvictWorkerCursors(workerID)
+			}
+			s.Config.Logger.Info().Str("workerID", workerID).Msg("Client disconnected")
 			return stream.Context().Err()
 		}
 	}
