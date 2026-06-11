@@ -250,13 +250,12 @@ func (bo *QueueBO) GetQueues(ctx context.Context, q string, cursor string, pageS
 }
 
 // GetQueuesWithFilter paginates queues using DB-level filter rules derived from a ClaimWorkFilter.
-// Only queues with MessagesCount > 0 are returned. The vNamespace filter and exact code
+// Only queues with MessagesCount > 0 are returned. VNamespace filters and exact code
 // exclusions are pushed to the repository; ExcludeQueuePatterns are applied in memory inside
 // the repository.
-func (bo *QueueBO) GetQueuesWithFilter(ctx context.Context, filter models.ClaimWorkFilter, cursor string, pageSize int, vNamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Queue], error) {
+func (bo *QueueBO) GetQueuesWithFilter(ctx context.Context, filter models.ClaimWorkFilter, cursor string, pageSize int, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Queue], error) {
 	cmd := &queue_command.PaginateQueuesWithFilterCommand{
 		Filter:     filter,
-		VNamespace: vNamespace,
 		Cursor:     cursor,
 		PageSize:   pageSize,
 		CF:         cf,
