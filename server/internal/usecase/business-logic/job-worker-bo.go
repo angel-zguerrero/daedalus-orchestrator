@@ -163,8 +163,12 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 		claimedByPolicy[code] = policy.CurrentQueueMessages
 	}
 
+	// Protects concurrent reads and writes to claimedByPolicy across shard goroutines
+	var claimMu sync.Mutex
+
 	// Returns true when every policy with a positive cap has been satisfied.
 	// MaxQueueMessages == 0 means unlimited, so that policy is never considered satisfied.
+	// Must be called with claimMu held.
 	allPoliciesSatisfied := func() bool {
 		for code, policy := range policies {
 			if policy.MaxQueueMessages == 0 {
@@ -182,12 +186,12 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 	queueBO := &QueueBO{Config: bo.Config}
 
 	for policyCode, policy := range policies {
-		if allPoliciesSatisfied() {
-			break
-		}
-		if policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages {
+		claimMu.Lock()
+		if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
+			claimMu.Unlock()
 			continue
 		}
+		claimMu.Unlock()
 
 		// Derive the numeric index from the policy code ("policy-N" → N).
 		policyIndex := 0
@@ -202,11 +206,13 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 		tenantCursor := bo.cursorRegistry.get(tenantKey)
 		const tenantPageSize = 50
 
-	tenantLoop:
 		for {
+			claimMu.Lock()
 			if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
+				claimMu.Unlock()
 				break
 			}
+			claimMu.Unlock()
 
 			paginateCtx, paginateCancel := context.WithTimeout(stopperCtx, 10*time.Second)
 			tenantsResult, err := tenantBO.GetTenantsWithFilter(paginateCtx, filter, tenantCursor, tenantPageSize)
@@ -216,117 +222,177 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 				break
 			}
 
-			//fmt.Printf("Policy %s: paginated %d tenants\n", policyCode, len(tenantsResult.Entities))
+			if len(tenantsResult.Entities) == 0 {
+				bo.cursorRegistry.set(tenantKey, "")
+				break
+			}
 
-			for _, tenant := range tenantsResult.Entities {
-				if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
-					break tenantLoop
-				}
+			// Group the tenants in the current page by their Shard/RaftNode.
+			type tenantGroup struct {
+				node    *dragonboat.RaftNode
+				tenants []models.TenantInMaster
+			}
+			groupsByShard := make(map[uint64]*tenantGroup)
 
-				tenantNode := bo.getJobWorkerTenantNode(tenant)
-				if tenantNode == nil {
-					logger.Warn().Str("tenantCode", tenant.Code).Msg("No raft node found for tenant, skipping")
+			for _, t := range tenantsResult.Entities {
+				node := bo.getJobWorkerTenantNode(t)
+				if node == nil {
+					logger.Warn().Str("tenantCode", t.Code).Msg("No raft node found for tenant, skipping")
 					continue
 				}
-
-				cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
-				cfs := tenant.ID
-
-				// ── VNamespace pagination (DB-filtered) ───────────────────────
-				// Likewise resume vnamespace iteration from the last saved position.
-				vnsKey := claimCursorKey{workerID: workerID, policyCode: policyCode, tenantID: tenant.ID}
-				vnsCursor := bo.cursorRegistry.get(vnsKey)
-				const vnsPageSize = 50
-
-			vnsLoop:
-				for {
-					if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
-						break
+				shardID := node.ShardID
+				if groupsByShard[shardID] == nil {
+					groupsByShard[shardID] = &tenantGroup{
+						node:    node,
+						tenants: make([]models.TenantInMaster, 0),
 					}
+				}
+				groupsByShard[shardID].tenants = append(groupsByShard[shardID].tenants, t)
+			}
 
-					vnsCtx, vnsCancel := context.WithTimeout(stopperCtx, 10*time.Second)
-					vnsResult, err := vnamespaceBO.GetVNamespacesWithFilter(vnsCtx, filter, vnsCursor, vnsPageSize, cf, cfs, &tenant, tenantNode)
-					if tenant.Code == "QDBW9597" {
-						fmt.Printf("Policy %s: paginated %d vnamespaces for tenant %s\n", policyCode, len(vnsResult.Entities), tenant.Code)
-					}
-					vnsCancel()
-					if err != nil {
-						logger.Error().Err(err).
-							Str("policy", policyCode).
-							Str("tenant", tenant.Code).
-							Msg("❌ Failed to paginate vnamespaces during ClaimWork")
-						break
-					}
+			var wg sync.WaitGroup
 
-					for _, vns := range vnsResult.Entities {
+			// Process each shard concurrently.
+			for _, group := range groupsByShard {
+				wg.Add(1)
+				go func(g *tenantGroup) {
+					defer wg.Done()
+
+				shardTenantLoop:
+					for _, tenant := range g.tenants {
+						claimMu.Lock()
 						if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
-							break vnsLoop
+							claimMu.Unlock()
+							break shardTenantLoop
 						}
+						claimMu.Unlock()
 
-						// ── Collect all queues for this vnamespace ───────────────────────────
-						var allQueues []models.Queue
-						{
-							queueCursor := ""
-							const queuePageSize = 50
-							for {
-								qCtx, qCancel := context.WithTimeout(stopperCtx, 10*time.Second)
-								queuesResult, err := queueBO.GetQueuesWithFilter(qCtx, filter, queueCursor, queuePageSize, vns.Name, cf, cfs, &tenant, tenantNode)
-								qCancel()
-								if err != nil {
-									logger.Error().Err(err).
-										Str("policy", policyCode).
-										Str("tenant", tenant.Code).
-										Str("vnamespace", vns.Name).
-										Msg("❌ Failed to paginate queues during ClaimWork")
-									break
-								}
-								allQueues = append(allQueues, queuesResult.Entities...)
-								if queuesResult.Cursor == "" || len(queuesResult.Entities) < queuePageSize {
-									break
-								}
-								queueCursor = queuesResult.Cursor
-							}
-						}
+						cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
+						cfs := tenant.ID
 
-						// ── Round-robin drain: cycle through all queues until the policy
-						// is satisfied or a full round yields no new messages. ─────────────
+						// ── VNamespace pagination (DB-filtered) ───────────────────────
+						// Likewise resume vnamespace iteration from the last saved position.
+						vnsKey := claimCursorKey{workerID: workerID, policyCode: policyCode, tenantID: tenant.ID}
+						vnsCursor := bo.cursorRegistry.get(vnsKey)
+						const vnsPageSize = 50
+
+					vnsLoop:
 						for {
+							claimMu.Lock()
 							if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
+								claimMu.Unlock()
 								break
 							}
-							claimedInRound := 0
-							for i := range allQueues {
-								queue := &allQueues[i]
+							claimMu.Unlock()
+
+							vnsCtx, vnsCancel := context.WithTimeout(stopperCtx, 10*time.Second)
+							vnsResult, err := vnamespaceBO.GetVNamespacesWithFilter(vnsCtx, filter, vnsCursor, vnsPageSize, cf, cfs, &tenant, g.node)
+							vnsCancel()
+							if err != nil {
+								logger.Error().Err(err).
+									Str("policy", policyCode).
+									Str("tenant", tenant.Code).
+									Msg("❌ Failed to paginate vnamespaces during ClaimWork")
+								break
+							}
+
+							for _, vns := range vnsResult.Entities {
+								claimMu.Lock()
 								if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
-									break
+									claimMu.Unlock()
+									break vnsLoop
+								}
+								claimMu.Unlock()
+
+								// ── Collect all queues for this vnamespace ───────────────────────────
+								var allQueues []models.Queue
+								{
+									queueCursor := ""
+									const queuePageSize = 50
+									for {
+										qCtx, qCancel := context.WithTimeout(stopperCtx, 10*time.Second)
+										queuesResult, err := queueBO.GetQueuesWithFilter(qCtx, filter, queueCursor, queuePageSize, vns.Name, cf, cfs, &tenant, g.node)
+										qCancel()
+										if err != nil {
+											logger.Error().Err(err).
+												Str("policy", policyCode).
+												Str("tenant", tenant.Code).
+												Str("vnamespace", vns.Name).
+												Msg("❌ Failed to paginate queues during ClaimWork")
+											break
+										}
+										allQueues = append(allQueues, queuesResult.Entities...)
+										if queuesResult.Cursor == "" || len(queuesResult.Entities) < queuePageSize {
+											break
+										}
+										queueCursor = queuesResult.Cursor
+									}
 								}
 
-								// Respect the queue's own delivering-message cap (0 = unlimited).
-								// MessagesCount > 0 is already guaranteed by the DB query.
-								if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
-									continue
-								}
+								// ── Round-robin drain: cycle through all queues until the policy
+								// is satisfied or a full round yields no new messages. ─────────────
+								for {
+									claimMu.Lock()
+									if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
+										claimMu.Unlock()
+										break
+									}
+									claimMu.Unlock()
+									
+									claimedInRound := 0
+									for i := range allQueues {
+										queue := &allQueues[i]
+										
+										claimMu.Lock()
+										if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
+											claimMu.Unlock()
+											break
+										}
+										
+										// Respect the queue's own delivering-message cap (0 = unlimited).
+										// MessagesCount > 0 is already guaranteed by the DB query.
+										if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
+											claimMu.Unlock()
+											continue
+										}
 
-								// ── Dequeue message ──
-								if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, queue, &tenant, tenantNode, cf, cfs, messageChan) {
-									queue.CurrentDeliveringMessages++
-									claimedByPolicy[policyCode]++
-									claimedInRound++
+										// Optimistically reserve the slot
+										if policy.MaxQueueMessages > 0 {
+											claimedByPolicy[policyCode]++
+										}
+										claimMu.Unlock()
+
+										// ── Dequeue message ──
+										if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, queue, &tenant, g.node, cf, cfs, messageChan) {
+											queue.CurrentDeliveringMessages++
+											claimedInRound++
+										} else {
+											// Failed to dequeue, refund the slot
+											claimMu.Lock()
+											if policy.MaxQueueMessages > 0 {
+												claimedByPolicy[policyCode]--
+											}
+											claimMu.Unlock()
+										}
+									}
+									if claimedInRound == 0 {
+										break // No queue delivered a message this round; all queues exhausted.
+									}
 								}
 							}
-							if claimedInRound == 0 {
-								break // No queue delivered a message this round; all queues exhausted.
+
+							bo.cursorRegistry.set(vnsKey, vnsResult.Cursor)
+							if vnsResult.Cursor == "" || len(vnsResult.Entities) < vnsPageSize {
+								break
 							}
+							vnsCursor = vnsResult.Cursor
 						}
 					}
-
-					bo.cursorRegistry.set(vnsKey, vnsResult.Cursor)
-					if vnsResult.Cursor == "" || len(vnsResult.Entities) < vnsPageSize {
-						break
-					}
-					vnsCursor = vnsResult.Cursor
-				}
+				}(group)
 			}
+			
+			// Wait for all shard goroutines to finish processing this page of tenants
+			wg.Wait()
 
 			// Persist the cursor so the next cycle resumes from here.
 			// set("") automatically removes the entry, causing the next cycle to wrap around.
