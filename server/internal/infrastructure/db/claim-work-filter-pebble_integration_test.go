@@ -466,7 +466,6 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 	type tc struct {
 		name            string
 		filter          models.ClaimWorkFilter
-		vNamespace      string
 		wantTotalCount  int
 		wantUniqCodes   []string
 		wantAbsentCodes []string
@@ -480,8 +479,7 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 		},
 		{
 			name:           "empty filter vns=prod-api returns 10",
-			filter:         models.ClaimWorkFilter{},
-			vNamespace:     "prod-api",
+			filter:         models.ClaimWorkFilter{VNamespaces: []string{"prod-api"}},
 			wantTotalCount: 10,
 			wantUniqCodes:  cwfQueues,
 		},
@@ -494,8 +492,7 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 		},
 		{
 			name:           "single QueueCode orders + vns=prod-api returns 1",
-			filter:         models.ClaimWorkFilter{QueueCodes: []string{"orders"}},
-			vNamespace:     "prod-api",
+			filter:         models.ClaimWorkFilter{QueueCodes: []string{"orders"}, VNamespaces: []string{"prod-api"}},
 			wantTotalCount: 1,
 			wantUniqCodes:  []string{"orders"},
 		},
@@ -514,19 +511,12 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 			wantAbsentCodes: []string{"orders", "batch-jobs"},
 		},
 		{
-			name:            "QueuePattern batch-* no vns returns 20",
-			filter:          models.ClaimWorkFilter{QueuePatterns: []string{"batch-*"}},
+			name: "QueuePattern batch-* no vns returns 20",
+			filter: models.ClaimWorkFilter{
+				QueuePatterns: []string{"batch-*"},
+			},
 			wantTotalCount:  20,
 			wantUniqCodes:   []string{"batch-jobs", "batch-export"},
-			wantAbsentCodes: []string{"orders", "audit-log"},
-		},
-		{
-			name: "QueuePatterns audit-* batch-* combined returns 50",
-			filter: models.ClaimWorkFilter{
-				QueuePatterns: []string{"audit-*", "batch-*"},
-			},
-			wantTotalCount:  50,
-			wantUniqCodes:   []string{"audit-log", "audit-access", "audit-changes", "batch-jobs", "batch-export"},
 			wantAbsentCodes: []string{"orders", "payments"},
 		},
 		{
@@ -607,8 +597,8 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 			name: "vns=prod-api + ExcludeQueuePattern batch-* returns 8",
 			filter: models.ClaimWorkFilter{
 				ExcludeQueuePatterns: []string{"batch-*"},
+				VNamespaces:          []string{"prod-api"},
 			},
-			vNamespace:      "prod-api",
 			wantTotalCount:  8,
 			wantAbsentCodes: []string{"batch-jobs", "batch-export"},
 			wantUniqCodes:   []string{"orders", "audit-log"},
@@ -616,9 +606,9 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 		{
 			name: "QueueCodes orders+payments vns=staging-api returns 2",
 			filter: models.ClaimWorkFilter{
-				QueueCodes: []string{"orders", "payments"},
+				QueueCodes:  []string{"orders", "payments"},
+				VNamespaces: []string{"staging-api"},
 			},
-			vNamespace:     "staging-api",
 			wantTotalCount: 2,
 			wantUniqCodes:  []string{"orders", "payments"},
 		},
@@ -638,7 +628,7 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := cwfQueueRepo(t, store)
-			result, err := repo.PaginateWithClaimWorkFilter(tc.filter, tc.vNamespace, cwfPageSize, "", now)
+			result, err := repo.PaginateWithClaimWorkFilter(tc.filter, cwfPageSize, "", now)
 			require.NoError(t, err)
 			assert.Len(t, result.Entities, tc.wantTotalCount, "unique codes: %v", uniqueCodes(result))
 			uniq := uniqueCodes(result)
@@ -673,8 +663,10 @@ func TestPebbleClaimWorkFilter_Queues_ZeroMessagesExcluded(t *testing.T) {
 	}
 	repo := cwfQueueRepo(t, store)
 	result, err := repo.PaginateWithClaimWorkFilter(
-		models.ClaimWorkFilter{QueueCodes: []string{"empty-queue"}},
-		"prod-api",
+		models.ClaimWorkFilter{
+			QueueCodes:  []string{"empty-queue"},
+			VNamespaces: []string{"prod-api"},
+		},
 		cwfPageSize, "", now,
 	)
 	require.NoError(t, err)

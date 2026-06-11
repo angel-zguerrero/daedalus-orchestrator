@@ -13,12 +13,11 @@ func init() {
 }
 
 // PaginateQueuesWithFilterCommand paginates queues using the DB-level rules encoded in
-// ClaimWorkFilter. Only queues with MessagesCount > 0 are returned. The VNamespace field
-// is also applied at the DB level. ExcludeQueuePatterns are handled in the repository as
+// ClaimWorkFilter. Only queues with MessagesCount > 0 are returned. VNamespace filters
+// are also applied at the DB level. ExcludeQueuePatterns are handled in the repository as
 // an in-memory post-filter (no NOT LIKE support in the query DSL).
 type PaginateQueuesWithFilterCommand struct {
 	Filter     models.ClaimWorkFilter
-	VNamespace string
 	Cursor     string
 	PageSize   int
 	CF         string
@@ -35,7 +34,7 @@ func (cmd *PaginateQueuesWithFilterCommand) Execute(uow *db.UnitOfWork, now time
 		return *commandResult
 	}
 
-	result, err := queueRepo.PaginateWithClaimWorkFilter(cmd.Filter, cmd.VNamespace, cmd.PageSize, cmd.Cursor, now)
+	result, err := queueRepo.PaginateWithClaimWorkFilter(cmd.Filter, cmd.PageSize, cmd.Cursor, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

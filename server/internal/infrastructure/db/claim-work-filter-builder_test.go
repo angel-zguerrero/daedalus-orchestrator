@@ -263,24 +263,22 @@ func TestBuildVNamespaceFilterQuery(t *testing.T) {
 
 // TestBuildQueueFilterQuery covers all ClaimWorkFilter possibilities used by
 // GetQueuesWithFilter via PaginateWithClaimWorkFilter on QueueRepository.
-// MessagesCount > 0 is always appended; vNamespace is appended when non-empty.
+// MessagesCount > 0 is always appended at the end.
 func TestBuildQueueFilterQuery(t *testing.T) {
 	tests := []struct {
 		name        string
 		filter      models.ClaimWorkFilter
-		vNamespace  string
 		wantDBQuery string
 	}{
 		{
-			name:        "empty filter no vNamespace",
+			name:        "empty filter",
 			filter:      models.ClaimWorkFilter{},
 			wantDBQuery: "MessagesCount > 0",
 		},
 		{
-			name:        "empty filter with vNamespace",
-			filter:      models.ClaimWorkFilter{},
-			vNamespace:  "prod",
-			wantDBQuery: "MessagesCount > 0 & VNamespace = prod",
+			name:        "empty filter with VNamespaces",
+			filter:      models.ClaimWorkFilter{VNamespaces: []string{"prod"}},
+			wantDBQuery: "VNamespace = prod & MessagesCount > 0",
 		},
 		{
 			name:        "single QueueCode",
@@ -347,13 +345,13 @@ func TestBuildQueueFilterQuery(t *testing.T) {
 			wantDBQuery: "Code = orders & Code NOT LIKE internal-* & MessagesCount > 0",
 		},
 		{
-			name: "QueuePatterns and ExcludeQueueCodes with vNamespace",
+			name: "QueuePatterns and ExcludeQueueCodes with VNamespaces",
 			filter: models.ClaimWorkFilter{
 				QueuePatterns:     []string{"order-*"},
 				ExcludeQueueCodes: []string{"order-archive"},
+				VNamespaces:       []string{"production"},
 			},
-			vNamespace:  "production",
-			wantDBQuery: "Code LIKE order-* & Code != order-archive & MessagesCount > 0 & VNamespace = production",
+			wantDBQuery: "Code LIKE order-* & VNamespace = production & Code != order-archive & MessagesCount > 0",
 		},
 		{
 			name: "QueuePatterns and ExcludeQueuePatterns",
@@ -364,15 +362,15 @@ func TestBuildQueueFilterQuery(t *testing.T) {
 			wantDBQuery: "Code LIKE prod-* & Code NOT LIKE prod-internal-* & MessagesCount > 0",
 		},
 		{
-			name: "all queue fields combined with vNamespace",
+			name: "all queue fields combined with VNamespaces",
 			filter: models.ClaimWorkFilter{
 				QueueCodes:           []string{"orders"},
 				QueuePatterns:        []string{"payment-*"},
 				ExcludeQueueCodes:    []string{"payment-archive"},
 				ExcludeQueuePatterns: []string{"payment-internal-*"},
+				VNamespaces:          []string{"prod"},
 			},
-			vNamespace:  "prod",
-			wantDBQuery: "(Code = orders | Code LIKE payment-*) & Code != payment-archive & Code NOT LIKE payment-internal-* & MessagesCount > 0 & VNamespace = prod",
+			wantDBQuery: "(Code = orders | Code LIKE payment-*) & VNamespace = prod & Code != payment-archive & Code NOT LIKE payment-internal-* & MessagesCount > 0",
 		},
 		{
 			name:        "ExcludeQueueCodes only",
@@ -391,7 +389,7 @@ func TestBuildQueueFilterQuery(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := db.BuildQueueFilterQuery(tc.filter, tc.vNamespace)
+			got := db.BuildQueueFilterQuery(tc.filter)
 			assert.Equal(t, tc.wantDBQuery, got.DBQuery)
 		})
 	}

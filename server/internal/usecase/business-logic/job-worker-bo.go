@@ -11,6 +11,7 @@ import (
 	"deadalus-orch/shared/models"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -182,7 +183,6 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 	}
 
 	tenantBO := &TenantBO{Config: bo.Config}
-	vnamespaceBO := &VNamespaceBO{Config: bo.Config}
 	queueBO := &QueueBO{Config: bo.Config}
 
 	for policyCode, policy := range policies {
@@ -270,13 +270,13 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 						cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
 						cfs := tenant.ID
 
-						// ── VNamespace pagination (DB-filtered) ───────────────────────
-						// Likewise resume vnamespace iteration from the last saved position.
-						vnsKey := claimCursorKey{workerID: workerID, policyCode: policyCode, tenantID: tenant.ID}
-						vnsCursor := bo.cursorRegistry.get(vnsKey)
-						const vnsPageSize = 50
+						// ── Queue pagination (DB-filtered with VNamespace rules) ──────────
+						// Resume queue iteration from the last saved position for this tenant.
+						tenantQueueKey := claimCursorKey{workerID: workerID, policyCode: policyCode, tenantID: tenant.ID}
+						queueCursor := bo.cursorRegistry.get(tenantQueueKey)
+						const queuePageSize = 50
 
-					vnsLoop:
+					queueLoop:
 						for {
 							claimMu.Lock()
 							if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
@@ -285,107 +285,75 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 							}
 							claimMu.Unlock()
 
-							vnsCtx, vnsCancel := context.WithTimeout(stopperCtx, 10*time.Second)
-							vnsResult, err := vnamespaceBO.GetVNamespacesWithFilter(vnsCtx, filter, vnsCursor, vnsPageSize, cf, cfs, &tenant, g.node)
-							vnsCancel()
+							qCtx, qCancel := context.WithTimeout(stopperCtx, 10*time.Second)
+							queuesResult, err := queueBO.GetQueuesWithFilter(qCtx, filter, queueCursor, queuePageSize, cf, cfs, &tenant, g.node)
+							qCancel()
 							if err != nil {
 								logger.Error().Err(err).
 									Str("policy", policyCode).
 									Str("tenant", tenant.Code).
-									Msg("❌ Failed to paginate vnamespaces during ClaimWork")
+									Msg("❌ Failed to paginate queues during ClaimWork")
 								break
 							}
 
-							for _, vns := range vnsResult.Entities {
+							var allQueues []models.Queue = queuesResult.Entities
+
+							// ── Round-robin drain: cycle through all queues until the policy
+							// is satisfied or a full round yields no new messages. ─────────────
+							for {
 								claimMu.Lock()
 								if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
 									claimMu.Unlock()
-									break vnsLoop
+									break queueLoop
 								}
 								claimMu.Unlock()
-
-								// ── Collect all queues for this vnamespace ───────────────────────────
-								var allQueues []models.Queue
-								{
-									queueCursor := ""
-									const queuePageSize = 50
-									for {
-										qCtx, qCancel := context.WithTimeout(stopperCtx, 10*time.Second)
-										queuesResult, err := queueBO.GetQueuesWithFilter(qCtx, filter, queueCursor, queuePageSize, vns.Name, cf, cfs, &tenant, g.node)
-										qCancel()
-										if err != nil {
-											logger.Error().Err(err).
-												Str("policy", policyCode).
-												Str("tenant", tenant.Code).
-												Str("vnamespace", vns.Name).
-												Msg("❌ Failed to paginate queues during ClaimWork")
-											break
-										}
-										allQueues = append(allQueues, queuesResult.Entities...)
-										if queuesResult.Cursor == "" || len(queuesResult.Entities) < queuePageSize {
-											break
-										}
-										queueCursor = queuesResult.Cursor
-									}
-								}
-
-								// ── Round-robin drain: cycle through all queues until the policy
-								// is satisfied or a full round yields no new messages. ─────────────
-								for {
+								
+								claimedInRound := 0
+								for i := range allQueues {
+									queue := &allQueues[i]
+									
 									claimMu.Lock()
 									if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
 										claimMu.Unlock()
-										break
+										break queueLoop
+									}
+									
+									// Respect the queue's own delivering-message cap (0 = unlimited).
+									// MessagesCount > 0 is already guaranteed by the DB query.
+									if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
+										claimMu.Unlock()
+										continue
+									}
+
+									// Optimistically reserve the slot
+									if policy.MaxQueueMessages > 0 {
+										claimedByPolicy[policyCode]++
 									}
 									claimMu.Unlock()
-									
-									claimedInRound := 0
-									for i := range allQueues {
-										queue := &allQueues[i]
-										
-										claimMu.Lock()
-										if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
-											claimMu.Unlock()
-											break
-										}
-										
-										// Respect the queue's own delivering-message cap (0 = unlimited).
-										// MessagesCount > 0 is already guaranteed by the DB query.
-										if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
-											claimMu.Unlock()
-											continue
-										}
 
-										// Optimistically reserve the slot
+									// ── Dequeue message ──
+									if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, queue, &tenant, g.node, cf, cfs, messageChan) {
+										queue.CurrentDeliveringMessages++
+										claimedInRound++
+									} else {
+										// Failed to dequeue, refund the slot
+										claimMu.Lock()
 										if policy.MaxQueueMessages > 0 {
-											claimedByPolicy[policyCode]++
+											claimedByPolicy[policyCode]--
 										}
 										claimMu.Unlock()
-
-										// ── Dequeue message ──
-										if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, queue, &tenant, g.node, cf, cfs, messageChan) {
-											queue.CurrentDeliveringMessages++
-											claimedInRound++
-										} else {
-											// Failed to dequeue, refund the slot
-											claimMu.Lock()
-											if policy.MaxQueueMessages > 0 {
-												claimedByPolicy[policyCode]--
-											}
-											claimMu.Unlock()
-										}
 									}
-									if claimedInRound == 0 {
-										break // No queue delivered a message this round; all queues exhausted.
-									}
+								}
+								if claimedInRound == 0 {
+									break // No queue delivered a message this round; all queues exhausted.
 								}
 							}
 
-							bo.cursorRegistry.set(vnsKey, vnsResult.Cursor)
-							if vnsResult.Cursor == "" || len(vnsResult.Entities) < vnsPageSize {
+							bo.cursorRegistry.set(tenantQueueKey, queuesResult.Cursor)
+							if queuesResult.Cursor == "" || len(queuesResult.Entities) < queuePageSize {
 								break
 							}
-							vnsCursor = vnsResult.Cursor
+							queueCursor = queuesResult.Cursor
 						}
 					}
 				}(group)
@@ -438,11 +406,19 @@ func (bo *JobWorkerBO) dequeueMessage(
 	)
 
 	if err != nil {
-		bo.Config.Logger.Error().Err(err).
-			Str("workerID", workerID).
-			Str("queueCode", queue.Code).
-			Str("tenant", tenant.Code).
-			Msg("❌ Failed to dequeue message")
+		if strings.Contains(err.Error(), "is empty") {
+			bo.Config.Logger.Debug().
+				Str("workerID", workerID).
+				Str("queueCode", queue.Code).
+				Str("tenant", tenant.Code).
+				Msg("Queue became empty before dequeue could complete")
+		} else {
+			bo.Config.Logger.Error().Err(err).
+				Str("workerID", workerID).
+				Str("queueCode", queue.Code).
+				Str("tenant", tenant.Code).
+				Msg("❌ Failed to dequeue message")
+		}
 		return false
 	}
 

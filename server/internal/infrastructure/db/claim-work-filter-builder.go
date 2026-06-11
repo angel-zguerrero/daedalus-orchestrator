@@ -62,15 +62,27 @@ func BuildVNamespaceFilterQuery(f models.ClaimWorkFilter) ClaimWorkFilterQuery {
 
 // BuildQueueFilterQuery converts the queue-relevant parts of a ClaimWorkFilter.
 // It also enforces MessagesCount > 0 at the DB level to skip empty queues.
-func BuildQueueFilterQuery(f models.ClaimWorkFilter, vNamespace string) ClaimWorkFilterQuery {
-	var inclusionClauses []string
+// Now it also applies VNamespace filters directly on the Queue since Queue has a VNamespace property.
+func BuildQueueFilterQuery(f models.ClaimWorkFilter) ClaimWorkFilterQuery {
+	// 1. Queue Code inclusions
+	var qInclusionClauses []string
 	for _, code := range f.QueueCodes {
-		inclusionClauses = append(inclusionClauses, fmt.Sprintf("Code = %s", code))
+		qInclusionClauses = append(qInclusionClauses, fmt.Sprintf("Code = %s", code))
 	}
 	for _, pat := range f.QueuePatterns {
-		inclusionClauses = append(inclusionClauses, fmt.Sprintf("Code LIKE %s", pat))
+		qInclusionClauses = append(qInclusionClauses, fmt.Sprintf("Code LIKE %s", pat))
 	}
 
+	// 2. VNamespace inclusions
+	var vnsInclusionClauses []string
+	for _, ns := range f.VNamespaces {
+		vnsInclusionClauses = append(vnsInclusionClauses, fmt.Sprintf("VNamespace = %s", ns))
+	}
+	for _, pat := range f.VNamespacePatterns {
+		vnsInclusionClauses = append(vnsInclusionClauses, fmt.Sprintf("VNamespace LIKE %s", pat))
+	}
+
+	// 3. Exclusions (Queue and VNamespace)
 	var exclusionClauses []string
 	for _, code := range f.ExcludeQueueCodes {
 		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Code != %s", code))
@@ -78,23 +90,52 @@ func BuildQueueFilterQuery(f models.ClaimWorkFilter, vNamespace string) ClaimWor
 	for _, pat := range f.ExcludeQueuePatterns {
 		exclusionClauses = append(exclusionClauses, fmt.Sprintf("Code NOT LIKE %s", pat))
 	}
+	for _, ns := range f.ExcludeVNamespaces {
+		exclusionClauses = append(exclusionClauses, fmt.Sprintf("VNamespace != %s", ns))
+	}
+	for _, pat := range f.ExcludeVNamespacePatterns {
+		exclusionClauses = append(exclusionClauses, fmt.Sprintf("VNamespace NOT LIKE %s", pat))
+	}
 
-	fq := buildFilterQuery(inclusionClauses, exclusionClauses)
+	// Build the final query parts
+	var parts []string
+
+	// Queue Inclusions (OR)
+	if len(qInclusionClauses) > 0 {
+		if len(qInclusionClauses) == 1 {
+			parts = append(parts, qInclusionClauses[0])
+		} else {
+			parts = append(parts, "("+strings.Join(qInclusionClauses, " | ")+")")
+		}
+	}
+
+	// VNamespace Inclusions (OR)
+	if len(vnsInclusionClauses) > 0 {
+		if len(vnsInclusionClauses) == 1 {
+			parts = append(parts, vnsInclusionClauses[0])
+		} else {
+			parts = append(parts, "("+strings.Join(vnsInclusionClauses, " | ")+")")
+		}
+	}
+
+	// Exclusions (AND)
+	for _, exc := range exclusionClauses {
+		parts = append(parts, exc)
+	}
 
 	// Always restrict to queues that have pending messages
-	var extraClauses []string
-	extraClauses = append(extraClauses, "MessagesCount > 0")
-	if vNamespace != "" {
-		extraClauses = append(extraClauses, fmt.Sprintf("VNamespace = %s", vNamespace))
-	}
+	parts = append(parts, "MessagesCount > 0")
 
-	if fq.DBQuery == "ID != 0" {
-		fq.DBQuery = strings.Join(extraClauses, " & ")
+	var query string
+	if len(parts) == 0 {
+		query = "ID != 0" // match-all workaround, though it will never hit this because of MessagesCount
 	} else {
-		fq.DBQuery = fq.DBQuery + " & " + strings.Join(extraClauses, " & ")
+		query = strings.Join(parts, " & ")
 	}
 
-	return fq
+	return ClaimWorkFilterQuery{
+		DBQuery: query,
+	}
 }
 
 // buildFilterQuery is the generic query assembler shared by the three entity builders above.
