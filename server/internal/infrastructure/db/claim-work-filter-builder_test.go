@@ -20,27 +20,27 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 		{
 			name:        "empty filter",
 			filter:      models.ClaimWorkFilter{},
-			wantDBQuery: "ID != 0",
+			wantDBQuery: "HasMessages = true",
 		},
 		{
 			name:        "single TenantCode",
 			filter:      models.ClaimWorkFilter{TenantCodes: []string{"acme"}},
-			wantDBQuery: "Code = acme",
+			wantDBQuery: "Code = acme & HasMessages = true",
 		},
 		{
 			name:        "multiple TenantCodes",
 			filter:      models.ClaimWorkFilter{TenantCodes: []string{"acme", "globex"}},
-			wantDBQuery: "(Code = acme | Code = globex)",
+			wantDBQuery: "(Code = acme | Code = globex) & HasMessages = true",
 		},
 		{
 			name:        "single TenantPattern",
 			filter:      models.ClaimWorkFilter{TenantPatterns: []string{"acme-*"}},
-			wantDBQuery: "Code LIKE acme-*",
+			wantDBQuery: "Code LIKE acme-* & HasMessages = true",
 		},
 		{
 			name:        "multiple TenantPatterns",
 			filter:      models.ClaimWorkFilter{TenantPatterns: []string{"acme-*", "beta-*"}},
-			wantDBQuery: "(Code LIKE acme-* | Code LIKE beta-*)",
+			wantDBQuery: "(Code LIKE acme-* | Code LIKE beta-*) & HasMessages = true",
 		},
 		{
 			name: "TenantCodes and TenantPatterns combined",
@@ -48,27 +48,27 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 				TenantCodes:    []string{"acme"},
 				TenantPatterns: []string{"beta-*"},
 			},
-			wantDBQuery: "(Code = acme | Code LIKE beta-*)",
+			wantDBQuery: "(Code = acme | Code LIKE beta-*) & HasMessages = true",
 		},
 		{
 			name:        "single ExcludeTenantCode",
 			filter:      models.ClaimWorkFilter{ExcludeTenantCodes: []string{"evil-corp"}},
-			wantDBQuery: "Code != evil-corp",
+			wantDBQuery: "Code != evil-corp & HasMessages = true",
 		},
 		{
 			name:        "multiple ExcludeTenantCodes",
 			filter:      models.ClaimWorkFilter{ExcludeTenantCodes: []string{"evil-corp", "bad-co"}},
-			wantDBQuery: "Code != evil-corp & Code != bad-co",
+			wantDBQuery: "Code != evil-corp & Code != bad-co & HasMessages = true",
 		},
 		{
 			name:        "single ExcludeTenantPattern uses NOT LIKE",
 			filter:      models.ClaimWorkFilter{ExcludeTenantPatterns: []string{"internal-*"}},
-			wantDBQuery: "Code NOT LIKE internal-*",
+			wantDBQuery: "Code NOT LIKE internal-* & HasMessages = true",
 		},
 		{
 			name:        "multiple ExcludeTenantPatterns use NOT LIKE",
 			filter:      models.ClaimWorkFilter{ExcludeTenantPatterns: []string{"internal-*", "test-*"}},
-			wantDBQuery: "Code NOT LIKE internal-* & Code NOT LIKE test-*",
+			wantDBQuery: "Code NOT LIKE internal-* & Code NOT LIKE test-* & HasMessages = true",
 		},
 		{
 			name: "TenantCodes and ExcludeTenantCodes",
@@ -76,7 +76,7 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 				TenantCodes:        []string{"acme", "globex"},
 				ExcludeTenantCodes: []string{"globex"},
 			},
-			wantDBQuery: "(Code = acme | Code = globex) & Code != globex",
+			wantDBQuery: "(Code = acme | Code = globex) & Code != globex & HasMessages = true",
 		},
 		{
 			name: "TenantCodes and ExcludeTenantPatterns",
@@ -84,7 +84,7 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 				TenantCodes:           []string{"acme"},
 				ExcludeTenantPatterns: []string{"internal-*"},
 			},
-			wantDBQuery: "Code = acme & Code NOT LIKE internal-*",
+			wantDBQuery: "Code = acme & Code NOT LIKE internal-* & HasMessages = true",
 		},
 		{
 			name: "TenantPatterns and ExcludeTenantCodes",
@@ -92,7 +92,7 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 				TenantPatterns:     []string{"prod-*"},
 				ExcludeTenantCodes: []string{"prod-legacy"},
 			},
-			wantDBQuery: "Code LIKE prod-* & Code != prod-legacy",
+			wantDBQuery: "Code LIKE prod-* & Code != prod-legacy & HasMessages = true",
 		},
 		{
 			name: "TenantPatterns and ExcludeTenantPatterns",
@@ -100,7 +100,7 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 				TenantPatterns:        []string{"prod-*"},
 				ExcludeTenantPatterns: []string{"prod-internal-*"},
 			},
-			wantDBQuery: "Code LIKE prod-* & Code NOT LIKE prod-internal-*",
+			wantDBQuery: "Code LIKE prod-* & Code NOT LIKE prod-internal-* & HasMessages = true",
 		},
 		{
 			name: "all tenant fields combined",
@@ -110,12 +110,12 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 				ExcludeTenantCodes:    []string{"prod-legacy"},
 				ExcludeTenantPatterns: []string{"prod-internal-*"},
 			},
-			wantDBQuery: "(Code = acme | Code LIKE prod-*) & Code != prod-legacy & Code NOT LIKE prod-internal-*",
+			wantDBQuery: "(Code = acme | Code LIKE prod-*) & Code != prod-legacy & Code NOT LIKE prod-internal-* & HasMessages = true",
 		},
 		{
 			name:        "ExcludeTenantCodes only",
 			filter:      models.ClaimWorkFilter{ExcludeTenantCodes: []string{"acme"}},
-			wantDBQuery: "Code != acme",
+			wantDBQuery: "Code != acme & HasMessages = true",
 		},
 		{
 			name: "ExcludeTenantCodes and ExcludeTenantPatterns",
@@ -123,7 +123,7 @@ func TestBuildTenantFilterQuery(t *testing.T) {
 				ExcludeTenantCodes:    []string{"evil-corp"},
 				ExcludeTenantPatterns: []string{"test-*"},
 			},
-			wantDBQuery: "Code != evil-corp & Code NOT LIKE test-*",
+			wantDBQuery: "Code != evil-corp & Code NOT LIKE test-* & HasMessages = true",
 		},
 	}
 

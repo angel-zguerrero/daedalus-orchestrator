@@ -144,6 +144,16 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return updateDashboardSummaryCommand.Execute(uow, now)
 	}
 
+	markTenantActiveCommand, ok := cmd.(tenant_command.MarkTenantActiveCommand)
+	if ok {
+		return markTenantActiveCommand.Execute(uow, now)
+	}
+
+	markTenantInactiveCommand, ok := cmd.(tenant_command.MarkTenantInactiveCommand)
+	if ok {
+		return markTenantInactiveCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult

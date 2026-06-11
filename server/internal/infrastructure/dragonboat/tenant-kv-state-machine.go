@@ -10,6 +10,7 @@ import (
 	header_command "deadalus-orch/server/internal/usecase/command/header"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
+	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
 	"strings"
 	"time"
@@ -142,6 +143,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return listHeadersCommand.Execute(uow, now)
 	}
 
+	getOutboxEventsCommand, ok := cmd.(tenant_command.GetOutboxEventsCommand)
+	if ok {
+		return getOutboxEventsCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
@@ -229,6 +235,16 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	processExpiredLeasesCommand, ok := cmd.(queue_command.ProcessExpiredLeasesCommand)
 	if ok {
 		return processExpiredLeasesCommand.Execute(uow, now)
+	}
+
+	deleteOutboxEventsCommand, ok := cmd.(tenant_command.DeleteOutboxEventsCommand)
+	if ok {
+		return deleteOutboxEventsCommand.Execute(uow, now)
+	}
+
+	resetTenantShardStateCommand, ok := cmd.(tenant_command.ResetTenantShardStateCommand)
+	if ok {
+		return resetTenantShardStateCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

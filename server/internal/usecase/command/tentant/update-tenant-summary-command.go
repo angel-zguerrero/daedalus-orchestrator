@@ -43,6 +43,7 @@ func (cmd *UpdateTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time
 		tenant.QueuesCount = summary.QueuesCount
 		tenant.BindingsCount = summary.BindingsCount
 		tenant.MessagesCount = summary.MessagesCount
+		tenant.HasMessages = summary.HasMessages
 
 		// Save the updated tenant
 		_, err = tenantRepo.UpdateTenantInMaster(tenant, now)
