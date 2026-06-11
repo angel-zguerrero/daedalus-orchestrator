@@ -63,10 +63,7 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 		select {
 		case req, ok := <-requestChan:
 			if !ok {
-				// Client closed the stream — clean up cursors if we know the worker.
-				if workerID != "" {
-					s.JobWorkerBO.EvictWorkerCursors(workerID)
-				}
+				// Client closed the stream.
 				return nil
 			}
 
@@ -176,10 +173,7 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 			return fmt.Errorf("error receiving from client: %w", err)
 
 		case <-stream.Context().Done():
-			// Client disconnected — evict cursors to prevent registry memory leaks.
-			if workerID != "" {
-				s.JobWorkerBO.EvictWorkerCursors(workerID)
-			}
+			// Client disconnected
 			s.Config.Logger.Info().Str("workerID", workerID).Msg("Client disconnected")
 			return stream.Context().Err()
 		}

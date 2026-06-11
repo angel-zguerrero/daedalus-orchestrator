@@ -29,7 +29,6 @@ type ClaimedMessage struct {
 // claimCursorKey identifies a pagination cursor stored in the registry.
 // tenantID is empty for the tenant-level cursor; it is set for vnamespace-level cursors.
 type claimCursorKey struct {
-	workerID   string
 	policyCode string
 	tenantID   string
 }
@@ -66,16 +65,7 @@ func (r *claimCursorRegistry) set(key claimCursorKey, cursor string) {
 	}
 }
 
-// evictWorker removes all cursors belonging to workerID.
-func (r *claimCursorRegistry) evictWorker(workerID string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for key := range r.cursors {
-		if key.workerID == workerID {
-			delete(r.cursors, key)
-		}
-	}
-}
+
 
 type JobWorkerBO struct {
 	Config         *common.ServerConfing
@@ -92,11 +82,7 @@ func NewJobWorkerBO(Config *common.ServerConfing) *JobWorkerBO {
 	}
 }
 
-// EvictWorkerCursors removes all cached pagination cursors for the given worker.
-// Call this when a worker's gRPC stream closes so stale cursors don't accumulate.
-func (bo *JobWorkerBO) EvictWorkerCursors(workerID string) {
-	bo.cursorRegistry.evictWorker(workerID)
-}
+
 
 func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerName string, Information map[string]string, ClaimWorkCapacityPolicies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) error {
 	// Upsert the JobWorker: update LastHeartbeat and TTL on every ClaimWork call
@@ -205,7 +191,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 		// ── Tenant pagination (DB-filtered) ───────────────────────────────────
 		// Resume from the cursor saved by the previous ClaimWork cycle for this
 		// worker+policy pair, enabling fair round-robin rotation across all tenants.
-		tenantKey := claimCursorKey{workerID: workerID, policyCode: policyCode}
+		tenantKey := claimCursorKey{policyCode: policyCode}
 		tenantCursor := bo.cursorRegistry.get(tenantKey)
 		const tenantPageSize = 50
 
@@ -275,7 +261,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 
 						// ── Queue pagination (DB-filtered with VNamespace rules) ──────────
 						// Resume queue iteration from the last saved position for this tenant.
-						tenantQueueKey := claimCursorKey{workerID: workerID, policyCode: policyCode, tenantID: tenant.ID}
+						tenantQueueKey := claimCursorKey{policyCode: policyCode, tenantID: tenant.ID}
 						queueCursor := bo.cursorRegistry.get(tenantQueueKey)
 						const queuePageSize = 50
 
