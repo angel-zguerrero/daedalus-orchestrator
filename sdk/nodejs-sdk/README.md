@@ -158,6 +158,7 @@ We provide fully functional examples in the [examples/](file:///Users/angel/Docu
 
 - **[Simple Worker](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator/sdk/nodejs-sdk/examples/simple-worker/index.ts)**: A basic worker showing connection and message consumption.
 - **[Assert Resources](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator/sdk/nodejs-sdk/examples/assert-resources/index.ts)**: A comprehensive example demonstrating how to upsert a tenant, exchange, queue, and binding, plus publishing and enqueueing messages.
+- **[Email Simulator](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator/sdk/nodejs-sdk/examples/email%20simulator/index.ts)**: A realistic example simulating a multi-tenant email platform with distinct queues for transactional, marketing, and report emails, highlighting how Daedalus orchestrates fairness and isolates noisy neighbors.
 
 ### Running the Examples
 
@@ -173,6 +174,11 @@ Run the examples directly using Nx:
 - **Assert Resources**:
   ```bash
   nx run server:run-nodejs-assert-resources
+  ```
+
+- **Email Simulator**:
+  ```bash
+  nx run server:run-nodejs-email-simulator
   ```
 
 #### Option B: Running from the SDK Directory
@@ -191,4 +197,11 @@ Navigate to `sdk/nodejs-sdk` first, then run:
   npm run example:assert-resources
   # or manually:
   npx ts-node examples/assert-resources/index.ts
+  ```
+
+- **Email Simulator**:
+  ```bash
+  npm run example:email-simulator
+  # or manually:
+  npx ts-node "examples/email simulator/index.ts"
   ```
