@@ -114,6 +114,11 @@ func (cmd *AckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) command
 		queue.CurrentDeliveringMessages = 0
 	}
 
+	queue.MessagesCount--
+	if queue.MessagesCount < 0 {
+		queue.MessagesCount = 0
+	}
+
 	if _, err = queueRepo.UpdateQueue(queue, now); err != nil {
 		commandResult.Error = fmt.Sprintf("failed to update queue %s: %s", message.QueueID, err.Error())
 		return *commandResult

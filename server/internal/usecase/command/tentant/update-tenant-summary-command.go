@@ -43,7 +43,13 @@ func (cmd *UpdateTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time
 		tenant.QueuesCount = summary.QueuesCount
 		tenant.BindingsCount = summary.BindingsCount
 		tenant.MessagesCount = summary.MessagesCount
-		tenant.HasMessages = summary.HasMessages
+
+		// Self-healing: if the summary says we have messages but the master node thinks we don't,
+		// we force it to active. We do NOT heal the other way (MessagesCount == 0 -> HasMessages = false)
+		// because the summary is asynchronous and might be stale (e.g. read 0 just before a message was enqueued).
+		if tenant.MessagesCount > 0 && !tenant.HasMessages {
+			tenant.HasMessages = true
+		}
 
 		// Save the updated tenant
 		_, err = tenantRepo.UpdateTenantInMaster(tenant, now)

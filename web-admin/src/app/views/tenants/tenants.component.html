@@ -56,6 +56,7 @@
             <th>Queues Count</th>
             <th>Bindings Count</th>
             <th>Messages Count</th>
+            <th>Active</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -78,6 +79,11 @@
             <td>{{ tenant.QueuesCount }}</td>
             <td>{{ tenant.BindingsCount }}</td>
             <td>{{ tenant.MessagesCount }}</td>
+            <td>
+              <c-badge [color]="tenant.HasMessages ? 'success' : 'secondary'" shape="rounded-pill">
+                {{ tenant.HasMessages ? 'Yes' : 'No' }}
+              </c-badge>
+            </td>
             <td>
               <div class="btn-group" role="group">
                 <button 
@@ -300,6 +306,15 @@
             <code>{{ selectedTenant?.Code || selectedTenant?.code || 'N/A' }}</code>
           </div>
           <div class="form-text">Unique business identifier (immutable)</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Active</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="selectedTenant?.HasMessages ? 'success' : 'secondary'" shape="rounded-pill">
+              {{ selectedTenant?.HasMessages ? 'Yes' : 'No' }}
+            </c-badge>
+          </div>
+          <div class="form-text">Indicates if the tenant has active messages to process</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Status</label>
