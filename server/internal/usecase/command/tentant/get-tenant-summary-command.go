@@ -47,6 +47,7 @@ func (cmd *GetTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 		ExchangesCount: tenant.ExchangesCount,
 		QueuesCount:    tenant.QueuesCount,
 		MessagesCount:  tenant.MessagesCount,
+		HasMessages:    tenant.HasMessages,
 		CreatedAt:      tenant.CreatedAt,
 		UpdatedAt:      tenant.UpdatedAt,
 	}

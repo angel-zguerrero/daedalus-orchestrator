@@ -526,9 +526,11 @@ To switch engines at runtime, set `MASTER_DB_ENGINE` and `TENANT_DB_ENGINE` (or 
 | `nx run server:build-sdk-golang` | Build the Go SDK |
 | `nx run server:run-golang-simple-worker` | Run the Go SDK simple worker example |
 | `nx run server:run-golang-assert-resources` | Run the Go SDK assert resources example |
+| `nx run server:run-golang-email-simulator` | Run the Go SDK email simulator example |
 | `nx run server:build-sdk-nodejs` | Build the Node.js SDK |
 | `nx run server:run-nodejs-simple-worker` | Run the Node.js SDK simple worker example |
 | `nx run server:run-nodejs-assert-resources` | Run the Node.js SDK assert resources example |
+| `nx run server:run-nodejs-email-simulator` | Run the Node.js SDK email simulator example |
 
 ---
 

@@ -208,6 +208,7 @@ We provide fully functional examples in the [examples/](examples/) folder:
 
 - **[Simple Worker](examples/simple-worker/main.go)**: A basic worker showing connection and message consumption.
 - **[Assert Resources](examples/assert-resources/main.go)**: A comprehensive example demonstrating how to upsert a tenant, exchange, queue, and binding, plus publishing and enqueueing messages.
+- **[Email Simulator](examples/email-simulator/main.go)**: A realistic example simulating a multi-tenant email platform with distinct queues for transactional, marketing, and report emails, highlighting how Daedalus orchestrates fairness and isolates noisy neighbors.
 
 ### Running the Examples
 
@@ -225,6 +226,11 @@ Run the examples directly using Nx:
   nx run server:run-golang-assert-resources
   ```
 
+- **Email Simulator**:
+  ```bash
+  nx run server:run-golang-email-simulator
+  ```
+
 #### Option B: Running from the SDK Directory
 
 Navigate to `sdk/golang-sdk` first, then run:
@@ -237,6 +243,11 @@ Navigate to `sdk/golang-sdk` first, then run:
 - **Assert Resources**:
   ```bash
   go run examples/assert-resources/main.go
+  ```
+
+- **Email Simulator**:
+  ```bash
+  go run examples/email-simulator/main.go
   ```
 
 ---

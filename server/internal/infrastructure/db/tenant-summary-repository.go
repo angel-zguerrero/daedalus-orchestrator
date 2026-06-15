@@ -30,7 +30,6 @@ func (r *TenantSummaryRepository) CreateTenantSummary(input *models.TenantSummar
 
 func (r *TenantSummaryRepository) UpdateTenantSummary(input *models.TenantSummary, now time.Time) (bool, error) {
 	input.UpdatedAt = now
-	fmt.Println("Updating TenantSummary:", input.ID, "at", now)
 	return r.Update(input, now)
 }
 

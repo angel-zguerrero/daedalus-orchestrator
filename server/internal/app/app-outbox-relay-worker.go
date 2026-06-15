@@ -135,11 +135,24 @@ func (app *Application) processOutboxEventsForNode(tenantNode *dragonboat.RaftNo
 		}
 
 		ctxWrite, cancelWrite := context.WithTimeout(context.Background(), 10*time.Second)
-		_, err := app.MasterNode.Write(ctxWrite, fsmCmd) // fire and forget/wait for completion, but we ignore errors here
-		cancelWrite()
+		resultChan, err := app.MasterNode.Write(ctxWrite, fsmCmd)
 		if err != nil {
-			log.Err(err).Str("tenant_id", tenantID).Msg("❌ Failed to mark tenant active in Master")
+			cancelWrite()
+			log.Err(err).Str("tenant_id", tenantID).Msg("❌ Failed to submit mark tenant active to Master")
 			return // Stop processing so we don't delete the events if we failed to relay!
+		}
+		
+		select {
+		case writeResult := <-resultChan:
+			cancelWrite()
+			if writeResult.Error != nil {
+				log.Err(writeResult.Error).Str("tenant_id", tenantID).Msg("❌ Failed to execute mark tenant active in Master")
+				return
+			}
+		case <-ctxWrite.Done():
+			cancelWrite()
+			log.Err(ctxWrite.Err()).Str("tenant_id", tenantID).Msg("❌ Timeout marking tenant active in Master")
+			return
 		}
 	}
 
@@ -156,11 +169,23 @@ func (app *Application) processOutboxEventsForNode(tenantNode *dragonboat.RaftNo
 	}
 
 	ctxDel, cancelDel := context.WithTimeout(context.Background(), 10*time.Second)
-	_, err = tenantNode.Write(ctxDel, deleteFsmCmd)
-	cancelDel()
+	delResultChan, err := tenantNode.Write(ctxDel, deleteFsmCmd)
 	if err != nil {
-		log.Err(err).Uint64("shard_id", tenantNode.ShardID).Msg("❌ Failed to delete outbox events")
-	} else {
-		log.Info().Uint64("shard_id", tenantNode.ShardID).Int("deleted", len(processedEventIDs)).Msg("✅ Outbox events relayed and deleted")
+		cancelDel()
+		log.Err(err).Uint64("shard_id", tenantNode.ShardID).Msg("❌ Failed to submit delete outbox events")
+		return
+	}
+	
+	select {
+	case writeResult := <-delResultChan:
+		cancelDel()
+		if writeResult.Error != nil {
+			log.Err(writeResult.Error).Uint64("shard_id", tenantNode.ShardID).Msg("❌ Failed to delete outbox events")
+		} else {
+			log.Info().Uint64("shard_id", tenantNode.ShardID).Int("deleted", len(processedEventIDs)).Msg("✅ Outbox events relayed and deleted")
+		}
+	case <-ctxDel.Done():
+		cancelDel()
+		log.Err(ctxDel.Err()).Uint64("shard_id", tenantNode.ShardID).Msg("❌ Timeout deleting outbox events")
 	}
 }

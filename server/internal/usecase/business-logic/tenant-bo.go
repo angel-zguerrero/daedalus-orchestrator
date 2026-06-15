@@ -343,5 +343,9 @@ func (bo *TenantBO) GetTenantSummary(ctx context.Context, tenantCode string) (mo
 		return models.TenantSummary{}, fmt.Errorf("get tenant summary failed: %w", err)
 	}
 
+	// Override the HasMessages field with the true status from TenantInMaster
+	// because TenantSummary does not maintain this field accurately.
+	tenantSummary.HasMessages = tenant.HasMessages
+
 	return tenantSummary, nil
 }

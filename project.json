@@ -140,6 +140,30 @@
                 "parallel": false,
                 "cwd": "sdk/golang-sdk"
             }
+        },
+        "run-golang-email-simulator": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "go run examples/email-simulator/main.go"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/golang-sdk"
+            }
+        },
+        "run-nodejs-email-simulator": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "npx ts-node \"examples/email simulator/index.ts\""
+                    }
+                ],
+                "parallel": false,
+                "cwd": "sdk/nodejs-sdk"
+            }
         }
     }
 }
