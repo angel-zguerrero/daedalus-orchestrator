@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -251,6 +252,10 @@ func main() {
 
 	// ===== WORKERS: Process emails =====
 
+	var transactionalCount int64
+	var marketingCount int64
+	var reportCount int64
+
 	// Worker 1: Transactional Processor (FAST, critical SLA)
 	go func() {
 		err := sdk.CreateWorker(ctx, daedalus.WorkerOptions{
@@ -276,6 +281,8 @@ func main() {
 				log.Printf("✉️  [TRANSACTIONAL] %s: To: %s | Subject: %s", email.CompanyID, email.To, subject)
 
 				time.Sleep(10 * time.Millisecond) // Very fast
+				count := atomic.AddInt64(&transactionalCount, 1)
+				log.Printf("[Worker: email-transactional-processor] Processed message count: %d", count)
 				return ack()
 			},
 		})
@@ -309,6 +316,8 @@ func main() {
 				log.Printf("📢 [MARKETING] %s: To: %s | Subject: %s", email.CompanyID, email.To, subject)
 
 				time.Sleep(20 * time.Millisecond) // Slightly slower
+				count := atomic.AddInt64(&marketingCount, 1)
+				log.Printf("[Worker: email-marketing-processor] Processed message count: %d", count)
 				return ack()
 			},
 		})
@@ -342,6 +351,8 @@ func main() {
 				log.Printf("📊 [REPORT] %s: Archiving report: %s", email.CompanyID, subject)
 
 				time.Sleep(500 * time.Millisecond) // Slow, background
+				count := atomic.AddInt64(&reportCount, 1)
+				log.Printf("[Worker: email-report-processor] Processed message count: %d", count)
 				return ack()
 			},
 		})

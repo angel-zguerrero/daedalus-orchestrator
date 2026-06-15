@@ -182,12 +182,6 @@ func (cmd *ProcessExpiredLeasesCommand) deleteMessageAndLease(
 		return fmt.Errorf("failed to delete message: %w", err)
 	}
 
-	// Decrement queue message count
-	queue.MessagesCount--
-	if queue.MessagesCount < 0 {
-		queue.MessagesCount = 0
-	}
-
 	// Decrement delivering messages counter
 	queue.CurrentDeliveringMessages--
 	if queue.CurrentDeliveringMessages < 0 {
@@ -196,23 +190,6 @@ func (cmd *ProcessExpiredLeasesCommand) deleteMessageAndLease(
 
 	if _, err := queueRepo.UpdateQueue(queue, now); err != nil {
 		return fmt.Errorf("failed to update queue: %w", err)
-	}
-
-	// Update partition count
-	if message.QueuePartitionID != "" {
-		partition, err := partitionRepo.FindByField("ID", message.QueuePartitionID, now)
-		if err != nil {
-			return fmt.Errorf("failed to load partition: %w", err)
-		}
-		if partition != nil {
-			partition.MessagesCount--
-			if partition.MessagesCount < 0 {
-				partition.MessagesCount = 0
-			}
-			if _, err := partitionRepo.UpdateQueuePartition(partition, now); err != nil {
-				return fmt.Errorf("failed to update partition: %w", err)
-			}
-		}
 	}
 
 	return nil

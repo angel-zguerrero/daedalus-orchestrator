@@ -121,7 +121,7 @@ func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerNam
 	// Launch a dedicated stopper goroutine for this worker.
 	// It will iterate all ClaimWorkCapacityPolicies, paginate tenants → vnamespaces → queues,
 	// and dequeue messages until all policies are satisfied or pagination is exhausted.
-	go bo.runClaimWorkStopper(workerId, ClaimWorkCapacityPolicies, messageChan)
+	go bo.runClaimWorkStopper(ctx, workerId, ClaimWorkCapacityPolicies, messageChan)
 
 	return nil
 }
@@ -129,7 +129,7 @@ func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerNam
 // runClaimWorkStopper is the goroutine that drives the claim-work process for a single JobWorker.
 // It terminates when all ClaimWorkCapacityPolicies are satisfied or all pagination is exhausted,
 // after which a subsequent ClaimWork call is allowed to spawn a new stopper.
-func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) {
+func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string, policies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) {
 	// Always release the stopper slot when the goroutine exits so the next ClaimWork call
 	// can spawn a new one.
 	defer func() {
@@ -138,7 +138,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 		bo.stoppersMu.Unlock()
 	}()
 
-	stopperCtx, stopperCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	stopperCtx, stopperCancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer stopperCancel()
 
 	logger := bo.Config.Logger.With().Str("workerID", workerID).Logger()
@@ -291,12 +291,12 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 									qCtx2, qCancel2 := context.WithTimeout(stopperCtx, 2*time.Second)
 									allQueuesPaginated, err2 := queueBO.GetQueues(qCtx2, "", emptyCursor, 50, "", false, cf, cfs, &tenant, g.node, false)
 									qCancel2()
-									
+
 									if err2 != nil {
 										hasMessages = true // Prevent deactivation on error
 										break
 									}
-									
+
 									for i := range allQueuesPaginated.Entities {
 										q := &allQueuesPaginated.Entities[i]
 										if q.MessagesCount > 0 || q.CurrentDeliveringMessages > 0 {
@@ -304,7 +304,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 											break
 										}
 									}
-									
+
 									if hasMessages || allQueuesPaginated.Cursor == "" || len(allQueuesPaginated.Entities) < 50 {
 										break
 									}
