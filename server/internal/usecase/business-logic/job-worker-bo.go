@@ -6,12 +6,12 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"deadalus-orch/server/internal/pkg/config"
+	"deadalus-orch/server/internal/pkg/utils"
+	general_command "deadalus-orch/server/internal/usecase/command/general"
 	job_worker_command "deadalus-orch/server/internal/usecase/command/job-worker"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
-	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"deadalus-orch/shared/models"
-	"deadalus-orch/server/internal/pkg/utils"
 	"errors"
 	"fmt"
 	"strings"
@@ -65,24 +65,20 @@ func (r *claimCursorRegistry) set(key claimCursorKey, cursor string) {
 	}
 }
 
-
-
 type JobWorkerBO struct {
 	Config         *common.ServerConfing
-	stoppers        map[string]bool
-	stoppersMu      sync.Mutex
-	cursorRegistry  *claimCursorRegistry
+	stoppers       map[string]bool
+	stoppersMu     sync.Mutex
+	cursorRegistry *claimCursorRegistry
 }
 
 func NewJobWorkerBO(Config *common.ServerConfing) *JobWorkerBO {
 	return &JobWorkerBO{
 		Config:         Config,
-		stoppers:        make(map[string]bool),
-		cursorRegistry:  newClaimCursorRegistry(),
+		stoppers:       make(map[string]bool),
+		cursorRegistry: newClaimCursorRegistry(),
 	}
 }
-
-
 
 func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerName string, Information map[string]string, ClaimWorkCapacityPolicies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) error {
 	// Upsert the JobWorker: update LastHeartbeat and TTL on every ClaimWork call
@@ -289,12 +285,33 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 
 							if len(allQueues) == 0 && queueCursor == "" {
 								// No queues match this policy. Let's check if the tenant is completely empty.
-								emptyFilter := models.ClaimWorkFilter{}
-								qCtx2, qCancel2 := context.WithTimeout(stopperCtx, 2*time.Second)
-								allActive, err2 := queueBO.GetQueuesWithFilter(qCtx2, emptyFilter, "", 1, cf, cfs, &tenant, g.node)
-								qCancel2()
-								
-								if err2 == nil && (allActive.Entities == nil || len(allActive.Entities) == 0) {
+								hasMessages := false
+								emptyCursor := ""
+								for {
+									qCtx2, qCancel2 := context.WithTimeout(stopperCtx, 2*time.Second)
+									allQueuesPaginated, err2 := queueBO.GetQueues(qCtx2, "", emptyCursor, 50, "", false, cf, cfs, &tenant, g.node, false)
+									qCancel2()
+									
+									if err2 != nil {
+										hasMessages = true // Prevent deactivation on error
+										break
+									}
+									
+									for i := range allQueuesPaginated.Entities {
+										q := &allQueuesPaginated.Entities[i]
+										if q.MessagesCount > 0 || q.CurrentDeliveringMessages > 0 {
+											hasMessages = true
+											break
+										}
+									}
+									
+									if hasMessages || allQueuesPaginated.Cursor == "" || len(allQueuesPaginated.Entities) < 50 {
+										break
+									}
+									emptyCursor = allQueuesPaginated.Cursor
+								}
+
+								if !hasMessages {
 									bo.deactivateTenant(tenant.ID, g.node, cf, cfs)
 								}
 							}
@@ -308,17 +325,17 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 									break queueLoop
 								}
 								claimMu.Unlock()
-								
+
 								claimedInRound := 0
 								for i := range allQueues {
 									queue := &allQueues[i]
-									
+
 									claimMu.Lock()
 									if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
 										claimMu.Unlock()
 										break queueLoop
 									}
-									
+
 									// Respect the queue's own delivering-message cap (0 = unlimited).
 									// MessagesCount > 0 is already guaranteed by the DB query.
 									if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
@@ -359,7 +376,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(workerID string, policies map[string]
 					}
 				}(group)
 			}
-			
+
 			// Wait for all shard goroutines to finish processing this page of tenants
 			wg.Wait()
 
@@ -639,13 +656,22 @@ func (bo *JobWorkerBO) deactivateTenant(tenantID string, tenantNode *dragonboat.
 		CMD:  inactiveCmd,
 	}
 
-	// Fire and forget to Master
+	// Fire and wait to Master
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err := bo.Config.MasterNode.Write(ctx, fsmCmd)
+		resultChan, err := bo.Config.MasterNode.Write(ctx, fsmCmd)
 		if err != nil {
-			bo.Config.Logger.Debug().Err(err).Str("tenant", tenantID).Msg("Failed to mark tenant inactive in Master")
+			bo.Config.Logger.Debug().Err(err).Str("tenant", tenantID).Msg("Failed to start mark tenant inactive operation")
+			return
+		}
+		select {
+		case res := <-resultChan:
+			if res.Error != nil {
+				bo.Config.Logger.Debug().Err(res.Error).Str("tenant", tenantID).Msg("Failed to mark tenant inactive in Master")
+			}
+		case <-ctx.Done():
+			bo.Config.Logger.Debug().Err(ctx.Err()).Str("tenant", tenantID).Msg("Timeout marking tenant inactive in Master")
 		}
 	}()
 
@@ -661,13 +687,22 @@ func (bo *JobWorkerBO) deactivateTenant(tenantID string, tenantNode *dragonboat.
 		CMD:  resetCmd,
 	}
 
-	// Fire and forget to Shard
+	// Fire and wait to Shard
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err := tenantNode.Write(ctx, fsmResetCmd)
+		resultChan, err := tenantNode.Write(ctx, fsmResetCmd)
 		if err != nil {
-			bo.Config.Logger.Debug().Err(err).Str("tenant", tenantID).Msg("Failed to reset tenant shard state")
+			bo.Config.Logger.Debug().Err(err).Str("tenant", tenantID).Msg("Failed to start reset tenant shard state operation")
+			return
+		}
+		select {
+		case res := <-resultChan:
+			if res.Error != nil {
+				bo.Config.Logger.Debug().Err(res.Error).Str("tenant", tenantID).Msg("Failed to reset tenant shard state")
+			}
+		case <-ctx.Done():
+			bo.Config.Logger.Debug().Err(ctx.Err()).Str("tenant", tenantID).Msg("Timeout resetting tenant shard state")
 		}
 	}()
 }

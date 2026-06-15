@@ -14,7 +14,7 @@ async function main() {
         intervalMs: 500,
         capacityPolicies: [
             {
-                maxQueueMessages: 10,
+                maxQueueMessages: 100,
                 claimWorkFilter: {
                 }
             }
@@ -24,7 +24,7 @@ async function main() {
             console.log('📝 Content:', message);
 
             // Simulate processing
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            await new Promise(resolve => setTimeout(resolve, 10));
 
             // Acknowledge the message after processing
             console.log('✅ Message processed, sending ACK...');

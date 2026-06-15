@@ -43,5 +43,10 @@ func (bo *TenantSummaryBO) GetTenantSummary(ctx context.Context, tenantId, cf, c
 		return models.TenantSummary{}, fmt.Errorf("get tenant summary command failed: %w", err)
 	}
 
+	// Override the dormant HasMessages field with the true status from TenantInMaster
+	if tenant != nil {
+		tenantSummary.HasMessages = tenant.HasMessages
+	}
+
 	return tenantSummary, nil
 }
