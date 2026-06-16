@@ -648,6 +648,7 @@ func (bo *JobWorkerBO) AckMessage(ctx context.Context, leaseID, tenantCode strin
 	if bo.Config.MetricsCollector != nil {
 		bo.Config.MetricsCollector.RecordAck(tenantCode, result.QueueCode, result.VNamespace, 1)
 		bo.Config.MetricsCollector.RecordLatency(tenantCode, result.QueueCode, result.VNamespace, uint64(result.ProcessingLatencyMs))
+		bo.Config.MetricsCollector.UpdateGauges(tenantCode, result.QueueCode, result.VNamespace, result.Pending, result.InProcess)
 	}
 
 	return nil

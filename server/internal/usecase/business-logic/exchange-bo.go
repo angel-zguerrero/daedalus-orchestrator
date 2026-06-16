@@ -257,7 +257,7 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 	}
 	copy(enqueueCommand.Messages, queueMessages)
 
-	createdMessages, err := dragonboat.ExecuteRepositoryCommand[[]models.QueueMessage](
+	createdResult, err := dragonboat.ExecuteRepositoryCommand[queue.EnqueueResult](
 		tenantNode,
 		ctx,
 		enqueueCommand,
@@ -269,10 +269,15 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 		return nil, err
 	}
 
+	createdMessages := createdResult.Messages
+
 	if bo.Config.MetricsCollector != nil {
 		for _, msg := range createdMessages {
 			queueCode := queueCodeMap[msg.QueueID]
 			bo.Config.MetricsCollector.RecordPublish(tenant.Code, queueCode, vnamespace, 1)
+		}
+		for _, gauge := range createdResult.Gauges {
+			bo.Config.MetricsCollector.UpdateGauges(tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
 		}
 	}
 

@@ -19,8 +19,10 @@ func init() {
 
 // DequeueResult is the value returned in CommandResult.Result after a successful dequeue.
 type DequeueResult struct {
-	Message models.QueueMessage
-	Lease   models.QueueMessageLease
+	Message   models.QueueMessage
+	Lease     models.QueueMessageLease
+	Pending   uint64
+	InProcess uint64
 }
 
 // DequeueCommand dequeues the next available message from the specified queue for a
@@ -252,8 +254,10 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 	message.NextQueueMessageID = ""
 
 	commandResult.Result = DequeueResult{
-		Message: *message,
-		Lease:   *lease,
+		Message:   *message,
+		Lease:     *lease,
+		Pending:   uint64(queue.MessagesCount),
+		InProcess: uint64(queue.CurrentDeliveringMessages),
 	}
 	return *commandResult
 }

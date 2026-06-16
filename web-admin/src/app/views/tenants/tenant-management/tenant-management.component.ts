@@ -68,6 +68,14 @@ export class TenantManagementComponent implements OnInit {
     deliver: 0,
     ack: 0
   };
+  gaugeMetricsData: any = {
+    labels: [],
+    datasets: []
+  };
+  currentGauges: any = {
+    pending: 0,
+    inProcess: 0
+  };
   metricsOptions: any = {
     maintainAspectRatio: false,
     elements: {
@@ -166,6 +174,9 @@ export class TenantManagementComponent implements OnInit {
         const publishData: number[] = [];
         const deliveryData: number[] = [];
         const ackData: number[] = [];
+        
+        const pendingData: number[] = [];
+        const inProcessData: number[] = [];
 
         const normalizedStartTime = Math.floor(startTime / 5) * 5;
         const normalizedEndTime = Math.floor(endTime / 5) * 5;
@@ -179,10 +190,14 @@ export class TenantManagementComponent implements OnInit {
             publishData.push(dp.published || 0);
             deliveryData.push(dp.delivered || 0);
             ackData.push(dp.acked || 0);
+            pendingData.push(dp.pending || 0);
+            inProcessData.push(dp.inProcess || 0);
           } else {
             publishData.push(0);
             deliveryData.push(0);
             ackData.push(0);
+            pendingData.push(0);
+            inProcessData.push(0);
           }
         }
 
@@ -219,6 +234,26 @@ export class TenantManagementComponent implements OnInit {
           ]
         };
 
+        this.gaugeMetricsData = {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Pending (Wait in queue)',
+              backgroundColor: 'transparent',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+              data: pendingData
+            },
+            {
+              label: 'In Process (Claimed)',
+              backgroundColor: 'transparent',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+              data: inProcessData
+            }
+          ]
+        };
+
         let lastPublish = 0;
         let lastDeliver = 0;
         let lastAck = 0;
@@ -236,11 +271,26 @@ export class TenantManagementComponent implements OnInit {
           deliver: lastDeliver,
           ack: lastAck
         };
+        
+        let lastPending = 0;
+        let lastInProcess = 0;
+        if (result.datapoints && result.datapoints.length > 0) {
+          const lastDp = result.datapoints[result.datapoints.length - 1];
+          lastPending = lastDp.pending || 0;
+          lastInProcess = lastDp.inProcess || 0;
+        }
+        
+        this.currentGauges = {
+          pending: lastPending,
+          inProcess: lastInProcess
+        };
       },
       error: (err: any) => {
         this.metricsLoading = false;
         this.metricsData = { labels: [], datasets: [] };
+        this.gaugeMetricsData = { labels: [], datasets: [] };
         this.currentRates = { publish: 0, deliver: 0, ack: 0 };
+        this.currentGauges = { pending: 0, inProcess: 0 };
         console.error('Failed to load global tenant metrics', err);
       }
     });

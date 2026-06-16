@@ -354,7 +354,7 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 		CFS:      cfs,
 	}
 
-	createdMessages, err := dragonboat.ExecuteRepositoryCommand[[]models.QueueMessage](
+	createdResult, err := dragonboat.ExecuteRepositoryCommand[queue_command.EnqueueResult](
 		tenantNode,
 		ctx,
 		enqueueCommand,
@@ -366,9 +366,14 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 		return "", err
 	}
 
+	createdMessages := createdResult.Messages
+
 	if len(createdMessages) > 0 {
 		if bo.Config.MetricsCollector != nil {
 			bo.Config.MetricsCollector.RecordPublish(tenant.Code, queueCode, vnamespace, 1)
+			for _, gauge := range createdResult.Gauges {
+				bo.Config.MetricsCollector.UpdateGauges(tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
+			}
 		}
 		return createdMessages[0].ID, nil
 	}
@@ -462,6 +467,7 @@ func (bo *QueueBO) DequeueMessage(
 
 	if bo.Config.MetricsCollector != nil {
 		bo.Config.MetricsCollector.RecordDelivery(tenant.Code, queueCode, vnamespace, 1)
+		bo.Config.MetricsCollector.UpdateGauges(tenant.Code, queueCode, vnamespace, result.Pending, result.InProcess)
 	}
 
 	return result, nil

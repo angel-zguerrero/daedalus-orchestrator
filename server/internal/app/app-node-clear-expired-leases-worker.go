@@ -246,6 +246,13 @@ func (app *Application) clearTenantExpiredLeases(
 							Str("error", errMsg).
 							Msg("⚠️ Error processing expired lease")
 					}
+
+					// Update gauges if metrics collector is available
+					if app.MetricsCollector != nil {
+						for _, gauge := range result.Gauges {
+							app.MetricsCollector.UpdateGauges(tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
+						}
+					}
 				}
 
 				// If we processed fewer leases than the limit, we've reached the end

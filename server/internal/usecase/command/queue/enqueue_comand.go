@@ -15,6 +15,12 @@ func init() {
 	gob.Register([]models.QueuePartition{})
 	gob.Register(models.QueueMessage{})
 	gob.Register([]models.QueueMessage{})
+	gob.Register(EnqueueResult{})
+}
+
+type EnqueueResult struct {
+	Messages []models.QueueMessage
+	Gauges   []models.QueueGauges
 }
 
 type EnqueueCommand struct {
@@ -342,9 +348,23 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		}
 	}
 
-	commandResult.Result = processedMessages
+	gaugesList := make([]models.QueueGauges, 0, len(queuesCache))
+	for _, queue := range queuesCache {
+		gaugesList = append(gaugesList, models.QueueGauges{
+			QueueCode:  queue.Code,
+			VNamespace: queue.VNamespace,
+			Pending:    uint64(queue.MessagesCount),
+			InProcess:  uint64(queue.CurrentDeliveringMessages),
+		})
+	}
+
+	commandResult.Result = EnqueueResult{
+		Messages: processedMessages,
+		Gauges:   gaugesList,
+	}
 	return *commandResult
-} // Helper function to get keys from map
+}
+// Helper function to get keys from map
 func getKeysFromMap(m map[int]int) []int {
 	keys := make([]int, 0, len(m))
 	for k := range m {

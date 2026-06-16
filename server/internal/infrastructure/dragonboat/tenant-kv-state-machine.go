@@ -154,6 +154,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return queryMetricsRangeCommand.Execute(uow, now)
 	}
 
+	getQueueGaugesCommand, ok := cmd.(queue_command.GetQueueGaugesCommand)
+	if ok {
+		return getQueueGaugesCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult

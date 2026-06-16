@@ -20,6 +20,7 @@ type ProcessExpiredLeasesResult struct {
 	DeletedMessages  int
 	RequeuedMessages int
 	Errors           []string
+	Gauges           []models.QueueGauges
 }
 
 // ProcessExpiredLeasesCommand processes expired leases in a paginated manner.
@@ -156,7 +157,27 @@ func (cmd *ProcessExpiredLeasesCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		}
 	}
 
-	commandResult.Result = result
+	// ── 4. Collect gauges for affected queues ────────────────────────────────────
+	gaugesMap := make(map[string]models.QueueGauges)
+	for _, lease := range expiredLeases.Entities {
+		message, _ := queueMessageRepo.GetQueueMessageById(lease.QueueMessageID, now)
+		if message != nil {
+			queue, _ := queueRepo.GetQueueById(message.QueueID, now)
+			if queue != nil {
+				gaugesMap[queue.ID] = models.QueueGauges{
+					QueueCode:  queue.Code,
+					VNamespace: queue.VNamespace,
+					Pending:    uint64(queue.MessagesCount),
+					InProcess:  uint64(queue.CurrentDeliveringMessages),
+				}
+			}
+		}
+	}
+	for _, g := range gaugesMap {
+		result.Gauges = append(result.Gauges, g)
+	}
+
+	commandResult.Result = *result
 	return *commandResult
 }
 

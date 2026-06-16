@@ -71,9 +71,19 @@ func bucketKey(tenantCode, queueCode, vnamespace string, timestamp int64) string
 // MetricsCollector accumulates per-queue metric counters in memory.
 // It is safe for concurrent use.
 type MetricsCollector struct {
-	mu         sync.RWMutex
-	resolution int64 // bucket width in seconds
-	buckets    map[string]*bucketEntry
+	mu               sync.RWMutex
+	resolution       int64 // bucket width in seconds
+	buckets          map[string]*bucketEntry
+	persistentGauges map[string]*persistentGauge
+}
+
+// persistentGauge stores the exact known DB state of a queue
+type persistentGauge struct {
+	tenantCode string
+	queueCode  string
+	vnamespace string
+	pending    uint64
+	inProcess  uint64
 }
 
 // bucketEntry associates dimensional metadata with its atomic counters.
@@ -92,8 +102,9 @@ func NewMetricsCollector(resolutionSeconds int) *MetricsCollector {
 		resolutionSeconds = 5
 	}
 	return &MetricsCollector{
-		resolution: int64(resolutionSeconds),
-		buckets:    make(map[string]*bucketEntry),
+		resolution:       int64(resolutionSeconds),
+		buckets:          make(map[string]*bucketEntry),
+		persistentGauges: make(map[string]*persistentGauge),
 	}
 }
 
@@ -177,14 +188,33 @@ func (mc *MetricsCollector) RecordLatency(tenantCode, queueCode, vnamespace stri
 	updateMax(&entry.data.LatencyMaxMs, latencyMs)
 }
 
-// SnapshotGauges takes a point-in-time snapshot of gauge metrics (Pending and
-// InProcess) and stores them in the current bucket. This should be called by
-// the flush worker right before persisting so the values reflect the latest
-// queue state.
+// UpdateGauges takes an exact point-in-time snapshot of gauges (Pending and InProcess)
+// directly from DB operation results and remembers them.
+func (mc *MetricsCollector) UpdateGauges(tenantCode, queueCode, vnamespace string, pending, inProcess uint64) {
+	key := fmt.Sprintf("%s:%s:%s", tenantCode, queueCode, vnamespace)
+
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+
+	gauge, ok := mc.persistentGauges[key]
+	if !ok {
+		gauge = &persistentGauge{
+			tenantCode: tenantCode,
+			queueCode:  queueCode,
+			vnamespace: vnamespace,
+		}
+		mc.persistentGauges[key] = gauge
+	}
+	gauge.pending = pending
+	gauge.inProcess = inProcess
+
+	// If pending and inProcess are 0, it means the queue has no backlog.
+	// But we keep it in persistentGauges until next FlushCompleted so it can flush one last 0-bucket.
+}
+
+// SnapshotGauges is kept for backward compatibility if needed, but it's replaced by UpdateGauges.
 func (mc *MetricsCollector) SnapshotGauges(tenantCode, queueCode, vnamespace string, pending, inProcess uint64) {
-	entry := mc.getOrCreateBucket(tenantCode, queueCode, vnamespace)
-	entry.data.Pending.Store(pending)
-	entry.data.InProcess.Store(inProcess)
+	mc.UpdateGauges(tenantCode, queueCode, vnamespace, pending, inProcess)
 }
 
 // ── Flushing ──────────────────────────────────────────────────────────────
@@ -200,10 +230,11 @@ func (mc *MetricsCollector) FlushCompleted() []FlushedBucket {
 	defer mc.mu.Unlock()
 
 	var result []FlushedBucket
+	flushedKeys := make(map[string]struct{})
 
 	for key, entry := range mc.buckets {
 		if entry.timestamp < cutoff {
-			result = append(result, FlushedBucket{
+			fb := FlushedBucket{
 				TenantCode:   entry.tenantCode,
 				QueueCode:    entry.queueCode,
 				VNamespace:   entry.vnamespace,
@@ -212,13 +243,43 @@ func (mc *MetricsCollector) FlushCompleted() []FlushedBucket {
 				Delivered:    entry.data.Delivered.Load(),
 				Acked:        entry.data.Acked.Load(),
 				Failed:       entry.data.Failed.Load(),
-				Pending:      entry.data.Pending.Load(),
-				InProcess:    entry.data.InProcess.Load(),
-				LatencySumMs: entry.data.LatencySumMs.Load(),
-				LatencyCount: entry.data.LatencyCount.Load(),
-				LatencyMaxMs: entry.data.LatencyMaxMs.Load(),
-			})
+			}
+
+			// Add the gauges
+			gKey := fmt.Sprintf("%s:%s:%s", entry.tenantCode, entry.queueCode, entry.vnamespace)
+			if gauge, ok := mc.persistentGauges[gKey]; ok {
+				fb.Pending = gauge.pending
+				fb.InProcess = gauge.inProcess
+			}
+
+			fb.LatencySumMs = entry.data.LatencySumMs.Load()
+			fb.LatencyCount = entry.data.LatencyCount.Load()
+			fb.LatencyMaxMs = entry.data.LatencyMaxMs.Load()
+
+			result = append(result, fb)
+			flushedKeys[key] = struct{}{}
 			delete(mc.buckets, key)
+		}
+	}
+
+	// Process queues with known backlogs
+	for key, gauge := range mc.persistentGauges {
+		bKey := bucketKey(gauge.tenantCode, gauge.queueCode, gauge.vnamespace, cutoff-mc.resolution)
+		// Only create an artificial bucket if throughput didn't already create one
+		if _, exists := flushedKeys[bKey]; !exists {
+			result = append(result, FlushedBucket{
+				TenantCode: gauge.tenantCode,
+				QueueCode:  gauge.queueCode,
+				VNamespace: gauge.vnamespace,
+				Timestamp:  cutoff - mc.resolution,
+				Pending:    gauge.pending,
+				InProcess:  gauge.inProcess,
+			})
+		}
+
+		// If a queue falls completely flat, remove it from memory tracking
+		if gauge.pending == 0 && gauge.inProcess == 0 {
+			delete(mc.persistentGauges, key)
 		}
 	}
 

@@ -22,6 +22,8 @@ type AckMessageResult struct {
 	VNamespace          string
 	ProcessingLatencyMs float64
 	QueueLatencyMs      float64
+	Pending             uint64
+	InProcess           uint64
 }
 
 // AckMessageCommand acknowledges a message by deleting its lease and decrementing
@@ -165,6 +167,8 @@ func (cmd *AckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) command
 		VNamespace:          queue.VNamespace,
 		ProcessingLatencyMs: processingLatencyMs,
 		QueueLatencyMs:      queueLatencyMs,
+		Pending:             uint64(queue.MessagesCount),
+		InProcess:           uint64(queue.CurrentDeliveringMessages),
 	}
 	return *commandResult
 }
