@@ -4,6 +4,7 @@ import "time"
 
 const (
 	EventTypeTenantActivated = "TenantActivated"
+	EventTypeMetricsRelay    = "MetricsRelay"
 )
 
 // OutboxEvent tracks edge-triggered events generated inside a Raft State Machine
@@ -12,6 +13,7 @@ type OutboxEvent struct {
 	ID        string `orm:"primary-key"`
 	EventType string
 	TenantID  string
+	Payload   []byte
 	CreatedAt time.Time
 }
 

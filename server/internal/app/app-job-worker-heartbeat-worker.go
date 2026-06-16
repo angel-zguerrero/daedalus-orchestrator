@@ -57,7 +57,8 @@ func (app *Application) getJobWorkerBO() *business_logic.JobWorkerBO {
 
 func (app *Application) getServerConfig() *common.ServerConfing {
 	return &common.ServerConfing{
-		Logger:     log.Logger,
-		MasterNode: app.MasterNode,
+		Logger:           log.Logger,
+		MasterNode:       app.MasterNode,
+		MetricsCollector: app.MetricsCollector,
 	}
 }

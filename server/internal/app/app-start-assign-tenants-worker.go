@@ -212,6 +212,7 @@ func (app *Application) AssignTenants() {
 				}
 			}
 			app.TenantNodesDictionary[tenant.ID] = tenantNode
+			app.TenantNodesDictionary[tenant.Code] = tenantNode
 		}
 
 		if len(assignableTenantCodes) > 0 {

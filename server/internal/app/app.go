@@ -4,6 +4,7 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/infrastructure/metrics"
 
 	grpc_server "deadalus-orch/server/internal/infrastructure/server/grpc"
 	rest_server "deadalus-orch/server/internal/infrastructure/server/rest"
@@ -70,7 +71,13 @@ type Application struct {
 	TenantSummaryWorkerStopper     *syncutil.Stopper
 	DashboardSummaryWorkerStopper  *syncutil.Stopper
 	OutboxRelayWorkerStopper       *syncutil.Stopper
+	MetricsRelayWorkerStopper      *syncutil.Stopper
 	JobWorkerHeartbeatStopper      *syncutil.Stopper
+	MetricsFlushWorkerStopper      *syncutil.Stopper
+	MetricsAggregationWorkerStopper *syncutil.Stopper
+	MetricsDownsampleWorkerStopper *syncutil.Stopper
+
+	MetricsCollector *metrics.MetricsCollector
 
 	ApiLock  sync.Mutex
 	GrpcLock sync.Mutex
@@ -249,6 +256,23 @@ func (app *Application) Run() {
 	// Outbox worker should run frequently, e.g. every 1 second
 	app.StartOutboxRelayWorker(1 * time.Second)
 
+	// Metrics Relay worker should also run frequently, e.g. every 2 seconds
+	app.StartMetricsRelayWorker(2 * time.Second)
+
+	// Start TSDB Metrics Workers
+	resolution := config.GlobalConfiguration.MetricsBucketResolution
+	if resolution <= 0 {
+		resolution = 5
+	}
+	app.MetricsCollector = metrics.NewMetricsCollector(resolution)
+	app.MetricsFlushWorkerStopper = syncutil.NewStopper()
+	app.MetricsAggregationWorkerStopper = syncutil.NewStopper()
+	app.MetricsDownsampleWorkerStopper = syncutil.NewStopper()
+	
+	app.StartMetricsFlushWorker(time.Duration(resolution) * time.Second)
+	app.StartMetricsAggregationWorker(time.Duration(resolution) * time.Second)
+	app.StartMetricsDownsampleWorker(1 * time.Minute)
+
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
 }
@@ -373,8 +397,22 @@ func (app *Application) Stop() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		app.OutboxRelayWorkerStopper.Stop()
-		log.Info().Msg("✅ OutboxRelayWorkerStopper stopped.")
+		if app.OutboxRelayWorkerStopper != nil {
+			app.OutboxRelayWorkerStopper.Stop()
+		}
+		if app.MetricsRelayWorkerStopper != nil {
+			app.MetricsRelayWorkerStopper.Stop()
+		}
+		if app.MetricsFlushWorkerStopper != nil {
+			app.MetricsFlushWorkerStopper.Stop()
+		}
+		if app.MetricsAggregationWorkerStopper != nil {
+			app.MetricsAggregationWorkerStopper.Stop()
+		}
+		if app.MetricsDownsampleWorkerStopper != nil {
+			app.MetricsDownsampleWorkerStopper.Stop()
+		}
+		log.Info().Msg("✅ OutboxRelayWorkerStopper and Metrics Workers stopped.")
 	}()
 
 	// Stop Job Worker Heartbeat Monitor
@@ -424,6 +462,7 @@ func NewApplication() *Application {
 		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
 		DashboardSummaryWorkerStopper: syncutil.NewStopper(),
 		OutboxRelayWorkerStopper:      syncutil.NewStopper(),
+		MetricsRelayWorkerStopper:     syncutil.NewStopper(),
 		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),

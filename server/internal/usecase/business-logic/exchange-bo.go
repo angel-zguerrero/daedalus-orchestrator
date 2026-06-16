@@ -269,6 +269,13 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 		return nil, err
 	}
 
+	if bo.Config.MetricsCollector != nil {
+		for _, msg := range createdMessages {
+			queueCode := queueCodeMap[msg.QueueID]
+			bo.Config.MetricsCollector.RecordPublish(tenant.Code, queueCode, vnamespace, 1)
+		}
+	}
+
 	resultingMessages := make(map[string]string, len(createdMessages))
 	for _, msg := range createdMessages {
 		queueCode := queueCodeMap[msg.QueueID]

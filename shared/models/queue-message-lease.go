@@ -18,6 +18,7 @@ type QueueMessageLease struct {
 	LeaseUntil     time.Time
 
 	JobWorkerCapacityPolicyIndexMatch int // Index of the capacity policy that matched when the lease was created, used for worker capacity management and scheduling decisions.
+	CreatedAt                         time.Time
 }
 
 func (QueueMessageLease) TableName() string {

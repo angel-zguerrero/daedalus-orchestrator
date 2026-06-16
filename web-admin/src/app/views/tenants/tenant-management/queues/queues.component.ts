@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { QueuesService } from '../services/queues.service';
 import { ExchangesService } from '../services/exchanges.service';
 import { VNamespacesService } from '../services/vnamespaces.service';
+import { TSDBMetricsService } from '../../services/tsdb-metrics.service';
 import {
   TableModule,
   UtilitiesModule,
@@ -19,6 +20,7 @@ import {
 } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
+import { ChartjsModule } from '@coreui/angular-chartjs';
 import * as XLSX from 'xlsx';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
@@ -90,7 +92,8 @@ interface Exchange {
     MatInputModule,
     MatAutocompleteModule,
     AsyncPipe,
-    ProgressModule
+    ProgressModule,
+    ChartjsModule
   ]
 })
 export class QueuesComponent implements OnInit {
@@ -154,6 +157,30 @@ export class QueuesComponent implements OnInit {
   messageHeaderKey: string = '';
   messageHeaderValue: string = '';
 
+  // Metrics Data
+  metricsLoading: boolean = false;
+  metricsData: any = {
+    labels: [],
+    datasets: []
+  };
+  metricsOptions: any = {
+    maintainAspectRatio: false,
+    elements: {
+      line: { tension: 0.4 },
+      point: { radius: 0, hitRadius: 10, hoverRadius: 4, hoverBorderWidth: 3 }
+    },
+    scales: {
+      y: {
+        min: 0,
+        ticks: {
+          precision: 0,
+          beginAtZero: true
+        }
+      }
+    }
+  };
+  selectedTimeRange: number = 600; // Default to last 10 minutes
+
   // Priority management properties
   priorityType: string = 'normal';
   maxPriority: number = 1;
@@ -186,6 +213,7 @@ export class QueuesComponent implements OnInit {
     private queuesService: QueuesService,
     private exchangesService: ExchangesService,
     private vNamespacesService: VNamespacesService,
+    private tsdbMetricsService: TSDBMetricsService,
     private fb: FormBuilder,
     private router: Router
   ) {
@@ -437,6 +465,98 @@ export class QueuesComponent implements OnInit {
     this.selectedQueue = queue;
     this.detailsModalVisible = true;
     this.showAlert = false; // Clear any previous alerts
+    
+    // Load metrics based on selected time range
+    this.loadMetrics(queue.Code, queue.VNamespace, this.selectedTimeRange);
+  }
+
+  onTimeRangeChange(): void {
+    if (this.selectedQueue) {
+      this.loadMetrics(this.selectedQueue.Code, this.selectedQueue.VNamespace, this.selectedTimeRange);
+    }
+  }
+
+  loadMetrics(queueCode: string, vnamespace: string, timeRangeSeconds: number): void {
+    this.metricsLoading = true;
+    const endTime = Math.floor(Date.now() / 1000);
+    const startTime = endTime - timeRangeSeconds;
+    
+    this.tsdbMetricsService.getTSDBMetrics(this.tenantCode, queueCode, vnamespace, 5, startTime, endTime).subscribe({
+      next: (result: any) => {
+        this.metricsLoading = false;
+        if (!result || !result.datapoints) {
+           result = { datapoints: [] }; // Handle as empty to pad with 0s
+        }
+        
+        const datapointMap = new Map<number, any>();
+        if (result.datapoints) {
+          result.datapoints.forEach((dp: any) => {
+            datapointMap.set(dp.timestamp, dp);
+          });
+        }
+
+        const labels: string[] = [];
+        const publishData: number[] = [];
+        const deliveryData: number[] = [];
+        const ackData: number[] = [];
+
+        const normalizedStartTime = Math.floor(startTime / 5) * 5;
+        const normalizedEndTime = Math.floor(endTime / 5) * 5;
+
+        for (let ts = normalizedStartTime; ts <= normalizedEndTime; ts += 5) {
+          const date = new Date(ts * 1000);
+          labels.push(`${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`);
+          
+          if (datapointMap.has(ts)) {
+            const dp = datapointMap.get(ts);
+            publishData.push(dp.published || 0);
+            deliveryData.push(dp.delivered || 0);
+            ackData.push(dp.acked || 0);
+          } else {
+            publishData.push(0);
+            deliveryData.push(0);
+            ackData.push(0);
+          }
+        }
+
+        this.metricsData = {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Published',
+              backgroundColor: 'rgba(51, 153, 255, 0.1)',
+              borderColor: '#3399ff',
+              pointHoverBackgroundColor: '#3399ff',
+              borderWidth: 2,
+              data: publishData,
+              fill: true
+            },
+            {
+              label: 'Delivered',
+              backgroundColor: 'rgba(249, 177, 21, 0.1)',
+              borderColor: '#f9b115',
+              pointHoverBackgroundColor: '#f9b115',
+              borderWidth: 2,
+              data: deliveryData,
+              fill: true
+            },
+            {
+              label: 'Acked',
+              backgroundColor: 'rgba(46, 184, 92, 0.1)',
+              borderColor: '#2eb85c',
+              pointHoverBackgroundColor: '#2eb85c',
+              borderWidth: 2,
+              data: ackData,
+              fill: true
+            }
+          ]
+        };
+      },
+      error: (err: any) => {
+        this.metricsLoading = false;
+        console.error('Failed to load metrics', err);
+      }
+    });
   }
 
   viewMessages(queue: Queue): void {

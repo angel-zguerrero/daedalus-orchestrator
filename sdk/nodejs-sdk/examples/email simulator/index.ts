@@ -116,7 +116,7 @@ async function main() {
     // Tienda A (Big): 5K transactional + 10K marketing
     console.log('🛍️  Tienda A: 5K confirmations + 10K Black Friday promos');
 
-    await publishBatch(sdk, 200, (i) => {
+    await publishBatch(sdk, 5_000, (i) => {
         return {
             tenantCode: 'tienda-a',
             exchangeCode: 'email-events',
@@ -136,7 +136,7 @@ async function main() {
         };
     });
 
-    await publishBatch(sdk, 200, (i) => {
+    await publishBatch(sdk, 10_000, (i) => {
         return {
             tenantCode: 'tienda-a',
             exchangeCode: 'email-events',
@@ -161,7 +161,7 @@ async function main() {
     // Tienda B (Small): 5K transactional + 10K marketing (ISOLATED)
     console.log('🏪 Tienda B: 5K confirmations + 10K promos (ISOLATED from A)');
 
-    await publishBatch(sdk, 200, (i) => {
+    await publishBatch(sdk, 5_000, (i) => {
         return {
             tenantCode: 'tienda-b',
             exchangeCode: 'email-events',
@@ -181,7 +181,7 @@ async function main() {
         };
     });
 
-    await publishBatch(sdk, 200, (i) => {
+    await publishBatch(sdk, 10_000, (i) => {
         return {
             tenantCode: 'tienda-b',
             exchangeCode: 'email-events',
@@ -203,9 +203,9 @@ async function main() {
 
 
     // Banco C: OTPs (ISOLATED)
-    console.log('🏦 Banco C: 20K OTP emails (ISOLATED)');
+    console.log('🏦 Banco C: 5K OTP emails (ISOLATED)');
 
-    await publishBatch(sdk, 200, (i) => {
+    await publishBatch(sdk, 5_000, (i) => {
         return {
             tenantCode: 'banco-c',
             exchangeCode: 'email-events',

@@ -21,6 +21,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 	adminController := auth.NewAdminController(s.Config)
 	metricsController := metrics.NewMetricsController(s.Config)
+	tsdbMetricsController := metrics.NewTSDBMetricsController(s.Config)
 	tenantController := tenant.NewTenantController(s.Config)
 	exchangeController := exchange.NewExchangeController(s.Config)
 	queueController := queue.NewQueueController(s.Config)
@@ -54,6 +55,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
 			tenantsGroup.GET("/:code", tenantController.GetTenantHandler)
 			tenantsGroup.GET("/:code/summary", tenantController.GetTenantSummaryHandler)
+			tenantsGroup.GET("/:code/metrics/tsdb", tsdbMetricsController.GetTSDBMetricsHandler)
 			tenantsGroup.DELETE("/:code", tenantController.DeleteTenantHandler)
 			{
 				tenantsGroup.POST("/:code/exchange", exchangeController.CreateExchangeHandler)
@@ -96,6 +98,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		apiV1Group.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 30))
 		{
 			clusterController.RegisterRoutes(apiV1Group)
+			apiV1Group.GET("/cluster/metrics/tsdb", tsdbMetricsController.GetGlobalTSDBMetricsHandler)
 		}
 
 		// Dashboard endpoints

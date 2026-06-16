@@ -26,6 +26,7 @@ func (app *Application) StartRestAPI() {
 			JwtKey:                []byte(jwtSecret),
 			JwtDuration:           jwtDuration,
 			Logger:                log.Logger,
+			MetricsCollector:      app.MetricsCollector,
 		}
 		app.RestAPI = rest_server.NewRestServer(serverConfig)
 

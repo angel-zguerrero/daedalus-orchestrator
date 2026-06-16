@@ -2,6 +2,7 @@ package common
 
 import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/infrastructure/metrics"
 	"net/http"
 	"sync"
 	"time"
@@ -18,4 +19,5 @@ type ServerConfing struct {
 	JwtDuration           time.Duration
 	Server                *http.Server
 	Logger                zerolog.Logger
+	MetricsCollector      *metrics.MetricsCollector
 }
