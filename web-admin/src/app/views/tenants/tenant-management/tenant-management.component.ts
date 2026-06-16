@@ -181,6 +181,9 @@ export class TenantManagementComponent implements OnInit {
         const normalizedStartTime = Math.floor(startTime / 5) * 5;
         const normalizedEndTime = Math.floor(endTime / 5) * 5;
 
+        let currentPending = 0;
+        let currentInProcess = 0;
+
         for (let ts = normalizedStartTime; ts <= normalizedEndTime; ts += 5) {
           const date = new Date(ts * 1000);
           labels.push(`${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`);
@@ -190,14 +193,19 @@ export class TenantManagementComponent implements OnInit {
             publishData.push(dp.published || 0);
             deliveryData.push(dp.delivered || 0);
             ackData.push(dp.acked || 0);
-            pendingData.push(dp.pending || 0);
-            inProcessData.push(dp.inProcess || 0);
+            
+            currentPending = dp.pending !== undefined ? dp.pending : currentPending;
+            currentInProcess = dp.inProcess !== undefined ? dp.inProcess : currentInProcess;
+            
+            pendingData.push(currentPending);
+            inProcessData.push(currentInProcess);
           } else {
             publishData.push(0);
             deliveryData.push(0);
             ackData.push(0);
-            pendingData.push(0);
-            inProcessData.push(0);
+            
+            pendingData.push(currentPending);
+            inProcessData.push(currentInProcess);
           }
         }
 
