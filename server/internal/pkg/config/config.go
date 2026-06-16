@@ -68,6 +68,17 @@ type Config struct {
 	// requesting JobWorker before the lease automatically expires.
 	// Default: 30 seconds. Minimum: 5 seconds.
 	MessageLeaseDuration time.Duration
+
+	// MetricsBucketResolution is the time window (in seconds) for TSDB metric
+	// buckets. A lower value gives finer granularity but more storage.
+	// Default: 5. Minimum: 1.
+	MetricsBucketResolution int
+
+	// MetricsRetentionRawHours defines how many hours to keep raw-resolution
+	// metric buckets before they are eligible for deletion. Downsampled data
+	// at coarser resolutions is retained longer automatically.
+	// Default: 1.
+	MetricsRetentionRawHours int
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading

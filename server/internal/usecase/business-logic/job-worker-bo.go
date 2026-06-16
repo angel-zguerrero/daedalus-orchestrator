@@ -450,6 +450,9 @@ func (bo *JobWorkerBO) dequeueMessage(
 	select {
 	case messageChan <- claimedMsg:
 		bo.Config.Logger.Debug().Str("messageID", result.Message.ID).Msg("📤 Sent message to stream")
+		if bo.Config.MetricsCollector != nil {
+			bo.Config.MetricsCollector.RecordDelivery(tenant.Code, queue.Code, queue.VNamespace, 1)
+		}
 	default:
 		bo.Config.Logger.Warn().Str("messageID", result.Message.ID).Msg("⚠️ Message channel full or closed, message not sent")
 	}
@@ -641,6 +644,11 @@ func (bo *JobWorkerBO) AckMessage(ctx context.Context, leaseID, tenantCode strin
 		Str("leaseID", leaseID).
 		Str("tenantCode", tenantCode).
 		Msg("✅ Message acknowledged successfully")
+
+	if bo.Config.MetricsCollector != nil {
+		bo.Config.MetricsCollector.RecordAck(tenantCode, result.QueueCode, result.VNamespace, 1)
+		bo.Config.MetricsCollector.RecordLatency(tenantCode, result.QueueCode, result.VNamespace, uint64(result.ProcessingLatencyMs))
+	}
 
 	return nil
 }

@@ -30,7 +30,7 @@ func NewTenantBO(Config *common.ServerConfing) *TenantBO {
 	}
 }
 
-func (bo *TenantBO) SetTenantNode(shardID int, tenantId string) *dragonboat.RaftNode {
+func (bo *TenantBO) SetTenantNode(shardID int, tenantId, tenantCode string) *dragonboat.RaftNode {
 	var tenantNode *dragonboat.RaftNode
 
 	bo.Config.TenantNodesLock.Lock()
@@ -44,6 +44,9 @@ func (bo *TenantBO) SetTenantNode(shardID int, tenantId string) *dragonboat.Raft
 
 	bo.Config.TenantNodesLock.Lock()
 	bo.Config.TenantNodesDictionary[tenantId] = tenantNode
+	if tenantCode != "" {
+		bo.Config.TenantNodesDictionary[tenantCode] = tenantNode
+	}
 	bo.Config.TenantNodesLock.Unlock()
 	return tenantNode
 }
@@ -97,7 +100,7 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 	// Crear ColumnFamilies y recolectar códigos
 	var tenantCodes []string
 	for i := range created {
-		tenantNode := bo.SetTenantNode(created[i].ShardId, created[i].ID)
+		tenantNode := bo.SetTenantNode(created[i].ShardId, created[i].ID, created[i].Code)
 		if tenantNode == nil {
 			return nil, fmt.Errorf("tenant node not found for ID %s", created[i].ID)
 		}

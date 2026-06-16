@@ -26,6 +26,7 @@ func (app *Application) StartGrpcAPI() {
 			JwtKey:                []byte(jwtSecret),
 			JwtDuration:           jwtDuration,
 			Logger:                log.Logger,
+			MetricsCollector:      app.MetricsCollector,
 		}
 		grpcAPI, _ := grpc_server.NewGrpcServer(serverConfig)
 		app.GrpcAPI = grpcAPI

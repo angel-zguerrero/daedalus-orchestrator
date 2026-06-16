@@ -13,4 +13,11 @@ export class DashboardService {
   getDashboardSummary(): Observable<any> {
     return this.http.get(`${this.apiUrl}/summary`);
   }
+
+  getGlobalTSDBMetrics(resolution: number = 5, startTime?: number, endTime?: number): Observable<any> {
+    let url = `/rest-api/v1/cluster/metrics/tsdb?resolution=${resolution}`;
+    if (startTime) url += `&startTime=${startTime}`;
+    if (endTime) url += `&endTime=${endTime}`;
+    return this.http.get(url);
+  }
 }

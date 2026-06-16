@@ -238,6 +238,7 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		LeaseStatus:                       models.QueueMessageLeaseStatusActive,
 		LeaseUntil:                        now.Add(cmd.LeaseDuration),
 		JobWorkerCapacityPolicyIndexMatch: cmd.JobWorkerCapacityPolicyIndex,
+		CreatedAt:                         now,
 	}
 
 	if _, err = leaseRepo.CreateQueueMessageLease(lease, now); err != nil {

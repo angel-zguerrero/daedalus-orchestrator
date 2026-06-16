@@ -8,6 +8,7 @@ import (
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	header_command "deadalus-orch/server/internal/usecase/command/header"
+	metrics_command "deadalus-orch/server/internal/usecase/command/metrics"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
@@ -148,6 +149,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return getOutboxEventsCommand.Execute(uow, now)
 	}
 
+	queryMetricsRangeCommand, ok := cmd.(metrics_command.QueryMetricsRangeCommand)
+	if ok {
+		return queryMetricsRangeCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult
@@ -245,6 +251,21 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	resetTenantShardStateCommand, ok := cmd.(tenant_command.ResetTenantShardStateCommand)
 	if ok {
 		return resetTenantShardStateCommand.Execute(uow, now)
+	}
+
+	saveMetricsBucketsCommand, ok := cmd.(metrics_command.SaveMetricsBucketsCommand)
+	if ok {
+		return saveMetricsBucketsCommand.Execute(uow, now)
+	}
+
+	deleteExpiredMetricsCommand, ok := cmd.(metrics_command.DeleteExpiredMetricsCommand)
+	if ok {
+		return deleteExpiredMetricsCommand.Execute(uow, now)
+	}
+
+	downsampleMetricsCommand, ok := cmd.(metrics_command.DownsampleMetricsCommand)
+	if ok {
+		return downsampleMetricsCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

@@ -129,6 +129,38 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- TSDB Metrics Section -->
+                  <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <h6 class="mb-0">
+                        <svg cIcon name="cil-chart-line" class="me-2"></svg>
+                        Tenant Metrics
+                      </h6>
+                      <select class="form-select form-select-sm w-auto bg-dark text-white border-secondary" [(ngModel)]="selectedTimeRange" (change)="onTimeRangeChange()">
+                        <option [value]="60">Last 1 min</option>
+                        <option [value]="300">Last 5 min</option>
+                        <option [value]="600">Last 10 min</option>
+                        <option [value]="1800">Last 30 min</option>
+                        <option [value]="2700">Last 45 min</option>
+                        <option [value]="3600">Last 1 hour</option>
+                      </select>
+                    </div>
+                    <c-card color="dark" class="border-0">
+                      <c-card-body>
+                        <div *ngIf="metricsLoading" class="text-center py-4">
+                          <c-spinner></c-spinner>
+                          <div class="mt-2 text-muted">Loading metrics...</div>
+                        </div>
+                        <div *ngIf="!metricsLoading && metricsData.labels.length > 0" style="height: 300px;">
+                          <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="300"></c-chart>
+                        </div>
+                        <div *ngIf="!metricsLoading && metricsData.labels.length === 0" class="text-center py-4 text-muted">
+                          No metrics data available for the selected time range.
+                        </div>
+                      </c-card-body>
+                    </c-card>
+                  </div>
                 </c-card-body>
               </c-card>
             </c-tab-panel>

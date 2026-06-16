@@ -6,6 +6,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	job_worker_command "deadalus-orch/server/internal/usecase/command/job-worker"
+	metrics_command "deadalus-orch/server/internal/usecase/command/metrics"
 
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"time"
@@ -80,6 +81,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return getDashboardSummaryCommand.Execute(uow, now)
 	}
 
+	queryMetricsRangeCommand, ok := input.(metrics_command.QueryMetricsRangeCommand)
+	if ok {
+		return queryMetricsRangeCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 
@@ -152,6 +158,16 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	markTenantInactiveCommand, ok := cmd.(tenant_command.MarkTenantInactiveCommand)
 	if ok {
 		return markTenantInactiveCommand.Execute(uow, now)
+	}
+
+	saveMetricsBucketsCommand, ok := cmd.(metrics_command.SaveMetricsBucketsCommand)
+	if ok {
+		return saveMetricsBucketsCommand.Execute(uow, now)
+	}
+
+	deleteExpiredMetricsCommand, ok := cmd.(metrics_command.DeleteExpiredMetricsCommand)
+	if ok {
+		return deleteExpiredMetricsCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

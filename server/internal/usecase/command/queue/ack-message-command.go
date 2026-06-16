@@ -16,8 +16,12 @@ func init() {
 
 // AckMessageResult is the value returned in CommandResult.Result after a successful ack.
 type AckMessageResult struct {
-	Success bool
-	Message string
+	Success             bool
+	Message             string
+	QueueCode           string
+	VNamespace          string
+	ProcessingLatencyMs float64
+	QueueLatencyMs      float64
 }
 
 // AckMessageCommand acknowledges a message by deleting its lease and decrementing
@@ -143,9 +147,24 @@ func (cmd *AckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) command
 
 	// ── 8. return result ─────────────────────────────────────────────────────────
 
+	var leaseCreatedAt time.Time = lease.CreatedAt
+	if leaseCreatedAt.IsZero() {
+		// Fallback for old leases that didn't have CreatedAt.
+		// Approximate it by subtracting the lease duration from LeaseUntil if available,
+		// otherwise just use `now` to avoid massive latency spikes.
+		leaseCreatedAt = now
+	}
+
+	processingLatencyMs := float64(now.Sub(leaseCreatedAt).Milliseconds())
+	queueLatencyMs := float64(leaseCreatedAt.Sub(message.CreatedAt).Milliseconds())
+
 	commandResult.Result = AckMessageResult{
-		Success: true,
-		Message: "Message acknowledged successfully",
+		Success:             true,
+		Message:             "Message acknowledged successfully",
+		QueueCode:           queue.Code,
+		VNamespace:          queue.VNamespace,
+		ProcessingLatencyMs: processingLatencyMs,
+		QueueLatencyMs:      queueLatencyMs,
 	}
 	return *commandResult
 }

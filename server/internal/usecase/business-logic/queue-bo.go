@@ -367,6 +367,9 @@ func (bo *QueueBO) EnqueueMessage(ctx context.Context, queueCode string, message
 	}
 
 	if len(createdMessages) > 0 {
+		if bo.Config.MetricsCollector != nil {
+			bo.Config.MetricsCollector.RecordPublish(tenant.Code, queueCode, vnamespace, 1)
+		}
 		return createdMessages[0].ID, nil
 	}
 
@@ -455,6 +458,10 @@ func (bo *QueueBO) DequeueMessage(
 	)
 	if err != nil {
 		return queue_command.DequeueResult{}, fmt.Errorf("dequeue command failed: %w", err)
+	}
+
+	if bo.Config.MetricsCollector != nil {
+		bo.Config.MetricsCollector.RecordDelivery(tenant.Code, queueCode, vnamespace, 1)
 	}
 
 	return result, nil
