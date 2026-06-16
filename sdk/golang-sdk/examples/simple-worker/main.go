@@ -51,7 +51,7 @@ func main() {
 			log.Printf("📝 Content: %s", message.Message.Content)
 
 			// Simulate processing
-			time.Sleep(1 * time.Second)
+			time.Sleep(6 * time.Second)
 
 			// Acknowledge the message after processing
 			log.Println("✅ Message processed, sending ACK...")

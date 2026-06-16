@@ -16,7 +16,8 @@ import {
   AlertComponent,
   SpinnerComponent,
   BadgeComponent,
-  ProgressModule
+  ProgressModule,
+  TooltipModule
 } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
@@ -93,6 +94,7 @@ interface Exchange {
     MatAutocompleteModule,
     AsyncPipe,
     ProgressModule,
+    TooltipModule,
     ChartjsModule
   ]
 })

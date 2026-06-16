@@ -447,6 +447,10 @@ func (bo *JobWorkerBO) dequeueMessage(
 		TenantCode: tenant.Code,
 	}
 
+	if bo.Config.MetricsCollector != nil {
+		bo.Config.MetricsCollector.UpdateGauges(tenant.Code, queue.Code, queue.VNamespace, result.Pending, result.InProcess)
+	}
+
 	select {
 	case messageChan <- claimedMsg:
 		bo.Config.Logger.Debug().Str("messageID", result.Message.ID).Msg("📤 Sent message to stream")

@@ -110,12 +110,8 @@
                   <!-- KPIs Horizontal Row -->
                   <div class="d-flex justify-content-around mb-3 pb-3 border-bottom border-secondary">
                     <div class="text-center">
-                      <h6 class="text-muted mb-1" style="color: rgba(255, 99, 132, 1) !important;">Pending</h6>
-                      <h4 class="mb-0" style="color: rgba(255, 99, 132, 1) !important;">{{ currentGauges?.pending | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
-                    </div>
-                    <div class="text-center">
-                      <h6 class="text-muted mb-1" style="color: rgba(54, 162, 235, 1) !important;">In Process</h6>
-                      <h4 class="mb-0" style="color: rgba(54, 162, 235, 1) !important;">{{ currentGauges?.inProcess | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
+                      <h6 class="text-muted mb-1" style="color: rgba(255, 99, 132, 1) !important;">Messages in Backlog</h6>
+                      <h4 class="mb-0" style="color: rgba(255, 99, 132, 1) !important;">{{ currentGauges?.total | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
                     </div>
                   </div>
 
