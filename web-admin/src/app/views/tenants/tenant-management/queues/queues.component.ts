@@ -163,6 +163,19 @@ export class QueuesComponent implements OnInit {
     labels: [],
     datasets: []
   };
+  gaugeMetricsData: any = {
+    labels: [],
+    datasets: []
+  };
+  currentRates: any = {
+    publish: 0,
+    deliver: 0,
+    ack: 0
+  };
+  currentGauges: any = {
+    pending: 0,
+    inProcess: 0
+  };
   metricsOptions: any = {
     maintainAspectRatio: false,
     elements: {
@@ -499,9 +512,14 @@ export class QueuesComponent implements OnInit {
         const publishData: number[] = [];
         const deliveryData: number[] = [];
         const ackData: number[] = [];
+        const pendingData: number[] = [];
+        const inProcessData: number[] = [];
 
         const normalizedStartTime = Math.floor(startTime / 5) * 5;
         const normalizedEndTime = Math.floor(endTime / 5) * 5;
+
+        let currentPending = 0;
+        let currentInProcess = 0;
 
         for (let ts = normalizedStartTime; ts <= normalizedEndTime; ts += 5) {
           const date = new Date(ts * 1000);
@@ -512,10 +530,19 @@ export class QueuesComponent implements OnInit {
             publishData.push(dp.published || 0);
             deliveryData.push(dp.delivered || 0);
             ackData.push(dp.acked || 0);
+            
+            // Allow matching both camelCase and snake_case from API
+            currentPending = dp.pending !== undefined ? dp.pending : currentPending;
+            currentInProcess = dp.inProcess !== undefined ? dp.inProcess : (dp.in_process !== undefined ? dp.in_process : currentInProcess);
+            
+            pendingData.push(currentPending);
+            inProcessData.push(currentInProcess);
           } else {
             publishData.push(0);
             deliveryData.push(0);
             ackData.push(0);
+            pendingData.push(currentPending);
+            inProcessData.push(currentInProcess);
           }
         }
 
@@ -550,6 +577,56 @@ export class QueuesComponent implements OnInit {
               fill: true
             }
           ]
+        };
+
+        this.gaugeMetricsData = {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Pending',
+              backgroundColor: 'transparent',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+              borderWidth: 2,
+              data: pendingData,
+              fill: false
+            },
+            {
+              label: 'In Process',
+              backgroundColor: 'transparent',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 2,
+              data: inProcessData,
+              fill: false
+            }
+          ]
+        };
+
+        let lastPublish = 0;
+        let lastDeliver = 0;
+        let lastAck = 0;
+        let lastPending = 0;
+        let lastInProcess = 0;
+        
+        if (result.datapoints && result.datapoints.length > 0) {
+          const lastDp = result.datapoints[result.datapoints.length - 1];
+          lastPublish = (lastDp.published || 0) / 5;
+          lastDeliver = (lastDp.delivered || 0) / 5;
+          lastAck = (lastDp.acked || 0) / 5;
+          lastPending = lastDp.pending !== undefined ? lastDp.pending : 0;
+          lastInProcess = lastDp.inProcess !== undefined ? lastDp.inProcess : (lastDp.in_process !== undefined ? lastDp.in_process : 0);
+        }
+
+        this.currentRates = {
+          publish: lastPublish,
+          deliver: lastDeliver,
+          ack: lastAck
+        };
+        
+        this.currentGauges = {
+          pending: lastPending,
+          inProcess: lastInProcess
         };
       },
       error: (err: any) => {

@@ -1,11 +1,19 @@
 <c-row>
   <c-col xs="12">
     <c-card class="mb-4">
-      <c-card-header>
+      <c-card-header class="d-flex justify-content-between align-items-center">
         <h4 class="mb-0">
           <svg cIcon name="cil-speedometer" class="me-2"></svg>
           System Dashboard
         </h4>
+        <select class="form-select form-select-sm w-auto" [(ngModel)]="selectedTimeRange" (change)="onTimeRangeChange()">
+          <option [value]="60">Last 1 min</option>
+          <option [value]="300">Last 5 min</option>
+          <option [value]="600">Last 10 min</option>
+          <option [value]="1800">Last 30 min</option>
+          <option [value]="2700">Last 45 min</option>
+          <option [value]="3600">Last 1 hour</option>
+        </select>
       </c-card-header>
       <c-card-body>
 
@@ -31,148 +39,159 @@
           </button>
         </div>
 
-        <!-- Metrics cards -->
-        <div *ngIf="dashboardSummary && !dashboardLoading" class="row">
+
+
+
+
+        <!-- Charts Row -->
+        <div class="row">
+          
+          <!-- Global TSDB Throughput Metrics Section -->
+          <div class="col-xl-6 mb-4">
+            <c-card class="bg-dark text-white border-0 h-100">
+              <c-card-header class="d-flex justify-content-between align-items-center bg-dark">
+                <h6 class="mb-0">
+                  <svg cIcon name="cil-chart-line" class="me-2"></svg>
+                  Throughput & Latency
+                </h6>
+              </c-card-header>
+              <c-card-body>
+                <div *ngIf="metricsLoading" class="text-center py-4">
+                  <c-spinner></c-spinner>
+                  <div class="mt-2 text-muted">Loading metrics...</div>
+                </div>
+                
+                <div *ngIf="!metricsLoading && metricsData.labels.length > 0">
+                  <!-- KPIs Horizontal Row -->
+                  <div class="d-flex justify-content-around mb-3 pb-3 border-bottom border-secondary">
+                    <div class="text-center">
+                      <h6 class="text-muted mb-1">Published</h6>
+                      <h4 class="text-primary mb-0">{{ currentRates?.publish | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+                    </div>
+                    <div class="text-center">
+                      <h6 class="text-muted mb-1">Delivered</h6>
+                      <h4 class="text-success mb-0">{{ currentRates?.deliver | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+                    </div>
+                    <div class="text-center">
+                      <h6 class="text-muted mb-1">Acked</h6>
+                      <h4 class="text-warning mb-0">{{ currentRates?.ack | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+                    </div>
+                  </div>
+                  
+                  <!-- Chart -->
+                  <div style="height: 250px;">
+                    <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="250"></c-chart>
+                  </div>
+                </div>
+                
+                <div *ngIf="!metricsLoading && metricsData.labels.length === 0" class="text-center py-4 text-muted">
+                  No metrics data available for the selected time range.
+                </div>
+              </c-card-body>
+            </c-card>
+          </div>
+
+          <!-- Global TSDB Gauge Metrics Section -->
+          <div class="col-xl-6 mb-4">
+            <c-card class="bg-dark text-white border-0 h-100">
+              <c-card-header class="d-flex justify-content-between align-items-center bg-dark">
+                <h6 class="mb-0">
+                  <svg cIcon name="cil-chart-pie" class="me-2"></svg>
+                  Queue Backlog
+                </h6>
+              </c-card-header>
+              <c-card-body>
+                <div *ngIf="metricsLoading" class="text-center py-4">
+                  <c-spinner></c-spinner>
+                  <div class="mt-2 text-muted">Loading metrics...</div>
+                </div>
+                
+                <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length > 0">
+                  <!-- KPIs Horizontal Row -->
+                  <div class="d-flex justify-content-around mb-3 pb-3 border-bottom border-secondary">
+                    <div class="text-center">
+                      <h6 class="text-muted mb-1" style="color: rgba(255, 99, 132, 1) !important;">Pending</h6>
+                      <h4 class="mb-0" style="color: rgba(255, 99, 132, 1) !important;">{{ currentGauges?.pending | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
+                    </div>
+                    <div class="text-center">
+                      <h6 class="text-muted mb-1" style="color: rgba(54, 162, 235, 1) !important;">In Process</h6>
+                      <h4 class="mb-0" style="color: rgba(54, 162, 235, 1) !important;">{{ currentGauges?.inProcess | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
+                    </div>
+                  </div>
+
+                  <!-- Chart -->
+                  <div style="height: 250px;">
+                    <c-chart [data]="gaugeMetricsData" [options]="metricsOptions" type="line" height="250"></c-chart>
+                  </div>
+                </div>
+
+                <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length === 0" class="text-center py-4 text-muted">
+                  No metrics data available for the selected time range.
+                </div>
+              </c-card-body>
+            </c-card>
+          </div>
+          
+        </div>
+        
+        <!-- Metrics cards (Moved below charts and made smaller) -->
+        <div *ngIf="dashboardSummary && !dashboardLoading" class="row mt-4">
 
           <!-- Tenants -->
-          <div class="col-md-4 col-lg-2dot4 mb-3">
+          <div class="col">
             <div class="card border-primary h-100">
-              <div class="card-body text-center">
-                <svg cIcon name="cil-people" size="3xl" class="text-primary mb-2"></svg>
-                <h3 class="card-title text-primary">{{ dashboardSummary.TenantsCount || 0 }}</h3>
-                <p class="card-text text-muted mb-0">Tenants</p>
+              <div class="card-body text-center py-2">
+                <svg cIcon name="cil-people" size="xl" class="text-primary mb-1"></svg>
+                <h5 class="card-title text-primary mb-1">{{ dashboardSummary.TenantsCount || 0 }}</h5>
+                <p class="card-text text-muted small mb-0">Tenants</p>
               </div>
             </div>
           </div>
 
           <!-- Exchanges -->
-          <div class="col-md-4 col-lg-2dot4 mb-3">
+          <div class="col">
             <div class="card border-success h-100">
-              <div class="card-body text-center">
-                <svg cIcon name="cil-share" size="3xl" class="text-success mb-2"></svg>
-                <h3 class="card-title text-success">{{ dashboardSummary.ExchangesCount || 0 }}</h3>
-                <p class="card-text text-muted mb-0">Exchanges</p>
+              <div class="card-body text-center py-2">
+                <svg cIcon name="cil-share" size="xl" class="text-success mb-1"></svg>
+                <h5 class="card-title text-success mb-1">{{ dashboardSummary.ExchangesCount || 0 }}</h5>
+                <p class="card-text text-muted small mb-0">Exchanges</p>
               </div>
             </div>
           </div>
 
           <!-- Queues -->
-          <div class="col-md-4 col-lg-2dot4 mb-3">
+          <div class="col">
             <div class="card border-warning h-100">
-              <div class="card-body text-center">
-                <svg cIcon name="cil-list" size="3xl" class="text-warning mb-2"></svg>
-                <h3 class="card-title text-warning">{{ dashboardSummary.QueuesCount || 0 }}</h3>
-                <p class="card-text text-muted mb-0">Queues</p>
+              <div class="card-body text-center py-2">
+                <svg cIcon name="cil-list" size="xl" class="text-warning mb-1"></svg>
+                <h5 class="card-title text-warning mb-1">{{ dashboardSummary.QueuesCount || 0 }}</h5>
+                <p class="card-text text-muted small mb-0">Queues</p>
               </div>
             </div>
           </div>
 
           <!-- Bindings -->
-          <div class="col-md-4 col-lg-2dot4 mb-3">
+          <div class="col">
             <div class="card border-info h-100">
-              <div class="card-body text-center">
-                <svg cIcon name="cil-link" size="3xl" class="text-info mb-2"></svg>
-                <h3 class="card-title text-info">{{ dashboardSummary.BindingsCount || 0 }}</h3>
-                <p class="card-text text-muted mb-0">Bindings</p>
+              <div class="card-body text-center py-2">
+                <svg cIcon name="cil-link" size="xl" class="text-info mb-1"></svg>
+                <h5 class="card-title text-info mb-1">{{ dashboardSummary.BindingsCount || 0 }}</h5>
+                <p class="card-text text-muted small mb-0">Bindings</p>
               </div>
             </div>
           </div>
 
           <!-- Messages -->
-          <div class="col-md-4 col-lg-2dot4 mb-3">
+          <div class="col">
             <div class="card border-danger h-100">
-              <div class="card-body text-center">
-                <svg cIcon name="cil-envelope-letter" size="3xl" class="text-danger mb-2"></svg>
-                <h3 class="card-title text-danger">{{ dashboardSummary.MessagesCount || 0 }}</h3>
-                <p class="card-text text-muted mb-0">Messages</p>
+              <div class="card-body text-center py-2">
+                <svg cIcon name="cil-envelope-letter" size="xl" class="text-danger mb-1"></svg>
+                <h5 class="card-title text-danger mb-1">{{ dashboardSummary.MessagesCount || 0 }}</h5>
+                <p class="card-text text-muted small mb-0">Messages</p>
               </div>
             </div>
           </div>
 
-        </div>
-
-        <!-- Global TSDB Metrics Section -->
-        <div class="mt-4 mb-4">
-          <c-card class="bg-dark text-white border-0">
-            <c-card-header class="d-flex justify-content-between align-items-center bg-dark">
-              <h5 class="mb-0">
-                <svg cIcon name="cil-chart-line" class="me-2"></svg>
-                Global Message Throughput & Latency
-              </h5>
-              <select class="form-select form-select-sm w-auto bg-dark text-white border-secondary" [(ngModel)]="selectedTimeRange" (change)="onTimeRangeChange()">
-                <option [value]="60">Last 1 min</option>
-                <option [value]="300">Last 5 min</option>
-                <option [value]="600">Last 10 min</option>
-                <option [value]="1800">Last 30 min</option>
-                <option [value]="2700">Last 45 min</option>
-                <option [value]="3600">Last 1 hour</option>
-              </select>
-            </c-card-header>
-            <c-card-body>
-              <div *ngIf="metricsLoading" class="text-center py-4">
-                <c-spinner></c-spinner>
-                <div class="mt-2 text-muted">Loading metrics...</div>
-              </div>
-              <div *ngIf="!metricsLoading && metricsData.labels.length > 0" class="row">
-                <div class="col-md-10" style="height: 300px;">
-                  <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="300"></c-chart>
-                </div>
-                <div class="col-md-2 d-flex flex-column justify-content-center border-start border-secondary">
-                  <div class="mb-4 text-center">
-                    <h6 class="text-muted mb-1">Published</h6>
-                    <h3 class="text-primary mb-0">{{ currentRates?.publish | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msg/s</small></h3>
-                  </div>
-                  <div class="mb-4 text-center">
-                    <h6 class="text-muted mb-1">Delivered</h6>
-                    <h3 class="text-success mb-0">{{ currentRates?.deliver | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msg/s</small></h3>
-                  </div>
-                  <div class="text-center">
-                    <h6 class="text-muted mb-1">Acked</h6>
-                    <h3 class="text-warning mb-0">{{ currentRates?.ack | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msg/s</small></h3>
-                  </div>
-                </div>
-              </div>
-              <div *ngIf="!metricsLoading && metricsData.labels.length === 0" class="text-center py-4 text-muted">
-                No metrics data available for the selected time range.
-              </div>
-            </c-card-body>
-          </c-card>
-        </div>
-
-        <!-- Global TSDB Gauge Metrics Section -->
-        <div class="mt-4 mb-4">
-          <c-card class="bg-dark text-white border-0">
-            <c-card-header class="d-flex justify-content-between align-items-center bg-dark">
-              <h5 class="mb-0">
-                <svg cIcon name="cil-chart-pie" class="me-2"></svg>
-                Global Queue Backlog
-              </h5>
-            </c-card-header>
-            <c-card-body>
-              <div *ngIf="metricsLoading" class="text-center py-4">
-                <c-spinner></c-spinner>
-                <div class="mt-2 text-muted">Loading metrics...</div>
-              </div>
-              <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length > 0" class="row">
-                <div class="col-md-10" style="height: 300px;">
-                  <c-chart [data]="gaugeMetricsData" [options]="metricsOptions" type="line" height="300"></c-chart>
-                </div>
-                <div class="col-md-2 d-flex flex-column justify-content-center border-start border-secondary">
-                  <div class="mb-4 text-center">
-                    <h6 class="text-muted mb-1" style="color: rgba(255, 99, 132, 1) !important;">Pending</h6>
-                    <h3 class="mb-0" style="color: rgba(255, 99, 132, 1) !important;">{{ currentGauges?.pending | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msgs</small></h3>
-                  </div>
-                  <div class="text-center">
-                    <h6 class="text-muted mb-1" style="color: rgba(54, 162, 235, 1) !important;">In Process</h6>
-                    <h3 class="mb-0" style="color: rgba(54, 162, 235, 1) !important;">{{ currentGauges?.inProcess | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msgs</small></h3>
-                  </div>
-                </div>
-              </div>
-              <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length === 0" class="text-center py-4 text-muted">
-                No metrics data available for the selected time range.
-              </div>
-            </c-card-body>
-          </c-card>
         </div>
         <!-- Last updated -->
         <div *ngIf="dashboardSummary && !dashboardLoading" class="mt-4">

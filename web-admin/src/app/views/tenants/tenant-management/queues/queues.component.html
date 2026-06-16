@@ -787,6 +787,115 @@
   <c-modal-body *ngIf="selectedQueue">
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
 
+    <!-- TSDB Metrics Section -->
+    <div class="row mt-4 mb-2">
+      <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">
+            <svg cIcon name="cil-chart-line" class="me-2"></svg>
+            Real-time Metrics
+          </h6>
+          <select class="form-select form-select-sm w-auto bg-dark text-white border-secondary" [(ngModel)]="selectedTimeRange" (change)="onTimeRangeChange()">
+            <option [value]="60">Last 1 min</option>
+            <option [value]="300">Last 5 min</option>
+            <option [value]="600">Last 10 min</option>
+            <option [value]="1800">Last 30 min</option>
+            <option [value]="2700">Last 45 min</option>
+            <option [value]="3600">Last 1 hour</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+      <!-- Queue Throughput Metrics Section -->
+      <div class="col-xl-6 mb-4">
+        <c-card color="dark" class="border-0 h-100">
+          <c-card-header class="d-flex justify-content-between align-items-center bg-dark border-bottom-0">
+            <h6 class="mb-0">
+              <svg cIcon name="cil-chart-line" class="me-2"></svg>
+              Queue Throughput
+            </h6>
+          </c-card-header>
+          <c-card-body>
+            <div *ngIf="metricsLoading" class="text-center py-4">
+              <c-spinner></c-spinner>
+              <div class="mt-2 text-muted">Loading metrics...</div>
+            </div>
+            
+            <div *ngIf="!metricsLoading && metricsData.labels.length > 0">
+              <!-- KPIs Horizontal Row -->
+              <div class="d-flex justify-content-around mb-3 pb-3 border-bottom border-secondary">
+                <div class="text-center">
+                  <h6 class="text-muted mb-1">Published</h6>
+                  <h4 class="text-primary mb-0">{{ currentRates?.publish | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+                </div>
+                <div class="text-center">
+                  <h6 class="text-muted mb-1">Delivered</h6>
+                  <h4 class="text-success mb-0">{{ currentRates?.deliver | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+                </div>
+                <div class="text-center">
+                  <h6 class="text-muted mb-1">Acked</h6>
+                  <h4 class="text-warning mb-0">{{ currentRates?.ack | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+                </div>
+              </div>
+              
+              <!-- Chart -->
+              <div style="height: 250px;">
+                <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="250"></c-chart>
+              </div>
+            </div>
+            
+            <div *ngIf="!metricsLoading && metricsData.labels.length === 0" class="text-center py-4 text-muted">
+              No metrics data available for the selected time range.
+            </div>
+          </c-card-body>
+        </c-card>
+      </div>
+
+      <!-- Queue Gauge Metrics Section -->
+      <div class="col-xl-6 mb-4">
+        <c-card color="dark" class="border-0 h-100">
+          <c-card-header class="d-flex justify-content-between align-items-center bg-dark border-bottom-0">
+            <h6 class="mb-0">
+              <svg cIcon name="cil-chart-pie" class="me-2"></svg>
+              Queue Backlog
+            </h6>
+          </c-card-header>
+          <c-card-body>
+            <div *ngIf="metricsLoading" class="text-center py-4">
+              <c-spinner></c-spinner>
+              <div class="mt-2 text-muted">Loading metrics...</div>
+            </div>
+            
+            <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length > 0">
+              <!-- KPIs Horizontal Row -->
+              <div class="d-flex justify-content-around mb-3 pb-3 border-bottom border-secondary">
+                <div class="text-center">
+                  <h6 class="text-muted mb-1" style="color: rgba(255, 99, 132, 1) !important;">Pending</h6>
+                  <h4 class="mb-0" style="color: rgba(255, 99, 132, 1) !important;">{{ currentGauges?.pending | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
+                </div>
+                <div class="text-center">
+                  <h6 class="text-muted mb-1" style="color: rgba(54, 162, 235, 1) !important;">In Process</h6>
+                  <h4 class="mb-0" style="color: rgba(54, 162, 235, 1) !important;">{{ currentGauges?.inProcess | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
+                </div>
+              </div>
+
+              <!-- Chart -->
+              <div style="height: 250px;">
+                <c-chart [data]="gaugeMetricsData" [options]="metricsOptions" type="line" height="250"></c-chart>
+              </div>
+            </div>
+
+            <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length === 0" class="text-center py-4 text-muted">
+              No metrics data available for the selected time range.
+            </div>
+          </c-card-body>
+        </c-card>
+      </div>
+    </div>
+
     <!-- Expiration Alert -->
     <c-alert *ngIf="getExpirationInfo(selectedQueue).isExpired" color="danger" class="mb-3">
       <svg cIcon name="cil-warning" class="me-2"></svg>
@@ -999,39 +1108,7 @@
       </div>
     </div>
 
-    <!-- TSDB Metrics Section -->
-    <div class="row mt-4">
-      <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h6 class="mb-0">
-            <svg cIcon name="cil-chart-line" class="me-2"></svg>
-            Real-time Metrics
-          </h6>
-          <select class="form-select form-select-sm w-auto bg-dark text-white border-secondary" [(ngModel)]="selectedTimeRange" (change)="onTimeRangeChange()">
-            <option [value]="60">Last 1 min</option>
-            <option [value]="300">Last 5 min</option>
-            <option [value]="600">Last 10 min</option>
-            <option [value]="1800">Last 30 min</option>
-            <option [value]="2700">Last 45 min</option>
-            <option [value]="3600">Last 1 hour</option>
-          </select>
-        </div>
-        <div class="card bg-dark border-0">
-          <div class="card-body">
-            <div *ngIf="metricsLoading" class="text-center py-4">
-              <c-spinner></c-spinner>
-              <div class="mt-2 text-muted">Loading metrics...</div>
-            </div>
-            <div *ngIf="!metricsLoading && metricsData.labels.length > 0" style="height: 250px;">
-              <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="250"></c-chart>
-            </div>
-            <div *ngIf="!metricsLoading && metricsData.labels.length === 0" class="text-center py-4 text-muted">
-              No metrics data available for the selected time range.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+
 
     <!-- Priority Type Section - Full Width -->
     <div class="row mt-4">
