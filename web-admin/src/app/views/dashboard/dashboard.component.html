@@ -113,8 +113,24 @@
                 <c-spinner></c-spinner>
                 <div class="mt-2 text-muted">Loading metrics...</div>
               </div>
-              <div *ngIf="!metricsLoading && metricsData.labels.length > 0" style="height: 300px;">
-                <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="300"></c-chart>
+              <div *ngIf="!metricsLoading && metricsData.labels.length > 0" class="row">
+                <div class="col-md-10" style="height: 300px;">
+                  <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="300"></c-chart>
+                </div>
+                <div class="col-md-2 d-flex flex-column justify-content-center border-start border-secondary">
+                  <div class="mb-4 text-center">
+                    <h6 class="text-muted mb-1">Published</h6>
+                    <h3 class="text-primary mb-0">{{ currentRates?.publish | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msg/s</small></h3>
+                  </div>
+                  <div class="mb-4 text-center">
+                    <h6 class="text-muted mb-1">Delivered</h6>
+                    <h3 class="text-success mb-0">{{ currentRates?.deliver | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msg/s</small></h3>
+                  </div>
+                  <div class="text-center">
+                    <h6 class="text-muted mb-1">Acked</h6>
+                    <h3 class="text-warning mb-0">{{ currentRates?.ack | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.5em;">msg/s</small></h3>
+                  </div>
+                </div>
               </div>
               <div *ngIf="!metricsLoading && metricsData.labels.length === 0" class="text-center py-4 text-muted">
                 No metrics data available for the selected time range.
