@@ -8,7 +8,8 @@ import { IconDirective } from '@coreui/icons-angular';
 import { DashboardService } from './services/dashboard.service';
 import { ChartjsModule } from '@coreui/angular-chartjs';
 import { FormsModule } from '@angular/forms';
-import { Subject } from 'rxjs';
+import { Subject, interval, Subscription } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { SpinnerComponent } from '@coreui/angular';
 
 @Component({
@@ -54,21 +55,40 @@ export class DashboardComponent implements OnInit {
   };
   selectedTimeRange: number = 600;
   private destroy$ = new Subject<void>();
+  private refreshSubscription?: Subscription;
 
   constructor(private dashboardService: DashboardService) {}
 
   ngOnInit(): void {
     this.loadDashboardSummary();
     this.loadGlobalMetrics();
+
+    // Auto-refresh every 5 seconds
+    this.refreshSubscription = interval(5000)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        // Only refresh if we aren't currently loading to prevent overlapping requests
+        if (!this.dashboardLoading) {
+          this.loadDashboardSummary(true);
+        }
+        if (!this.metricsLoading) {
+          this.loadGlobalMetrics(true);
+        }
+      });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.refreshSubscription) {
+      this.refreshSubscription.unsubscribe();
+    }
   }
 
-  loadDashboardSummary(): void {
-    this.dashboardLoading = true;
+  loadDashboardSummary(isBackgroundRefresh: boolean = false): void {
+    if (!isBackgroundRefresh) {
+      this.dashboardLoading = true;
+    }
     this.dashboardError = false;
     this.dashboardService.getDashboardSummary().subscribe({
       next: (response) => {
@@ -77,7 +97,9 @@ export class DashboardComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error loading dashboard summary:', error);
-        this.dashboardSummary = null;
+        if (!isBackgroundRefresh) {
+          this.dashboardSummary = null;
+        }
         this.dashboardLoading = false;
         this.dashboardError = true;
       }
@@ -88,8 +110,10 @@ export class DashboardComponent implements OnInit {
     this.loadGlobalMetrics();
   }
 
-  loadGlobalMetrics(): void {
-    this.metricsLoading = true;
+  loadGlobalMetrics(isBackgroundRefresh: boolean = false): void {
+    if (!isBackgroundRefresh) {
+      this.metricsLoading = true;
+    }
     const endTime = Math.floor(Date.now() / 1000);
     const startTime = endTime - this.selectedTimeRange;
     
