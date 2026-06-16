@@ -63,6 +63,11 @@ export class TenantManagementComponent implements OnInit {
     datasets: [],
     labels: []
   };
+  currentRates: any = {
+    publish: 0,
+    deliver: 0,
+    ack: 0
+  };
   metricsOptions: any = {
     maintainAspectRatio: false,
     elements: {
@@ -213,9 +218,29 @@ export class TenantManagementComponent implements OnInit {
             }
           ]
         };
+
+        let lastPublish = 0;
+        let lastDeliver = 0;
+        let lastAck = 0;
+        
+        if (result.datapoints && result.datapoints.length > 0) {
+          const lastDp = result.datapoints[result.datapoints.length - 1];
+          // Since each datapoint covers 5 seconds (the step is 5)
+          lastPublish = (lastDp.published || 0) / 5;
+          lastDeliver = (lastDp.delivered || 0) / 5;
+          lastAck = (lastDp.acked || 0) / 5;
+        }
+
+        this.currentRates = {
+          publish: lastPublish,
+          deliver: lastDeliver,
+          ack: lastAck
+        };
       },
       error: (err: any) => {
         this.metricsLoading = false;
+        this.metricsData = { labels: [], datasets: [] };
+        this.currentRates = { publish: 0, deliver: 0, ack: 0 };
         console.error('Failed to load global tenant metrics', err);
       }
     });
