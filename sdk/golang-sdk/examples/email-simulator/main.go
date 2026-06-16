@@ -15,7 +15,7 @@ import (
 	daedalus "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk"
 )
 
-const BatchSize = 1000
+const BatchSize = 50
 
 type EmailMessage struct {
 	MessageID string `json:"messageId"`

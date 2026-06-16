@@ -39,10 +39,10 @@ func main() {
 
 	err := sdk.CreateWorker(ctx, daedalus.WorkerOptions{
 		WorkerName: "Simple Go Worker",
-		IntervalMs: 500,
+		IntervalMs: 100,
 		CapacityPolicies: []daedalus.ClaimWorkCapacityPolicy{
 			{
-				MaxQueueMessages: 10,
+				MaxQueueMessages: 100,
 				ClaimWorkFilter:  &daedalus.ClaimWorkFilter{},
 			},
 		},
@@ -51,7 +51,7 @@ func main() {
 			log.Printf("📝 Content: %s", message.Message.Content)
 
 			// Simulate processing
-			time.Sleep(10 * time.Second)
+			time.Sleep(1 * time.Second)
 
 			// Acknowledge the message after processing
 			log.Println("✅ Message processed, sending ACK...")

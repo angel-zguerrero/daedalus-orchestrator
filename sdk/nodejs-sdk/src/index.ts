@@ -613,9 +613,12 @@ export class DaedalusSDK {
                   }
                 };
 
-                await onMessage(claimedMessage, ackCallback);
+                // Process message asynchronously
+                Promise.resolve(onMessage(claimedMessage, ackCallback)).catch((handlerError: any) => {
+                  console.error('❌ Error in onMessage handler:', handlerError.message);
+                });
               } catch (handlerError: any) {
-                console.error('❌ Error in onMessage handler:', handlerError.message);
+                console.error('❌ Error setting up onMessage handler:', handlerError.message);
               }
             }
           }

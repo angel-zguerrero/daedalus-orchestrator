@@ -11,7 +11,7 @@ async function main() {
 
     await daedalusSDK.createWorker({
         workerName: 'Simple Node.js Worker 2',
-        intervalMs: 500,
+        intervalMs: 100,
         capacityPolicies: [
             {
                 maxQueueMessages: 100,
