@@ -76,10 +76,10 @@ func NewRestServer(config *common.ServerConfing) *RestServer {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Starting...</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f9; color: #333; }
+        body { font-family: 'IBM Plex Sans', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #080C0F; color: #E8F4F8; }
         .message { text-align: center; }
-        h1 { font-size: 2em; margin-bottom: 0.5em; }
-        p { color: #666; }
+        h1 { font-family: 'Geist Mono', monospace; font-size: 2em; margin-bottom: 0.5em; color: #00E5FF; }
+        p { color: #7A9BA8; }
     </style>
 </head>
 <body>
