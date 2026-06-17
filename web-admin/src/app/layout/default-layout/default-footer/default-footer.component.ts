@@ -7,7 +7,7 @@ import { FooterComponent } from '@coreui/angular';
   styleUrls: ['./default-footer.component.scss']
 })
 export class DefaultFooterComponent extends FooterComponent {
-  readonly version = 'v1.0.5';
+  readonly version = 'v1.0.6';
 
   constructor() {
     super();
