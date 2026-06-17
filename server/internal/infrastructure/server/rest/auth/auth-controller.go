@@ -91,6 +91,7 @@ func (ctrl *AdminController) AuthStatusHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"hasRoot": exists,
+		"isDemo":  ctrl.Config.IsDemo,
 	})
 }
 

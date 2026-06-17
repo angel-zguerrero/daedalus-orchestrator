@@ -11,9 +11,11 @@ export class AuthService {
   private tokenKey = 'authToken';
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
   private rootExistsSubject = new BehaviorSubject<boolean | null>(null);
+  private isDemoSubject = new BehaviorSubject<boolean>(false);
 
   public isAuthenticated$: Observable<boolean> = this.isAuthenticatedSubject.asObservable();
   public rootExists$: Observable<boolean | null> = this.rootExistsSubject.asObservable();
+  public isDemo$: Observable<boolean> = this.isDemoSubject.asObservable();
 
   constructor(private http: HttpClient, private router: Router) {}
 
@@ -25,8 +27,11 @@ export class AuthService {
     if (this.rootExistsSubject.value === true) {
       return of(true);
     }
-    return this.http.get<{ hasRoot: boolean }>('/rest-api/auth/status').pipe(
-      tap(res => this.rootExistsSubject.next(res.hasRoot)),
+    return this.http.get<{ hasRoot: boolean, isDemo: boolean }>('/rest-api/auth/status').pipe(
+      tap(res => {
+        this.rootExistsSubject.next(res.hasRoot);
+        this.isDemoSubject.next(res.isDemo);
+      }),
       map(res => res.hasRoot),
       catchError(err => {
         console.error('Failed checking root status:', err);

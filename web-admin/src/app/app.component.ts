@@ -4,17 +4,27 @@ import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { delay, filter, map, tap } from 'rxjs/operators';
 
-import { ColorModeService } from '@coreui/angular';
+import { ColorModeService, AlertComponent } from '@coreui/angular';
 import { IconSetService } from '@coreui/icons-angular';
 import { iconSubset } from './icons/icon-subset';
+import { AuthService } from './auth/auth.service';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-root',
-  template: '<router-outlet />',
-  imports: [RouterOutlet]
+  template: `
+    @if (authService.isDemo$ | async) {
+      <div style="background-color: #dc3545; color: #fff; text-align: center; padding: 10px; font-weight: bold; z-index: 1050; position: relative;">
+        Demo Mode: Dangerous for production
+      </div>
+    }
+    <router-outlet />
+  `,
+  imports: [RouterOutlet, CommonModule]
 })
 export class AppComponent implements OnInit {
   title = 'Daedalus Orchestrator';
+  authService = inject(AuthService);
 
   readonly #destroyRef: DestroyRef = inject(DestroyRef);
   readonly #activatedRoute: ActivatedRoute = inject(ActivatedRoute);

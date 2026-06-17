@@ -79,6 +79,9 @@ type Config struct {
 	// at coarser resolutions is retained longer automatically.
 	// Default: 1.
 	MetricsRetentionRawHours int
+
+	// Demo is a flag that enables demo mode, creating a default admin user.
+	Demo bool
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
