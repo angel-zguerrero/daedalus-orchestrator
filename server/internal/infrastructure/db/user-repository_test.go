@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -24,13 +25,13 @@ func TestPutUser_Success(t *testing.T) {
 
 	user := models.CreateUser{Username: "foo", Email: "foo@mail.com", Password: "1234"}
 
-	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil)
+
 	mockStore.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:foo", mock.Anything).Return(false, nil).Times(1)
 	mockStore.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:foo@mail.com", mock.Anything).Return(false, nil).Times(1)
 	mockStore.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return(false, nil).Times(1)
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1)
 
-	id, err := repo.CreateUser(user)
+	id, err := repo.CreateUser(user, time.Now())
 	assert.NoError(t, err)
 	err = uow.Commit()
 	assert.NotNil(t, id)
@@ -52,7 +53,7 @@ func TestGetUser_Success(t *testing.T) {
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:foo", mock.Anything).Return([]byte("123"), nil)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return(data, nil)
 
-	user, err := repo.GetUserByUsername("foo")
+	user, err := repo.GetUserByUsername("foo", time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, "foo", user.Username)
 	mockStore.AssertExpectations(t)
@@ -65,7 +66,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:bar", mock.Anything).Return(nil, nil)
 
-	user, err := repo.GetUserByUsername("bar")
+	user, err := repo.GetUserByUsername("bar", time.Now())
 	assert.NoError(t, err)
 	assert.Nil(t, user)
 	mockStore.AssertExpectations(t)
@@ -78,7 +79,7 @@ func TestGetUser_ErrorOnGet(t *testing.T) {
 	repo, err := db.NewUserRepository(uow, iGF)
 
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:x", mock.Anything).Return(nil, errors.New("get failed"))
-	user, err := repo.GetUserByUsername("x")
+	user, err := repo.GetUserByUsername("x", time.Now())
 	assert.Error(t, err)
 	assert.Nil(t, user)
 	mockStore.AssertExpectations(t)
@@ -93,7 +94,7 @@ func TestGetUser_UnmarshalError(t *testing.T) {
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:x", mock.Anything).Return([]byte("123"), nil)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return([]byte("invalid-json"), nil)
 
-	user, err := repo.GetUserByUsername("x")
+	user, err := repo.GetUserByUsername("x", time.Now())
 	assert.Error(t, err)
 	assert.Empty(t, user)
 	mockStore.AssertExpectations(t)
@@ -110,7 +111,7 @@ func TestDeleteUser_Success(t *testing.T) {
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:bob", mock.Anything).Return([]byte("123"), nil)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return(rootData, nil)
 
-	result, err := repo.DeleteUser("bob")
+	result, err := repo.DeleteUser("bob", time.Now())
 	assert.Equal(t, true, result)
 	assert.NoError(t, err)
 	mockStore.AssertExpectations(t)
@@ -125,7 +126,7 @@ func TestDeleteUser_CannotDeleteRoot(t *testing.T) {
 	rootData, _ := json.Marshal(root)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:admin", mock.Anything).Return([]byte("123"), nil)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return(rootData, nil)
-	_, err = repo.DeleteUser("admin")
+	_, err = repo.DeleteUser("admin", time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot delete root user")
 	mockStore.AssertExpectations(t)
@@ -138,7 +139,7 @@ func TestDeleteUser_GetError(t *testing.T) {
 	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, mock.Anything, mock.Anything).Return(nil, errors.New("get failed"))
 
-	_, err = repo.DeleteUser("someone")
+	_, err = repo.DeleteUser("someone", time.Now())
 	assert.Error(t, err)
 	mockStore.AssertExpectations(t)
 }
@@ -150,7 +151,7 @@ func TestDeleteUser_UnmarshalRootError(t *testing.T) {
 	repo, err := db.NewUserRepository(uow, iGF)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:x", mock.Anything).Return([]byte("123"), nil)
 	mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return([]byte("invalid-json"), nil)
-	_, err = repo.DeleteUser("x")
+	_, err = repo.DeleteUser("x", time.Now())
 	assert.Error(t, err)
 	mockStore.AssertExpectations(t)
 }
@@ -167,7 +168,7 @@ func TestDeleteUser_WriteError(t *testing.T) {
 
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("write failed"))
 
-	_, err = repo.DeleteUser("user")
+	_, err = repo.DeleteUser("user", time.Now())
 	assert.NoError(t, err)
 	err = uow.Commit()
 	assert.Error(t, err)
@@ -184,13 +185,13 @@ func TestPutUser_KVStorePutError(t *testing.T) {
 		Email:    "test@example.com",
 	}
 
-	mockStore.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil)
+
 	mockStore.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:testuser", mock.Anything).Return(false, nil).Times(1)
 	mockStore.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:test@example.com", mock.Anything).Return(false, nil).Times(1)
 	mockStore.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return(false, nil).Times(1)
 	mockStore.On("Write", mock.Anything, mock.Anything).Return(errors.New("kv put failed")).Times(1)
 
-	_, err = repo.CreateUser(userInput)
+	_, err = repo.CreateUser(userInput, time.Now())
 
 	assert.NoError(t, err)
 	err = uow.Commit()
@@ -226,7 +227,7 @@ func TestLoginUser(t *testing.T) {
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:"+userEmail, mock.Anything).Return([]byte(userID), nil).Once()
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
-		found, err := repo.Login(userEmail, correctPassword)
+		found, err := repo.Login(userEmail, correctPassword, time.Now())
 		assert.NoError(t, err)
 		assert.True(t, found)
 		mockStore.AssertExpectations(t)
@@ -238,7 +239,7 @@ func TestLoginUser(t *testing.T) {
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:"+userUsername, mock.Anything).Return([]byte(userID), nil).Once()
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
-		found, err := repo.Login(userUsername, correctPassword)
+		found, err := repo.Login(userUsername, correctPassword, time.Now())
 		assert.NoError(t, err)
 		assert.True(t, found)
 		mockStore.AssertExpectations(t)
@@ -248,7 +249,7 @@ func TestLoginUser(t *testing.T) {
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:"+userEmail, mock.Anything).Return([]byte(userID), nil).Once()
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
-		found, err := repo.Login(userEmail, incorrectPassword)
+		found, err := repo.Login(userEmail, incorrectPassword, time.Now())
 		assert.NoError(t, err) // bcrypt.ErrMismatchedHashAndPassword is not an "error" for Login logic, it's a valid outcome
 		assert.False(t, found)
 		mockStore.AssertExpectations(t)
@@ -259,7 +260,7 @@ func TestLoginUser(t *testing.T) {
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:"+userUsername, mock.Anything).Return([]byte(userID), nil).Once()
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:"+userID, mock.Anything).Return(userData, nil).Once()
 
-		found, err := repo.Login(userUsername, incorrectPassword)
+		found, err := repo.Login(userUsername, incorrectPassword, time.Now())
 		assert.NoError(t, err) // bcrypt.ErrMismatchedHashAndPassword is not an "error" for Login logic
 		assert.False(t, found)
 		mockStore.AssertExpectations(t)
@@ -270,7 +271,7 @@ func TestLoginUser(t *testing.T) {
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:"+unknownIdentifier, mock.Anything).Return(nil, nil).Once()
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:"+unknownIdentifier, mock.Anything).Return(nil, nil).Once()
 
-		found, err := repo.Login(unknownIdentifier, "anypassword")
+		found, err := repo.Login(unknownIdentifier, "anypassword", time.Now())
 		assert.NoError(t, err)
 		assert.False(t, found)
 		mockStore.AssertExpectations(t)
@@ -281,7 +282,7 @@ func TestLoginUser(t *testing.T) {
 		expectedError := errors.New("db error on email lookup")
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:"+errorIdentifier, mock.Anything).Return(nil, expectedError).Once()
 
-		found, err := repo.Login(errorIdentifier, "anypassword")
+		found, err := repo.Login(errorIdentifier, "anypassword", time.Now())
 		assert.Error(t, err)
 		assert.Equal(t, expectedError, err)
 		assert.False(t, found)
@@ -294,7 +295,7 @@ func TestLoginUser(t *testing.T) {
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:"+errorIdentifier, mock.Anything).Return(nil, nil).Once() // Email lookup fine, returns nil
 		mockStore.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Username:"+errorIdentifier, mock.Anything).Return(nil, expectedError).Once()
 
-		found, err := repo.Login(errorIdentifier, "anypassword")
+		found, err := repo.Login(errorIdentifier, "anypassword", time.Now())
 		assert.Error(t, err)
 		assert.Equal(t, expectedError, err)
 		assert.False(t, found)

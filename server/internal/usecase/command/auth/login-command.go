@@ -26,7 +26,7 @@ func (cmd *LoginCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Comm
 		return *commandResult
 	}
 
-	loggedIn, err := userRepo.Login(cmd.UsernameOrEmail, cmd.Password)
+	loggedIn, err := userRepo.Login(cmd.UsernameOrEmail, cmd.Password, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

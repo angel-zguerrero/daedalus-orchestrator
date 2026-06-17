@@ -2,7 +2,6 @@ package auth_command
 
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
 	"time"
@@ -14,6 +13,10 @@ func init() {
 
 // BootstrapRootUserCommand represents a command to authenticate a user.
 type BootstrapRootUserCommand struct {
+	ID           string
+	Username     string
+	Email        string
+	PasswordHash string
 }
 
 func (cmd *BootstrapRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -24,7 +27,7 @@ func (cmd *BootstrapRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) 
 		return *commandResult
 	}
 
-	err = db.BootstrapRootUser(*userRepo, *config.GlobalConfiguration)
+	err = db.BootstrapRootUser(*userRepo, cmd.ID, cmd.Username, cmd.Email, cmd.PasswordHash, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

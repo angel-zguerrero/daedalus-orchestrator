@@ -4,7 +4,8 @@ import (
 	"deadalus-orch/shared/models"
 	"fmt"
 
-	"deadalus-orch/server/internal/pkg/config"
+	"time"
+
 
 	"github.com/rs/zerolog/log"
 )
@@ -20,17 +21,14 @@ import (
 // Returns:
 //   - An error if any operation fails (e.g., accessing the KVStore, missing credentials),
 //     or nil if the root user exists or is successfully created.
-func BootstrapRootUser(userRepository UserRepository, config config.Config) error {
-	root, err := userRepository.GetUserRoot()
+func BootstrapRootUser(userRepository UserRepository, id string, username string, email string, passwordHash string, now time.Time) error {
+	root, err := userRepository.GetUserRoot(now)
 	if err != nil {
 		return fmt.Errorf("failed to get default root: %v", err)
 	}
 
 	if root == nil {
-		username := config.DefaultRootUser
-		password := config.DefaultRootPassword
-
-		if username == "" || password == "" {
+		if username == "" || passwordHash == "" {
 			log.Info().Msg("ℹ️ Default root user credentials not provided in env. Initial setup required via UI.")
 			return nil
 		}
@@ -40,12 +38,12 @@ func BootstrapRootUser(userRepository UserRepository, config config.Config) erro
 			Msg("🧑‍💻 Creating default root user")
 
 		_, err = userRepository.CreateUser(models.CreateUser{
-			ID:         "94adc9e9e1194d39aaf7f9cfc392ee48",
+			ID:         id,
 			Username:   username,
-			Email:      "noemail@daedalus.com",
-			Password:   password,
+			Email:      email,
+			Password:   passwordHash,
 			IsRootUser: true,
-		})
+		}, now)
 		return err
 	}
 

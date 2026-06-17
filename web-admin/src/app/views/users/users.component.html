@@ -1,0 +1,419 @@
+<c-card class="mb-4">
+  <c-card-header> Users Management </c-card-header>
+  <c-card-body>
+    <c-alert
+      color="danger"
+      *ngIf="showAlert"
+      [innerHTML]="errorMessage"
+    ></c-alert>
+    <!-- Search and Actions Row -->
+    <c-row class="mb-3">
+      <c-col [md]="4">
+        <div class="input-group">
+          <input
+            type="text"
+            cFormControl
+            placeholder="Search users..."
+            [(ngModel)]="searchQuery"
+            (keydown.enter)="searchUsers()"
+          />
+          <button
+            cButton
+            type="button"
+            color="secondary"
+            variant="outline"
+            (click)="searchUsers()"
+          >
+            <svg cIcon name="cil-search"></svg>
+          </button>
+        </div>
+      </c-col>
+      <c-col [md]="8" class="d-flex justify-content-end">
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create User
+        </button>
+      </c-col>
+    </c-row>
+
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loading">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading users...</p>
+    </div>
+
+    <!-- Users Table -->
+    <div class="table-responsive" *ngIf="!loading">
+      <table cTable class="mt-4" [hover]="true">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Root User</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of users" class="align-middle">
+            <td
+              class="text-truncate"
+              style="max-width: 150px"
+              title="{{ user.ID }}"
+            >
+              <code>{{ user.ID }}</code>
+            </td>
+            <td>
+              <strong>{{ user.Username }}</strong>
+            </td>
+            <td>{{ user.Email }}</td>
+            <td>
+              <c-badge
+                [color]="user.IsRootUser ? 'danger' : 'info'"
+                shape="rounded-pill"
+              >
+                {{ user.IsRootUser ? "Yes" : "No" }}
+              </c-badge>
+            </td>
+            <td>
+              <div class="btn-group" role="group">
+                <button
+                  cButton
+                  color="warning"
+                  size="sm"
+                  (click)="openEditModal(user)"
+                  title="Edit"
+                >
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button
+                  *ngIf="!user.IsRootUser"
+                  cButton
+                  color="danger"
+                  size="sm"
+                  (click)="openDeleteModal(user)"
+                  title="Delete"
+                >
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="users.length === 0">
+            <td colspan="5" class="text-center py-4">
+              <div class="text-muted">
+                <svg
+                  cIcon
+                  name="cil-user"
+                  size="3xl"
+                  class="d-block mx-auto mb-2"
+                ></svg>
+                <h6>No users found</h6>
+                <p class="mb-0">Create a new user to get started.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Pagination -->
+    <div class="d-flex justify-content-end mt-3" *ngIf="users.length > 0">
+      <button
+        cButton
+        color="secondary"
+        [disabled]="cursors.length === 1"
+        (click)="previousPage()"
+      >
+        <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+        Previous
+      </button>
+      <button
+        cButton
+        color="secondary"
+        [disabled]="!cursor"
+        (click)="nextPage()"
+        class="ms-2"
+      >
+        Next
+        <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create User Modal -->
+<c-modal
+  id="createModal"
+  [visible]="createModalVisible"
+  (visibleChange)="createModalVisible = $event"
+  size="lg"
+>
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-user-plus" class="me-2"></svg>
+      Create User
+    </h5>
+    <button (click)="createModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert
+      color="danger"
+      *ngIf="showAlert"
+      [innerHTML]="errorMessage"
+    ></c-alert>
+    <form
+      [formGroup]="userForm"
+      (ngSubmit)="createUser()"
+      (keydown.enter)="createUser()"
+    >
+      <c-row class="mb-3" [gutter]="{ gy: 2, gx: 3 }">
+        <c-col [md]="6">
+          <label cLabel for="username">Username *</label>
+          <input
+            cFormControl
+            id="username"
+            formControlName="Username"
+            placeholder="Enter username"
+          />
+          <small
+            class="text-danger"
+            *ngIf="
+              userForm.get('Username')?.invalid &&
+              userForm.get('Username')?.touched
+            "
+            >Username is required</small
+          >
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="email">Email *</label>
+          <input
+            cFormControl
+            type="email"
+            id="email"
+            formControlName="Email"
+            placeholder="Enter email address"
+          />
+          <small
+            class="text-danger"
+            *ngIf="
+              userForm.get('Email')?.invalid && userForm.get('Email')?.touched
+            "
+            >Valid email is required</small
+          >
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="password">Password *</label>
+          <input
+            cFormControl
+            type="password"
+            id="password"
+            formControlName="Password"
+            placeholder="Enter password"
+          />
+          <small
+            class="text-danger"
+            *ngIf="
+              userForm.get('Password')?.invalid &&
+              userForm.get('Password')?.touched
+            "
+          >
+            <span *ngIf="userForm.get('Password')?.errors?.['required']"
+              >Password is required.
+            </span>
+            <span *ngIf="userForm.get('Password')?.errors?.['minlength']"
+              >Password must be at least 6 characters.</span
+            >
+          </small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="repeat-password">Repeat Password *</label>
+          <input
+            cFormControl
+            type="password"
+            id="repeat-password"
+            formControlName="RepeatPassword"
+            placeholder="Repeat password"
+          />
+          <small
+            class="text-danger"
+            *ngIf="
+              userForm.get('RepeatPassword')?.invalid &&
+              userForm.get('RepeatPassword')?.touched
+            "
+          >
+            <span *ngIf="userForm.get('RepeatPassword')?.errors?.['required']"
+              >Please repeat the password.
+            </span>
+            <span
+              *ngIf="
+                userForm.get('RepeatPassword')?.errors?.['passwordMismatch']
+              "
+              >Passwords do not match.</span
+            >
+          </small>
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="createModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button
+      cButton
+      color="primary"
+      (click)="createUser()"
+      [disabled]="!userForm.valid"
+    >
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Create
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Edit User Modal -->
+<c-modal
+  id="editModal"
+  [visible]="editModalVisible"
+  (visibleChange)="editModalVisible = $event"
+  size="lg"
+>
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-pencil" class="me-2"></svg>
+      Edit User
+    </h5>
+    <button (click)="editModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert
+      color="danger"
+      *ngIf="showAlert"
+      [innerHTML]="errorMessage"
+    ></c-alert>
+    <form
+      [formGroup]="userFormUpdate"
+      (ngSubmit)="updateUser()"
+      (keydown.enter)="updateUser()"
+    >
+      <c-row class="mb-3" [gutter]="{ gy: 2, gx: 3 }">
+        <c-col [md]="6">
+          <label cLabel for="username-update">Username</label>
+          <input cFormControl id="username-update" formControlName="Username" />
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="email-update">Email *</label>
+          <input
+            cFormControl
+            type="email"
+            id="email-update"
+            formControlName="Email"
+          />
+          <small
+            class="text-danger"
+            *ngIf="
+              userFormUpdate.get('Email')?.invalid &&
+              userFormUpdate.get('Email')?.touched
+            "
+            >Valid email is required</small
+          >
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="password-update">New Password</label>
+          <input
+            cFormControl
+            type="password"
+            id="password-update"
+            formControlName="Password"
+            placeholder="Leave blank to keep current password"
+          />
+          <small
+            class="text-danger"
+            *ngIf="
+              userFormUpdate.get('Password')?.invalid &&
+              userFormUpdate.get('Password')?.touched
+            "
+          >
+            <span *ngIf="userFormUpdate.get('Password')?.errors?.['minlength']"
+              >Password must be at least 6 characters.</span
+            >
+          </small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="repeat-password-update">Repeat New Password</label>
+          <input
+            cFormControl
+            type="password"
+            id="repeat-password-update"
+            formControlName="RepeatPassword"
+            placeholder="Repeat new password"
+          />
+          <small
+            class="text-danger"
+            *ngIf="
+              userFormUpdate.get('RepeatPassword')?.invalid &&
+              userFormUpdate.get('RepeatPassword')?.touched
+            "
+          >
+            <span
+              *ngIf="
+                userFormUpdate.get('RepeatPassword')?.errors?.[
+                  'passwordMismatch'
+                ]
+              "
+              >Passwords do not match.</span
+            >
+          </small>
+        </c-col>
+      </c-row>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="editModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button
+      cButton
+      color="primary"
+      (click)="updateUser()"
+      [disabled]="!userFormUpdate.valid"
+    >
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Save Changes
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Delete User Modal -->
+<c-modal
+  id="deleteModal"
+  [visible]="deleteModalVisible"
+  (visibleChange)="deleteModalVisible = $event"
+>
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-trash" class="me-2"></svg>
+      Delete User
+    </h5>
+    <button (click)="deleteModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center">
+      <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
+      <h6>Are you sure you want to delete this user?</h6>
+      <p class="text-muted mb-0">
+        <strong>{{ selectedUser?.Username }}</strong>
+        <br />This action cannot be undone.
+      </p>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="deleteModalVisible = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="danger" (click)="deleteUser()">
+      <svg cIcon name="cil-trash" class="me-1"></svg>
+      Delete User
+    </button>
+  </c-modal-footer>
+</c-modal>

@@ -40,9 +40,10 @@ export class AuthService {
     );
   }
 
-  setupRoot(credentials: { username?: string, password?: string }): Observable<any> {
+  setupRoot(credentials: { username?: string, email?: string, password?: string }): Observable<any> {
     const payload = {
       username: credentials.username,
+      email: credentials.email,
       password: credentials.password
     };
     return this.http.post<any>('/rest-api/auth/setup', payload).pipe(
@@ -108,6 +109,23 @@ export class AuthService {
 
   getToken(): string | null {
     return localStorage.getItem(this.tokenKey);
+  }
+
+  getLoggedInUsername(): string | null {
+    const token = this.getToken();
+    if (!token) return null;
+    
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const payload = JSON.parse(jsonPayload);
+      return payload.sub || null;
+    } catch (e) {
+      return null;
+    }
   }
 
   isLoggedIn(): boolean {

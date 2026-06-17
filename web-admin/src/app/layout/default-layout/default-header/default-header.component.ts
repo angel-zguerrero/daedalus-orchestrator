@@ -1,4 +1,4 @@
-import { NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet, NgIf } from '@angular/common';
 import { Component, inject, input } from '@angular/core';
 import { AuthService } from '../../../auth/auth.service';
 
@@ -29,6 +29,7 @@ import { IconDirective } from '@coreui/icons-angular';
     IconDirective,
     HeaderNavComponent,
     NgTemplateOutlet,
+    NgIf,
     BreadcrumbRouterComponent,
     DropdownComponent,
     DropdownToggleDirective,
@@ -38,15 +39,20 @@ import { IconDirective } from '@coreui/icons-angular';
   ]
 })
 export class DefaultHeaderComponent extends HeaderComponent {
-  readonly #authService = inject(AuthService);
+  readonly authService = inject(AuthService); // Changed to public for HTML access
+  username: string | null = null;
 
   constructor() {
     super();
   }
 
+  ngOnInit() {
+    this.username = this.authService.getLoggedInUsername();
+  }
+
   sidebarId = input('sidebar1');
 
   logout() {
-    this.#authService.logout();
+    this.authService.logout();
   }
 }

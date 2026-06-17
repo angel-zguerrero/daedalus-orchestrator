@@ -9,9 +9,12 @@ import (
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
@@ -107,7 +110,25 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 					log.Info().Msg("📦 Database column families defined.")
 
 					if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConsensus) {
-						bootstrapRootUserCmd := &auth_command.BootstrapRootUserCommand{}
+						username := config.GlobalConfiguration.DefaultRootUser
+						password := config.GlobalConfiguration.DefaultRootPassword
+
+						var passwordHash string
+						if password != "" {
+							hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+							if err != nil {
+								log.Error().Err(err).Msg("❌ Failed to hash default root password")
+							} else {
+								passwordHash = string(hash)
+							}
+						}
+
+						bootstrapRootUserCmd := &auth_command.BootstrapRootUserCommand{
+							ID:           strings.ReplaceAll(uuid.New().String(), "-", ""),
+							Username:     username,
+							Email:        "noemail@daedalus.com",
+							PasswordHash: passwordHash,
+						}
 						cmd := general_command.FSM_Command{
 							Now:  utils.GetNowInInt(),
 							Type: general_command.REPOSITORY_COMMAND,

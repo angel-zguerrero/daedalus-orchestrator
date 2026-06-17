@@ -24,57 +24,82 @@ func NewUserRepository(uow *UnitOfWork, factory IDGeneratorFactory) (*UserReposi
 	return &UserRepository{repo: repo}, nil
 }
 
-func (r *UserRepository) CreateUser(input models.CreateUser) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	now := time.Now()
+func (r *UserRepository) CreateUser(input models.CreateUser, now time.Time) (string, error) {
 
-	rootUser, err := r.repo.FindByField("IsRootUser", "true", now)
-	if err != nil {
-		return "", err
-	}
+	if input.IsRootUser {
+		rootUser, err := r.repo.FindByField("IsRootUser", "true", now)
+		if err != nil {
+			return "", err
+		}
 
-	if rootUser != nil {
-		return "", fmt.Errorf("Only a single root user is allowed")
+		if rootUser != nil {
+			return "", fmt.Errorf("Only a single root user is allowed")
+		}
 	}
 
 	user := &models.User{
 		ID:           input.ID,
 		Username:     input.Username,
 		Email:        input.Email,
-		PasswordHash: string(hash),
+		PasswordHash: input.Password,
 		IsRootUser:   input.IsRootUser,
 	}
 
 	return r.repo.Create(user, now)
 }
 
-func (r *UserRepository) GetUserByUsername(username string) (*models.User, error) {
-	return r.repo.FindByField("Username", username, time.Now())
+func (r *UserRepository) GetUserByUsername(username string, now time.Time) (*models.User, error) {
+	return r.repo.FindByField("Username", username, now)
 }
 
-func (r *UserRepository) GetUserRoot() (*models.User, error) {
-	return r.repo.FindByField("IsRootUser", "true", time.Now())
+func (r *UserRepository) GetUserRoot(now time.Time) (*models.User, error) {
+	return r.repo.FindByField("IsRootUser", "true", now)
 }
 
-func (r *UserRepository) DeleteUser(username string) (bool, error) {
-	now := time.Now()
-	rootUser, err := r.repo.FindByField("Username", username, now)
+func (r *UserRepository) GetUsers(filter string, cursor string, limit int, now time.Time) (*FindResult[models.User], error) {
+	if filter == "" {
+		return r.repo.Find("ID != 0", limit, cursor, now) // ID != 0 Workaround
+	} else {
+		return r.repo.Find("Username LIKE *"+filter+"* | Email LIKE *"+filter+"*", limit, cursor, now)
+	}
+}
+
+func (r *UserRepository) UpdateUser(input models.UpdateUser, now time.Time) (bool, error) {
+	user, err := r.repo.FindByField("ID", input.ID, now)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, fmt.Errorf("user not found: %s", input.ID)
+	}
+
+	user.Username = input.Username
+	user.Email = input.Email
+	fmt.Printf("UserRepository.UpdateUser received input.Password length: %d\n", len(input.Password))
+	if input.Password != "" {
+		user.PasswordHash = input.Password
+		fmt.Printf("UserRepository.UpdateUser assigned new PasswordHash\n")
+	} else {
+		fmt.Printf("UserRepository.UpdateUser skipped PasswordHash assignment\n")
+	}
+
+	return r.repo.Update(user, now)
+}
+
+func (r *UserRepository) DeleteUser(id string, now time.Time) (bool, error) {
+	rootUser, err := r.repo.FindByField("ID", id, now)
 	if err != nil || rootUser == nil {
 		return false, err
 	}
 
 	if rootUser != nil && rootUser.IsRootUser {
-		return false, fmt.Errorf("cannot delete root user: %s", username)
+		return false, fmt.Errorf("cannot delete root user: %s", id)
 	}
 
 	return r.repo.Delete(rootUser.ID, now)
 }
 
-func (r *UserRepository) Login(usernameOrEmail, password string) (bool, error) {
-	now := time.Now()
+func (r *UserRepository) Login(usernameOrEmail, password string, now time.Time) (bool, error) {
 	user, err := r.repo.FindByField("Email", usernameOrEmail, now)
 	if err != nil {
 		// Error during email lookup
@@ -94,6 +119,10 @@ func (r *UserRepository) Login(usernameOrEmail, password string) (bool, error) {
 		// User not found by either email or username
 		return false, nil
 	}
+
+	fmt.Printf("UserRepository.Login: User found: %s\n", user.Username)
+	fmt.Printf("UserRepository.Login: Password hash: %s\n", user.PasswordHash)
+	fmt.Printf("UserRepository.Login: Password: %s\n", password)
 
 	// User found, now validate password
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
