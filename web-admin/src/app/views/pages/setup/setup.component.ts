@@ -56,7 +56,7 @@ export class SetupComponent {
       this.setupError = 'Please fill out all fields correctly.';
       return;
     }
-    const { username, password, repeatPassword } = setupForm.value;
+    const { username, email, password, repeatPassword } = setupForm.value;
     if (password !== repeatPassword) {
       this.setupError = 'Passwords do not match.';
       return;
@@ -65,7 +65,7 @@ export class SetupComponent {
     this.isLoading = true;
     this.setupError = null;
 
-    this.authService.setupRoot({ username, password }).subscribe({
+    this.authService.setupRoot({ username, email, password }).subscribe({
       next: (response) => {
         this.isLoading = false;
         this.router.navigate(['/login']);

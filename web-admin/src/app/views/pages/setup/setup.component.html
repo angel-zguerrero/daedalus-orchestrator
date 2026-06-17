@@ -33,6 +33,29 @@
                   <small *ngIf="username.errors?.['required']">Username is required.</small>
                 </div>
 
+                <!-- Email -->
+                <c-input-group class="mb-3">
+                  <span cInputGroupText>
+                    <svg cIcon name="cilEnvelopeOpen"></svg>
+                  </span>
+                  <input
+                    autoComplete="email"
+                    type="email"
+                    cFormControl
+                    placeholder="Email"
+                    name="email"
+                    ngModel
+                    required
+                    email
+                    #email="ngModel"
+                  />
+                </c-input-group>
+                <div *ngIf="email.invalid && (email.dirty || email.touched || setupForm.submitted)"
+                     cTextColor="danger" class="form-text mb-3">
+                  <small *ngIf="email.errors?.['required']">Email is required.</small>
+                  <small *ngIf="email.errors?.['email']">Must be a valid email address.</small>
+                </div>
+
                 <!-- Password -->
                 <c-input-group class="mb-3">
                   <span cInputGroupText>

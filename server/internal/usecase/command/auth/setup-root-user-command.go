@@ -15,7 +15,9 @@ func init() {
 
 // SetupRootUserCommand represents a command to initialize root user credentials.
 type SetupRootUserCommand struct {
+	ID       string
 	Username string
+	Email    string
 	Password string
 }
 
@@ -27,7 +29,7 @@ func (cmd *SetupRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		return *commandResult
 	}
 
-	root, err := userRepo.GetUserRoot()
+	root, err := userRepo.GetUserRoot(now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
@@ -44,12 +46,12 @@ func (cmd *SetupRootUserCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	}
 
 	_, err = userRepo.CreateUser(models.CreateUser{
-		ID:         "94adc9e9e1194d39aaf7f9cfc392ee48",
+		ID:         cmd.ID,
 		Username:   cmd.Username,
-		Email:      "noemail@daedalus.com",
+		Email:      cmd.Email,
 		Password:   cmd.Password,
 		IsRootUser: true,
-	})
+	}, now)
 	if err != nil {
 		commandResult.Error = fmt.Sprintf("failed to create root user: %v", err)
 		return *commandResult

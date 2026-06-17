@@ -10,6 +10,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
+	"deadalus-orch/server/internal/infrastructure/server/rest/user"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"time"
@@ -30,6 +31,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	jobWorkerController := jobworker.NewJobWorkerController(s.Config)
 	clusterController := cluster.NewClusterController(s.Config)
 	dashboardController := dashboard.NewDashboardController(s.Config)
+	userController := user.NewUserController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -82,7 +84,15 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			}
 		}
 
-
+		usersGroup := restAPIGroup.Group("/users")
+		usersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		usersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
+		{
+			usersGroup.GET("", userController.GetUsersHandler)
+			usersGroup.POST("", userController.CreateUserHandler)
+			usersGroup.PUT("/:id", userController.UpdateUserHandler)
+			usersGroup.DELETE("/:id", userController.DeleteUserHandler)
+		}
 
 		jobWorkersGroup := restAPIGroup.Group("/job-workers")
 		jobWorkersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))

@@ -34,3 +34,22 @@ type CreateUser struct {
 
 	IsRootUser bool
 }
+
+// UpdateUser is a struct used for capturing user input when editing an existing user.
+type UpdateUser struct {
+	// ID is the unique identifier of the user to update.
+	ID string
+	// Username is the target username to update.
+	Username string
+	// Email is the new email address.
+	Email string
+	// Password is the new plain text password. Leave empty if not changing.
+	Password string
+}
+
+// SetupRootUser is a struct used for capturing user input when setting up the initial root user.
+type SetupRootUser struct {
+	Username string
+	Email    string
+	Password string
+}

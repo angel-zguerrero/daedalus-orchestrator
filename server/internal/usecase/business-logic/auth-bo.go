@@ -10,9 +10,12 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/config"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
+	"deadalus-orch/shared/models"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthBO struct {
@@ -142,12 +145,21 @@ func (bo *AuthBO) CheckRootExists(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
-func (bo *AuthBO) SetupRootUser(ctx context.Context, username, password string) error {
-	cmd := &auth_command.SetupRootUserCommand{
-		Username: username,
-		Password: password,
+func (bo *AuthBO) SetupRootUser(ctx context.Context, input models.SetupRootUser) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
 	}
-	_, err := dragonboat.ExecuteRepositoryCommand[interface{}](
+
+	newID := strings.ReplaceAll(uuid.New().String(), "-", "")
+
+	cmd := &auth_command.SetupRootUserCommand{
+		ID:       newID,
+		Username: input.Username,
+		Email:    input.Email,
+		Password: string(hash),
+	}
+	_, err = dragonboat.ExecuteRepositoryCommand[interface{}](
 		bo.MasterNode,
 		ctx,
 		cmd,

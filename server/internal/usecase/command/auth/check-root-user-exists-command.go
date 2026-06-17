@@ -23,7 +23,7 @@ func (cmd *CheckRootUserExistsCommand) Execute(uow *db.UnitOfWork, now time.Time
 		return *commandResult
 	}
 
-	root, err := userRepo.GetUserRoot()
+	root, err := userRepo.GetUserRoot(now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

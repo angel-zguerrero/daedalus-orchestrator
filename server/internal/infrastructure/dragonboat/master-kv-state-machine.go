@@ -7,8 +7,8 @@ import (
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	job_worker_command "deadalus-orch/server/internal/usecase/command/job-worker"
 	metrics_command "deadalus-orch/server/internal/usecase/command/metrics"
-
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
+	user_command "deadalus-orch/server/internal/usecase/command/user"
 	"time"
 
 	"github.com/lni/dragonboat/v4/statemachine"
@@ -84,6 +84,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 	queryMetricsRangeCommand, ok := input.(metrics_command.QueryMetricsRangeCommand)
 	if ok {
 		return queryMetricsRangeCommand.Execute(uow, now)
+	}
+
+	getUsersCommand, ok := input.(user_command.GetUsersCommand)
+	if ok {
+		return getUsersCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
@@ -168,6 +173,21 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 	deleteExpiredMetricsCommand, ok := cmd.(metrics_command.DeleteExpiredMetricsCommand)
 	if ok {
 		return deleteExpiredMetricsCommand.Execute(uow, now)
+	}
+
+	createUserCommand, ok := cmd.(user_command.CreateUserCommand)
+	if ok {
+		return createUserCommand.Execute(uow, now)
+	}
+
+	updateUserCommand, ok := cmd.(user_command.UpdateUserCommand)
+	if ok {
+		return updateUserCommand.Execute(uow, now)
+	}
+
+	deleteUserCommand, ok := cmd.(user_command.DeleteUserCommand)
+	if ok {
+		return deleteUserCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}

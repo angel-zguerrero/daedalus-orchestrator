@@ -23,7 +23,8 @@
 
 <ng-template #userDropdown>
   <c-dropdown [popperOptions]="{ placement: 'bottom-start' }" variant="nav-item">
-    <button [caret]="false" cDropdownToggle class="py-0 pe-0 daedalus-avatar-btn" aria-label="Open user menu">
+    <button [caret]="false" cDropdownToggle class="py-0 pe-0 daedalus-avatar-btn d-flex align-items-center gap-2" aria-label="Open user menu">
+      <span *ngIf="username" class="fw-semibold text-body">{{ username }}</span>
       <c-avatar
         shape="rounded-1"
         size="md"

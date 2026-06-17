@@ -5,6 +5,7 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
+	"deadalus-orch/shared/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -76,6 +77,7 @@ func (ctrl *AdminController) LogoutHandler(c *gin.Context) {
 
 type setupRequest struct {
 	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -117,7 +119,11 @@ func (ctrl *AdminController) AuthSetupHandler(c *gin.Context) {
 		return
 	}
 
-	err = authBO.SetupRootUser(c.Request.Context(), req.Username, req.Password)
+	err = authBO.SetupRootUser(c.Request.Context(), models.SetupRootUser{
+		Username: req.Username,
+		Email:    req.Email,
+		Password: req.Password,
+	})
 	if err != nil {
 		ctrl.Config.Logger.Error().Err(err).Str("username", req.Username).Msg("Root user setup failed")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Setup failed: " + err.Error()})
