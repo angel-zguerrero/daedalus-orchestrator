@@ -14,8 +14,8 @@ import { CommonModule } from '@angular/common';
   selector: 'app-root',
   template: `
     @if (authService.isDemo$ | async) {
-      <div style="background-color: #ffc107; color: #000; text-align: center; padding: 10px; font-weight: bold; z-index: 1050; position: relative;">
-        Modo demo, para acceder usuar usuario admin, password admin
+      <div style="background-color: #dc3545; color: #fff; text-align: center; padding: 10px; font-weight: bold; z-index: 1050; position: relative;">
+        Demo Mode: Dangerous for production
       </div>
     }
     <router-outlet />
