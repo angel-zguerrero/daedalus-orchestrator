@@ -17,7 +17,8 @@ type QueueMessageLease struct {
 	LeaseStatus    QueueMessageLeaseStatus
 	LeaseUntil     time.Time
 
-	JobWorkerCapacityPolicyIndexMatch int // Index of the capacity policy that matched when the lease was created, used for worker capacity management and scheduling decisions.
+	IsDelivered                       bool // True if the message was successfully delivered to the worker stream.
+	JobWorkerCapacityPolicyIndexMatch int  // Index of the capacity policy that matched when the lease was created, used for worker capacity management and scheduling decisions.
 	CreatedAt                         time.Time
 }
 

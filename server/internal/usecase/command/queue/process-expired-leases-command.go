@@ -125,6 +125,14 @@ func (cmd *ProcessExpiredLeasesCommand) Execute(uow *db.UnitOfWork, now time.Tim
 			continue
 		}
 
+		if !lease.IsDelivered {
+			// The message was dequeued but never successfully delivered to the worker stream.
+			message.Attempts--
+			if message.Attempts < 0 {
+				message.Attempts = 0
+			}
+		}
+
 		// Check if message has reached max attempts
 		if queue.MaxAttempts > 0 && message.Attempts >= queue.MaxAttempts {
 			fmt.Printf("Message %s has reached max attempts (%d), deleting message and lease\n", message.ID, message.Attempts)
