@@ -8,9 +8,6 @@
               <form cForm #loginForm="ngForm" (ngSubmit)="onLogin(loginForm)">
                 <h1>Login</h1>
                 <p class="text-body-secondary">Sign In to your account</p>
-                <p class="text-info" *ngIf="authService.isDemo$ | async">
-                  Demo mode active. You can use <strong>admin</strong> for both username and password.
-                </p>
 
                 <c-alert color="warning" *ngIf="authService.isDemo$ | async" class="mt-3">
                   Demo mode. To access, use username admin and password admin.
@@ -24,18 +21,11 @@
                   <span cInputGroupText>
                     <svg cIcon name="cilUser"></svg>
                   </span>
-                  <input
-                    autoComplete="username"
-                    cFormControl
-                    placeholder="Username"
-                    name="username"
-                    ngModel
-                    required
-                    #username="ngModel"
-                  />
+                  <input autoComplete="username" cFormControl placeholder="Username" name="username" ngModel required
+                    #username="ngModel" />
                 </c-input-group>
                 <div *ngIf="username.invalid && (username.dirty || username.touched || loginForm.submitted)"
-                     cTextColor="danger" class="form-text">
+                  cTextColor="danger" class="form-text">
                   <small *ngIf="username.errors?.['required']">Username is required.</small>
                 </div>
 
@@ -43,25 +33,18 @@
                   <span cInputGroupText>
                     <svg cIcon name="cilLockLocked"></svg>
                   </span>
-                  <input
-                    autoComplete="current-password"
-                    cFormControl
-                    placeholder="Password"
-                    type="password"
-                    name="password"
-                    ngModel
-                    required
-                    #password="ngModel"
-                  />
+                  <input autoComplete="current-password" cFormControl placeholder="Password" type="password"
+                    name="password" ngModel required #password="ngModel" />
                 </c-input-group>
                 <div *ngIf="password.invalid && (password.dirty || password.touched || loginForm.submitted)"
-                     cTextColor="danger" class="form-text">
+                  cTextColor="danger" class="form-text">
                   <small *ngIf="password.errors?.['required']">Password is required.</small>
                 </div>
 
                 <c-row>
                   <c-col xs="6">
-                    <button cButton class="px-4" color="primary" type="submit" [disabled]="isLoading || loginForm.invalid">
+                    <button cButton class="px-4" color="primary" type="submit"
+                      [disabled]="isLoading || loginForm.invalid">
                       <span *ngIf="isLoading" cSpinner component="span" size="sm" aria-hidden="true"></span>
                       <span *ngIf="isLoading"> Logging in...</span>
                       <span *ngIf="!isLoading">Login</span>
