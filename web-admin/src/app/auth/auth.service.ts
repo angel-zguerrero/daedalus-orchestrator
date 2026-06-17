@@ -27,12 +27,18 @@ export class AuthService {
     if (this.rootExistsSubject.value === true) {
       return of(true);
     }
+    return this.refreshAuthStatus();
+  }
+
+  refreshAuthStatus(): Observable<boolean> {
     return this.http.get<{ hasRoot: boolean, isDemo: boolean }>('/rest-api/auth/status').pipe(
       tap(res => {
-        this.rootExistsSubject.next(res.hasRoot);
+        // If in demo mode, the root user is auto-created, so we don't need setup
+        const effectivelyHasRoot = res.hasRoot || res.isDemo;
+        this.rootExistsSubject.next(effectivelyHasRoot);
         this.isDemoSubject.next(res.isDemo);
       }),
-      map(res => res.hasRoot),
+      map(res => res.hasRoot || res.isDemo),
       catchError(err => {
         console.error('Failed checking root status:', err);
         return of(true); // default to true on error to fail secure

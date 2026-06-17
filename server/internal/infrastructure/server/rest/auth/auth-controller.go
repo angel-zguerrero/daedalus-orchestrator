@@ -91,9 +91,21 @@ func (ctrl *AdminController) AuthStatusHandler(c *gin.Context) {
 		return
 	}
 
+	isDemo := ctrl.Config.IsDemo
+	if isDemo {
+		resolved, err := authBO.IsDemoResolved(c.Request.Context())
+		if err != nil {
+			ctrl.Config.Logger.Error().Err(err).Msg("Failed to check if demo mode is resolved")
+			// Depending on error policy, we could fail or proceed assuming not resolved.
+			// Let's assume it's not resolved if there's an error.
+		} else if resolved {
+			isDemo = false
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"hasRoot": exists,
-		"isDemo":  ctrl.Config.IsDemo,
+		"isDemo":  isDemo,
 	})
 }
 

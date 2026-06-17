@@ -291,6 +291,14 @@
       *ngIf="showAlert"
       [innerHTML]="errorMessage"
     ></c-alert>
+    <c-alert
+      color="warning"
+      *ngIf="isDemoMode && selectedUser?.IsRootUser"
+      class="mb-3"
+    >
+      <svg cIcon name="cil-warning" class="me-2"></svg>
+      Changing the root password will permanently disable demo mode.
+    </c-alert>
     <form
       [formGroup]="userFormUpdate"
       (ngSubmit)="updateUser()"

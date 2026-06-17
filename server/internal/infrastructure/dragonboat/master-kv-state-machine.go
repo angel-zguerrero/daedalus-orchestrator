@@ -45,6 +45,11 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return checkRootUserExistsCommand.Execute(uow, now)
 	}
 
+	checkDemoResolvedCommand, ok := input.(auth_command.CheckDemoResolvedCommand)
+	if ok {
+		return checkDemoResolvedCommand.Execute(uow, now)
+	}
+
 	checkSessionExistsCommand, ok := input.(auth_command.CheckSessionExistsCommand)
 	if ok {
 		return checkSessionExistsCommand.Execute(uow, now)

@@ -80,7 +80,7 @@ type Config struct {
 	// Default: 1.
 	MetricsRetentionRawHours int
 
-	// Demo is a flag that enables demo mode, creating a default admin user.
+	// Demo is a flag that enables demo mode. Enabled by default unless --production is used.
 	Demo bool
 }
 

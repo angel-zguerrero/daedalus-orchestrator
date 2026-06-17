@@ -25,6 +25,8 @@ import {
 } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
 import { ErrorUtil } from '../../shared/utils/error.util';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AuthService } from '../../auth/auth.service';
 
 export const passwordMatchValidator: ValidatorFn = (
   control: AbstractControl,
@@ -74,6 +76,8 @@ export class UsersComponent implements OnInit {
   cursors: string[] = [];
   pageSize = 20;
   searchQuery = '';
+  checkResolveDemo = false;
+  isDemoMode = false;
 
   public createModalVisible = false;
   public editModalVisible = false;
@@ -90,6 +94,9 @@ export class UsersComponent implements OnInit {
   constructor(
     private usersService: UsersService,
     private fb: FormBuilder,
+    private route: ActivatedRoute,
+    private router: Router,
+    public authService: AuthService
   ) {
     this.userForm = this.fb.group(
       {
@@ -114,7 +121,32 @@ export class UsersComponent implements OnInit {
 
   ngOnInit(): void {
     this.cursors.push('');
+    
+    this.authService.isDemo$.subscribe(isDemo => {
+      this.isDemoMode = isDemo;
+    });
+
     this.loadUsers();
+
+    this.route.queryParams.subscribe(params => {
+      if (params['resolveDemo']) {
+        if (this.users.length > 0) {
+          const rootUser = this.users.find(u => u.IsRootUser);
+          if (rootUser) {
+            this.openEditModal(rootUser);
+          }
+        } else {
+          this.checkResolveDemo = true;
+        }
+
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { resolveDemo: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        });
+      }
+    });
   }
 
   loadUsers(cursor: string = '', isPrevious: boolean = false): void {
@@ -129,6 +161,14 @@ export class UsersComponent implements OnInit {
           this.users = response.result.Entities;
           this.cursor = response.result.Cursor;
           this.loading = false;
+
+          if (this.checkResolveDemo) {
+            this.checkResolveDemo = false;
+            const rootUser = this.users.find(u => u.IsRootUser);
+            if (rootUser) {
+              this.openEditModal(rootUser);
+            }
+          }
         },
         error: (error) => {
           this.showAlert = true;
@@ -209,6 +249,7 @@ export class UsersComponent implements OnInit {
             this.editModalVisible = false;
             this.loadUsers();
             this.showAlert = false;
+            this.authService.refreshAuthStatus().subscribe();
           },
           error: (error) => {
             this.showAlert = true;

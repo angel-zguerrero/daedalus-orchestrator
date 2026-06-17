@@ -475,6 +475,7 @@ Configuration is loaded from three sources, in order of precedence (highest → 
 | Flag | Type | Description | Default |
 |---|---|---|---|
 | `--config` | string | Path to the configuration file. | *(none)* |
+| `--production` | bool | Disable demo mode. Demo mode is enabled by default. | `false` |
 | `--self-member-host` | string | IP/hostname for cluster peer communication. | *(required for cluster)* |
 | `--cluster-base-port` | int | Base port for Raft communication. | *(required for cluster)* |
 | `--initial-members` | string | Comma-separated member list for new cluster bootstrap. | *(required for new cluster)* |
@@ -518,8 +519,10 @@ To switch engines at runtime, set `MASTER_DB_ENGINE` and `TENANT_DB_ENGINE` (or 
 
 | Command | Description |
 |---|---|
-| `nx run server:serve` | Run the server only (PebbleDB, no admin UI) |
-| `nx run server:serve-admin` | Build the admin UI then run the server |
+| `nx run server:serve` | Run the server only in demo mode (PebbleDB, no admin UI) |
+| `nx run server:serve-production` | Run the server only in production mode (PebbleDB, no admin UI) |
+| `nx run server:serve-admin` | Build the admin UI then run the server in demo mode |
+| `nx run server:serve-admin-production` | Build the admin UI then run the server in production mode |
 | `nx run server:serve-rocksdb` | Run the server with RocksDB (advanced) |
 | `nx run server:serve-rocksdb-admin` | Build the admin UI then run the server with RocksDB (advanced) |
 | `nx run daedalus-web-admin:build:development` | Build the admin UI only |

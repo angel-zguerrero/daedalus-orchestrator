@@ -79,6 +79,12 @@ func (r *UserRepository) UpdateUser(input models.UpdateUser, now time.Time) (boo
 	if input.Password != "" {
 		user.PasswordHash = input.Password
 		fmt.Printf("UserRepository.UpdateUser assigned new PasswordHash\n")
+
+		// If root user changes their password, resolve demo mode
+		if user.IsRootUser {
+			r.repo.kvStore.Put(AdminFC, AdminFCSector, "demo_resolved", []byte("true"), 0, now)
+			fmt.Printf("UserRepository.UpdateUser resolved demo mode\n")
+		}
 	} else {
 		fmt.Printf("UserRepository.UpdateUser skipped PasswordHash assignment\n")
 	}

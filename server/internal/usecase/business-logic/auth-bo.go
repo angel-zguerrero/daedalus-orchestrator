@@ -145,6 +145,22 @@ func (bo *AuthBO) CheckRootExists(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
+func (bo *AuthBO) IsDemoResolved(ctx context.Context) (bool, error) {
+	cmd := &auth_command.CheckDemoResolvedCommand{}
+	resolved, err := dragonboat.ExecuteRepositoryQuery[bool](
+		bo.MasterNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"check demo resolved",
+	)
+	if err != nil {
+		return false, err
+	}
+	return resolved, nil
+}
+
 func (bo *AuthBO) SetupRootUser(ctx context.Context, input models.SetupRootUser) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {

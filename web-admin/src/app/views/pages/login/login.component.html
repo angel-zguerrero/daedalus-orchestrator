@@ -10,7 +10,7 @@
                 <p class="text-body-secondary">Sign In to your account</p>
 
                 <c-alert color="warning" *ngIf="authService.isDemo$ | async" class="mt-3">
-                  Demo mode. To access, use username admin and password admin.
+                  Demo mode. To access, use username admin and password admin. Please change the root password after logging in to resolve this warning.
                 </c-alert>
 
                 <c-alert color="danger" *ngIf="loginError" class="mt-3">

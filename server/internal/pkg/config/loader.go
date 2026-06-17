@@ -207,8 +207,8 @@ var DeploymentIDFlag = flag.Uint64(constants.DeploymentIDFlagName, 0, "Unique id
 // before the lease expires automatically.
 var MessageLeaseDurationFlag = flag.Int64(constants.MessageLeaseDurationFlagName, 0, fmt.Sprintf("Duration in seconds a dequeued message is leased to a JobWorker (default: %d, minimum: 5). Overrides config file and environment variable.", constants.DefaultMessageLeaseDurationSeconds))
 
-// DemoFlag defines the --demo command-line flag.
-var DemoFlag = flag.Bool("demo", false, "Enable demo mode, which automatically sets up a root user with username 'admin' and password 'admin'.")
+// ProductionFlag defines the --production command-line flag.
+var ProductionFlag = flag.Bool("production", false, "Disable demo mode.")
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -529,10 +529,18 @@ func LoadDefaultConfiguration() error {
 		config.MessageLeaseDuration = time.Duration(*MessageLeaseDurationFlag) * time.Second
 	}
 
-	if DemoFlag != nil && *DemoFlag {
-		config.Demo = true
-		config.DefaultRootUser = "admin"
-		config.DefaultRootPassword = "admin"
+	config.Demo = true
+	if ProductionFlag != nil && *ProductionFlag {
+		config.Demo = false
+	}
+
+	if config.Demo {
+		if config.DefaultRootUser == "" {
+			config.DefaultRootUser = "admin"
+		}
+		if config.DefaultRootPassword == "" {
+			config.DefaultRootPassword = "admin"
+		}
 	}
 
 	// Apply defaults if values are not set by any source

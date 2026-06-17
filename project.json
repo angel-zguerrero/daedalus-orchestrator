@@ -16,6 +16,18 @@
                 "cwd": "server"
             }
         },
+        "serve-production": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "go run cmd/main.go --production"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "server"
+            }
+        },
         "serve-admin": {
             "executor": "nx:run-commands",
             "options": {
@@ -25,6 +37,21 @@
                     },
                     {
                         "command": "go run cmd/main.go"
+                    }
+                ],
+                "parallel": false,
+                "cwd": "server"
+            }
+        },
+        "serve-admin-production": {
+            "executor": "nx:run-commands",
+            "options": {
+                "commands": [
+                    {
+                        "command": "nx run daedalus-web-admin:build:development"
+                    },
+                    {
+                        "command": "go run cmd/main.go --production"
                     }
                 ],
                 "parallel": false,
