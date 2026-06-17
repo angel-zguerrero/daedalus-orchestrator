@@ -144,10 +144,6 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 				}
 
 				// Always ensure APIs are running if roles match, but Start*API() has internal guards
-				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleAdmin) {
-					app.StartRestAPI()
-				}
-
 				if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConnector) {
 					app.StartGrpcAPI()
 				}
