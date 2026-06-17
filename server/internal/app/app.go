@@ -275,6 +275,9 @@ func (app *Application) Run() {
 
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
+	if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
+		app.StartRestAPI()
+	}
 }
 
 func (app *Application) Stop() {
