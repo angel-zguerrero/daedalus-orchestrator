@@ -59,6 +59,20 @@ func (r *UserRepository) GetUserRoot() (*models.User, error) {
 	return r.repo.FindByField("IsRootUser", "true", time.Now())
 }
 
+func (r *UserRepository) UpdateUser(input models.User, password *string) (bool, error) {
+	now := time.Now()
+
+	if password != nil && *password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*password), bcrypt.DefaultCost)
+		if err != nil {
+			return false, err
+		}
+		input.PasswordHash = string(hash)
+	}
+
+	return r.repo.Update(&input, now)
+}
+
 func (r *UserRepository) DeleteUser(username string) (bool, error) {
 	now := time.Now()
 	rootUser, err := r.repo.FindByField("Username", username, now)
