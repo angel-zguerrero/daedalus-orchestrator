@@ -20,4 +20,5 @@ type ServerConfing struct {
 	Server                *http.Server
 	Logger                zerolog.Logger
 	MetricsCollector      *metrics.MetricsCollector
+	IsDemo                bool
 }

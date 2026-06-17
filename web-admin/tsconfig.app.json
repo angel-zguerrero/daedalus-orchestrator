@@ -9,7 +9,7 @@
     ],
     "paths": {
       "@docs-components/*": [
-        "web-admin/src/components/*"
+        "src/components/*"
       ]
     }
   },
