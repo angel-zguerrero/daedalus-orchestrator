@@ -21,4 +21,5 @@ type ServerConfing struct {
 	Logger                zerolog.Logger
 	MetricsCollector      *metrics.MetricsCollector
 	IsDemo                bool
+	IsReady               func() bool
 }

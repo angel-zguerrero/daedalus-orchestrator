@@ -454,11 +454,34 @@ func (bo *JobWorkerBO) dequeueMessage(
 	select {
 	case messageChan <- claimedMsg:
 		bo.Config.Logger.Debug().Str("messageID", result.Message.ID).Msg("📤 Sent message to stream")
+
+		// Marcar el lease como entregado en la base de datos de forma asíncrona
+		go func(lID string, tNode *dragonboat.RaftNode, columnF, columnFS string) {
+			ctxBg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			cmd := &queue_command.MarkLeaseDeliveredCommand{
+				LeaseID: lID,
+				CF:      columnF,
+				CFS:     columnFS,
+			}
+			_, err := dragonboat.ExecuteRepositoryCommand[queue_command.MarkLeaseDeliveredResult](
+				tNode,
+				ctxBg,
+				cmd,
+				config.GlobalConfiguration.ApiRaftTimeout,
+				bo.Config.Logger,
+				"mark lease delivered",
+			)
+			if err != nil {
+				bo.Config.Logger.Error().Err(err).Str("leaseID", lID).Msg("❌ Failed to mark lease delivered")
+			}
+		}(result.Lease.ID, tenantNode, cf, cfs)
+
 		if bo.Config.MetricsCollector != nil {
 			bo.Config.MetricsCollector.RecordDelivery(tenant.Code, queue.Code, queue.VNamespace, 1)
 		}
-	default:
-		bo.Config.Logger.Warn().Str("messageID", result.Message.ID).Msg("⚠️ Message channel full or closed, message not sent")
+	case <-ctx.Done():
+		bo.Config.Logger.Warn().Str("messageID", result.Message.ID).Msg("⚠️ Context cancelled, message not sent")
 	}
 	return true
 }

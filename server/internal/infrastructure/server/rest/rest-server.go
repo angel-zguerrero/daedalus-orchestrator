@@ -41,9 +41,60 @@ func NewRestServer(config *common.ServerConfing) *RestServer {
 	gin.DefaultErrorWriter = zerologAdapter{config.Logger}
 	engine := gin.Default()
 
+	engine.Use(func(c *gin.Context) {
+		isReady := config.IsReady != nil && config.IsReady()
+		if !isReady {
+			if strings.HasPrefix(c.Request.URL.Path, "/rest-api/") {
+				c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "System is starting..."})
+				return
+			}
+			if c.Request.URL.Path != "/starting" {
+				c.Redirect(http.StatusTemporaryRedirect, "/starting")
+				c.Abort()
+				return
+			}
+		} else {
+			if c.Request.URL.Path == "/starting" {
+				c.Redirect(http.StatusTemporaryRedirect, "/admin/")
+				c.Abort()
+				return
+			}
+		}
+		c.Next()
+	})
+
 	// Ruta para servir archivos estáticos
 	staticPath := resolveAngularDistPath(config)
 	engine.Static("/admin/", staticPath)
+
+	engine.GET("/starting", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starting...</title>
+    <style>
+        body { font-family: 'IBM Plex Sans', system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #080C0F; color: #E8F4F8; }
+        .message { text-align: center; }
+        h1 { font-family: 'Geist Mono', monospace; font-size: 2em; margin-bottom: 0.5em; color: #00E5FF; }
+        p { color: #7A9BA8; }
+    </style>
+</head>
+<body>
+    <div class="message">
+        <h1>System is starting...</h1>
+        <p>Please wait while the system initializes.</p>
+    </div>
+    <script>
+        setTimeout(function() {
+            window.location.reload(1);
+        }, 5000); // Check every 5 seconds
+    </script>
+</body>
+</html>`))
+	})
 
 	engine.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/admin/")

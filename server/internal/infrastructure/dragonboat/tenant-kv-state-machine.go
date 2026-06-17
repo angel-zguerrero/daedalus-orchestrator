@@ -243,6 +243,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return ackMessageCommand.Execute(uow, now)
 	}
 
+	markLeaseDeliveredCommand, ok := cmd.(queue_command.MarkLeaseDeliveredCommand)
+	if ok {
+		return markLeaseDeliveredCommand.Execute(uow, now)
+	}
+
 	processExpiredLeasesCommand, ok := cmd.(queue_command.ProcessExpiredLeasesCommand)
 	if ok {
 		return processExpiredLeasesCommand.Execute(uow, now)

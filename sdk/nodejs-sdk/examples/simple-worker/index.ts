@@ -4,7 +4,7 @@ async function main() {
     const daedalusSDK = new DaedalusSDK({
         uri: 'http://localhost:4000',
         username: 'admin',
-        password: '123456'
+        password: 'admin'
     });
 
     await daedalusSDK.connect();

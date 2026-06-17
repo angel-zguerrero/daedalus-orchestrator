@@ -28,6 +28,7 @@ func (app *Application) StartRestAPI() {
 			Logger:                log.Logger,
 			MetricsCollector:      app.MetricsCollector,
 			IsDemo:                config.GlobalConfiguration.Demo,
+			IsReady:               func() bool { return app.MasterNodeIsReady },
 		}
 		app.RestAPI = rest_server.NewRestServer(serverConfig)
 
