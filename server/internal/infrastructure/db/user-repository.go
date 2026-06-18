@@ -126,10 +126,6 @@ func (r *UserRepository) Login(usernameOrEmail, password string, now time.Time) 
 		return false, nil
 	}
 
-	fmt.Printf("UserRepository.Login: User found: %s\n", user.Username)
-	fmt.Printf("UserRepository.Login: Password hash: %s\n", user.PasswordHash)
-	fmt.Printf("UserRepository.Login: Password: %s\n", password)
-
 	// User found, now validate password
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
