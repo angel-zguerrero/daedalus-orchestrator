@@ -469,7 +469,7 @@ func (r *Repository[T]) tryCompoundQuery(filter string, now time.Time) (*T, bool
 		return nil, true, fmt.Errorf("error getting entity data: %w", err)
 	}
 
-	if dataBytes == nil {
+	if len(dataBytes) == 0 {
 		return nil, true, nil // Data not found (inconsistent state), but it was a compound query
 	}
 
@@ -610,6 +610,9 @@ func (r *Repository[T]) Find(filter string, limit int, cursor string, now time.T
 		if err != nil {
 			return nil, err
 		}
+		if len(dataBytes) == 0 {
+			continue
+		}
 		var result T
 		err = json.Unmarshal(dataBytes, &result)
 		if err != nil {
@@ -670,7 +673,7 @@ func (r *Repository[T]) FindByField(field string, value string, now time.Time) (
 		return nil, err
 	}
 
-	if dataBytes == nil {
+	if len(dataBytes) == 0 {
 		return nil, nil
 	}
 
