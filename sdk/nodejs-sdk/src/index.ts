@@ -611,6 +611,7 @@ export class DaedalusSDK {
                   if (policyIdx >= 0 && policyIdx < currentCounts.length) {
                     currentCounts[policyIdx] = Math.max(0, currentCounts[policyIdx] - 1);
                   }
+                  triggerClaimRequest();
                 };
 
                 // Process message asynchronously
@@ -669,6 +670,18 @@ export class DaedalusSDK {
               console.error('❌ Error sending claim request:', err.message);
             }
           });
+        };
+
+        let claimRequestPending = false;
+        const triggerClaimRequest = () => {
+          if (claimRequestPending) return;
+          claimRequestPending = true;
+          setTimeout(() => {
+            claimRequestPending = false;
+            if (connected) {
+              sendClaimRequest();
+            }
+          }, 50); // 50ms debounce
         };
 
         // Send initial claim request

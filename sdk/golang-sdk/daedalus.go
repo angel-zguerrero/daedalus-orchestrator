@@ -462,6 +462,14 @@ func (sdk *DaedalusSDK) runWorkerStream(
 	streamDone := make(chan struct{})
 	connected := false
 
+	claimTrigger := make(chan struct{}, 1)
+	triggerClaimRequest := func() {
+		select {
+		case claimTrigger <- struct{}{}:
+		default:
+		}
+	}
+
 	// Handle incoming messages from server in a goroutine
 	go func() {
 		defer close(streamDone)
@@ -536,6 +544,7 @@ func (sdk *DaedalusSDK) runWorkerStream(
 								currentCounts[policyIdx] = int32(math.Max(0, float64(currentCounts[policyIdx]-1)))
 								countsMu.Unlock()
 							}
+							triggerClaimRequest()
 						}
 						return err
 					}
@@ -585,6 +594,8 @@ func (sdk *DaedalusSDK) runWorkerStream(
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	var lastClaimRequest time.Time
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -595,7 +606,27 @@ func (sdk *DaedalusSDK) runWorkerStream(
 				return fmt.Errorf("failed to establish stream connection")
 			}
 			return nil
+		case <-claimTrigger:
+			if time.Since(lastClaimRequest) < 50*time.Millisecond {
+				go func() {
+					time.Sleep(50 * time.Millisecond)
+					triggerClaimRequest()
+				}()
+				continue
+			}
+			lastClaimRequest = time.Now()
+
+			sysInfoMu.RLock()
+			currentSysInfo := sysInfo
+			sysInfoMu.RUnlock()
+			if connected {
+				if err := sdk.sendClaimRequest(stream, workerID, options, currentCounts, countsMu, currentSysInfo); err != nil {
+					log.Printf("❌ Error sending claim request: %v", err)
+					return err
+				}
+			}
 		case <-ticker.C:
+			lastClaimRequest = time.Now()
 			sysInfoMu.RLock()
 			currentSysInfo := sysInfo
 			sysInfoMu.RUnlock()
