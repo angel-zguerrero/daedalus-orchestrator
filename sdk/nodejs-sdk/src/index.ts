@@ -347,7 +347,6 @@ export class DaedalusSDK {
             console.error('❌ Ack message failed:', response.message);
             return reject(new Error(response.message));
           }
-          console.log('✅ Message acknowledged successfully');
           resolve();
         }
       );
@@ -570,7 +569,6 @@ export class DaedalusSDK {
             consecutiveFailures = 0; // Reset failures on successful connection/ack
           } else if (streamMessage.claimedMessage) {
             const claimed = streamMessage.claimedMessage;
-            console.log(`📬 Received message: ${claimed.message.ID} from tenant ${claimed.tenantCode}`);
 
             if (onMessage) {
               try {
@@ -644,7 +642,7 @@ export class DaedalusSDK {
 
         // Function to send claim request
         let currentInformation: Record<string, string> = await getSystemInfo();
-        
+
         // Update system information every 15 seconds to avoid heavy OS polling
         const sysInfoInterval = setInterval(async () => {
           try {

@@ -27,13 +27,13 @@ import (
 type DaedalusSDK struct {
 	config Config
 
-	conn           *grpc.ClientConn
-	authClient     authpb.AuthServiceClient
+	conn            *grpc.ClientConn
+	authClient      authpb.AuthServiceClient
 	jobWorkerClient jobworkerpb.JobWorkerServiceClient
-	tenantClient   tenantpb.TenantServiceClient
-	exchangeClient exchangepb.ExchangeServiceClient
-	queueClient    queuepb.QueueServiceClient
-	bindingClient  bindingpb.BindingServiceClient
+	tenantClient    tenantpb.TenantServiceClient
+	exchangeClient  exchangepb.ExchangeServiceClient
+	queueClient     queuepb.QueueServiceClient
+	bindingClient   bindingpb.BindingServiceClient
 
 	token string
 	mu    sync.RWMutex
@@ -190,7 +190,6 @@ func (sdk *DaedalusSDK) AckMessage(ctx context.Context, leaseID, tenantCode stri
 		log.Printf("❌ Ack message failed: %s", resp.Message)
 		return fmt.Errorf("ack message failed: %s", resp.Message)
 	}
-	log.Println("✅ Message acknowledged successfully")
 	return nil
 }
 
@@ -279,19 +278,19 @@ func (sdk *DaedalusSDK) AssertBinding(ctx context.Context, input AssertBindingIn
 	}
 
 	resp, err := sdk.bindingClient.CreateBinding(sdk.authCtx(ctx), &bindingpb.CreateBindingRequest{
-		TenantCode:          input.TenantCode,
-		Code:                input.Code,
-		ExchangeCode:        input.ExchangeCode,
-		QueueCode:           input.QueueCode,
-		TargetExchangeCode:  input.TargetExchangeCode,
+		TenantCode:            input.TenantCode,
+		Code:                  input.Code,
+		ExchangeCode:          input.ExchangeCode,
+		QueueCode:             input.QueueCode,
+		TargetExchangeCode:    input.TargetExchangeCode,
 		AlternateExchangeCode: input.AlternateExchangeCode,
-		Vnamespace:          input.VNamespace,
-		RoutingKey:          input.RoutingKey,
-		Pattern:             input.Pattern,
-		XMatch:              input.XMatch,
-		BindingType:         bindingType,
-		TargetExchangeType:  input.TargetExchangeType,
-		Headers:             input.Headers,
+		Vnamespace:            input.VNamespace,
+		RoutingKey:            input.RoutingKey,
+		Pattern:               input.Pattern,
+		XMatch:                input.XMatch,
+		BindingType:           bindingType,
+		TargetExchangeType:    input.TargetExchangeType,
+		Headers:               input.Headers,
 	})
 	if err != nil {
 		log.Printf("❌ Failed to assert binding: %v", err)
@@ -336,10 +335,10 @@ func (sdk *DaedalusSDK) PublishMessage(ctx context.Context, input PublishMessage
 	}
 
 	resp, err := sdk.exchangeClient.PublishMessage(sdk.authCtx(ctx), &exchangepb.PublishMessageRequest{
-		TenantCode:                    input.TenantCode,
-		ExchangeCode:                  input.ExchangeCode,
+		TenantCode:                     input.TenantCode,
+		ExchangeCode:                   input.ExchangeCode,
 		RoutingKeyOrPatternOrQueueCode: input.RoutingKeyOrPatternOrQueueCode,
-		Vnamespace:                    input.VNamespace,
+		Vnamespace:                     input.VNamespace,
 		Message: &exchangepb.QueueMessage{
 			MessageId:   input.MessageID,
 			Handler:     input.Handler,
@@ -501,8 +500,6 @@ func (sdk *DaedalusSDK) runWorkerStream(
 
 			case *jobworkerpb.ClaimWorkStreamMessage_ClaimedMessage:
 				claimed := m.ClaimedMessage
-				log.Printf("📬 Received message: %s from tenant %s", claimed.Message.ID, claimed.TenantCode)
-
 				if options.OnMessage != nil {
 					claimedMsg := ClaimedMessage{
 						Message: QueueMessage{
@@ -664,10 +661,10 @@ func (sdk *DaedalusSDK) sendClaimRequest(
 				ExcludeVNamespaces:        p.ClaimWorkFilter.ExcludeVNamespaces,
 				VNamespacePatterns:        p.ClaimWorkFilter.VNamespacePatterns,
 				ExcludeVNamespacePatterns: p.ClaimWorkFilter.ExcludeVNamespacePatterns,
-				QueueCodes:               p.ClaimWorkFilter.QueueCodes,
-				ExcludeQueueCodes:        p.ClaimWorkFilter.ExcludeQueueCodes,
-				QueuePatterns:            p.ClaimWorkFilter.QueuePatterns,
-				ExcludeQueuePatterns:     p.ClaimWorkFilter.ExcludeQueuePatterns,
+				QueueCodes:                p.ClaimWorkFilter.QueueCodes,
+				ExcludeQueueCodes:         p.ClaimWorkFilter.ExcludeQueueCodes,
+				QueuePatterns:             p.ClaimWorkFilter.QueuePatterns,
+				ExcludeQueuePatterns:      p.ClaimWorkFilter.ExcludeQueuePatterns,
 			}
 		}
 		policies[i] = policy
