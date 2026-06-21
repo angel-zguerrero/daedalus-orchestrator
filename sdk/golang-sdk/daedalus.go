@@ -550,8 +550,34 @@ func (sdk *DaedalusSDK) runWorkerStream(
 		}
 	}()
 
+	// Set up system info caching to avoid heavy OS polling
+	sysInfo := GetSystemInfo()
+	var sysInfoMu sync.RWMutex
+
+	sysInfoTicker := time.NewTicker(15 * time.Second)
+	defer sysInfoTicker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-streamDone:
+				return
+			case <-sysInfoTicker.C:
+				info := GetSystemInfo()
+				sysInfoMu.Lock()
+				sysInfo = info
+				sysInfoMu.Unlock()
+			}
+		}
+	}()
+
 	// Send initial claim request
-	if err := sdk.sendClaimRequest(stream, workerID, options, currentCounts, countsMu); err != nil {
+	sysInfoMu.RLock()
+	currentSysInfo := sysInfo
+	sysInfoMu.RUnlock()
+	if err := sdk.sendClaimRequest(stream, workerID, options, currentCounts, countsMu, currentSysInfo); err != nil {
 		return err
 	}
 
@@ -570,7 +596,10 @@ func (sdk *DaedalusSDK) runWorkerStream(
 			}
 			return nil
 		case <-ticker.C:
-			if err := sdk.sendClaimRequest(stream, workerID, options, currentCounts, countsMu); err != nil {
+			sysInfoMu.RLock()
+			currentSysInfo := sysInfo
+			sysInfoMu.RUnlock()
+			if err := sdk.sendClaimRequest(stream, workerID, options, currentCounts, countsMu, currentSysInfo); err != nil {
 				log.Printf("❌ Error sending claim request: %v", err)
 				return err
 			}
@@ -584,8 +613,8 @@ func (sdk *DaedalusSDK) sendClaimRequest(
 	options WorkerOptions,
 	currentCounts []int32,
 	countsMu *sync.Mutex,
+	sysInfo map[string]string,
 ) error {
-	sysInfo := GetSystemInfo()
 
 	countsMu.Lock()
 	policies := make([]*jobworkerpb.ClaimWorkCapacityPolicy, len(options.CapacityPolicies))

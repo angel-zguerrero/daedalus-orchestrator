@@ -642,10 +642,18 @@ export class DaedalusSDK {
         });
 
         // Function to send claim request
-        const sendClaimRequest = async () => {
-          let currentInformation: Record<string, string> = {};
-          currentInformation = await getSystemInfo();
+        let currentInformation: Record<string, string> = await getSystemInfo();
+        
+        // Update system information every 15 seconds to avoid heavy OS polling
+        const sysInfoInterval = setInterval(async () => {
+          try {
+            currentInformation = await getSystemInfo();
+          } catch (err) {
+            console.error('Failed to update system info:', err);
+          }
+        }, 15000);
 
+        const sendClaimRequest = () => {
           const request = {
             workerID: workerId,
             workerName: workerName,
@@ -664,17 +672,18 @@ export class DaedalusSDK {
         };
 
         // Send initial claim request
-        await sendClaimRequest();
+        sendClaimRequest();
 
         // Send claim requests periodically
-        const claimInterval = setInterval(async () => {
-          await sendClaimRequest();
+        const claimInterval = setInterval(() => {
+          sendClaimRequest();
         }, intervalMs);
 
         // Wait for stream to end
         await streamPromise;
 
         clearInterval(claimInterval);
+        clearInterval(sysInfoInterval);
 
         if (!connected) {
           throw new Error('Failed to establish stream connection');
