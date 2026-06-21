@@ -29,7 +29,7 @@ func NewJobWorkerService(config *common.ServerConfing) *JobWorkerService {
 
 func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer) error {
 	// Create a channel to receive claimed messages from business logic
-	messageChan := make(chan bo.ClaimedMessage, 100)
+	messageChan := make(chan bo.ClaimedMessage, 1000)
 
 	// Track if we've sent the initial ACK
 	ackSent := false

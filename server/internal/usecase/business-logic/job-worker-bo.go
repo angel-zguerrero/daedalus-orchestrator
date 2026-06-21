@@ -316,7 +316,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 								}
 							}
 
-							// ── Round-robin drain: cycle through all queues until the policy
+							// ── Batch drain: process all queues concurrently until the policy
 							// is satisfied or a full round yields no new messages. ─────────────
 							for {
 								claimMu.Lock()
@@ -326,44 +326,94 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 								}
 								claimMu.Unlock()
 
+								var batchWg sync.WaitGroup
+								var batchMu sync.Mutex
 								claimedInRound := 0
+
 								for i := range allQueues {
 									queue := &allQueues[i]
 
+									// Determinar cuántos mensajes podemos sacar de esta cola en este lote
 									claimMu.Lock()
 									if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
 										claimMu.Unlock()
 										break queueLoop
 									}
 
-									// Respect the queue's own delivering-message cap (0 = unlimited).
-									// MessagesCount > 0 is already guaranteed by the DB query.
-									if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
+									// Respetar el límite de entrega de la cola
+									maxFromQueue := queue.MessagesCount
+									if maxFromQueue <= 0 {
 										claimMu.Unlock()
 										continue
 									}
 
-									// Optimistically reserve the slot
+									if queue.MaxDeliveringMessages > 0 {
+										availableCapacity := queue.MaxDeliveringMessages - queue.CurrentDeliveringMessages
+										if availableCapacity <= 0 {
+											claimMu.Unlock()
+											continue
+										}
+										if availableCapacity < maxFromQueue {
+											maxFromQueue = availableCapacity
+										}
+									}
+
+									// Respetar el límite de la política
 									if policy.MaxQueueMessages > 0 {
-										claimedByPolicy[policyCode]++
+										policyCapacity := policy.MaxQueueMessages - claimedByPolicy[policyCode]
+										if policyCapacity <= 0 {
+											claimMu.Unlock()
+											break queueLoop
+										}
+										if policyCapacity < maxFromQueue {
+											maxFromQueue = policyCapacity
+										}
+									}
+
+									// Limitar el tamaño del lote por cola para evitar monopolización
+									const maxBatchSizePerQueue = 50
+									if maxFromQueue > maxBatchSizePerQueue {
+										maxFromQueue = maxBatchSizePerQueue
+									}
+
+									// Optimísticamente reservamos el espacio
+									if policy.MaxQueueMessages > 0 {
+										claimedByPolicy[policyCode] += maxFromQueue
 									}
 									claimMu.Unlock()
 
-									// ── Dequeue message ──
-									if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, queue, &tenant, g.node, cf, cfs, messageChan) {
-										queue.CurrentDeliveringMessages++
-										claimedInRound++
-									} else {
-										// Failed to dequeue, refund the slot
-										claimMu.Lock()
-										if policy.MaxQueueMessages > 0 {
-											claimedByPolicy[policyCode]--
-										}
-										claimMu.Unlock()
+									if maxFromQueue <= 0 {
+										continue
+									}
+
+									// Lanzar goroutines para dequeue concurrente
+									for j := 0; j < maxFromQueue; j++ {
+										batchWg.Add(1)
+										go func(q *models.Queue) {
+											defer batchWg.Done()
+
+											if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, q, &tenant, g.node, cf, cfs, messageChan) {
+												batchMu.Lock()
+												q.CurrentDeliveringMessages++
+												claimedInRound++
+												batchMu.Unlock()
+											} else {
+												// Si falla el dequeue, reembolsamos el slot
+												claimMu.Lock()
+												if policy.MaxQueueMessages > 0 {
+													claimedByPolicy[policyCode]--
+												}
+												claimMu.Unlock()
+											}
+										}(queue)
 									}
 								}
+
+								// Esperar a que todos los dequeues del lote terminen
+								batchWg.Wait()
+
 								if claimedInRound == 0 {
-									break // No queue delivered a message this round; all queues exhausted.
+									break // No se entregaron mensajes en esta ronda; todas las colas agotadas.
 								}
 							}
 
