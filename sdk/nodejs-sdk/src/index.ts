@@ -1,8 +1,20 @@
 import * as grpc from '@grpc/grpc-js';
-import * as protoLoader from '@grpc/proto-loader';
-import * as path from 'path';
 import * as si from 'systeminformation';
 const crypto = require('crypto');
+
+import { AuthServiceClient } from './proto/auth_grpc_pb';
+import { JobWorkerServiceClient } from './proto/jobworker_grpc_pb';
+import { TenantServiceClient } from './proto/tenant_grpc_pb';
+import { ExchangeServiceClient } from './proto/exchange_grpc_pb';
+import { QueueServiceClient } from './proto/queue_grpc_pb';
+import { BindingServiceClient } from './proto/binding_grpc_pb';
+
+import { LoginRequest } from './proto/auth_pb';
+import { ClaimWorkRequest, ClaimWorkCapacityPolicy as PBClaimWorkCapacityPolicy, ClaimWorkFilter as PBClaimWorkFilter, ClaimWorkStreamMessage, AckMessageRequest } from './proto/jobworker_pb';
+import { AssertTenantRequest } from './proto/tenant_pb';
+import { CreateExchangeRequest, PublishMessageRequest, QueueMessage as ExchangeQueueMessage } from './proto/exchange_pb';
+import { CreateQueueRequest, EnqueueMessageRequest } from './proto/queue_pb';
+import { CreateBindingRequest } from './proto/binding_pb';
 
 export async function getSystemInfo(): Promise<Record<string, string>> {
   try {
@@ -114,7 +126,6 @@ export interface AssertQueueInput {
   maxAttempts?: number;
   maxQueueSize?: number;
   maxDeliveringMessages?: number;
-  /** 'normal' = strict priority order, server sets thresholds automatically. 'fair' = provide desiredPriorityThresholds. */
   priorityType?: 'normal' | 'fair';
   desiredPriorityThresholds?: Record<number, number>;
   headers?: Record<string, string>;
@@ -172,39 +183,15 @@ export interface SDKConfig {
 }
 
 export class DaedalusSDK {
-  private jobWorkerClient: any;
-  private authClient: any;
-  private tenantClient: any;
-  private exchangeClient: any;
-  private queueClient: any;
-  private bindingClient: any;
+  private jobWorkerClient?: JobWorkerServiceClient;
+  private authClient?: AuthServiceClient;
+  private tenantClient?: TenantServiceClient;
+  private exchangeClient?: ExchangeServiceClient;
+  private queueClient?: QueueServiceClient;
+  private bindingClient?: BindingServiceClient;
   private token: string | null = null;
-  private jobWorkerProtoPath: string;
-  private authProtoPath: string;
-  private tenantProtoPath: string;
-  private exchangeProtoPath: string;
-  private queueProtoPath: string;
-  private bindingProtoPath: string;
 
   constructor(private config: SDKConfig) {
-    const protoBase = path.resolve(__dirname, '../../../server/internal/infrastructure/server/grpc/proto/definitions');
-    this.jobWorkerProtoPath = path.join(protoBase, 'jobworker.proto');
-    this.authProtoPath = path.join(protoBase, 'auth.proto');
-    this.tenantProtoPath = path.join(protoBase, 'tenant.proto');
-    this.exchangeProtoPath = path.join(protoBase, 'exchange.proto');
-    this.queueProtoPath = path.join(protoBase, 'queue.proto');
-    this.bindingProtoPath = path.join(protoBase, 'binding.proto');
-  }
-
-  private loadProto(protoPath: string) {
-    const packageDefinition = protoLoader.loadSync(protoPath, {
-      keepCase: true,
-      longs: String,
-      enums: String,
-      defaults: true,
-      oneofs: true
-    });
-    return grpc.loadPackageDefinition(packageDefinition);
   }
 
   async connect() {
@@ -240,44 +227,34 @@ export class DaedalusSDK {
   private async _connectOnce() {
     const target = this.config.uri.replace('http://', '').replace('https://', '');
 
-    // Load Auth Proto and create client
-    const authProtoDescriptor = this.loadProto(this.authProtoPath) as any;
-    this.authClient = new authProtoDescriptor.auth.AuthService(
+    this.authClient = new AuthServiceClient(
       target,
       grpc.credentials.createInsecure()
     );
 
-    // Perform Initial Login
     await this.login();
 
-    // Load JobWorker Proto and create client
-    const jobWorkerProtoDescriptor = this.loadProto(this.jobWorkerProtoPath) as any;
-    this.jobWorkerClient = new jobWorkerProtoDescriptor.jobworker.JobWorkerService(
+    this.jobWorkerClient = new JobWorkerServiceClient(
       target,
       grpc.credentials.createInsecure()
     );
 
-    // Load resource management clients
-    const tenantProtoDescriptor = this.loadProto(this.tenantProtoPath) as any;
-    this.tenantClient = new tenantProtoDescriptor.tenant.TenantService(
+    this.tenantClient = new TenantServiceClient(
       target,
       grpc.credentials.createInsecure()
     );
 
-    const exchangeProtoDescriptor = this.loadProto(this.exchangeProtoPath) as any;
-    this.exchangeClient = new exchangeProtoDescriptor.exchange.ExchangeService(
+    this.exchangeClient = new ExchangeServiceClient(
       target,
       grpc.credentials.createInsecure()
     );
 
-    const queueProtoDescriptor = this.loadProto(this.queueProtoPath) as any;
-    this.queueClient = new queueProtoDescriptor.queue.QueueService(
+    this.queueClient = new QueueServiceClient(
       target,
       grpc.credentials.createInsecure()
     );
 
-    const bindingProtoDescriptor = this.loadProto(this.bindingProtoPath) as any;
-    this.bindingClient = new bindingProtoDescriptor.binding.BindingService(
+    this.bindingClient = new BindingServiceClient(
       target,
       grpc.credentials.createInsecure()
     );
@@ -286,13 +263,14 @@ export class DaedalusSDK {
   private async login() {
     console.log(`🔐 Logging in as ${this.config.username}...`);
     try {
+      const req = new LoginRequest();
+      req.setUsernameoremail(this.config.username);
+      req.setPassword(this.config.password);
+
       const loginResponse = await new Promise<any>((resolve, reject) => {
-        this.authClient.Login({
-          usernameOrEmail: this.config.username,
-          password: this.config.password
-        }, (err: any, response: any) => {
+        this.authClient!.login(req, (err: any, response: any) => {
           if (err) return reject(err);
-          resolve(response);
+          resolve(response.toObject());
         });
       });
 
@@ -305,24 +283,12 @@ export class DaedalusSDK {
   }
 
   async disconnect() {
-    if (this.jobWorkerClient) {
-      this.jobWorkerClient.close();
-    }
-    if (this.authClient) {
-      this.authClient.close();
-    }
-    if (this.tenantClient) {
-      this.tenantClient.close();
-    }
-    if (this.exchangeClient) {
-      this.exchangeClient.close();
-    }
-    if (this.queueClient) {
-      this.queueClient.close();
-    }
-    if (this.bindingClient) {
-      this.bindingClient.close();
-    }
+    if (this.jobWorkerClient) this.jobWorkerClient.close();
+    if (this.authClient) this.authClient.close();
+    if (this.tenantClient) this.tenantClient.close();
+    if (this.exchangeClient) this.exchangeClient.close();
+    if (this.queueClient) this.queueClient.close();
+    if (this.bindingClient) this.bindingClient.close();
   }
 
   private getMetadata(): grpc.Metadata {
@@ -335,17 +301,22 @@ export class DaedalusSDK {
 
   async ackMessage(leaseID: string, tenantCode: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.jobWorkerClient.AckMessage(
-        { leaseID, tenantCode },
+      const req = new AckMessageRequest();
+      req.setLeaseid(leaseID);
+      req.setTenantcode(tenantCode);
+
+      this.jobWorkerClient!.ackMessage(
+        req,
         this.getMetadata(),
         (err: any, response: any) => {
           if (err) {
             console.error('❌ Failed to ack message:', err.message);
             return reject(err);
           }
-          if (!response.success) {
-            console.error('❌ Ack message failed:', response.message);
-            return reject(new Error(response.message));
+          const respObj = response.toObject();
+          if (!respObj.success) {
+            console.error('❌ Ack message failed:', respObj.message);
+            return reject(new Error(respObj.message));
           }
           console.log('✅ Message acknowledged successfully');
           resolve();
@@ -356,8 +327,12 @@ export class DaedalusSDK {
 
   async assertTenant(input: AssertTenantInput): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.tenantClient.AssertTenant(
-        { code: input.code, name: input.name },
+      const req = new AssertTenantRequest();
+      req.setCode(input.code);
+      req.setName(input.name);
+
+      this.tenantClient!.assertTenant(
+        req,
         this.getMetadata(),
         (err: any, response: any) => {
           if (err) {
@@ -365,7 +340,7 @@ export class DaedalusSDK {
             return reject(err);
           }
           console.log(`✅ Tenant asserted: ${input.code}`);
-          resolve(response.result);
+          resolve(response.toObject().result);
         }
       );
     });
@@ -373,15 +348,22 @@ export class DaedalusSDK {
 
   async assertExchange(input: AssertExchangeInput): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.exchangeClient.CreateExchange(
-        {
-          tenantCode: input.tenantCode,
-          code: input.code,
-          name: input.name,
-          type: input.type,
-          vnamespace: input.vnamespace ?? '',
-          headers: input.headers ?? {}
-        },
+      const req = new CreateExchangeRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setCode(input.code);
+      req.setName(input.name);
+      req.setType(input.type);
+      req.setVnamespace(input.vnamespace ?? '');
+
+      if (input.headers) {
+        const headersMap = req.getHeadersMap();
+        for (const [k, v] of Object.entries(input.headers)) {
+          headersMap.set(k, v);
+        }
+      }
+
+      this.exchangeClient!.createExchange(
+        req,
         this.getMetadata(),
         (err: any, response: any) => {
           if (err) {
@@ -389,7 +371,7 @@ export class DaedalusSDK {
             return reject(err);
           }
           console.log(`✅ Exchange asserted: ${input.code}`);
-          resolve(response.result);
+          resolve(response.toObject().result);
         }
       );
     });
@@ -397,26 +379,37 @@ export class DaedalusSDK {
 
   async assertQueue(input: AssertQueueInput): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.queueClient.CreateQueue(
-        {
-          tenantCode: input.tenantCode,
-          code: input.code,
-          name: input.name,
-          type: input.type ?? 'standard',
-          state: input.state ?? 'active',
-          vnamespace: input.vnamespace ?? '',
-          defaultQueueMessageTTL: input.defaultQueueMessageTTL ?? 0,
-          defaultQueueMessageDelayTime: input.defaultQueueMessageDelayTime ?? 0,
-          queueExpires: input.queueExpires ?? 0,
-          allowDuplicated: input.allowDuplicated ?? false,
-          maxAttempts: input.maxAttempts ?? 0,
-          maxQueueSize: input.maxQueueSize ?? 0,
-          maxDeliveringMessages: input.maxDeliveringMessages ?? 0,
-          desiredPriorityThresholds: input.priorityType === 'normal'
-            ? {}
-            : (input.desiredPriorityThresholds ?? {}),
-          headers: input.headers ?? {}
-        },
+      const req = new CreateQueueRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setCode(input.code);
+      req.setName(input.name);
+      req.setType(input.type ?? 'standard');
+      req.setState(input.state ?? 'active');
+      req.setVnamespace(input.vnamespace ?? '');
+      req.setDefaultqueuemessagettl(input.defaultQueueMessageTTL ?? 0);
+      req.setDefaultqueuemessagedelaytime(input.defaultQueueMessageDelayTime ?? 0);
+      req.setQueueexpires(input.queueExpires ?? 0);
+      req.setAllowduplicated(input.allowDuplicated ?? false);
+      req.setMaxattempts(input.maxAttempts ?? 0);
+      req.setMaxqueuesize(input.maxQueueSize ?? 0);
+      req.setMaxdeliveringmessages(input.maxDeliveringMessages ?? 0);
+
+      if (input.priorityType !== 'normal' && input.desiredPriorityThresholds) {
+        const priorityMap = req.getDesiredprioritythresholdsMap();
+        for (const [k, v] of Object.entries(input.desiredPriorityThresholds)) {
+          priorityMap.set(Number(k), v);
+        }
+      }
+
+      if (input.headers) {
+        const headersMap = req.getHeadersMap();
+        for (const [k, v] of Object.entries(input.headers)) {
+          headersMap.set(k, v);
+        }
+      }
+
+      this.queueClient!.createQueue(
+        req,
         this.getMetadata(),
         (err: any, response: any) => {
           if (err) {
@@ -424,7 +417,7 @@ export class DaedalusSDK {
             return reject(err);
           }
           console.log(`✅ Queue asserted: ${input.code}`);
-          resolve(response.result);
+          resolve(response.toObject().result);
         }
       );
     });
@@ -432,25 +425,38 @@ export class DaedalusSDK {
 
   async enqueueMessage(input: EnqueueMessageInput): Promise<{ messageId: string }> {
     return new Promise((resolve, reject) => {
-      this.queueClient.EnqueueMessage(
-        {
-          tenantCode: input.tenantCode,
-          queueCode: input.queueCode,
-          content: input.content,
-          contentType: input.contentType ?? 'text/plain',
-          vnamespace: input.vnamespace ?? '',
-          priority: input.priority ?? 0,
-          handler: input.handler ?? '',
-          headers: input.headers ?? {},
-          parameters: input.parameters ?? {}
-        },
+      const req = new EnqueueMessageRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setQueuecode(input.queueCode);
+      req.setContent(input.content);
+      req.setContenttype(input.contentType ?? 'text/plain');
+      req.setVnamespace(input.vnamespace ?? '');
+      req.setPriority(input.priority ?? 0);
+      req.setHandler(input.handler ?? '');
+
+      if (input.headers) {
+        const headersMap = req.getHeadersMap();
+        for (const [k, v] of Object.entries(input.headers)) {
+          headersMap.set(k, v);
+        }
+      }
+
+      if (input.parameters) {
+        const parametersMap = req.getParametersMap();
+        for (const [k, v] of Object.entries(input.parameters)) {
+          parametersMap.set(k, v);
+        }
+      }
+
+      this.queueClient!.enqueueMessage(
+        req,
         this.getMetadata(),
         (err: any, response: any) => {
           if (err) {
             console.error('❌ Failed to enqueue message:', err.message);
             return reject(err);
           }
-          resolve({ messageId: response.messageId });
+          resolve({ messageId: response.toObject().messageid });
         }
       );
     });
@@ -462,29 +468,48 @@ export class DaedalusSDK {
       : Buffer.from(input.content);
 
     return new Promise((resolve, reject) => {
-      this.exchangeClient.PublishMessage(
-        {
-          tenantCode: input.tenantCode,
-          exchangeCode: input.exchangeCode,
-          routingKeyOrPatternOrQueueCode: input.routingKeyOrPatternOrQueueCode ?? '',
-          vnamespace: input.vnamespace ?? '',
-          message: {
-            messageId: input.messageId ?? '',
-            handler: input.handler ?? '',
-            priority: input.priority ?? 0,
-            parameters: input.parameters ?? {},
-            headers: input.headers ?? {},
-            contentType: input.contentType ?? 'text/plain',
-            content: contentBytes
-          }
-        },
+      const req = new PublishMessageRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setExchangecode(input.exchangeCode);
+      req.setRoutingkeyorpatternorqueuecode(input.routingKeyOrPatternOrQueueCode ?? '');
+      req.setVnamespace(input.vnamespace ?? '');
+
+      const msg = new ExchangeQueueMessage();
+      msg.setMessageid(input.messageId ?? '');
+      msg.setHandler(input.handler ?? '');
+      msg.setPriority(input.priority ?? 0);
+      msg.setContenttype(input.contentType ?? 'text/plain');
+      msg.setContent(contentBytes);
+      
+      if (input.parameters) {
+        const parametersMap = msg.getParametersMap();
+        for (const [k, v] of Object.entries(input.parameters)) {
+          parametersMap.set(k, v);
+        }
+      }
+      if (input.headers) {
+        const headersMap = msg.getHeadersMap();
+        for (const [k, v] of Object.entries(input.headers)) {
+          headersMap.set(k, v);
+        }
+      }
+      req.setMessage(msg);
+
+      this.exchangeClient!.publishMessage(
+        req,
         this.getMetadata(),
         (err: any, response: any) => {
           if (err) {
             console.error('❌ Failed to publish message:', err.message);
             return reject(err);
           }
-          resolve(response.queueMessages ?? {});
+          const respObj = response.toObject();
+          const qmMap = respObj.queuemessagesMap || [];
+          const result: Record<string, string> = {};
+          qmMap.forEach((entry: any) => {
+            result[entry[0]] = entry[1];
+          });
+          resolve(result);
         }
       );
     });
@@ -492,22 +517,29 @@ export class DaedalusSDK {
 
   async assertBinding(input: AssertBindingInput): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.bindingClient.CreateBinding(
-        {
-          tenantCode: input.tenantCode,
-          code: input.code,
-          exchangeCode: input.exchangeCode,
-          queueCode: input.queueCode ?? '',
-          targetExchangeCode: input.targetExchangeCode ?? '',
-          alternateExchangeCode: input.alternateExchangeCode ?? '',
-          vnamespace: input.vnamespace ?? '',
-          routingKey: input.routingKey ?? '',
-          pattern: input.pattern ?? '',
-          xMatch: input.xMatch ?? '',
-          bindingType: input.bindingType ?? 'classic',
-          targetExchangeType: input.targetExchangeType ?? '',
-          headers: input.headers ?? {}
-        },
+      const req = new CreateBindingRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setCode(input.code);
+      req.setExchangecode(input.exchangeCode);
+      req.setQueuecode(input.queueCode ?? '');
+      req.setTargetexchangecode(input.targetExchangeCode ?? '');
+      req.setAlternateexchangecode(input.alternateExchangeCode ?? '');
+      req.setVnamespace(input.vnamespace ?? '');
+      req.setRoutingkey(input.routingKey ?? '');
+      req.setPattern(input.pattern ?? '');
+      req.setXmatch(input.xMatch ?? '');
+      req.setBindingtype(input.bindingType ?? 'classic');
+      req.setTargetexchangetype(input.targetExchangeType ?? '');
+
+      if (input.headers) {
+        const headersMap = req.getHeadersMap();
+        for (const [k, v] of Object.entries(input.headers)) {
+          headersMap.set(k, v);
+        }
+      }
+
+      this.bindingClient!.createBinding(
+        req,
         this.getMetadata(),
         (err: any, response: any) => {
           if (err) {
@@ -515,7 +547,7 @@ export class DaedalusSDK {
             return reject(err);
           }
           console.log(`✅ Binding asserted: ${input.code}`);
-          resolve(response.result);
+          resolve(response.toObject().result);
         }
       );
     });
@@ -526,15 +558,11 @@ export class DaedalusSDK {
     const {
       workerName,
       capacityPolicies,
-      intervalMs = 10000, // 10 seconds
+      intervalMs = 10000,
       onMessage
     } = options;
 
     const workerId = `${crypto.randomUUID()}-${Date.now()}`;
-
-    // Track in-flight message counts per capacity policy index.
-    // Incremented when a message is received, decremented when ack'd.
-    // Sent to the server on every heartbeat so it can enforce per-policy limits.
     const currentCounts = new Array(capacityPolicies.length).fill(0) as number[];
 
     let consecutiveFailures = 0;
@@ -545,8 +573,7 @@ export class DaedalusSDK {
           await this.login();
         }
 
-        // Create bidirectional stream
-        const call = this.jobWorkerClient.ClaimWork(this.getMetadata());
+        const call = this.jobWorkerClient!.claimWork(this.getMetadata());
 
         console.log(`🔌 Opening bidirectional stream for worker ${workerId}...`);
 
@@ -562,58 +589,65 @@ export class DaedalusSDK {
           };
         });
 
-        // Handle incoming messages from server
-        call.on('data', async (streamMessage: any) => {
-          if (streamMessage.ack) {
-            console.log('✅ Connected to server:', streamMessage.ack.knowledge);
+        call.on('data', async (streamMessage: ClaimWorkStreamMessage) => {
+          if (streamMessage.hasAck()) {
+            const ack = streamMessage.getAck()!;
+            console.log('✅ Connected to server:', ack.getKnowledge());
             connected = true;
-            consecutiveFailures = 0; // Reset failures on successful connection/ack
-          } else if (streamMessage.claimedMessage) {
-            const claimed = streamMessage.claimedMessage;
-            console.log(`📬 Received message: ${claimed.message.ID} from tenant ${claimed.tenantCode}`);
+            consecutiveFailures = 0;
+          } else if (streamMessage.hasClaimedmessage()) {
+            const claimed = streamMessage.getClaimedmessage()!;
+            const msgObj = claimed.getMessage()!.toObject();
+            const leaseObj = claimed.getLease()!.toObject();
+            
+            console.log(`📬 Received message: ${msgObj.id} from tenant ${claimed.getTenantcode()}`);
 
             if (onMessage) {
               try {
+                // Convert Map arrays back to Record<string, string>
+                const headersObj: Record<string, string> = {};
+                msgObj.headersMap.forEach((entry: any) => { headersObj[entry[0]] = entry[1]; });
+
+                const paramsObj: Record<string, string> = {};
+                msgObj.parametersMap.forEach((entry: any) => { paramsObj[entry[0]] = entry[1]; });
+
                 const claimedMessage: ClaimedMessage = {
                   message: {
-                    id: claimed.message.ID,
-                    messageId: claimed.message.MessageID,
-                    content: claimed.message.Content,
-                    contentType: claimed.message.ContentType,
-                    headers: claimed.message.Headers || {},
-                    queueId: claimed.message.QueueID,
-                    priority: claimed.message.Priority,
-                    attempts: claimed.message.Attempts || 0,
-                    handler: claimed.message.Handler,
-                    parameters: claimed.message.Parameters || {},
-                    vNamespace: claimed.message.VNamespace,
-                    createdAt: claimed.message.CreatedAt
+                    id: msgObj.id,
+                    messageId: msgObj.messageid,
+                    content: msgObj.content as string,
+                    contentType: msgObj.contenttype,
+                    headers: headersObj,
+                    queueId: msgObj.queueid,
+                    priority: msgObj.priority,
+                    attempts: msgObj.attempts || 0,
+                    handler: msgObj.handler,
+                    parameters: paramsObj,
+                    vNamespace: msgObj.vnamespace,
+                    createdAt: msgObj.createdat
                   },
                   lease: {
-                    id: claimed.lease.ID,
-                    queueMessageId: claimed.lease.QueueMessageID,
-                    workerId: claimed.lease.WorkerID,
-                    leaseUntil: claimed.lease.LeaseUntil
+                    id: leaseObj.id,
+                    queueMessageId: leaseObj.queuemessageid,
+                    workerId: leaseObj.workerid,
+                    leaseUntil: leaseObj.leaseuntil
                   },
-                  tenantCode: claimed.tenantCode,
-                  capacityPolicyIndexMatch: claimed.capacityPolicyIndexMatch || 0
+                  tenantCode: claimed.getTenantcode(),
+                  capacityPolicyIndexMatch: claimed.getCapacitypolicyindexmatch() || 0
                 };
 
-                // Increment the in-flight count for the matched policy
                 const policyIdx = claimedMessage.capacityPolicyIndexMatch;
                 if (policyIdx >= 0 && policyIdx < currentCounts.length) {
                   currentCounts[policyIdx]++;
                 }
 
                 const ackCallback: AckCallback = async () => {
-                  await this.ackMessage(claimed.lease.ID, claimed.tenantCode);
-                  // Decrement the in-flight count after ack
+                  await this.ackMessage(leaseObj.id, claimed.getTenantcode());
                   if (policyIdx >= 0 && policyIdx < currentCounts.length) {
                     currentCounts[policyIdx] = Math.max(0, currentCounts[policyIdx] - 1);
                   }
                 };
 
-                // Process message asynchronously
                 Promise.resolve(onMessage(claimedMessage, ackCallback)).catch((handlerError: any) => {
                   console.error('❌ Error in onMessage handler:', handlerError.message);
                 });
@@ -625,10 +659,10 @@ export class DaedalusSDK {
         });
 
         call.on('error', (err: any) => {
-          if (err.code === 16) { // UNAUTHENTICATED
+          if (err.code === 16) {
             console.warn('🔄 Session expired (Error 16). Refreshing token...');
             this.token = null;
-          } else if (err.code === 1) { // CANCELLED
+          } else if (err.code === 1) {
             console.log('🚫 Stream cancelled');
           } else {
             console.error('❌ Stream error:', err.message);
@@ -641,37 +675,52 @@ export class DaedalusSDK {
           resolveStreamPromise();
         });
 
-        // Function to send claim request
         const sendClaimRequest = async () => {
-          let currentInformation: Record<string, string> = {};
-          currentInformation = await getSystemInfo();
+          const currentInformation = await getSystemInfo();
 
-          const request = {
-            workerID: workerId,
-            workerName: workerName,
-            information: currentInformation,
-            capacityPolicies: capacityPolicies.map((p, i) => ({
-              ...p,
-              currentQueueMessages: currentCounts[i] ?? 0
-            }))
-          };
+          const request = new ClaimWorkRequest();
+          request.setWorkerid(workerId);
+          request.setWorkername(workerName);
+          
+          const infoMap = request.getInformationMap();
+          for (const [k, v] of Object.entries(currentInformation)) {
+            infoMap.set(k, v);
+          }
 
-          call.write(request, (err: any) => {
-            if (err) {
-              console.error('❌ Error sending claim request:', err.message);
+          capacityPolicies.forEach((p, i) => {
+            const cp = new PBClaimWorkCapacityPolicy();
+            cp.setMaxqueuemessages(p.maxQueueMessages);
+            cp.setCurrentqueuemessages(currentCounts[i] ?? 0);
+            
+            if (p.claimWorkFilter) {
+              const f = new PBClaimWorkFilter();
+              if (p.claimWorkFilter.tenantCodes) p.claimWorkFilter.tenantCodes.forEach(v => f.addTenantcodes(v));
+              if (p.claimWorkFilter.excludeTenantCodes) p.claimWorkFilter.excludeTenantCodes.forEach(v => f.addExcludetenantcodes(v));
+              if (p.claimWorkFilter.tenantPatterns) p.claimWorkFilter.tenantPatterns.forEach(v => f.addTenantpatterns(v));
+              if (p.claimWorkFilter.excludeTenantPatterns) p.claimWorkFilter.excludeTenantPatterns.forEach(v => f.addExcludetenantpatterns(v));
+              if (p.claimWorkFilter.vNamespaces) p.claimWorkFilter.vNamespaces.forEach(v => f.addVnamespaces(v));
+              if (p.claimWorkFilter.excludeVNamespaces) p.claimWorkFilter.excludeVNamespaces.forEach(v => f.addExcludevnamespaces(v));
+              if (p.claimWorkFilter.vNamespacePatterns) p.claimWorkFilter.vNamespacePatterns.forEach(v => f.addVnamespacepatterns(v));
+              if (p.claimWorkFilter.excludeVNamespacePatterns) p.claimWorkFilter.excludeVNamespacePatterns.forEach(v => f.addExcludevnamespacepatterns(v));
+              if (p.claimWorkFilter.queueCodes) p.claimWorkFilter.queueCodes.forEach(v => f.addQueuecodes(v));
+              if (p.claimWorkFilter.excludeQueueCodes) p.claimWorkFilter.excludeQueueCodes.forEach(v => f.addExcludequeuecodes(v));
+              if (p.claimWorkFilter.queuePatterns) p.claimWorkFilter.queuePatterns.forEach(v => f.addQueuepatterns(v));
+              if (p.claimWorkFilter.excludeQueuePatterns) p.claimWorkFilter.excludeQueuePatterns.forEach(v => f.addExcludequeuepatterns(v));
+              cp.setClaimworkfilter(f);
             }
+            
+            request.addCapacitypolicies(cp);
           });
+
+          call.write(request);
         };
 
-        // Send initial claim request
         await sendClaimRequest();
 
-        // Send claim requests periodically
         const claimInterval = setInterval(async () => {
           await sendClaimRequest();
         }, intervalMs);
 
-        // Wait for stream to end
         await streamPromise;
 
         clearInterval(claimInterval);
@@ -702,14 +751,12 @@ export class DaedalusSDK {
         }
       }
 
-      // Check autoReconnect configuration before scheduling reconnection
       const autoReconnect = this.config.autoReconnect !== false;
       if (!autoReconnect) {
         console.log('🛑 Auto reconnect is disabled. Worker will exit.');
         return;
       }
 
-      // Reconnect after delay
       console.log(`⏳ Reconnecting in ${intervalMs}ms...`);
       setTimeout(run, intervalMs);
     };

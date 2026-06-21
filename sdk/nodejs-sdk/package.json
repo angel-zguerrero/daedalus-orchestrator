@@ -21,6 +21,7 @@
     "access": "public"
   },
   "scripts": {
+    "prebuild": "mkdir -p src/proto && grpc_tools_node_protoc --js_out=import_style=commonjs,binary:./src/proto --grpc_out=grpc_js:./src/proto --plugin=protoc-gen-ts=./node_modules/.bin/protoc-gen-ts --ts_out=grpc_js:./src/proto -I ../../server/internal/infrastructure/server/grpc/proto/definitions ../../server/internal/infrastructure/server/grpc/proto/definitions/*.proto",
     "build": "tsc",
     "example:simple-worker": "ts-node examples/simple-worker/index.ts",
     "example:assert-resources": "ts-node examples/assert-resources/index.ts",
@@ -28,13 +29,15 @@
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.9.0",
-    "@grpc/proto-loader": "^0.7.8",
+    "google-protobuf": "^4.0.2",
     "systeminformation": "^5.21.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "grpc_tools_node_protoc_ts": "^5.3.3",
+    "grpc-tools": "^1.13.1",
     "ts-node": "^10.9.0",
-    "@types/node": "^20.0.0"
+    "typescript": "^5.0.0"
   },
   "keywords": [
     "daedalus",
