@@ -11,6 +11,7 @@ service ExchangeService {
   rpc GetExchanges (GetExchangesRequest) returns (GetExchangesResponse);
   rpc DeleteExchange (DeleteExchangeRequest) returns (DeleteExchangeResponse);
   rpc PublishMessage (PublishMessageRequest) returns (PublishMessageResponse);
+  rpc PublishStream (stream PublishStreamRequest) returns (stream PublishStreamResponse);
 }
 
 message CreateExchangeRequest {
@@ -116,6 +117,22 @@ message QueueMessage {
 message PublishMessageResponse {
   string message = 1;
   map<string, string> queueMessages = 2; // queueCode -> messageID
+}
+
+message PublishStreamRequest {
+  string clientMessageId = 1;
+  string tenantCode = 2;
+  string exchangeCode = 3;
+  string routingKeyOrPatternOrQueueCode = 4;
+  string vnamespace = 5;
+  QueueMessage message = 6;
+}
+
+message PublishStreamResponse {
+  string clientMessageId = 1;
+  bool confirmed = 2;
+  map<string, string> queueMessages = 3;
+  string error = 4;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/exchange.proto

@@ -27,6 +27,8 @@ func (app *Application) StartGrpcAPI() {
 			JwtDuration:           jwtDuration,
 			Logger:                log.Logger,
 			MetricsCollector:      app.MetricsCollector,
+			PublishBufferMaxSize:         config.GlobalConfiguration.PublishBufferMaxSize,
+			PublishBufferFlushIntervalMs: config.GlobalConfiguration.PublishBufferFlushIntervalMs,
 		}
 		grpcAPI, _ := grpc_server.NewGrpcServer(serverConfig)
 		app.GrpcAPI = grpcAPI

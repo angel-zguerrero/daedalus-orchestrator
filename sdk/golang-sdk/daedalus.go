@@ -37,12 +37,34 @@ type DaedalusSDK struct {
 
 	token string
 	mu    sync.RWMutex
+
+	publishStream   exchangepb.ExchangeService_PublishStreamClient
+	publishPending  map[string]*pendingPublish
+	publishStreamMu sync.Mutex
+
+	enqueueStream   queuepb.QueueService_EnqueueStreamClient
+	enqueuePending  map[string]*pendingEnqueue
+	enqueueStreamMu sync.Mutex
+}
+
+type pendingPublish struct {
+	resolve chan PublishResult
+	reject  chan error
+	timer   *time.Timer
+}
+
+type pendingEnqueue struct {
+	resolve chan EnqueueResult
+	reject  chan error
+	timer   *time.Timer
 }
 
 // NewDaedalusSDK creates a new SDK instance with the given configuration.
 func NewDaedalusSDK(config Config) *DaedalusSDK {
 	return &DaedalusSDK{
-		config: config,
+		config:         config,
+		publishPending: make(map[string]*pendingPublish),
+		enqueuePending: make(map[string]*pendingEnqueue),
 	}
 }
 
@@ -136,6 +158,20 @@ func (sdk *DaedalusSDK) connectOnce(ctx context.Context) error {
 
 // Disconnect closes all gRPC connections.
 func (sdk *DaedalusSDK) Disconnect() error {
+	sdk.publishStreamMu.Lock()
+	if sdk.publishStream != nil {
+		sdk.publishStream.CloseSend()
+		sdk.publishStream = nil
+	}
+	sdk.publishStreamMu.Unlock()
+
+	sdk.enqueueStreamMu.Lock()
+	if sdk.enqueueStream != nil {
+		sdk.enqueueStream.CloseSend()
+		sdk.enqueueStream = nil
+	}
+	sdk.enqueueStreamMu.Unlock()
+
 	if sdk.conn != nil {
 		return sdk.conn.Close()
 	}
@@ -300,41 +336,227 @@ func (sdk *DaedalusSDK) AssertBinding(ctx context.Context, input AssertBindingIn
 	return resp.Result, nil
 }
 
+// ensureEnqueueStream makes sure the bidirectional enqueue stream is established.
+func (sdk *DaedalusSDK) ensureEnqueueStream(ctx context.Context) error {
+	sdk.enqueueStreamMu.Lock()
+	defer sdk.enqueueStreamMu.Unlock()
+
+	if sdk.enqueueStream != nil {
+		return nil
+	}
+
+	stream, err := sdk.queueClient.EnqueueStream(sdk.authCtx(context.Background()))
+	if err != nil {
+		return err
+	}
+	sdk.enqueueStream = stream
+
+	go func() {
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				log.Printf("EnqueueStream error: %v", err)
+				sdk.enqueueStreamMu.Lock()
+				sdk.enqueueStream = nil
+				sdk.enqueueStreamMu.Unlock()
+				return
+			}
+
+			sdk.mu.Lock()
+			pending, ok := sdk.enqueuePending[resp.ClientMessageId]
+			if ok {
+				if pending.timer != nil {
+					pending.timer.Stop()
+				}
+				delete(sdk.enqueuePending, resp.ClientMessageId)
+			}
+			sdk.mu.Unlock()
+
+			if ok {
+				if !resp.Confirmed {
+					pending.reject <- fmt.Errorf("enqueue failed: %s", resp.Error)
+				} else {
+					pending.resolve <- EnqueueResult{
+						ClientMessageID: resp.ClientMessageId,
+						Confirmed:       true,
+						MessageID:       resp.MessageId,
+					}
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+// ensurePublishStream makes sure the bidirectional publish stream is established.
+func (sdk *DaedalusSDK) ensurePublishStream(ctx context.Context) error {
+	sdk.publishStreamMu.Lock()
+	defer sdk.publishStreamMu.Unlock()
+
+	if sdk.publishStream != nil {
+		return nil
+	}
+
+	stream, err := sdk.exchangeClient.PublishStream(sdk.authCtx(context.Background()))
+	if err != nil {
+		return err
+	}
+	sdk.publishStream = stream
+
+	go func() {
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				log.Printf("PublishStream error: %v", err)
+				sdk.publishStreamMu.Lock()
+				sdk.publishStream = nil
+				sdk.publishStreamMu.Unlock()
+				return
+			}
+
+			sdk.mu.Lock()
+			pending, ok := sdk.publishPending[resp.ClientMessageId]
+			if ok {
+				if pending.timer != nil {
+					pending.timer.Stop()
+				}
+				delete(sdk.publishPending, resp.ClientMessageId)
+			}
+			sdk.mu.Unlock()
+
+			if ok {
+				if !resp.Confirmed {
+					pending.reject <- fmt.Errorf("publish failed: %s", resp.Error)
+				} else {
+					pending.resolve <- PublishResult{
+						ClientMessageID: resp.ClientMessageId,
+						Confirmed:       true,
+						QueueMessages:   resp.QueueMessages,
+					}
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
 // EnqueueMessage enqueues a message directly into a queue.
-// Returns the message ID assigned by the orchestrator.
-func (sdk *DaedalusSDK) EnqueueMessage(ctx context.Context, input EnqueueMessageInput) (string, error) {
+// Returns the result of the enqueue operation.
+func (sdk *DaedalusSDK) EnqueueMessage(ctx context.Context, input EnqueueMessageInput) (EnqueueResult, error) {
+	if err := sdk.ensureEnqueueStream(ctx); err != nil {
+		return EnqueueResult{}, fmt.Errorf("failed to ensure enqueue stream: %w", err)
+	}
+
+	clientMessageID := uuid.New().String()
+	waitForConfirmation := true
+	timeoutMs := 5000
+
+	if input.Options != nil {
+		waitForConfirmation = input.Options.WaitForConfirmation
+		if input.Options.TimeoutMs > 0 {
+			timeoutMs = input.Options.TimeoutMs
+		}
+	}
+
 	contentType := input.ContentType
 	if contentType == "" {
 		contentType = "text/plain"
 	}
 
-	resp, err := sdk.queueClient.EnqueueMessage(sdk.authCtx(ctx), &queuepb.EnqueueMessageRequest{
-		TenantCode:  input.TenantCode,
-		QueueCode:   input.QueueCode,
-		Content:     input.Content,
-		ContentType: contentType,
-		Vnamespace:  input.VNamespace,
-		Priority:    input.Priority,
-		Handler:     input.Handler,
-		Headers:     input.Headers,
-		Parameters:  input.Parameters,
-	})
-	if err != nil {
-		log.Printf("❌ Failed to enqueue message: %v", err)
-		return "", fmt.Errorf("enqueue message failed: %w", err)
+	req := &queuepb.EnqueueStreamRequest{
+		ClientMessageId: clientMessageID,
+		TenantCode:      input.TenantCode,
+		QueueCode:       input.QueueCode,
+		Content:         string(input.Content),
+		ContentType:     contentType,
+		Vnamespace:      input.VNamespace,
+		Priority:        input.Priority,
+		Handler:         input.Handler,
+		Headers:         input.Headers,
+		Parameters:      input.Parameters,
 	}
-	return resp.MessageId, nil
+
+	if !waitForConfirmation {
+		sdk.enqueueStreamMu.Lock()
+		err := sdk.enqueueStream.Send(req)
+		sdk.enqueueStreamMu.Unlock()
+		if err != nil {
+			return EnqueueResult{}, err
+		}
+		return EnqueueResult{ClientMessageID: clientMessageID, Confirmed: false}, nil
+	}
+
+	resolve := make(chan EnqueueResult, 1)
+	reject := make(chan error, 1)
+
+	timer := time.AfterFunc(time.Duration(timeoutMs)*time.Millisecond, func() {
+		sdk.mu.Lock()
+		delete(sdk.enqueuePending, clientMessageID)
+		sdk.mu.Unlock()
+		reject <- fmt.Errorf("enqueue confirmation timeout after %dms", timeoutMs)
+	})
+
+	sdk.mu.Lock()
+	sdk.enqueuePending[clientMessageID] = &pendingEnqueue{
+		resolve: resolve,
+		reject:  reject,
+		timer:   timer,
+	}
+	sdk.mu.Unlock()
+
+	sdk.enqueueStreamMu.Lock()
+	err := sdk.enqueueStream.Send(req)
+	sdk.enqueueStreamMu.Unlock()
+
+	if err != nil {
+		timer.Stop()
+		sdk.mu.Lock()
+		delete(sdk.enqueuePending, clientMessageID)
+		sdk.mu.Unlock()
+		return EnqueueResult{}, err
+	}
+
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		sdk.mu.Lock()
+		delete(sdk.enqueuePending, clientMessageID)
+		sdk.mu.Unlock()
+		return EnqueueResult{}, ctx.Err()
+	case res := <-resolve:
+		return res, nil
+	case err := <-reject:
+		return EnqueueResult{}, err
+	}
 }
 
 // PublishMessage publishes a message through an exchange.
-// Returns a map of queueCode → messageID for all routed messages.
-func (sdk *DaedalusSDK) PublishMessage(ctx context.Context, input PublishMessageInput) (map[string]string, error) {
+// Returns the result of the publish operation.
+func (sdk *DaedalusSDK) PublishMessage(ctx context.Context, input PublishMessageInput) (PublishResult, error) {
+	if err := sdk.ensurePublishStream(ctx); err != nil {
+		return PublishResult{}, fmt.Errorf("failed to ensure publish stream: %w", err)
+	}
+
+	clientMessageID := uuid.New().String()
+	waitForConfirmation := true
+	timeoutMs := 5000
+
+	if input.Options != nil {
+		waitForConfirmation = input.Options.WaitForConfirmation
+		if input.Options.TimeoutMs > 0 {
+			timeoutMs = input.Options.TimeoutMs
+		}
+	}
+
 	contentType := input.ContentType
 	if contentType == "" {
 		contentType = "text/plain"
 	}
 
-	resp, err := sdk.exchangeClient.PublishMessage(sdk.authCtx(ctx), &exchangepb.PublishMessageRequest{
+	req := &exchangepb.PublishStreamRequest{
+		ClientMessageId:                clientMessageID,
 		TenantCode:                     input.TenantCode,
 		ExchangeCode:                   input.ExchangeCode,
 		RoutingKeyOrPatternOrQueueCode: input.RoutingKeyOrPatternOrQueueCode,
@@ -348,15 +570,60 @@ func (sdk *DaedalusSDK) PublishMessage(ctx context.Context, input PublishMessage
 			ContentType: contentType,
 			Content:     input.Content,
 		},
+	}
+
+	if !waitForConfirmation {
+		sdk.publishStreamMu.Lock()
+		err := sdk.publishStream.Send(req)
+		sdk.publishStreamMu.Unlock()
+		if err != nil {
+			return PublishResult{}, err
+		}
+		return PublishResult{ClientMessageID: clientMessageID, Confirmed: false}, nil
+	}
+
+	resolve := make(chan PublishResult, 1)
+	reject := make(chan error, 1)
+
+	timer := time.AfterFunc(time.Duration(timeoutMs)*time.Millisecond, func() {
+		sdk.mu.Lock()
+		delete(sdk.publishPending, clientMessageID)
+		sdk.mu.Unlock()
+		reject <- fmt.Errorf("publish confirmation timeout after %dms", timeoutMs)
 	})
+
+	sdk.mu.Lock()
+	sdk.publishPending[clientMessageID] = &pendingPublish{
+		resolve: resolve,
+		reject:  reject,
+		timer:   timer,
+	}
+	sdk.mu.Unlock()
+
+	sdk.publishStreamMu.Lock()
+	err := sdk.publishStream.Send(req)
+	sdk.publishStreamMu.Unlock()
+
 	if err != nil {
-		log.Printf("❌ Failed to publish message: %v", err)
-		return nil, fmt.Errorf("publish message failed: %w", err)
+		timer.Stop()
+		sdk.mu.Lock()
+		delete(sdk.publishPending, clientMessageID)
+		sdk.mu.Unlock()
+		return PublishResult{}, err
 	}
-	if resp.QueueMessages == nil {
-		return map[string]string{}, nil
+
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		sdk.mu.Lock()
+		delete(sdk.publishPending, clientMessageID)
+		sdk.mu.Unlock()
+		return PublishResult{}, ctx.Err()
+	case res := <-resolve:
+		return res, nil
+	case err := <-reject:
+		return PublishResult{}, err
 	}
-	return resp.QueueMessages, nil
 }
 
 // CreateWorker starts a bidirectional streaming worker loop that claims and processes messages.

@@ -17,6 +17,7 @@ service QueueService {
   rpc GetQueues (GetQueuesRequest) returns (GetQueuesResponse);
   rpc DeleteQueue (DeleteQueueRequest) returns (DeleteQueueResponse);
   rpc EnqueueMessage (EnqueueMessageRequest) returns (EnqueueMessageResponse);
+  rpc EnqueueStream (stream EnqueueStreamRequest) returns (stream EnqueueStreamResponse);
 }
 
 message CreateQueueRequest {
@@ -159,6 +160,26 @@ message EnqueueMessageResponse {
   string message = 1;
   string messageId = 2;
   map<string, string> result = 3;
+}
+
+message EnqueueStreamRequest {
+  string clientMessageId = 1;
+  string tenantCode = 2;
+  string queueCode = 3;
+  string vnamespace = 4;
+  string content = 5;
+  string contentType = 6;
+  map<string, string> headers = 7;
+  int32 priority = 8;
+  string handler = 9;
+  map<string, string> parameters = 10;
+}
+
+message EnqueueStreamResponse {
+  string clientMessageId = 1;
+  bool confirmed = 2;
+  string messageId = 3;
+  string error = 4;
 }
 
 //protoc --go_out=./internal/infrastructure/server/grpc/proto --go-grpc_out=./internal/infrastructure/server/grpc/proto ./internal/infrastructure/server/grpc/proto/definitions/queue.proto

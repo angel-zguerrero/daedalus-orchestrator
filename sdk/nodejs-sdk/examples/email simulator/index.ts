@@ -1,6 +1,6 @@
 import { DaedalusSDK } from '../../src/index';
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 500;
 interface EmailMessage {
     messageId: string;
     companyId: string;

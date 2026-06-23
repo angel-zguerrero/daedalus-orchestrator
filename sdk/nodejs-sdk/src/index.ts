@@ -136,16 +136,39 @@ export interface AssertBindingInput {
   headers?: Record<string, string>;
 }
 
+export interface EnqueueOptions {
+  waitForConfirmation?: boolean; // default true
+  timeoutMs?: number; // default 5000
+}
+
+export interface EnqueueResult {
+  clientMessageId: string;
+  messageId?: string;
+  confirmed: boolean;
+}
+
 export interface EnqueueMessageInput {
   tenantCode: string;
   queueCode: string;
-  content: string;
+  content: string | Buffer;
   contentType?: string;
   vnamespace?: string;
   priority?: number;
   handler?: string;
   headers?: Record<string, string>;
   parameters?: Record<string, string>;
+  options?: EnqueueOptions;
+}
+
+export interface PublishOptions {
+  waitForConfirmation?: boolean; // default true
+  timeoutMs?: number; // default 5000
+}
+
+export interface PublishResult {
+  clientMessageId: string;
+  confirmed: boolean;
+  queueMessages?: Record<string, string>;
 }
 
 export interface PublishMessageInput {
@@ -160,6 +183,7 @@ export interface PublishMessageInput {
   headers?: Record<string, string>;
   parameters?: Record<string, string>;
   messageId?: string;
+  options?: PublishOptions;
 }
 
 export interface SDKConfig {
@@ -185,6 +209,12 @@ export class DaedalusSDK {
   private exchangeProtoPath: string;
   private queueProtoPath: string;
   private bindingProtoPath: string;
+
+  private publishStream: any = null;
+  private publishPending: Map<string, { resolve: Function, reject: Function, timer: NodeJS.Timeout }> = new Map();
+
+  private enqueueStream: any = null;
+  private enqueuePending: Map<string, { resolve: Function, reject: Function, timer: NodeJS.Timeout }> = new Map();
 
   constructor(private config: SDKConfig) {
     const protoBase = path.resolve(__dirname, '../../../server/internal/infrastructure/server/grpc/proto/definitions');
@@ -323,6 +353,14 @@ export class DaedalusSDK {
     if (this.bindingClient) {
       this.bindingClient.close();
     }
+    if (this.publishStream) {
+      this.publishStream.end();
+      this.publishStream = null;
+    }
+    if (this.enqueueStream) {
+      this.enqueueStream.end();
+      this.enqueueStream = null;
+    }
   }
 
   private getMetadata(): grpc.Metadata {
@@ -429,63 +467,159 @@ export class DaedalusSDK {
     });
   }
 
-  async enqueueMessage(input: EnqueueMessageInput): Promise<{ messageId: string }> {
-    return new Promise((resolve, reject) => {
-      this.queueClient.EnqueueMessage(
-        {
-          tenantCode: input.tenantCode,
-          queueCode: input.queueCode,
-          content: input.content,
-          contentType: input.contentType ?? 'text/plain',
-          vnamespace: input.vnamespace ?? '',
-          priority: input.priority ?? 0,
-          handler: input.handler ?? '',
-          headers: input.headers ?? {},
-          parameters: input.parameters ?? {}
-        },
-        this.getMetadata(),
-        (err: any, response: any) => {
-          if (err) {
-            console.error('❌ Failed to enqueue message:', err.message);
-            return reject(err);
+  private ensureEnqueueStream() {
+    if (!this.enqueueStream) {
+      this.enqueueStream = this.queueClient.EnqueueStream(this.getMetadata());
+      this.enqueueStream.on('data', (response: any) => {
+        const pending = this.enqueuePending.get(response.clientMessageId);
+        if (pending) {
+          clearTimeout(pending.timer);
+          this.enqueuePending.delete(response.clientMessageId);
+          if (!response.confirmed) {
+            pending.reject(new Error(response.error || 'Failed to enqueue message'));
+          } else {
+            pending.resolve({
+              clientMessageId: response.clientMessageId,
+              confirmed: true,
+              messageId: response.messageId
+            });
           }
-          resolve({ messageId: response.messageId });
         }
-      );
-    });
+      });
+      this.enqueueStream.on('error', (err: any) => {
+        console.error('EnqueueStream error:', err);
+        this.enqueueStream = null;
+      });
+      this.enqueueStream.on('end', () => {
+        this.enqueueStream = null;
+      });
+    }
   }
 
-  async publishMessage(input: PublishMessageInput): Promise<Record<string, string>> {
+  private ensurePublishStream() {
+    if (!this.publishStream) {
+      this.publishStream = this.exchangeClient.PublishStream(this.getMetadata());
+      this.publishStream.on('data', (response: any) => {
+        const pending = this.publishPending.get(response.clientMessageId);
+        if (pending) {
+          clearTimeout(pending.timer);
+          this.publishPending.delete(response.clientMessageId);
+          if (!response.confirmed) {
+            pending.reject(new Error(response.error || 'Failed to publish message'));
+          } else {
+            pending.resolve({
+              clientMessageId: response.clientMessageId,
+              confirmed: true,
+              queueMessages: response.queueMessages
+            });
+          }
+        }
+      });
+      this.publishStream.on('error', (err: any) => {
+        console.error('PublishStream error:', err);
+        this.publishStream = null;
+      });
+      this.publishStream.on('end', () => {
+        this.publishStream = null;
+      });
+    }
+  }
+
+  async enqueueMessage(input: EnqueueMessageInput): Promise<EnqueueResult> {
     const contentBytes = Buffer.isBuffer(input.content)
       ? input.content
       : Buffer.from(input.content);
 
+    this.ensureEnqueueStream();
+
+    const clientMessageId = crypto.randomUUID();
+    const waitForConfirmation = input.options?.waitForConfirmation ?? true;
+    const timeoutMs = input.options?.timeoutMs ?? 5000;
+
+    const request = {
+      clientMessageId,
+      tenantCode: input.tenantCode,
+      queueCode: input.queueCode,
+      content: contentBytes,
+      contentType: input.contentType ?? 'text/plain',
+      vnamespace: input.vnamespace ?? '',
+      priority: input.priority ?? 0,
+      handler: input.handler ?? '',
+      headers: input.headers ?? {},
+      parameters: input.parameters ?? {}
+    };
+
+    if (!waitForConfirmation) {
+      this.enqueueStream.write(request);
+      return { clientMessageId, confirmed: false };
+    }
+
     return new Promise((resolve, reject) => {
-      this.exchangeClient.PublishMessage(
-        {
-          tenantCode: input.tenantCode,
-          exchangeCode: input.exchangeCode,
-          routingKeyOrPatternOrQueueCode: input.routingKeyOrPatternOrQueueCode ?? '',
-          vnamespace: input.vnamespace ?? '',
-          message: {
-            messageId: input.messageId ?? '',
-            handler: input.handler ?? '',
-            priority: input.priority ?? 0,
-            parameters: input.parameters ?? {},
-            headers: input.headers ?? {},
-            contentType: input.contentType ?? 'text/plain',
-            content: contentBytes
-          }
-        },
-        this.getMetadata(),
-        (err: any, response: any) => {
-          if (err) {
-            console.error('❌ Failed to publish message:', err.message);
-            return reject(err);
-          }
-          resolve(response.queueMessages ?? {});
+      const timer = setTimeout(() => {
+        this.enqueuePending.delete(clientMessageId);
+        reject(new Error(`Enqueue confirmation timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.enqueuePending.set(clientMessageId, { resolve, reject, timer });
+
+      this.enqueueStream.write(request, (err: any) => {
+        if (err) {
+          clearTimeout(timer);
+          this.enqueuePending.delete(clientMessageId);
+          reject(err);
         }
-      );
+      });
+    });
+  }
+
+  async publishMessage(input: PublishMessageInput): Promise<PublishResult> {
+    const contentBytes = Buffer.isBuffer(input.content)
+      ? input.content
+      : Buffer.from(input.content);
+
+    this.ensurePublishStream();
+
+    const clientMessageId = crypto.randomUUID();
+    const waitForConfirmation = input.options?.waitForConfirmation ?? true;
+    const timeoutMs = input.options?.timeoutMs ?? 5000;
+
+    const request = {
+      clientMessageId,
+      tenantCode: input.tenantCode,
+      exchangeCode: input.exchangeCode,
+      routingKeyOrPatternOrQueueCode: input.routingKeyOrPatternOrQueueCode ?? '',
+      vnamespace: input.vnamespace ?? '',
+      message: {
+        messageId: input.messageId ?? '',
+        handler: input.handler ?? '',
+        priority: input.priority ?? 0,
+        parameters: input.parameters ?? {},
+        headers: input.headers ?? {},
+        contentType: input.contentType ?? 'text/plain',
+        content: contentBytes
+      }
+    };
+
+    if (!waitForConfirmation) {
+      this.publishStream.write(request);
+      return { clientMessageId, confirmed: false };
+    }
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.publishPending.delete(clientMessageId);
+        reject(new Error(`Publish confirmation timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.publishPending.set(clientMessageId, { resolve, reject, timer });
+
+      this.publishStream.write(request, (err: any) => {
+        if (err) {
+          clearTimeout(timer);
+          this.publishPending.delete(clientMessageId);
+          reject(err);
+        }
+      });
     });
   }
 

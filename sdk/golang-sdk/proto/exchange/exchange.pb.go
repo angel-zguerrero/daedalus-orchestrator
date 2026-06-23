@@ -1053,6 +1053,158 @@ func (x *PublishMessageResponse) GetQueueMessages() map[string]string {
 	return nil
 }
 
+type PublishStreamRequest struct {
+	state                          protoimpl.MessageState `protogen:"open.v1"`
+	ClientMessageId                string                 `protobuf:"bytes,1,opt,name=clientMessageId,proto3" json:"clientMessageId,omitempty"`
+	TenantCode                     string                 `protobuf:"bytes,2,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	ExchangeCode                   string                 `protobuf:"bytes,3,opt,name=exchangeCode,proto3" json:"exchangeCode,omitempty"`
+	RoutingKeyOrPatternOrQueueCode string                 `protobuf:"bytes,4,opt,name=routingKeyOrPatternOrQueueCode,proto3" json:"routingKeyOrPatternOrQueueCode,omitempty"`
+	Vnamespace                     string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	Message                        *QueueMessage          `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields                  protoimpl.UnknownFields
+	sizeCache                      protoimpl.SizeCache
+}
+
+func (x *PublishStreamRequest) Reset() {
+	*x = PublishStreamRequest{}
+	mi := &file_exchange_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishStreamRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishStreamRequest) ProtoMessage() {}
+
+func (x *PublishStreamRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_exchange_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishStreamRequest.ProtoReflect.Descriptor instead.
+func (*PublishStreamRequest) Descriptor() ([]byte, []int) {
+	return file_exchange_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *PublishStreamRequest) GetClientMessageId() string {
+	if x != nil {
+		return x.ClientMessageId
+	}
+	return ""
+}
+
+func (x *PublishStreamRequest) GetTenantCode() string {
+	if x != nil {
+		return x.TenantCode
+	}
+	return ""
+}
+
+func (x *PublishStreamRequest) GetExchangeCode() string {
+	if x != nil {
+		return x.ExchangeCode
+	}
+	return ""
+}
+
+func (x *PublishStreamRequest) GetRoutingKeyOrPatternOrQueueCode() string {
+	if x != nil {
+		return x.RoutingKeyOrPatternOrQueueCode
+	}
+	return ""
+}
+
+func (x *PublishStreamRequest) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
+	}
+	return ""
+}
+
+func (x *PublishStreamRequest) GetMessage() *QueueMessage {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
+type PublishStreamResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ClientMessageId string                 `protobuf:"bytes,1,opt,name=clientMessageId,proto3" json:"clientMessageId,omitempty"`
+	Confirmed       bool                   `protobuf:"varint,2,opt,name=confirmed,proto3" json:"confirmed,omitempty"`
+	QueueMessages   map[string]string      `protobuf:"bytes,3,rep,name=queueMessages,proto3" json:"queueMessages,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Error           string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PublishStreamResponse) Reset() {
+	*x = PublishStreamResponse{}
+	mi := &file_exchange_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishStreamResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishStreamResponse) ProtoMessage() {}
+
+func (x *PublishStreamResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_exchange_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishStreamResponse.ProtoReflect.Descriptor instead.
+func (*PublishStreamResponse) Descriptor() ([]byte, []int) {
+	return file_exchange_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *PublishStreamResponse) GetClientMessageId() string {
+	if x != nil {
+		return x.ClientMessageId
+	}
+	return ""
+}
+
+func (x *PublishStreamResponse) GetConfirmed() bool {
+	if x != nil {
+		return x.Confirmed
+	}
+	return false
+}
+
+func (x *PublishStreamResponse) GetQueueMessages() map[string]string {
+	if x != nil {
+		return x.QueueMessages
+	}
+	return nil
+}
+
+func (x *PublishStreamResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_exchange_proto protoreflect.FileDescriptor
 
 const file_exchange_proto_rawDesc = "" +
@@ -1176,14 +1328,34 @@ const file_exchange_proto_rawDesc = "" +
 	"\rqueueMessages\x18\x02 \x03(\v23.exchange.PublishMessageResponse.QueueMessagesEntryR\rqueueMessages\x1a@\n" +
 	"\x12QueueMessagesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\x8c\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9e\x02\n" +
+	"\x14PublishStreamRequest\x12(\n" +
+	"\x0fclientMessageId\x18\x01 \x01(\tR\x0fclientMessageId\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x02 \x01(\tR\n" +
+	"tenantCode\x12\"\n" +
+	"\fexchangeCode\x18\x03 \x01(\tR\fexchangeCode\x12F\n" +
+	"\x1eroutingKeyOrPatternOrQueueCode\x18\x04 \x01(\tR\x1eroutingKeyOrPatternOrQueueCode\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x05 \x01(\tR\n" +
+	"vnamespace\x120\n" +
+	"\amessage\x18\x06 \x01(\v2\x16.exchange.QueueMessageR\amessage\"\x91\x02\n" +
+	"\x15PublishStreamResponse\x12(\n" +
+	"\x0fclientMessageId\x18\x01 \x01(\tR\x0fclientMessageId\x12\x1c\n" +
+	"\tconfirmed\x18\x02 \x01(\bR\tconfirmed\x12X\n" +
+	"\rqueueMessages\x18\x03 \x03(\v22.exchange.PublishStreamResponse.QueueMessagesEntryR\rqueueMessages\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\x1a@\n" +
+	"\x12QueueMessagesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xe2\x04\n" +
 	"\x0fExchangeService\x12S\n" +
 	"\x0eCreateExchange\x12\x1f.exchange.CreateExchangeRequest\x1a .exchange.CreateExchangeResponse\x12_\n" +
 	"\x12BulkCreateExchange\x12#.exchange.BulkCreateExchangeRequest\x1a$.exchange.BulkCreateExchangeResponse\x12J\n" +
 	"\vGetExchange\x12\x1c.exchange.GetExchangeRequest\x1a\x1d.exchange.GetExchangeResponse\x12M\n" +
 	"\fGetExchanges\x12\x1d.exchange.GetExchangesRequest\x1a\x1e.exchange.GetExchangesResponse\x12S\n" +
 	"\x0eDeleteExchange\x12\x1f.exchange.DeleteExchangeRequest\x1a .exchange.DeleteExchangeResponse\x12S\n" +
-	"\x0ePublishMessage\x12\x1f.exchange.PublishMessageRequest\x1a .exchange.PublishMessageResponseB\x16Z\x14pb/exchange;exchangeb\x06proto3"
+	"\x0ePublishMessage\x12\x1f.exchange.PublishMessageRequest\x1a .exchange.PublishMessageResponse\x12T\n" +
+	"\rPublishStream\x12\x1e.exchange.PublishStreamRequest\x1a\x1f.exchange.PublishStreamResponse(\x010\x01B\x16Z\x14pb/exchange;exchangeb\x06proto3"
 
 var (
 	file_exchange_proto_rawDescOnce sync.Once
@@ -1197,7 +1369,7 @@ func file_exchange_proto_rawDescGZIP() []byte {
 	return file_exchange_proto_rawDescData
 }
 
-var file_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_exchange_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_exchange_proto_goTypes = []any{
 	(*CreateExchangeRequest)(nil),      // 0: exchange.CreateExchangeRequest
 	(*CreateExchangeResponse)(nil),     // 1: exchange.CreateExchangeResponse
@@ -1215,44 +1387,51 @@ var file_exchange_proto_goTypes = []any{
 	(*PublishMessageRequest)(nil),      // 13: exchange.PublishMessageRequest
 	(*QueueMessage)(nil),               // 14: exchange.QueueMessage
 	(*PublishMessageResponse)(nil),     // 15: exchange.PublishMessageResponse
-	nil,                                // 16: exchange.CreateExchangeRequest.HeadersEntry
-	nil,                                // 17: exchange.CreateExchangeItem.HeadersEntry
-	nil,                                // 18: exchange.Exchange.HeadersEntry
-	nil,                                // 19: exchange.QueueMessage.ParametersEntry
-	nil,                                // 20: exchange.QueueMessage.HeadersEntry
-	nil,                                // 21: exchange.PublishMessageResponse.QueueMessagesEntry
+	(*PublishStreamRequest)(nil),       // 16: exchange.PublishStreamRequest
+	(*PublishStreamResponse)(nil),      // 17: exchange.PublishStreamResponse
+	nil,                                // 18: exchange.CreateExchangeRequest.HeadersEntry
+	nil,                                // 19: exchange.CreateExchangeItem.HeadersEntry
+	nil,                                // 20: exchange.Exchange.HeadersEntry
+	nil,                                // 21: exchange.QueueMessage.ParametersEntry
+	nil,                                // 22: exchange.QueueMessage.HeadersEntry
+	nil,                                // 23: exchange.PublishMessageResponse.QueueMessagesEntry
+	nil,                                // 24: exchange.PublishStreamResponse.QueueMessagesEntry
 }
 var file_exchange_proto_depIdxs = []int32{
-	16, // 0: exchange.CreateExchangeRequest.headers:type_name -> exchange.CreateExchangeRequest.HeadersEntry
+	18, // 0: exchange.CreateExchangeRequest.headers:type_name -> exchange.CreateExchangeRequest.HeadersEntry
 	8,  // 1: exchange.CreateExchangeResponse.result:type_name -> exchange.Exchange
 	3,  // 2: exchange.BulkCreateExchangeRequest.exchanges:type_name -> exchange.CreateExchangeItem
-	17, // 3: exchange.CreateExchangeItem.headers:type_name -> exchange.CreateExchangeItem.HeadersEntry
+	19, // 3: exchange.CreateExchangeItem.headers:type_name -> exchange.CreateExchangeItem.HeadersEntry
 	8,  // 4: exchange.BulkCreateExchangeResponse.result:type_name -> exchange.Exchange
 	8,  // 5: exchange.GetExchangeResponse.result:type_name -> exchange.Exchange
-	18, // 6: exchange.Exchange.headers:type_name -> exchange.Exchange.HeadersEntry
+	20, // 6: exchange.Exchange.headers:type_name -> exchange.Exchange.HeadersEntry
 	8,  // 7: exchange.ExchangeFindResult.Entities:type_name -> exchange.Exchange
 	9,  // 8: exchange.GetExchangesResponse.result:type_name -> exchange.ExchangeFindResult
 	14, // 9: exchange.PublishMessageRequest.message:type_name -> exchange.QueueMessage
-	19, // 10: exchange.QueueMessage.parameters:type_name -> exchange.QueueMessage.ParametersEntry
-	20, // 11: exchange.QueueMessage.headers:type_name -> exchange.QueueMessage.HeadersEntry
-	21, // 12: exchange.PublishMessageResponse.queueMessages:type_name -> exchange.PublishMessageResponse.QueueMessagesEntry
-	0,  // 13: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
-	2,  // 14: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
-	5,  // 15: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
-	7,  // 16: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
-	11, // 17: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
-	13, // 18: exchange.ExchangeService.PublishMessage:input_type -> exchange.PublishMessageRequest
-	1,  // 19: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
-	4,  // 20: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
-	6,  // 21: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
-	10, // 22: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
-	12, // 23: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
-	15, // 24: exchange.ExchangeService.PublishMessage:output_type -> exchange.PublishMessageResponse
-	19, // [19:25] is the sub-list for method output_type
-	13, // [13:19] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	21, // 10: exchange.QueueMessage.parameters:type_name -> exchange.QueueMessage.ParametersEntry
+	22, // 11: exchange.QueueMessage.headers:type_name -> exchange.QueueMessage.HeadersEntry
+	23, // 12: exchange.PublishMessageResponse.queueMessages:type_name -> exchange.PublishMessageResponse.QueueMessagesEntry
+	14, // 13: exchange.PublishStreamRequest.message:type_name -> exchange.QueueMessage
+	24, // 14: exchange.PublishStreamResponse.queueMessages:type_name -> exchange.PublishStreamResponse.QueueMessagesEntry
+	0,  // 15: exchange.ExchangeService.CreateExchange:input_type -> exchange.CreateExchangeRequest
+	2,  // 16: exchange.ExchangeService.BulkCreateExchange:input_type -> exchange.BulkCreateExchangeRequest
+	5,  // 17: exchange.ExchangeService.GetExchange:input_type -> exchange.GetExchangeRequest
+	7,  // 18: exchange.ExchangeService.GetExchanges:input_type -> exchange.GetExchangesRequest
+	11, // 19: exchange.ExchangeService.DeleteExchange:input_type -> exchange.DeleteExchangeRequest
+	13, // 20: exchange.ExchangeService.PublishMessage:input_type -> exchange.PublishMessageRequest
+	16, // 21: exchange.ExchangeService.PublishStream:input_type -> exchange.PublishStreamRequest
+	1,  // 22: exchange.ExchangeService.CreateExchange:output_type -> exchange.CreateExchangeResponse
+	4,  // 23: exchange.ExchangeService.BulkCreateExchange:output_type -> exchange.BulkCreateExchangeResponse
+	6,  // 24: exchange.ExchangeService.GetExchange:output_type -> exchange.GetExchangeResponse
+	10, // 25: exchange.ExchangeService.GetExchanges:output_type -> exchange.GetExchangesResponse
+	12, // 26: exchange.ExchangeService.DeleteExchange:output_type -> exchange.DeleteExchangeResponse
+	15, // 27: exchange.ExchangeService.PublishMessage:output_type -> exchange.PublishMessageResponse
+	17, // 28: exchange.ExchangeService.PublishStream:output_type -> exchange.PublishStreamResponse
+	22, // [22:29] is the sub-list for method output_type
+	15, // [15:22] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_exchange_proto_init() }
@@ -1266,7 +1445,7 @@ func file_exchange_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_exchange_proto_rawDesc), len(file_exchange_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
