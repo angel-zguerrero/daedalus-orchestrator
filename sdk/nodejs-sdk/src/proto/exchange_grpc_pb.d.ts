@@ -14,6 +14,7 @@ interface IExchangeServiceService extends grpc.ServiceDefinition<grpc.UntypedSer
     getExchanges: IExchangeServiceService_IGetExchanges;
     deleteExchange: IExchangeServiceService_IDeleteExchange;
     publishMessage: IExchangeServiceService_IPublishMessage;
+    publishStream: IExchangeServiceService_IPublishStream;
 }
 
 interface IExchangeServiceService_ICreateExchange extends grpc.MethodDefinition<exchange_pb.CreateExchangeRequest, exchange_pb.CreateExchangeResponse> {
@@ -70,6 +71,15 @@ interface IExchangeServiceService_IPublishMessage extends grpc.MethodDefinition<
     responseSerialize: grpc.serialize<exchange_pb.PublishMessageResponse>;
     responseDeserialize: grpc.deserialize<exchange_pb.PublishMessageResponse>;
 }
+interface IExchangeServiceService_IPublishStream extends grpc.MethodDefinition<exchange_pb.PublishStreamRequest, exchange_pb.PublishStreamResponse> {
+    path: "/exchange.ExchangeService/PublishStream";
+    requestStream: true;
+    responseStream: true;
+    requestSerialize: grpc.serialize<exchange_pb.PublishStreamRequest>;
+    requestDeserialize: grpc.deserialize<exchange_pb.PublishStreamRequest>;
+    responseSerialize: grpc.serialize<exchange_pb.PublishStreamResponse>;
+    responseDeserialize: grpc.deserialize<exchange_pb.PublishStreamResponse>;
+}
 
 export const ExchangeServiceService: IExchangeServiceService;
 
@@ -80,6 +90,7 @@ export interface IExchangeServiceServer extends grpc.UntypedServiceImplementatio
     getExchanges: grpc.handleUnaryCall<exchange_pb.GetExchangesRequest, exchange_pb.GetExchangesResponse>;
     deleteExchange: grpc.handleUnaryCall<exchange_pb.DeleteExchangeRequest, exchange_pb.DeleteExchangeResponse>;
     publishMessage: grpc.handleUnaryCall<exchange_pb.PublishMessageRequest, exchange_pb.PublishMessageResponse>;
+    publishStream: grpc.handleBidiStreamingCall<exchange_pb.PublishStreamRequest, exchange_pb.PublishStreamResponse>;
 }
 
 export interface IExchangeServiceClient {
@@ -101,6 +112,9 @@ export interface IExchangeServiceClient {
     publishMessage(request: exchange_pb.PublishMessageRequest, callback: (error: grpc.ServiceError | null, response: exchange_pb.PublishMessageResponse) => void): grpc.ClientUnaryCall;
     publishMessage(request: exchange_pb.PublishMessageRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: exchange_pb.PublishMessageResponse) => void): grpc.ClientUnaryCall;
     publishMessage(request: exchange_pb.PublishMessageRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: exchange_pb.PublishMessageResponse) => void): grpc.ClientUnaryCall;
+    publishStream(): grpc.ClientDuplexStream<exchange_pb.PublishStreamRequest, exchange_pb.PublishStreamResponse>;
+    publishStream(options: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<exchange_pb.PublishStreamRequest, exchange_pb.PublishStreamResponse>;
+    publishStream(metadata: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<exchange_pb.PublishStreamRequest, exchange_pb.PublishStreamResponse>;
 }
 
 export class ExchangeServiceClient extends grpc.Client implements IExchangeServiceClient {
@@ -123,4 +137,6 @@ export class ExchangeServiceClient extends grpc.Client implements IExchangeServi
     public publishMessage(request: exchange_pb.PublishMessageRequest, callback: (error: grpc.ServiceError | null, response: exchange_pb.PublishMessageResponse) => void): grpc.ClientUnaryCall;
     public publishMessage(request: exchange_pb.PublishMessageRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: exchange_pb.PublishMessageResponse) => void): grpc.ClientUnaryCall;
     public publishMessage(request: exchange_pb.PublishMessageRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: exchange_pb.PublishMessageResponse) => void): grpc.ClientUnaryCall;
+    public publishStream(options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<exchange_pb.PublishStreamRequest, exchange_pb.PublishStreamResponse>;
+    public publishStream(metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<exchange_pb.PublishStreamRequest, exchange_pb.PublishStreamResponse>;
 }

@@ -587,6 +587,86 @@ export namespace EnqueueMessageResponse {
     }
 }
 
+export class EnqueueStreamRequest extends jspb.Message { 
+    getClientmessageid(): string;
+    setClientmessageid(value: string): EnqueueStreamRequest;
+    getTenantcode(): string;
+    setTenantcode(value: string): EnqueueStreamRequest;
+    getQueuecode(): string;
+    setQueuecode(value: string): EnqueueStreamRequest;
+    getVnamespace(): string;
+    setVnamespace(value: string): EnqueueStreamRequest;
+    getContent(): string;
+    setContent(value: string): EnqueueStreamRequest;
+    getContenttype(): string;
+    setContenttype(value: string): EnqueueStreamRequest;
+
+    getHeadersMap(): jspb.Map<string, string>;
+    clearHeadersMap(): void;
+    getPriority(): number;
+    setPriority(value: number): EnqueueStreamRequest;
+    getHandler(): string;
+    setHandler(value: string): EnqueueStreamRequest;
+
+    getParametersMap(): jspb.Map<string, string>;
+    clearParametersMap(): void;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): EnqueueStreamRequest.AsObject;
+    static toObject(includeInstance: boolean, msg: EnqueueStreamRequest): EnqueueStreamRequest.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: EnqueueStreamRequest, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): EnqueueStreamRequest;
+    static deserializeBinaryFromReader(message: EnqueueStreamRequest, reader: jspb.BinaryReader): EnqueueStreamRequest;
+}
+
+export namespace EnqueueStreamRequest {
+    export type AsObject = {
+        clientmessageid: string,
+        tenantcode: string,
+        queuecode: string,
+        vnamespace: string,
+        content: string,
+        contenttype: string,
+
+        headersMap: Array<[string, string]>,
+        priority: number,
+        handler: string,
+
+        parametersMap: Array<[string, string]>,
+    }
+}
+
+export class EnqueueStreamResponse extends jspb.Message { 
+    getClientmessageid(): string;
+    setClientmessageid(value: string): EnqueueStreamResponse;
+    getConfirmed(): boolean;
+    setConfirmed(value: boolean): EnqueueStreamResponse;
+    getMessageid(): string;
+    setMessageid(value: string): EnqueueStreamResponse;
+    getError(): string;
+    setError(value: string): EnqueueStreamResponse;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): EnqueueStreamResponse.AsObject;
+    static toObject(includeInstance: boolean, msg: EnqueueStreamResponse): EnqueueStreamResponse.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: EnqueueStreamResponse, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): EnqueueStreamResponse;
+    static deserializeBinaryFromReader(message: EnqueueStreamResponse, reader: jspb.BinaryReader): EnqueueStreamResponse;
+}
+
+export namespace EnqueueStreamResponse {
+    export type AsObject = {
+        clientmessageid: string,
+        confirmed: boolean,
+        messageid: string,
+        error: string,
+    }
+}
+
 export enum QueueType {
     STANDARD = 0,
     DELAYED = 1,

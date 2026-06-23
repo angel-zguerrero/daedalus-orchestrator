@@ -92,6 +92,28 @@ function deserialize_queue_EnqueueMessageResponse(buffer_arg) {
   return queue_pb.EnqueueMessageResponse.deserializeBinary(new Uint8Array(buffer_arg));
 }
 
+function serialize_queue_EnqueueStreamRequest(arg) {
+  if (!(arg instanceof queue_pb.EnqueueStreamRequest)) {
+    throw new Error('Expected argument of type queue.EnqueueStreamRequest');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_queue_EnqueueStreamRequest(buffer_arg) {
+  return queue_pb.EnqueueStreamRequest.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
+function serialize_queue_EnqueueStreamResponse(arg) {
+  if (!(arg instanceof queue_pb.EnqueueStreamResponse)) {
+    throw new Error('Expected argument of type queue.EnqueueStreamResponse');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_queue_EnqueueStreamResponse(buffer_arg) {
+  return queue_pb.EnqueueStreamResponse.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
 function serialize_queue_GetQueueRequest(arg) {
   if (!(arg instanceof queue_pb.GetQueueRequest)) {
     throw new Error('Expected argument of type queue.GetQueueRequest');
@@ -203,6 +225,17 @@ var QueueServiceService = exports.QueueServiceService = {
     requestDeserialize: deserialize_queue_EnqueueMessageRequest,
     responseSerialize: serialize_queue_EnqueueMessageResponse,
     responseDeserialize: deserialize_queue_EnqueueMessageResponse,
+  },
+  enqueueStream: {
+    path: '/queue.QueueService/EnqueueStream',
+    requestStream: true,
+    responseStream: true,
+    requestType: queue_pb.EnqueueStreamRequest,
+    responseType: queue_pb.EnqueueStreamResponse,
+    requestSerialize: serialize_queue_EnqueueStreamRequest,
+    requestDeserialize: deserialize_queue_EnqueueStreamRequest,
+    responseSerialize: serialize_queue_EnqueueStreamResponse,
+    responseDeserialize: deserialize_queue_EnqueueStreamResponse,
   },
 };
 

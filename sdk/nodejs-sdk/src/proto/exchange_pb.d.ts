@@ -480,3 +480,72 @@ export namespace PublishMessageResponse {
         queuemessagesMap: Array<[string, string]>,
     }
 }
+
+export class PublishStreamRequest extends jspb.Message { 
+    getClientmessageid(): string;
+    setClientmessageid(value: string): PublishStreamRequest;
+    getTenantcode(): string;
+    setTenantcode(value: string): PublishStreamRequest;
+    getExchangecode(): string;
+    setExchangecode(value: string): PublishStreamRequest;
+    getRoutingkeyorpatternorqueuecode(): string;
+    setRoutingkeyorpatternorqueuecode(value: string): PublishStreamRequest;
+    getVnamespace(): string;
+    setVnamespace(value: string): PublishStreamRequest;
+
+    hasMessage(): boolean;
+    clearMessage(): void;
+    getMessage(): QueueMessage | undefined;
+    setMessage(value?: QueueMessage): PublishStreamRequest;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): PublishStreamRequest.AsObject;
+    static toObject(includeInstance: boolean, msg: PublishStreamRequest): PublishStreamRequest.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: PublishStreamRequest, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): PublishStreamRequest;
+    static deserializeBinaryFromReader(message: PublishStreamRequest, reader: jspb.BinaryReader): PublishStreamRequest;
+}
+
+export namespace PublishStreamRequest {
+    export type AsObject = {
+        clientmessageid: string,
+        tenantcode: string,
+        exchangecode: string,
+        routingkeyorpatternorqueuecode: string,
+        vnamespace: string,
+        message?: QueueMessage.AsObject,
+    }
+}
+
+export class PublishStreamResponse extends jspb.Message { 
+    getClientmessageid(): string;
+    setClientmessageid(value: string): PublishStreamResponse;
+    getConfirmed(): boolean;
+    setConfirmed(value: boolean): PublishStreamResponse;
+
+    getQueuemessagesMap(): jspb.Map<string, string>;
+    clearQueuemessagesMap(): void;
+    getError(): string;
+    setError(value: string): PublishStreamResponse;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): PublishStreamResponse.AsObject;
+    static toObject(includeInstance: boolean, msg: PublishStreamResponse): PublishStreamResponse.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: PublishStreamResponse, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): PublishStreamResponse;
+    static deserializeBinaryFromReader(message: PublishStreamResponse, reader: jspb.BinaryReader): PublishStreamResponse;
+}
+
+export namespace PublishStreamResponse {
+    export type AsObject = {
+        clientmessageid: string,
+        confirmed: boolean,
+
+        queuemessagesMap: Array<[string, string]>,
+        error: string,
+    }
+}

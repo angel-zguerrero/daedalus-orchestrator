@@ -14,6 +14,7 @@ interface IQueueServiceService extends grpc.ServiceDefinition<grpc.UntypedServic
     getQueues: IQueueServiceService_IGetQueues;
     deleteQueue: IQueueServiceService_IDeleteQueue;
     enqueueMessage: IQueueServiceService_IEnqueueMessage;
+    enqueueStream: IQueueServiceService_IEnqueueStream;
 }
 
 interface IQueueServiceService_ICreateQueue extends grpc.MethodDefinition<queue_pb.CreateQueueRequest, queue_pb.CreateQueueResponse> {
@@ -70,6 +71,15 @@ interface IQueueServiceService_IEnqueueMessage extends grpc.MethodDefinition<que
     responseSerialize: grpc.serialize<queue_pb.EnqueueMessageResponse>;
     responseDeserialize: grpc.deserialize<queue_pb.EnqueueMessageResponse>;
 }
+interface IQueueServiceService_IEnqueueStream extends grpc.MethodDefinition<queue_pb.EnqueueStreamRequest, queue_pb.EnqueueStreamResponse> {
+    path: "/queue.QueueService/EnqueueStream";
+    requestStream: true;
+    responseStream: true;
+    requestSerialize: grpc.serialize<queue_pb.EnqueueStreamRequest>;
+    requestDeserialize: grpc.deserialize<queue_pb.EnqueueStreamRequest>;
+    responseSerialize: grpc.serialize<queue_pb.EnqueueStreamResponse>;
+    responseDeserialize: grpc.deserialize<queue_pb.EnqueueStreamResponse>;
+}
 
 export const QueueServiceService: IQueueServiceService;
 
@@ -80,6 +90,7 @@ export interface IQueueServiceServer extends grpc.UntypedServiceImplementation {
     getQueues: grpc.handleUnaryCall<queue_pb.GetQueuesRequest, queue_pb.GetQueuesResponse>;
     deleteQueue: grpc.handleUnaryCall<queue_pb.DeleteQueueRequest, queue_pb.DeleteQueueResponse>;
     enqueueMessage: grpc.handleUnaryCall<queue_pb.EnqueueMessageRequest, queue_pb.EnqueueMessageResponse>;
+    enqueueStream: grpc.handleBidiStreamingCall<queue_pb.EnqueueStreamRequest, queue_pb.EnqueueStreamResponse>;
 }
 
 export interface IQueueServiceClient {
@@ -101,6 +112,9 @@ export interface IQueueServiceClient {
     enqueueMessage(request: queue_pb.EnqueueMessageRequest, callback: (error: grpc.ServiceError | null, response: queue_pb.EnqueueMessageResponse) => void): grpc.ClientUnaryCall;
     enqueueMessage(request: queue_pb.EnqueueMessageRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: queue_pb.EnqueueMessageResponse) => void): grpc.ClientUnaryCall;
     enqueueMessage(request: queue_pb.EnqueueMessageRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: queue_pb.EnqueueMessageResponse) => void): grpc.ClientUnaryCall;
+    enqueueStream(): grpc.ClientDuplexStream<queue_pb.EnqueueStreamRequest, queue_pb.EnqueueStreamResponse>;
+    enqueueStream(options: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<queue_pb.EnqueueStreamRequest, queue_pb.EnqueueStreamResponse>;
+    enqueueStream(metadata: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<queue_pb.EnqueueStreamRequest, queue_pb.EnqueueStreamResponse>;
 }
 
 export class QueueServiceClient extends grpc.Client implements IQueueServiceClient {
@@ -123,4 +137,6 @@ export class QueueServiceClient extends grpc.Client implements IQueueServiceClie
     public enqueueMessage(request: queue_pb.EnqueueMessageRequest, callback: (error: grpc.ServiceError | null, response: queue_pb.EnqueueMessageResponse) => void): grpc.ClientUnaryCall;
     public enqueueMessage(request: queue_pb.EnqueueMessageRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: queue_pb.EnqueueMessageResponse) => void): grpc.ClientUnaryCall;
     public enqueueMessage(request: queue_pb.EnqueueMessageRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: queue_pb.EnqueueMessageResponse) => void): grpc.ClientUnaryCall;
+    public enqueueStream(options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<queue_pb.EnqueueStreamRequest, queue_pb.EnqueueStreamResponse>;
+    public enqueueStream(metadata?: grpc.Metadata, options?: Partial<grpc.CallOptions>): grpc.ClientDuplexStream<queue_pb.EnqueueStreamRequest, queue_pb.EnqueueStreamResponse>;
 }

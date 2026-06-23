@@ -136,6 +136,28 @@ function deserialize_exchange_PublishMessageResponse(buffer_arg) {
   return exchange_pb.PublishMessageResponse.deserializeBinary(new Uint8Array(buffer_arg));
 }
 
+function serialize_exchange_PublishStreamRequest(arg) {
+  if (!(arg instanceof exchange_pb.PublishStreamRequest)) {
+    throw new Error('Expected argument of type exchange.PublishStreamRequest');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_exchange_PublishStreamRequest(buffer_arg) {
+  return exchange_pb.PublishStreamRequest.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
+function serialize_exchange_PublishStreamResponse(arg) {
+  if (!(arg instanceof exchange_pb.PublishStreamResponse)) {
+    throw new Error('Expected argument of type exchange.PublishStreamResponse');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_exchange_PublishStreamResponse(buffer_arg) {
+  return exchange_pb.PublishStreamResponse.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
 
 var ExchangeServiceService = exports.ExchangeServiceService = {
   createExchange: {
@@ -203,6 +225,17 @@ var ExchangeServiceService = exports.ExchangeServiceService = {
     requestDeserialize: deserialize_exchange_PublishMessageRequest,
     responseSerialize: serialize_exchange_PublishMessageResponse,
     responseDeserialize: deserialize_exchange_PublishMessageResponse,
+  },
+  publishStream: {
+    path: '/exchange.ExchangeService/PublishStream',
+    requestStream: true,
+    responseStream: true,
+    requestType: exchange_pb.PublishStreamRequest,
+    responseType: exchange_pb.PublishStreamResponse,
+    requestSerialize: serialize_exchange_PublishStreamRequest,
+    requestDeserialize: deserialize_exchange_PublishStreamRequest,
+    responseSerialize: serialize_exchange_PublishStreamResponse,
+    responseDeserialize: deserialize_exchange_PublishStreamResponse,
   },
 };
 
