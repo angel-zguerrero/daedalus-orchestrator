@@ -129,17 +129,44 @@ type AssertBindingInput struct {
 	Headers             map[string]string
 }
 
+// EnqueueOptions holds options for enqueueing a message via streaming.
+type EnqueueOptions struct {
+	WaitForConfirmation bool
+	TimeoutMs           int
+}
+
+// EnqueueResult is returned when enqueueing a message via streaming.
+type EnqueueResult struct {
+	ClientMessageID string
+	MessageID       string
+	Confirmed       bool
+}
+
 // EnqueueMessageInput defines the parameters for enqueueing a message to a queue.
 type EnqueueMessageInput struct {
 	TenantCode  string
 	QueueCode   string
-	Content     string
+	Content     []byte
 	ContentType string
 	VNamespace  string
 	Priority    int32
 	Handler     string
 	Headers     map[string]string
 	Parameters  map[string]string
+	Options     *EnqueueOptions
+}
+
+// PublishOptions holds options for publishing a message via streaming.
+type PublishOptions struct {
+	WaitForConfirmation bool
+	TimeoutMs           int
+}
+
+// PublishResult is returned when publishing a message via streaming.
+type PublishResult struct {
+	ClientMessageID string
+	Confirmed       bool
+	QueueMessages   map[string]string
 }
 
 // PublishMessageInput defines the parameters for publishing a message via an exchange.
@@ -155,4 +182,5 @@ type PublishMessageInput struct {
 	Headers                       map[string]string
 	Parameters                    map[string]string
 	MessageID                     string
+	Options                       *PublishOptions
 }

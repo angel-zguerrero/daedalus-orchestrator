@@ -42,6 +42,8 @@ Available Flags:
   --tenant-summary-worker-interval  Interval for tenant summary worker in seconds. Minimum 10. Default 30. Overrides config file and environment variable.
   --max-headers                Maximum number of headers. Default 100, minimum 5, maximum 1000. Overrides config file and environment variable.
   --deployment-id              Unique identifier for cluster isolation (default 1). Overrides config file and environment variable.
+  --publish-buffer-flush-interval-ms Flush interval in ms for the publish/enqueue buffers. Default: 50. Overrides config file and environment variable.
+  --publish-buffer-max-size          Maximum number of messages to buffer before forcing a flush. Default: 200. Overrides config file and environment variable.
 
 
 Environment Variables:
@@ -71,6 +73,8 @@ Environment Variables:
   TENANT_SUMMARY_WORKER_INTERVAL  Interval for tenant summary worker in seconds. (Corresponds to ` + constants.EnvVarTenantSummaryWorkerInterval + `)
   MAX_HEADERS                 Maximum number of headers. (Corresponds to ` + constants.EnvVarMaxHeaders + `)
   DEPLOYMENT_ID                Unique identifier for cluster isolation. (Corresponds to ` + constants.EnvVarDeploymentID + `)
+  PUBLISH_BUFFER_FLUSH_INTERVAL_MS Flush interval in ms for the publish/enqueue buffers. (Corresponds to ` + constants.EnvVarPublishBufferFlushIntervalMs + `)
+  PUBLISH_BUFFER_MAX_SIZE          Maximum number of messages to buffer before forcing a flush. (Corresponds to ` + constants.EnvVarPublishBufferMaxSize + `)
 
   OTEL_ACTIVED                  Set to "true" or "false" to enable/disable OpenTelemetry.
   OTEL_ENDPOINT                OpenTelemetry collector endpoint.
@@ -106,6 +110,8 @@ Configuration File:
     tenant_summary_worker_interval  Interval for tenant summary worker in seconds.
     max_headers                   Maximum number of headers.
     deployment_id                 Unique identifier for cluster isolation.
+    publish_buffer_flush_interval_ms Flush interval in ms for the publish/enqueue buffers.
+    publish_buffer_max_size          Maximum number of messages to buffer before forcing a flush.
 
 
 Precedence of Configuration:
@@ -209,6 +215,12 @@ var MessageLeaseDurationFlag = flag.Int64(constants.MessageLeaseDurationFlagName
 
 // ProductionFlag defines the --production command-line flag.
 var ProductionFlag = flag.Bool("production", false, "Disable demo mode.")
+
+// PublishBufferFlushIntervalMsFlag defines the --publish-buffer-flush-interval-ms command-line flag.
+var PublishBufferFlushIntervalMsFlag = flag.Int(constants.PublishBufferFlushIntervalMsFlagName, 0, "Flush interval in ms for the publish/enqueue buffers. Default: 50. Overrides config file and environment variable.")
+
+// PublishBufferMaxSizeFlag defines the --publish-buffer-max-size command-line flag.
+var PublishBufferMaxSizeFlag = flag.Int(constants.PublishBufferMaxSizeFlagName, 0, "Maximum number of messages to buffer before forcing a flush. Default: 200. Overrides config file and environment variable.")
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -441,6 +453,22 @@ func LoadDefaultConfiguration() error {
 		config.MessageLeaseDuration = time.Duration(messageLeaseDuration) * time.Second
 	}
 
+	if envVal := os.Getenv(constants.EnvVarPublishBufferFlushIntervalMs); envVal != "" {
+		publishBufferFlushIntervalMs, err := strconv.Atoi(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarPublishBufferFlushIntervalMs, err)
+		}
+		config.PublishBufferFlushIntervalMs = publishBufferFlushIntervalMs
+	}
+
+	if envVal := os.Getenv(constants.EnvVarPublishBufferMaxSize); envVal != "" {
+		publishBufferMaxSize, err := strconv.Atoi(envVal)
+		if err != nil {
+			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarPublishBufferMaxSize, err)
+		}
+		config.PublishBufferMaxSize = publishBufferMaxSize
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -527,6 +555,14 @@ func LoadDefaultConfiguration() error {
 
 	if *MessageLeaseDurationFlag != 0 {
 		config.MessageLeaseDuration = time.Duration(*MessageLeaseDurationFlag) * time.Second
+	}
+
+	if *PublishBufferFlushIntervalMsFlag != 0 {
+		config.PublishBufferFlushIntervalMs = *PublishBufferFlushIntervalMsFlag
+	}
+
+	if *PublishBufferMaxSizeFlag != 0 {
+		config.PublishBufferMaxSize = *PublishBufferMaxSizeFlag
 	}
 
 	config.Demo = true
@@ -630,6 +666,13 @@ func LoadDefaultConfiguration() error {
 	if config.MessageLeaseDuration < 5*time.Second {
 		log.Warn().Msgf("MessageLeaseDuration (%v) is less than minimum 5 seconds. Setting to 5 seconds.", config.MessageLeaseDuration)
 		config.MessageLeaseDuration = 5 * time.Second
+	}
+
+	if config.PublishBufferFlushIntervalMs == 0 {
+		config.PublishBufferFlushIntervalMs = 50 // Default 50ms
+	}
+	if config.PublishBufferMaxSize == 0 {
+		config.PublishBufferMaxSize = 200 // Default 200 messages
 	}
 
 	// Specific default logic for cluster setup
@@ -909,6 +952,20 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.message_lease_duration = d
+
+		case constants.ConfigPublishBufferFlushIntervalMsKey:
+			p, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.publish_buffer_flush_interval_ms = p
+
+		case constants.ConfigPublishBufferMaxSizeKey:
+			p, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.publish_buffer_max_size = p
 
 		}
 	}

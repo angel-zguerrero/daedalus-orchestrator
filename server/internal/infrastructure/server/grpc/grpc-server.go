@@ -50,9 +50,14 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	tenantInterceptor := UnaryTenantInterceptor(tenantBO, cfg, cfg.Logger)
 	rateLimitInterceptor := UnaryRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 300)
 
+	streamAuthInterceptor := StreamAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
+	streamTenantInterceptor := StreamTenantInterceptor(tenantBO, cfg, cfg.Logger)
+	streamRateLimitInterceptor := StreamRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 300)
+
 	server := grpc.NewServer(
 		grpc.StatsHandler(otelHandler),
 		grpc.ChainUnaryInterceptor(authInterceptor, tenantInterceptor, rateLimitInterceptor),
+		grpc.ChainStreamInterceptor(streamAuthInterceptor, streamTenantInterceptor, streamRateLimitInterceptor),
 	)
 
 	// Registrar servicios

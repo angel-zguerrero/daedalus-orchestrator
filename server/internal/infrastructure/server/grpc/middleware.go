@@ -124,6 +124,87 @@ func extractTenantCodeFromRequest(req interface{}) string {
 	return ""
 }
 
+type wrappedStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (w *wrappedStream) Context() context.Context {
+	return w.ctx
+}
+
+// StreamTenantInterceptor returns a new stream server interceptor that extracts tenant information and injects it into the context
+func StreamTenantInterceptor(tenantBO *bo.TenantBO, serverConfig *common.ServerConfing, logger zerolog.Logger) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		// Note: Tenant code for streams usually needs to be extracted from metadata or the first message.
+		// For our case, we will rely on metadata if it's there. 
+		// If not, the stream handler itself will need to extract it from the first message (which is what we did in the handlers).
+		// However, to keep it consistent, if the handler already extracts it (like PublishStream), we don't strictly need it here unless we enforce it.
+		// We'll pass it through as we rely on the handler to call common.MustGetTenantData after parsing the first message if it's in the message.
+		// Wait, common.MustGetTenantData expects it in the context.
+		// If it's not in the context, MustGetTenantData panics.
+		// The stream request might not have the tenant code in metadata, but in the message itself.
+		// Ah, looking at `ExchangeService.PublishStream`, it does `common.MustGetTenantData(ctx)` *before* reading any message.
+		// This means the tenant code MUST be in the context, typically from metadata injected by the client, or we must extract it.
+		// In UnaryTenantInterceptor, it extracts from the `req` interface. For streams, `req` isn't available upfront.
+		// How does the client send it? Usually via metadata for streams.
+		// Let's implement extracting from metadata for StreamTenantInterceptor.
+
+		md, ok := metadata.FromIncomingContext(ss.Context())
+		if !ok {
+			return handler(srv, ss) // Let handler deal with missing tenant or panic
+		}
+
+		tenantCodes := md.Get("x-tenant-code") // Example header, adjust if client uses something else
+		if len(tenantCodes) == 0 {
+			// Try "tenant-code"
+			tenantCodes = md.Get("tenant-code")
+		}
+
+		if len(tenantCodes) == 0 {
+			return handler(srv, ss)
+		}
+
+		tenantCode := tenantCodes[0]
+
+		tenant, _, _, err := tenantBO.GetTenant(ss.Context(), tenantCode)
+		if err != nil {
+			logger.Error().Err(err).Str("tenantCode", tenantCode).Msg("Failed to get tenant in gRPC stream interceptor")
+			return status.Errorf(codes.InvalidArgument, "Invalid tenant: %v", err)
+		}
+
+		cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
+		cfs := tenant.ID
+
+		var node *dragonboat.RaftNode
+		serverConfig.TenantNodesLock.Lock()
+		for i := range serverConfig.TenantNodes {
+			if serverConfig.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+				node = serverConfig.TenantNodes[i]
+				break
+			}
+		}
+		serverConfig.TenantNodesLock.Unlock()
+
+		if node == nil {
+			logger.Error().Str("tenantCode", tenantCode).Str("cfs", cfs).Int("shardId", tenant.ShardId).Msg("No node found for tenant shard in gRPC stream interceptor")
+			return status.Errorf(codes.Internal, "Tenant node not available")
+		}
+
+		tenantCtx := &common.TenantContext{
+			Tenant: &tenant,
+			Node:   node,
+			CF:     cf,
+			CFS:    cfs,
+		}
+
+		newCtx := common.SetTenantContext(ss.Context(), tenantCtx)
+		wrapped := &wrappedStream{ServerStream: ss, ctx: newCtx}
+
+		return handler(srv, wrapped)
+	}
+}
+
 // UnaryAuthInterceptor returns a new unary server interceptor that authenticates requests.
 func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtKey []byte) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
@@ -217,6 +298,99 @@ func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger
 		}
 
 		return handler(ctx, req)
+	}
+}
+
+// StreamAuthInterceptor returns a new stream server interceptor that authenticates requests.
+func StreamAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtKey []byte) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		ctx := ss.Context()
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			logger.Warn().Msg("StreamAuthInterceptor: Missing metadata")
+			return status.Errorf(codes.Unauthenticated, "missing metadata")
+		}
+
+		// Similar logic as UnaryAuthInterceptor
+		if !strings.HasSuffix(info.FullMethod, "AuthService/Login") {
+			authHeaders := md.Get("authorization")
+			if len(authHeaders) == 0 {
+				logger.Warn().Msg("StreamAuthInterceptor: Authorization header missing")
+				return status.Errorf(codes.Unauthenticated, "authorization token is required")
+			}
+
+			authHeader := authHeaders[0]
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+				logger.Warn().Msg("StreamAuthInterceptor: Invalid Authorization header format")
+				return status.Errorf(codes.Unauthenticated, "authorization token format is 'Bearer <token>'")
+			}
+			tokenString := parts[1]
+
+			claims := &jwt.RegisteredClaims{}
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return jwtKey, nil
+			})
+
+			if err != nil {
+				if err == jwt.ErrTokenExpired {
+					logger.Warn().Msg("StreamAuthInterceptor: JWT token expired")
+					return status.Errorf(codes.Unauthenticated, "token expired")
+				}
+				logger.Warn().Err(err).Msg("StreamAuthInterceptor: Invalid JWT token")
+				return status.Errorf(codes.Unauthenticated, "invalid token")
+			}
+
+			if !token.Valid {
+				logger.Warn().Msg("StreamAuthInterceptor: JWT token is invalid")
+				return status.Errorf(codes.Unauthenticated, "invalid token")
+			}
+
+			checkSessionCmd := &auth_command.CheckSessionExistsCommand{
+				JWTToken: tokenString,
+				JWTKey:   jwtKey,
+			}
+
+			queryCmd := &general_command.Query_Command{
+				Command: &general_command.Repository_Command{
+					CMD: checkSessionCmd,
+				},
+				Now: time.Now().UnixNano(),
+			}
+
+			raftCtx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+			defer cancel()
+
+			result, err := MasterNode.Read(raftCtx, *queryCmd)
+			if err != nil {
+				logger.Error().Err(err).Msg("StreamAuthInterceptor: Failed to execute CheckSessionExistsCommand via Raft")
+				return status.Errorf(codes.Internal, "failed to verify session")
+			}
+
+			buf := bytes.NewBuffer(result.([]byte))
+			dec := gob.NewDecoder(buf)
+			parsedResult := &commands.CommandResult{}
+			if err := dec.Decode(parsedResult); err != nil {
+				logger.Error().Err(err).Msg("StreamAuthInterceptor: Session does not exist or has been invalidated - decode error")
+				return status.Errorf(codes.Internal, "failed to decode session verification result")
+			}
+
+			sessionExists, ok := parsedResult.Result.(bool)
+			if !ok {
+				logger.Error().Msg("StreamAuthInterceptor: Unexpected type for session existence result")
+				return status.Errorf(codes.Internal, "failed to interpret session verification result")
+			}
+
+			if !sessionExists {
+				logger.Warn().Str("token_subject", claims.Subject).Msg("StreamAuthInterceptor: Session does not exist or has been invalidated")
+				return status.Errorf(codes.Unauthenticated, "session is invalid or has expired")
+			}
+		}
+
+		return handler(srv, ss)
 	}
 }
 
@@ -318,5 +492,85 @@ func UnaryRateLimitInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.L
 		}
 
 		return handler(ctx, req)
+	}
+}
+
+// StreamRateLimitInterceptor returns a new stream server interceptor that rate-limits requests.
+func StreamRateLimitInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, keyStrategy string, period time.Duration, limit int64) grpc.StreamServerInterceptor {
+	rate := limiter.Rate{
+		Period: period,
+		Limit:  limit,
+	}
+
+	store := ratelimit_store.NewRaftStore(MasterNode, "grpc_ratelimit", period)
+	limiterInstance := limiter.New(store, rate)
+
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		ctx := ss.Context()
+		var key string
+
+		if keyStrategy == "token" {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if ok {
+				authHeaders := md.Get("authorization")
+				if len(authHeaders) > 0 {
+					authHeader := authHeaders[0]
+					parts := strings.Split(authHeader, " ")
+					if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
+						key = parts[1]
+					}
+				}
+			}
+			if key == "" {
+				p, ok := peer.FromContext(ctx)
+				if ok {
+					if tcpAddr, ok := p.Addr.(*net.TCPAddr); ok {
+						key = tcpAddr.IP.String()
+					} else {
+						key = p.Addr.String()
+					}
+				} else {
+					return status.Errorf(codes.Internal, "failed to determine client identity for rate limiting")
+				}
+			}
+		} else {
+			p, ok := peer.FromContext(ctx)
+			if !ok {
+				return status.Errorf(codes.Internal, "failed to determine client identity for rate limiting")
+			}
+			if tcpAddr, ok := p.Addr.(*net.TCPAddr); ok {
+				key = tcpAddr.IP.String()
+			} else {
+				key = p.Addr.String()
+			}
+		}
+
+		if key == "" {
+			return status.Errorf(codes.Internal, "could not determine rate limiting key")
+		}
+
+		limiterCtx, err := limiterInstance.Get(ctx, key)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to check rate limit")
+		}
+
+		if limiterCtx.Reached {
+			headers := metadata.New(map[string]string{
+				"x-ratelimit-limit":     fmt.Sprintf("%d", limiterCtx.Limit),
+				"x-ratelimit-remaining": fmt.Sprintf("%d", limiterCtx.Remaining),
+				"x-ratelimit-reset":     fmt.Sprintf("%d", limiterCtx.Reset),
+			})
+			_ = grpc.SetHeader(ctx, headers)
+			return status.Errorf(codes.ResourceExhausted, "too many requests, please try again later")
+		}
+
+		headers := metadata.New(map[string]string{
+			"x-ratelimit-limit":     fmt.Sprintf("%d", limiterCtx.Limit),
+			"x-ratelimit-remaining": fmt.Sprintf("%d", limiterCtx.Remaining),
+			"x-ratelimit-reset":     fmt.Sprintf("%d", limiterCtx.Reset),
+		})
+		_ = grpc.SetHeader(ctx, headers)
+
+		return handler(srv, ss)
 	}
 }

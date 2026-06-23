@@ -2,26 +2,42 @@ package exchange
 
 import (
 	"context"
+	"strconv"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/buffer"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"
+	pkg_config "deadalus-orch/server/internal/pkg/config"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
 )
 
 type ExchangeService struct {
 	pb.UnimplementedExchangeServiceServer
-	startTime  time.Time
-	Config     *common.ServerConfing
-	ExchangeBO *bo.ExchangeBO
+	startTime     time.Time
+	Config        *common.ServerConfing
+	ExchangeBO    *bo.ExchangeBO
+	publishBuffer *buffer.MessageBuffer[buffer.PublishBufferedMessage]
 }
 
 func NewExchangeService(config *common.ServerConfing) *ExchangeService {
+	exchangeBO := bo.NewExchangeBO(config)
+	
+	publishBuffer := buffer.NewMessageBuffer[buffer.PublishBufferedMessage](
+		time.Duration(config.PublishBufferFlushIntervalMs)*time.Millisecond,
+		config.PublishBufferMaxSize,
+		config.Logger,
+		buffer.NewPublishFlusher(exchangeBO, config.Logger, pkg_config.GlobalConfiguration.ApiRaftTimeout),
+	)
+
 	return &ExchangeService{
-		startTime:  time.Now(),
-		Config:     config,
-		ExchangeBO: bo.NewExchangeBO(config),
+		startTime:     time.Now(),
+		Config:        config,
+		ExchangeBO:    exchangeBO,
+		publishBuffer: publishBuffer,
 	}
 }
 
@@ -197,4 +213,141 @@ func (s *ExchangeService) PublishMessage(ctx context.Context, r *pb.PublishMessa
 		Message:       "Message published successfully",
 		QueueMessages: queueMessages, // map[string]string where key=queueCode, value=messageID
 	}, nil
+}
+
+func (s *ExchangeService) PublishStream(stream pb.ExchangeService_PublishStreamServer) error {
+	ctx := stream.Context()
+	tenantBO := bo.NewTenantBO(s.Config)
+	tenantCache := make(map[string]*common.TenantContext)
+
+	// gRPC streams are not safe for concurrent sends, use a dedicated channel and sender goroutine
+	sendChan := make(chan *pb.PublishStreamResponse, s.Config.PublishBufferMaxSize*2)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case resp := <-sendChan:
+				_ = stream.Send(resp)
+			}
+		}
+	}()
+
+	var recvCount int
+	var startRecv time.Time
+	
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			// Handle EOF or error
+			return nil
+		}
+
+		if recvCount == 0 {
+			startRecv = time.Now()
+		}
+		recvCount++
+		if recvCount%100 == 0 {
+			s.Config.Logger.Info().Int("count", recvCount).Dur("duration", time.Since(startRecv)).Msg("Received 100 messages from stream.Recv()")
+			startRecv = time.Now()
+		}
+
+		tenantCtx, ok := tenantCache[req.TenantCode]
+		if !ok {
+			tenant, _, _, err := tenantBO.GetTenant(ctx, req.TenantCode)
+			if err != nil {
+				s.Config.Logger.Error().Err(err).Str("tenantCode", req.TenantCode).Msg("Failed to get tenant in PublishStream")
+				resp := &pb.PublishStreamResponse{
+					ClientMessageId: req.ClientMessageId,
+					Confirmed:       false,
+					Error:           "Invalid tenant: " + err.Error(),
+				}
+				sendChan <- resp
+				continue
+			}
+
+			cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
+			cfs := tenant.ID
+
+			var tenantNode *dragonboat.RaftNode
+			s.Config.TenantNodesLock.Lock()
+			for i := range s.Config.TenantNodes {
+				if s.Config.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+					tenantNode = s.Config.TenantNodes[i]
+					break
+				}
+			}
+			s.Config.TenantNodesLock.Unlock()
+
+			if tenantNode == nil {
+				s.Config.Logger.Error().Str("tenantCode", req.TenantCode).Msg("No node found for tenant shard in PublishStream")
+				resp := &pb.PublishStreamResponse{
+					ClientMessageId: req.ClientMessageId,
+					Confirmed:       false,
+					Error:           "Tenant node not available",
+				}
+				sendChan <- resp
+				continue
+			}
+
+			tenantCtx = &common.TenantContext{
+				Tenant: &tenant,
+				Node:   tenantNode,
+				CF:     cf,
+				CFS:    cfs,
+			}
+			tenantCache[req.TenantCode] = tenantCtx
+		}
+
+		// Convert protobuf message to models.QueueMessage
+		message := models.QueueMessage{
+			MessageID:     req.Message.MessageId,
+			Handler:       req.Message.Handler,
+			Priority:      int(req.Message.Priority),
+			Parameters:    req.Message.Parameters,
+			Headers:       req.Message.Headers,
+			ContentType:   req.Message.ContentType,
+			Content:       req.Message.Content,
+			ContentLength: int64(len(req.Message.Content)),
+		}
+
+		responseChan := make(chan buffer.PublishConfirmation, 1)
+
+		bufferedMessage := buffer.PublishBufferedMessage{
+			ClientMessageID: req.ClientMessageId,
+			ExchangeCode:    req.ExchangeCode,
+			RoutingKey:      req.RoutingKeyOrPatternOrQueueCode,
+			VNamespace:      req.Vnamespace,
+			Message:         message,
+			CF:              tenantCtx.CF,
+			CFS:             tenantCtx.CFS,
+			Tenant:          tenantCtx.Tenant,
+			TenantNode:      tenantCtx.Node,
+			ResponseChan:    responseChan,
+		}
+
+		// Add to buffer (non-blocking unless flush happens)
+		s.publishBuffer.Add(ctx, bufferedMessage)
+
+		// Wait for response asynchronously and send back to client
+		go func(clientMsgId string, respChan <-chan buffer.PublishConfirmation) {
+			select {
+			case <-ctx.Done():
+				return
+			case confirmation := <-respChan:
+				resp := &pb.PublishStreamResponse{
+					ClientMessageId: clientMsgId,
+				}
+				if confirmation.Error != nil {
+					resp.Confirmed = false
+					resp.Error = confirmation.Error.Error()
+				} else {
+					resp.Confirmed = true
+					resp.QueueMessages = confirmation.QueueMessages
+				}
+				// Ignore send error, client might have disconnected
+				sendChan <- resp
+			}
+		}(req.ClientMessageId, responseChan)
+	}
 }
