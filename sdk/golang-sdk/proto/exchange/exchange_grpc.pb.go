@@ -25,6 +25,7 @@ const (
 	ExchangeService_GetExchanges_FullMethodName       = "/exchange.ExchangeService/GetExchanges"
 	ExchangeService_DeleteExchange_FullMethodName     = "/exchange.ExchangeService/DeleteExchange"
 	ExchangeService_PublishMessage_FullMethodName     = "/exchange.ExchangeService/PublishMessage"
+	ExchangeService_PublishStream_FullMethodName      = "/exchange.ExchangeService/PublishStream"
 )
 
 // ExchangeServiceClient is the client API for ExchangeService service.
@@ -37,6 +38,7 @@ type ExchangeServiceClient interface {
 	GetExchanges(ctx context.Context, in *GetExchangesRequest, opts ...grpc.CallOption) (*GetExchangesResponse, error)
 	DeleteExchange(ctx context.Context, in *DeleteExchangeRequest, opts ...grpc.CallOption) (*DeleteExchangeResponse, error)
 	PublishMessage(ctx context.Context, in *PublishMessageRequest, opts ...grpc.CallOption) (*PublishMessageResponse, error)
+	PublishStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PublishStreamRequest, PublishStreamResponse], error)
 }
 
 type exchangeServiceClient struct {
@@ -107,6 +109,19 @@ func (c *exchangeServiceClient) PublishMessage(ctx context.Context, in *PublishM
 	return out, nil
 }
 
+func (c *exchangeServiceClient) PublishStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PublishStreamRequest, PublishStreamResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ExchangeService_ServiceDesc.Streams[0], ExchangeService_PublishStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PublishStreamRequest, PublishStreamResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExchangeService_PublishStreamClient = grpc.BidiStreamingClient[PublishStreamRequest, PublishStreamResponse]
+
 // ExchangeServiceServer is the server API for ExchangeService service.
 // All implementations must embed UnimplementedExchangeServiceServer
 // for forward compatibility.
@@ -117,6 +132,7 @@ type ExchangeServiceServer interface {
 	GetExchanges(context.Context, *GetExchangesRequest) (*GetExchangesResponse, error)
 	DeleteExchange(context.Context, *DeleteExchangeRequest) (*DeleteExchangeResponse, error)
 	PublishMessage(context.Context, *PublishMessageRequest) (*PublishMessageResponse, error)
+	PublishStream(grpc.BidiStreamingServer[PublishStreamRequest, PublishStreamResponse]) error
 	mustEmbedUnimplementedExchangeServiceServer()
 }
 
@@ -144,6 +160,9 @@ func (UnimplementedExchangeServiceServer) DeleteExchange(context.Context, *Delet
 }
 func (UnimplementedExchangeServiceServer) PublishMessage(context.Context, *PublishMessageRequest) (*PublishMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PublishMessage not implemented")
+}
+func (UnimplementedExchangeServiceServer) PublishStream(grpc.BidiStreamingServer[PublishStreamRequest, PublishStreamResponse]) error {
+	return status.Error(codes.Unimplemented, "method PublishStream not implemented")
 }
 func (UnimplementedExchangeServiceServer) mustEmbedUnimplementedExchangeServiceServer() {}
 func (UnimplementedExchangeServiceServer) testEmbeddedByValue()                         {}
@@ -274,6 +293,13 @@ func _ExchangeService_PublishMessage_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ExchangeService_PublishStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ExchangeServiceServer).PublishStream(&grpc.GenericServerStream[PublishStreamRequest, PublishStreamResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ExchangeService_PublishStreamServer = grpc.BidiStreamingServer[PublishStreamRequest, PublishStreamResponse]
+
 // ExchangeService_ServiceDesc is the grpc.ServiceDesc for ExchangeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -306,6 +332,13 @@ var ExchangeService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ExchangeService_PublishMessage_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "PublishStream",
+			Handler:       _ExchangeService_PublishStream_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "exchange.proto",
 }

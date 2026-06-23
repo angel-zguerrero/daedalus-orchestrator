@@ -86,6 +86,12 @@ const ConfigDeploymentIDKey = "deployment_id"
 // to a JobWorker before the lease expires.
 const ConfigMessageLeaseDurationKey = "message_lease_duration"
 
+// ConfigPublishBufferFlushIntervalMsKey is the key for the publish buffer flush interval setting in the configuration file (in ms).
+const ConfigPublishBufferFlushIntervalMsKey = "publish_buffer_flush_interval_ms"
+
+// ConfigPublishBufferMaxSizeKey is the key for the publish buffer max size setting in the configuration file.
+const ConfigPublishBufferMaxSizeKey = "publish_buffer_max_size"
+
 // Environment variable keys. These constants define the names of environment variables used for configuration.
 
 // EnvVarEnvKey is the environment variable name for specifying the application environment (e.g., "development", "production").
@@ -178,6 +184,12 @@ const EnvVarDeploymentID = "DEPLOYMENT_ID"
 // (in seconds). It defines how long a dequeued message is locked to a JobWorker.
 const EnvVarMessageLeaseDuration = "MESSAGE_LEASE_DURATION"
 
+// EnvVarPublishBufferFlushIntervalMs is the environment variable name for the publish buffer flush interval in ms.
+const EnvVarPublishBufferFlushIntervalMs = "PUBLISH_BUFFER_FLUSH_INTERVAL_MS"
+
+// EnvVarPublishBufferMaxSize is the environment variable name for the publish buffer max size.
+const EnvVarPublishBufferMaxSize = "PUBLISH_BUFFER_MAX_SIZE"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").
@@ -260,6 +272,12 @@ const DeploymentIDFlagName = "deployment-id"
 // MessageLeaseDurationFlagName is the command-line flag name for the message lease duration
 // (in seconds).
 const MessageLeaseDurationFlagName = "message-lease-duration"
+
+// PublishBufferFlushIntervalMsFlagName is the command-line flag name for the publish buffer flush interval (in ms).
+const PublishBufferFlushIntervalMsFlagName = "publish-buffer-flush-interval-ms"
+
+// PublishBufferMaxSizeFlagName is the command-line flag name for the publish buffer max size.
+const PublishBufferMaxSizeFlagName = "publish-buffer-max-size"
 
 // DefaultMessageLeaseDurationSeconds is the default lease duration for a dequeued message
 // when no other source sets it.

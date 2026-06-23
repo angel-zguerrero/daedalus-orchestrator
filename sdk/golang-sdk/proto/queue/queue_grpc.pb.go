@@ -25,6 +25,7 @@ const (
 	QueueService_GetQueues_FullMethodName       = "/queue.QueueService/GetQueues"
 	QueueService_DeleteQueue_FullMethodName     = "/queue.QueueService/DeleteQueue"
 	QueueService_EnqueueMessage_FullMethodName  = "/queue.QueueService/EnqueueMessage"
+	QueueService_EnqueueStream_FullMethodName   = "/queue.QueueService/EnqueueStream"
 )
 
 // QueueServiceClient is the client API for QueueService service.
@@ -37,6 +38,7 @@ type QueueServiceClient interface {
 	GetQueues(ctx context.Context, in *GetQueuesRequest, opts ...grpc.CallOption) (*GetQueuesResponse, error)
 	DeleteQueue(ctx context.Context, in *DeleteQueueRequest, opts ...grpc.CallOption) (*DeleteQueueResponse, error)
 	EnqueueMessage(ctx context.Context, in *EnqueueMessageRequest, opts ...grpc.CallOption) (*EnqueueMessageResponse, error)
+	EnqueueStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[EnqueueStreamRequest, EnqueueStreamResponse], error)
 }
 
 type queueServiceClient struct {
@@ -107,6 +109,19 @@ func (c *queueServiceClient) EnqueueMessage(ctx context.Context, in *EnqueueMess
 	return out, nil
 }
 
+func (c *queueServiceClient) EnqueueStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[EnqueueStreamRequest, EnqueueStreamResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &QueueService_ServiceDesc.Streams[0], QueueService_EnqueueStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[EnqueueStreamRequest, EnqueueStreamResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type QueueService_EnqueueStreamClient = grpc.BidiStreamingClient[EnqueueStreamRequest, EnqueueStreamResponse]
+
 // QueueServiceServer is the server API for QueueService service.
 // All implementations must embed UnimplementedQueueServiceServer
 // for forward compatibility.
@@ -117,6 +132,7 @@ type QueueServiceServer interface {
 	GetQueues(context.Context, *GetQueuesRequest) (*GetQueuesResponse, error)
 	DeleteQueue(context.Context, *DeleteQueueRequest) (*DeleteQueueResponse, error)
 	EnqueueMessage(context.Context, *EnqueueMessageRequest) (*EnqueueMessageResponse, error)
+	EnqueueStream(grpc.BidiStreamingServer[EnqueueStreamRequest, EnqueueStreamResponse]) error
 	mustEmbedUnimplementedQueueServiceServer()
 }
 
@@ -144,6 +160,9 @@ func (UnimplementedQueueServiceServer) DeleteQueue(context.Context, *DeleteQueue
 }
 func (UnimplementedQueueServiceServer) EnqueueMessage(context.Context, *EnqueueMessageRequest) (*EnqueueMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EnqueueMessage not implemented")
+}
+func (UnimplementedQueueServiceServer) EnqueueStream(grpc.BidiStreamingServer[EnqueueStreamRequest, EnqueueStreamResponse]) error {
+	return status.Error(codes.Unimplemented, "method EnqueueStream not implemented")
 }
 func (UnimplementedQueueServiceServer) mustEmbedUnimplementedQueueServiceServer() {}
 func (UnimplementedQueueServiceServer) testEmbeddedByValue()                      {}
@@ -274,6 +293,13 @@ func _QueueService_EnqueueMessage_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _QueueService_EnqueueStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(QueueServiceServer).EnqueueStream(&grpc.GenericServerStream[EnqueueStreamRequest, EnqueueStreamResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type QueueService_EnqueueStreamServer = grpc.BidiStreamingServer[EnqueueStreamRequest, EnqueueStreamResponse]
+
 // QueueService_ServiceDesc is the grpc.ServiceDesc for QueueService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -306,6 +332,13 @@ var QueueService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _QueueService_EnqueueMessage_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "EnqueueStream",
+			Handler:       _QueueService_EnqueueStream_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "queue.proto",
 }

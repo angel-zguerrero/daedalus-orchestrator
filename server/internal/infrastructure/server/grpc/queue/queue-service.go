@@ -3,25 +3,41 @@ package queue
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/buffer"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"
+	pkg_config "deadalus-orch/server/internal/pkg/config"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
 )
 
 type QueueService struct {
 	pb.UnimplementedQueueServiceServer
-	startTime time.Time
-	Config    *common.ServerConfing
-	QueueBO   *bo.QueueBO
+	startTime     time.Time
+	Config        *common.ServerConfing
+	QueueBO       *bo.QueueBO
+	enqueueBuffer *buffer.MessageBuffer[buffer.EnqueueBufferedMessage]
 }
 
 func NewQueueService(config *common.ServerConfing) *QueueService {
+	queueBO := bo.NewQueueBO(config)
+	
+	enqueueBuffer := buffer.NewMessageBuffer[buffer.EnqueueBufferedMessage](
+		time.Duration(config.PublishBufferFlushIntervalMs)*time.Millisecond,
+		config.PublishBufferMaxSize,
+		config.Logger,
+		buffer.NewEnqueueFlusher(queueBO, config.Logger, pkg_config.GlobalConfiguration.ApiRaftTimeout),
+	)
+
 	return &QueueService{
-		Config:  config,
-		QueueBO: bo.NewQueueBO(config),
+		Config:        config,
+		QueueBO:       queueBO,
+		enqueueBuffer: enqueueBuffer,
 	}
 }
 
@@ -337,5 +353,123 @@ func isValidQueueType(queueType string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (s *QueueService) EnqueueStream(stream pb.QueueService_EnqueueStreamServer) error {
+	ctx := stream.Context()
+	tenantBO := bo.NewTenantBO(s.Config)
+	tenantCache := make(map[string]*common.TenantContext)
+
+	// gRPC streams are not safe for concurrent sends, use a dedicated channel and sender goroutine
+	sendChan := make(chan *pb.EnqueueStreamResponse, s.Config.PublishBufferMaxSize*2)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case resp := <-sendChan:
+				_ = stream.Send(resp)
+			}
+		}
+	}()
+
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			return nil
+		}
+
+		tenantCtx, ok := tenantCache[req.TenantCode]
+		if !ok {
+			tenant, _, _, err := tenantBO.GetTenant(ctx, req.TenantCode)
+			if err != nil {
+				s.Config.Logger.Error().Err(err).Str("tenantCode", req.TenantCode).Msg("Failed to get tenant in EnqueueStream")
+				resp := &pb.EnqueueStreamResponse{
+					ClientMessageId: req.ClientMessageId,
+					Confirmed:       false,
+					Error:           "Invalid tenant: " + err.Error(),
+				}
+				sendChan <- resp
+				continue
+			}
+
+			cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
+			cfs := tenant.ID
+
+			var tenantNode *dragonboat.RaftNode
+			s.Config.TenantNodesLock.Lock()
+			for i := range s.Config.TenantNodes {
+				if s.Config.TenantNodes[i].ShardID == uint64(tenant.ShardId) {
+					tenantNode = s.Config.TenantNodes[i]
+					break
+				}
+			}
+			s.Config.TenantNodesLock.Unlock()
+
+			if tenantNode == nil {
+				s.Config.Logger.Error().Str("tenantCode", req.TenantCode).Msg("No node found for tenant shard")
+				resp := &pb.EnqueueStreamResponse{
+					ClientMessageId: req.ClientMessageId,
+					Confirmed:       false,
+					Error:           "Tenant node not available",
+				}
+				sendChan <- resp
+				continue
+			}
+
+			tenantCtx = &common.TenantContext{
+				Tenant: &tenant,
+				Node:   tenantNode,
+				CF:     cf,
+				CFS:    cfs,
+			}
+			tenantCache[req.TenantCode] = tenantCtx
+		}
+
+		message := models.QueueMessage{
+			Content:     []byte(req.Content),
+			ContentType: req.ContentType,
+			Headers:     req.Headers,
+			Priority:    int(req.Priority),
+			Handler:     req.Handler,
+			Parameters:  req.Parameters,
+			VNamespace:  req.Vnamespace,
+		}
+
+		responseChan := make(chan buffer.EnqueueConfirmation, 1)
+
+		bufferedMessage := buffer.EnqueueBufferedMessage{
+			ClientMessageID: req.ClientMessageId,
+			QueueCode:       req.QueueCode,
+			VNamespace:      req.Vnamespace,
+			Message:         message,
+			CF:              tenantCtx.CF,
+			CFS:             tenantCtx.CFS,
+			Tenant:          tenantCtx.Tenant,
+			TenantNode:      tenantCtx.Node,
+			ResponseChan:    responseChan,
+		}
+
+		s.enqueueBuffer.Add(ctx, bufferedMessage)
+
+		go func(clientMsgId string, respChan <-chan buffer.EnqueueConfirmation) {
+			select {
+			case <-ctx.Done():
+				return
+			case confirmation := <-respChan:
+				resp := &pb.EnqueueStreamResponse{
+					ClientMessageId: clientMsgId,
+				}
+				if confirmation.Error != nil {
+					resp.Confirmed = false
+					resp.Error = confirmation.Error.Error()
+				} else {
+					resp.Confirmed = true
+					resp.MessageId = confirmation.MessageID
+				}
+				sendChan <- resp
+			}
+		}(req.ClientMessageId, responseChan)
 	}
 }

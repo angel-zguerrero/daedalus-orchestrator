@@ -82,6 +82,11 @@ type Config struct {
 
 	// Demo is a flag that enables demo mode. Enabled by default unless --production is used.
 	Demo bool
+
+	// PublishBufferFlushIntervalMs specifies the flush interval in ms for the publish/enqueue buffers. Default: 50.
+	PublishBufferFlushIntervalMs int
+	// PublishBufferMaxSize specifies the maximum number of messages to buffer before forcing a flush. Default: 200.
+	PublishBufferMaxSize int
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
@@ -114,6 +119,8 @@ type ConfigFromMap struct {
 	max_headers                        int   // Maximum number of headers
 	deployment_id                      uint64
 	message_lease_duration             int64 // Duration in seconds
+	publish_buffer_flush_interval_ms   int
+	publish_buffer_max_size            int
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -152,6 +159,8 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		MaxHeaders:                     configFromMapInstance.max_headers,
 		DeploymentID:                   configFromMapInstance.deployment_id,
 		MessageLeaseDuration:           time.Duration(configFromMapInstance.message_lease_duration) * time.Second,
+		PublishBufferFlushIntervalMs:   configFromMapInstance.publish_buffer_flush_interval_ms,
+		PublishBufferMaxSize:           configFromMapInstance.publish_buffer_max_size,
 
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
 		// after considering flags and env vars. We need to pass the raw string from the config file if present.

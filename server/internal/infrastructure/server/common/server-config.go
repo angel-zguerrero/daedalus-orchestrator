@@ -22,4 +22,6 @@ type ServerConfing struct {
 	MetricsCollector      *metrics.MetricsCollector
 	IsDemo                bool
 	IsReady               func() bool
+	PublishBufferFlushIntervalMs int
+	PublishBufferMaxSize         int
 }

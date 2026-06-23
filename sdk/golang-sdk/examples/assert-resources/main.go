@@ -148,7 +148,7 @@ func main() {
 					TenantCode:  "my-tenant",
 					QueueCode:   "my-queue",
 					VNamespace:  "default",
-					Content:     string(payload),
+					Content:     payload,
 					ContentType: "application/json",
 					Priority:    0,
 					Handler:     "my-handler",

@@ -1,0 +1,194 @@
+package buffer
+
+import (
+	"context"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	bo "deadalus-orch/server/internal/usecase/business-logic"
+	"deadalus-orch/server/internal/usecase/command/queue"
+	"deadalus-orch/shared/models"
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+)
+
+func NewPublishFlusher(exchangeBO *bo.ExchangeBO, logger zerolog.Logger, raftTimeout time.Duration) func(ctx context.Context, items []PublishBufferedMessage) {
+	return func(ctx context.Context, items []PublishBufferedMessage) {
+		if len(items) == 0 {
+			return
+		}
+
+		// Group by TenantNode + CF + CFS (Raft partition)
+		groups := make(map[string][]PublishBufferedMessage)
+		for _, item := range items {
+			key := item.GetGroupKey()
+			groups[key] = append(groups[key], item)
+		}
+
+		for _, group := range groups {
+			processPublishGroup(ctx, group, exchangeBO, logger, raftTimeout)
+		}
+	}
+}
+
+func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, exchangeBO *bo.ExchangeBO, logger zerolog.Logger, raftTimeout time.Duration) {
+	if len(items) == 0 {
+		return
+	}
+	
+	logger.Info().Int("items_count", len(items)).Msg("processPublishGroup started")
+
+	// For all items in the group, we assume they share the same TenantNode, CF, CFS, and Tenant Code.
+	// We use the first item to get the common properties.
+	tenantNode := items[0].TenantNode
+	cf := items[0].CF
+	cfs := items[0].CFS
+
+	var allMessages []models.QueueMessage
+	// Maps original index in 'items' to the indices of its resolved messages in 'allMessages'
+	itemToMessageIndices := make(map[int][]int)
+	// Maps original index in 'items' to any error encountered during routing
+	itemErrors := make(map[int]error)
+
+	msgIDToQueueCode := make(map[string]string)
+	publishedCounts := make(map[string]int)
+
+	// Cache to avoid querying the DB for identical routing keys in the same batch
+	routingCache := make(map[string][]models.Queue)
+
+	for i, item := range items {
+		// Serialize headers deterministically for the cache key
+		var headerStr strings.Builder
+		if item.Message.Headers != nil {
+			// Sort keys to ensure deterministic cache key
+			keys := make([]string, 0, len(item.Message.Headers))
+			for k := range item.Message.Headers {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+
+			for _, k := range keys {
+				headerStr.WriteString(fmt.Sprintf("%s=%s;", k, item.Message.Headers[k]))
+			}
+		}
+
+		cacheKey := fmt.Sprintf("%s|%s|%s|%s", item.ExchangeCode, item.RoutingKey, item.VNamespace, headerStr.String())
+
+		var queuesList []models.Queue
+		var err error
+
+		if cachedQueues, ok := routingCache[cacheKey]; ok {
+			queuesList = cachedQueues
+		} else {
+			// Resolve the exchange routing
+			queuesList, err = exchangeBO.GetQueuesFromExchange(ctx, item.ExchangeCode, item.RoutingKey, item.Message, item.VNamespace, cf, cfs, item.Tenant, tenantNode)
+			if err == nil {
+				routingCache[cacheKey] = queuesList
+			}
+		}
+
+		if err != nil {
+			itemErrors[i] = fmt.Errorf("failed to get queues from exchange: %w", err)
+			continue
+		}
+
+		if len(queuesList) == 0 {
+			itemErrors[i] = fmt.Errorf("no queues bound to exchange %s with routing key %s", item.ExchangeCode, item.RoutingKey)
+			continue
+		}
+
+		var indices []int
+		for _, q := range queuesList {
+			msg := item.Message // Copy
+			msg.QueueID = q.ID
+			msg.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
+			if msg.MessageID == "" {
+				msg.MessageID = msg.ID
+			}
+
+			msgIDToQueueCode[msg.ID] = q.Code
+			publishedCounts[q.Code+"|"+q.VNamespace]++
+
+			indices = append(indices, len(allMessages))
+			allMessages = append(allMessages, msg)
+		}
+		itemToMessageIndices[i] = indices
+	}
+
+	// If there are no messages to enqueue, notify any items that had errors
+	if len(allMessages) == 0 {
+		for i, item := range items {
+			if err, ok := itemErrors[i]; ok {
+				notifyPublishError(item, err)
+			} else {
+				// Should not happen, but just in case
+				notifyPublishError(item, fmt.Errorf("unknown routing error"))
+			}
+		}
+		return
+	}
+
+	// Execute batch enqueue
+	enqueueCmd := queue.EnqueueCommand{
+		CF:       cf,
+		CFS:      cfs,
+		Messages: allMessages,
+	}
+
+	startEnqueue := time.Now()
+	res, err := dragonboat.ExecuteRepositoryCommand[queue.EnqueueResult](
+		tenantNode,
+		ctx,
+		&enqueueCmd,
+		raftTimeout,
+		logger,
+		"EnqueueCommand (Batch Publish)",
+	)
+	logger.Info().Dur("duration", time.Since(startEnqueue)).Int("messages", len(allMessages)).Msg("EnqueueCommand executed in publish-flusher")
+
+	// Notify results back
+	if err != nil {
+		for _, item := range items {
+			notifyPublishError(item, err)
+		}
+		return
+	}
+
+	if exchangeBO.Config.MetricsCollector != nil {
+		for _, gauge := range res.Gauges {
+			exchangeBO.Config.MetricsCollector.UpdateGauges(items[0].Tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
+		}
+		for key, count := range publishedCounts {
+			parts := strings.Split(key, "|")
+			exchangeBO.Config.MetricsCollector.RecordPublish(items[0].Tenant.Code, parts[0], parts[1], uint64(count))
+		}
+	}
+
+	for i, item := range items {
+		if routingErr, ok := itemErrors[i]; ok {
+			notifyPublishError(item, routingErr)
+			continue
+		}
+
+		queueMessages := make(map[string]string)
+		for _, msgIdx := range itemToMessageIndices[i] {
+			msg := allMessages[msgIdx]
+			queueCode := msgIDToQueueCode[msg.ID]
+			queueMessages[queueCode] = msg.ID
+		}
+
+		item.ResponseChan <- PublishConfirmation{
+			QueueMessages: queueMessages,
+			Error:         nil,
+		}
+	}
+}
+
+func notifyPublishError(item PublishBufferedMessage, err error) {
+	item.ResponseChan <- PublishConfirmation{
+		Error: err,
+	}
+}
