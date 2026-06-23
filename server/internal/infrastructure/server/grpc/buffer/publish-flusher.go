@@ -9,13 +9,53 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
+type routingCacheEntry struct {
+	queues    []models.Queue
+	expiresAt time.Time
+}
+
+type RoutingCache struct {
+	mu      sync.RWMutex
+	entries map[string]routingCacheEntry
+	ttl     time.Duration
+}
+
+func NewRoutingCache(ttl time.Duration) *RoutingCache {
+	return &RoutingCache{
+		entries: make(map[string]routingCacheEntry),
+		ttl:     ttl,
+	}
+}
+
+func (rc *RoutingCache) Get(key string) ([]models.Queue, bool) {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	entry, ok := rc.entries[key]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return nil, false
+	}
+	return entry.queues, true
+}
+
+func (rc *RoutingCache) Set(key string, queues []models.Queue) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.entries[key] = routingCacheEntry{
+		queues:    queues,
+		expiresAt: time.Now().Add(rc.ttl),
+	}
+}
+
 func NewPublishFlusher(exchangeBO *bo.ExchangeBO, logger zerolog.Logger, raftTimeout time.Duration) func(ctx context.Context, items []PublishBufferedMessage) {
+	globalRoutingCache := NewRoutingCache(30 * time.Second)
+
 	return func(ctx context.Context, items []PublishBufferedMessage) {
 		if len(items) == 0 {
 			return
@@ -29,12 +69,12 @@ func NewPublishFlusher(exchangeBO *bo.ExchangeBO, logger zerolog.Logger, raftTim
 		}
 
 		for _, group := range groups {
-			processPublishGroup(ctx, group, exchangeBO, logger, raftTimeout)
+			processPublishGroup(ctx, group, exchangeBO, logger, raftTimeout, globalRoutingCache)
 		}
 	}
 }
 
-func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, exchangeBO *bo.ExchangeBO, logger zerolog.Logger, raftTimeout time.Duration) {
+func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, exchangeBO *bo.ExchangeBO, logger zerolog.Logger, raftTimeout time.Duration, routingCache *RoutingCache) {
 	if len(items) == 0 {
 		return
 	}
@@ -56,9 +96,6 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 	msgIDToQueueCode := make(map[string]string)
 	publishedCounts := make(map[string]int)
 
-	// Cache to avoid querying the DB for identical routing keys in the same batch
-	routingCache := make(map[string][]models.Queue)
-
 	for i, item := range items {
 		// Serialize headers deterministically for the cache key
 		var headerStr strings.Builder
@@ -75,18 +112,18 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 			}
 		}
 
-		cacheKey := fmt.Sprintf("%s|%s|%s|%s", item.ExchangeCode, item.RoutingKey, item.VNamespace, headerStr.String())
+		cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s", cf, cfs, item.ExchangeCode, item.RoutingKey, item.VNamespace, headerStr.String())
 
 		var queuesList []models.Queue
 		var err error
 
-		if cachedQueues, ok := routingCache[cacheKey]; ok {
+		if cachedQueues, ok := routingCache.Get(cacheKey); ok {
 			queuesList = cachedQueues
 		} else {
 			// Resolve the exchange routing
 			queuesList, err = exchangeBO.GetQueuesFromExchange(ctx, item.ExchangeCode, item.RoutingKey, item.Message, item.VNamespace, cf, cfs, item.Tenant, tenantNode)
 			if err == nil {
-				routingCache[cacheKey] = queuesList
+				routingCache.Set(cacheKey, queuesList)
 			}
 		}
 

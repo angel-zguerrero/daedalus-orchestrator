@@ -331,9 +331,19 @@ func (s *ExchangeService) PublishStream(stream pb.ExchangeService_PublishStreamS
 
 		// Wait for response asynchronously and send back to client
 		go func(clientMsgId string, respChan <-chan buffer.PublishConfirmation) {
+			timer := time.NewTimer(30 * time.Second)
+			defer timer.Stop()
+
 			select {
 			case <-ctx.Done():
 				return
+			case <-timer.C:
+				// Timeout: flusher never responded, prevent goroutine leak
+				sendChan <- &pb.PublishStreamResponse{
+					ClientMessageId: clientMsgId,
+					Confirmed:       false,
+					Error:           "server-side confirmation timeout",
+				}
 			case confirmation := <-respChan:
 				resp := &pb.PublishStreamResponse{
 					ClientMessageId: clientMsgId,

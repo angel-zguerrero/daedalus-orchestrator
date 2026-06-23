@@ -454,9 +454,19 @@ func (s *QueueService) EnqueueStream(stream pb.QueueService_EnqueueStreamServer)
 		s.enqueueBuffer.Add(ctx, bufferedMessage)
 
 		go func(clientMsgId string, respChan <-chan buffer.EnqueueConfirmation) {
+			timer := time.NewTimer(30 * time.Second)
+			defer timer.Stop()
+
 			select {
 			case <-ctx.Done():
 				return
+			case <-timer.C:
+				// Timeout: flusher never responded, prevent goroutine leak
+				sendChan <- &pb.EnqueueStreamResponse{
+					ClientMessageId: clientMsgId,
+					Confirmed:       false,
+					Error:           "server-side confirmation timeout",
+				}
 			case confirmation := <-respChan:
 				resp := &pb.EnqueueStreamResponse{
 					ClientMessageId: clientMsgId,

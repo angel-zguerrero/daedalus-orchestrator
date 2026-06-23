@@ -477,8 +477,8 @@ func InitRaftNode(ShardID uint64, ReplicaID uint64, selfMember Member, initialMe
 	raftNode.InitialMembers = initialMembers
 	raftNode.Join = join
 	raftNode.Roles = roles
-	raftNode.readSem = make(chan struct{}, 100)  // max 100 inflight reads
-	raftNode.writeSem = make(chan struct{}, 100) // max 100 inflight writes
+	raftNode.readSem = make(chan struct{}, 200)  // max 200 inflight reads
+	raftNode.writeSem = make(chan struct{}, 200) // max 200 inflight writes
 	// The passed stateMachineFn is assigned here.
 	raftNode.stateMachine = stateMachineFn
 	// However, StartReplica currently uses its own hardcoded state machine if not careful.

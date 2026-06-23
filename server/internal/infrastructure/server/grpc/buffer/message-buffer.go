@@ -70,6 +70,7 @@ type MessageBuffer[T BufferedItem] struct {
 	logger        zerolog.Logger
 	timer         *time.Timer
 	stopChan      chan struct{}
+	flushSem      chan struct{}
 }
 
 func NewMessageBuffer[T BufferedItem](flushInterval time.Duration, maxBufferSize int, logger zerolog.Logger, flushFunc func(ctx context.Context, items []T)) *MessageBuffer[T] {
@@ -80,6 +81,7 @@ func NewMessageBuffer[T BufferedItem](flushInterval time.Duration, maxBufferSize
 		flushFunc:     flushFunc,
 		logger:        logger,
 		stopChan:      make(chan struct{}),
+		flushSem:      make(chan struct{}, 3), // Limit to 3 concurrent flushes
 	}
 	mb.timer = time.AfterFunc(mb.flushInterval, mb.flushTrigger)
 	return mb
@@ -128,5 +130,12 @@ func (mb *MessageBuffer[T]) flush(ctx context.Context) {
 	mb.messages = make([]T, 0, mb.maxBufferSize)
 	mb.mu.Unlock()
 
-	go mb.flushFunc(ctx, itemsToFlush)
+	go func() {
+		// Acquire flush semaphore to limit concurrency
+		mb.flushSem <- struct{}{}
+		defer func() { <-mb.flushSem }()
+		
+		mb.flushFunc(ctx, itemsToFlush)
+	}()
 }
+

@@ -15,7 +15,7 @@ import (
 	daedalus "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk"
 )
 
-const BatchSize = 50
+const BatchSize = 2000
 
 type EmailMessage struct {
 	MessageID string `json:"messageId"`
@@ -131,10 +131,10 @@ func main() {
 
 	log.Println("📧 CloudMail Pro: Black Friday Surge...")
 
-	// Tienda A (Big): 5K transactional + 10K marketing
-	log.Println("🛍️  Tienda A: 5K confirmations + 10K Black Friday promos")
+	// Tienda A (Big): 50K transactional + 10K marketing
+	log.Println("🛍️  Tienda A: 50K confirmations + 10K Black Friday promos")
 
-	publishBatch(ctx, sdk, 5000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 50000, func(i int) daedalus.PublishMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("tienda-a-trans-%d", i),
 			CompanyID: "tienda-a",
@@ -178,10 +178,10 @@ func main() {
 		}
 	})
 
-	// Tienda B (Small): 5K transactional + 10K marketing (ISOLATED)
-	log.Println("🏪 Tienda B: 5K confirmations + 10K promos (ISOLATED from A)")
+	// Tienda B (Small): 50K transactional + 10K marketing (ISOLATED)
+	log.Println("🏪 Tienda B: 50K confirmations + 10K promos (ISOLATED from A)")
 
-	publishBatch(ctx, sdk, 5000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 50000, func(i int) daedalus.PublishMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("tienda-b-trans-%d", i),
 			CompanyID: "tienda-b",
@@ -226,9 +226,9 @@ func main() {
 	})
 
 	// Banco C: OTPs (ISOLATED)
-	log.Println("🏦 Banco C: 20K OTP emails (ISOLATED)")
+	log.Println("🏦 Banco C: 50K OTP emails (ISOLATED)")
 
-	publishBatch(ctx, sdk, 20000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 50000, func(i int) daedalus.PublishMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("banco-c-otp-%d", i),
 			CompanyID: "banco-c",

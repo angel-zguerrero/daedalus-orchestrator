@@ -1,6 +1,6 @@
 import { DaedalusSDK } from '../../src/index';
 
-const BATCH_SIZE = 500;
+const BATCH_SIZE = 2000;
 interface EmailMessage {
     messageId: string;
     companyId: string;
@@ -113,10 +113,10 @@ async function main() {
 
     console.log('📧 CloudMail Pro: Black Friday Surge...');
 
-    // Tienda A (Big): 5K transactional + 10K marketing
+    // Tienda A (Big): 50K transactional + 10K marketing
     console.log('🛍️  Tienda A: 5K confirmations + 10K Black Friday promos');
 
-    await publishBatch(sdk, 5_000, (i) => {
+    await publishBatch(sdk, 50_000, (i) => {
         return {
             tenantCode: 'tienda-a',
             exchangeCode: 'email-events',
@@ -158,10 +158,10 @@ async function main() {
 
 
 
-    // Tienda B (Small): 5K transactional + 10K marketing (ISOLATED)
-    console.log('🏪 Tienda B: 5K confirmations + 10K promos (ISOLATED from A)');
+    // Tienda B (Small): 50K transactional + 10K marketing (ISOLATED)
+    console.log('🏪 Tienda B: 50K confirmations + 10K promos (ISOLATED from A)');
 
-    await publishBatch(sdk, 5_000, (i) => {
+    await publishBatch(sdk, 50_000, (i) => {
         return {
             tenantCode: 'tienda-b',
             exchangeCode: 'email-events',
@@ -203,9 +203,9 @@ async function main() {
 
 
     // Banco C: OTPs (ISOLATED)
-    console.log('🏦 Banco C: 5K OTP emails (ISOLATED)');
+    console.log('🏦 Banco C: 50K OTP emails (ISOLATED)');
 
-    await publishBatch(sdk, 5_000, (i) => {
+    await publishBatch(sdk, 50_000, (i) => {
         return {
             tenantCode: 'banco-c',
             exchangeCode: 'email-events',
