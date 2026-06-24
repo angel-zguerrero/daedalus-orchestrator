@@ -190,6 +190,9 @@ const EnvVarPublishBufferFlushIntervalMs = "PUBLISH_BUFFER_FLUSH_INTERVAL_MS"
 // EnvVarPublishBufferMaxSize is the environment variable name for the publish buffer max size.
 const EnvVarPublishBufferMaxSize = "PUBLISH_BUFFER_MAX_SIZE"
 
+// EnvVarPublishBufferFlushConcurrency is the environment variable name for the publish buffer flush concurrency.
+const EnvVarPublishBufferFlushConcurrency = "PUBLISH_BUFFER_FLUSH_CONCURRENCY"
+
 // OpenTelemetry specific environment variables.
 
 // EnvVarOtelActived is the environment variable name to enable or disable OpenTelemetry ("true" or "false").

@@ -111,7 +111,9 @@ Configuration File:
     max_headers                   Maximum number of headers.
     deployment_id                 Unique identifier for cluster isolation.
     publish_buffer_flush_interval_ms Flush interval in ms for the publish/enqueue buffers.
-    publish_buffer_max_size          Maximum number of messages to buffer before forcing a flush.
+    publish_buffer_max_size            Maximum number of messages to buffer before forcing a flush.
+    publish_buffer_flush_concurrency   Number of concurrent flush workers.
+    publish_buffer_max_batch_size    Maximum batch size for publishing.
 
 
 Precedence of Configuration:
@@ -216,11 +218,16 @@ var MessageLeaseDurationFlag = flag.Int64(constants.MessageLeaseDurationFlagName
 // ProductionFlag defines the --production command-line flag.
 var ProductionFlag = flag.Bool("production", false, "Disable demo mode.")
 
+// PublishBufferFlushConcurrencyFlag defines the --publish-buffer-flush-concurrency command-line flag for specifying the number of concurrent flush workers.
+var PublishBufferFlushConcurrencyFlag = flag.Int("publish-buffer-flush-concurrency", 0, "Number of concurrent flush workers for publish/enqueue buffers. Default: 6. Overrides config file and environment variable.")
+
 // PublishBufferFlushIntervalMsFlag defines the --publish-buffer-flush-interval-ms command-line flag.
 var PublishBufferFlushIntervalMsFlag = flag.Int(constants.PublishBufferFlushIntervalMsFlagName, 0, "Flush interval in ms for the publish/enqueue buffers. Default: 50. Overrides config file and environment variable.")
 
 // PublishBufferMaxSizeFlag defines the --publish-buffer-max-size command-line flag.
 var PublishBufferMaxSizeFlag = flag.Int(constants.PublishBufferMaxSizeFlagName, 0, "Maximum number of messages to buffer before forcing a flush. Default: 200. Overrides config file and environment variable.")
+
+
 
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
@@ -467,6 +474,14 @@ func LoadDefaultConfiguration() error {
 			return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarPublishBufferMaxSize, err)
 		}
 		config.PublishBufferMaxSize = publishBufferMaxSize
+		// Handle PublishBufferFlushConcurrency env var
+		if envVal := os.Getenv(constants.EnvVarPublishBufferFlushConcurrency); envVal != "" {
+			publishBufferFlushConcurrency, err := strconv.Atoi(envVal)
+			if err != nil {
+				return fmt.Errorf("error parsing %s environment variable: %w", constants.EnvVarPublishBufferFlushConcurrency, err)
+			}
+			config.PublishBufferFlushConcurrency = publishBufferFlushConcurrency
+		}
 	}
 
 	// Flags override environment variables and config file
@@ -552,18 +567,14 @@ func LoadDefaultConfiguration() error {
 	if *DeploymentIDFlag != 0 { // Only override if different from default
 		config.DeploymentID = *DeploymentIDFlag
 	}
+	if *PublishBufferFlushConcurrencyFlag != 0 {
+		config.PublishBufferFlushConcurrency = *PublishBufferFlushConcurrencyFlag
+	}
 
 	if *MessageLeaseDurationFlag != 0 {
 		config.MessageLeaseDuration = time.Duration(*MessageLeaseDurationFlag) * time.Second
 	}
 
-	if *PublishBufferFlushIntervalMsFlag != 0 {
-		config.PublishBufferFlushIntervalMs = *PublishBufferFlushIntervalMsFlag
-	}
-
-	if *PublishBufferMaxSizeFlag != 0 {
-		config.PublishBufferMaxSize = *PublishBufferMaxSizeFlag
-	}
 
 	config.Demo = true
 	if ProductionFlag != nil && *ProductionFlag {
@@ -632,25 +643,6 @@ func LoadDefaultConfiguration() error {
 		config.DeploymentID = 0
 	}
 
-	// Default for ApiRaftTimeout if not set by file, env, or flag (flag itself has a default of 5s)
-	// This ensures that if config file parsing of api_raft_timeout results in 0 (e.g. key not present or invalid),
-	// and env var is not set, and flag is not explicitly used, it still gets the flag's default value.
-	// The previous block for flags `if *ApiRaftTimeoutFlag != 0` correctly assigns the flag's value (which could be its default).
-	// So, if config.ApiRaftTimeout is *still* 0 here, it implies it wasn't set by config file (parsed to 0),
-	// not by env var (parsed to 0), and the flag assignment logic also resulted in 0 (which shouldn't happen for time.Duration unless explicitly set to 0s).
-	// A time.Duration field defaults to 0. The flag has a default of 5s.
-	// If ApiRaftTimeout is 0 after all loading stages, it means it was explicitly set to "0s" or 0 in the config.
-	// We'll rely on the flag's default being propagated correctly.
-	// If `config.ApiRaftTimeout` is zero (e.g. after `ConfigFromMapToConfig` if `api_raft_timeout` was 0 and not overridden by ENV or Flag)
-	// we should ensure it gets a sensible default. The flag `*ApiRaftTimeoutFlag` will carry its default of 5s if not changed.
-	// The assignment `config.ApiRaftTimeout = *ApiRaftTimeoutFlag` handles this.
-	// So, an explicit check here for `config.ApiRaftTimeout == 0` and setting it to a default is redundant if the flag logic is correct.
-	// Let's verify the order: Config file (parsed into int64 seconds, then to duration), then ENV (parsed as duration), then Flag (is a duration).
-	// If config file has api_raft_timeout = 0, then config.ApiRaftTimeout becomes 0.
-	// Then if ENV is not set, it remains 0.
-	// Then `config.ApiRaftTimeout = *ApiRaftTimeoutFlag` will set it to the flag's value (e.g. 5s default, or user-set value).
-	// This logic seems fine.
-
 	if config.ApiRaftTimeout <= 0 {
 		log.Warn().Msgf("API Raft Timeout was configured to %v, which is invalid or zero. Resetting to default 30s.", config.ApiRaftTimeout)
 		config.ApiRaftTimeout = 30 * time.Second
@@ -673,6 +665,10 @@ func LoadDefaultConfiguration() error {
 	}
 	if config.PublishBufferMaxSize == 0 {
 		config.PublishBufferMaxSize = 200 // Default 200 messages
+	}
+	if config.PublishBufferFlushConcurrency == 0 {
+		config.PublishBufferFlushConcurrency = 6 // Default 6 workers
+		log.Info().Msgf("PublishBufferFlushConcurrency not specified, defaulting to %d", config.PublishBufferFlushConcurrency)
 	}
 
 	// Specific default logic for cluster setup
@@ -966,7 +962,6 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.publish_buffer_max_size = p
-
 		}
 	}
 
