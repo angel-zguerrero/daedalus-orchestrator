@@ -87,6 +87,8 @@ type Config struct {
 	PublishBufferFlushIntervalMs int
 	// PublishBufferMaxSize specifies the maximum number of messages to buffer before forcing a flush. Default: 200.
 	PublishBufferMaxSize int
+	// PublishBufferFlushConcurrency specifies number of concurrent flush workers for publish/enqueue buffers. Default: 6.
+	PublishBufferFlushConcurrency int
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
@@ -121,6 +123,8 @@ type ConfigFromMap struct {
 	message_lease_duration             int64 // Duration in seconds
 	publish_buffer_flush_interval_ms   int
 	publish_buffer_max_size            int
+	// publish_buffer_flush_concurrency specifies number of concurrent flush workers. Default: 6.
+	publish_buffer_flush_concurrency int
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)

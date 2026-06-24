@@ -6,8 +6,10 @@ import (
 	"deadalus-orch/shared/models"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	configPkg "deadalus-orch/server/internal/pkg/config"
 	"github.com/rs/zerolog"
 )
 
@@ -70,6 +72,7 @@ type MessageBuffer[T BufferedItem] struct {
 	logger        zerolog.Logger
 	timer         *time.Timer
 	stopChan      chan struct{}
+	firstAddLogged uint64 // atomic counter for one-time log
 	flushSem      chan struct{}
 }
 
@@ -81,7 +84,7 @@ func NewMessageBuffer[T BufferedItem](flushInterval time.Duration, maxBufferSize
 		flushFunc:     flushFunc,
 		logger:        logger,
 		stopChan:      make(chan struct{}),
-		flushSem:      make(chan struct{}, 3), // Limit to 3 concurrent flushes
+		flushSem:      make(chan struct{}, configPkg.GlobalConfiguration.PublishBufferFlushConcurrency), // Configurable concurrency
 	}
 	mb.timer = time.AfterFunc(mb.flushInterval, mb.flushTrigger)
 	return mb
@@ -103,9 +106,9 @@ func (mb *MessageBuffer[T]) Add(ctx context.Context, item T) {
 	m := mb.maxBufferSize
 	mb.mu.Unlock()
 
-	// LOG JUST ONCE for the first message
-	if l == 1 {
-		fmt.Printf("MessageBuffer Add: len=%d max=%d\n", l, m)
+	// Log once using atomic counter
+	if atomic.AddUint64(&mb.firstAddLogged, 1) == 1 {
+		mb.logger.Info().Int("len", l).Int("max", m).Msg("MessageBuffer Add")
 	}
 
 	if needsFlush {
