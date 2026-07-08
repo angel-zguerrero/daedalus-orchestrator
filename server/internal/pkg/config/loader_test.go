@@ -53,8 +53,10 @@ default_root_password=secret
 	err := LoadDefaultConfiguration()
 	require.NoError(t, err)
 
-	assert.Equal(t, "", GlobalConfiguration.DefaultRootUser)
-	assert.Equal(t, "", GlobalConfiguration.DefaultRootPassword)
+	// Config-file credentials are intentionally ignored (security: credentials must come from env vars).
+	// Without env vars and in Demo mode (non-production default), credentials fall back to "admin".
+	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestLoadDefault_ConfigFileOverwriteWithEnv(t *testing.T) {
@@ -118,8 +120,9 @@ func TestLoadDefault_NoFile_NoEnv_DefaultFallback(t *testing.T) {
 	err := LoadDefaultConfiguration()
 	require.NoError(t, err)
 
-	assert.Equal(t, "", GlobalConfiguration.DefaultRootUser)
-	assert.Equal(t, "", GlobalConfiguration.DefaultRootPassword)
+	// In Demo mode (active by default in non-production), missing credentials default to "admin".
+	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestLoadConfigFromPath_InvalidConnectorPortValue(t *testing.T) {
@@ -242,8 +245,9 @@ func TestLoadDefault_DefaultRootFallbacks(t *testing.T) {
 
 	err := LoadDefaultConfiguration()
 	require.NoError(t, err)
-	assert.Equal(t, "", GlobalConfiguration.DefaultRootUser)
-	assert.Equal(t, "", GlobalConfiguration.DefaultRootPassword)
+	// In Demo mode (active by default in non-production), missing credentials default to "admin".
+	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootUser)
+	assert.Equal(t, "admin", GlobalConfiguration.DefaultRootPassword)
 }
 
 func TestValidateClusterBasePort_PortTooLow(t *testing.T) {

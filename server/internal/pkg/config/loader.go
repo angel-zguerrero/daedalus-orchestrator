@@ -227,8 +227,6 @@ var PublishBufferFlushIntervalMsFlag = flag.Int(constants.PublishBufferFlushInte
 // PublishBufferMaxSizeFlag defines the --publish-buffer-max-size command-line flag.
 var PublishBufferMaxSizeFlag = flag.Int(constants.PublishBufferMaxSizeFlagName, 0, "Maximum number of messages to buffer before forcing a flush. Default: 200. Overrides config file and environment variable.")
 
-
-
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
 // The loading order of precedence is:
@@ -574,7 +572,6 @@ func LoadDefaultConfiguration() error {
 	if *MessageLeaseDurationFlag != 0 {
 		config.MessageLeaseDuration = time.Duration(*MessageLeaseDurationFlag) * time.Second
 	}
-
 
 	config.Demo = true
 	if ProductionFlag != nil && *ProductionFlag {

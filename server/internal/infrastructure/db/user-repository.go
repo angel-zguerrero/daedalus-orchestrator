@@ -92,14 +92,14 @@ func (r *UserRepository) UpdateUser(input models.UpdateUser, now time.Time) (boo
 	return r.repo.Update(user, now)
 }
 
-func (r *UserRepository) DeleteUser(id string, now time.Time) (bool, error) {
-	rootUser, err := r.repo.FindByField("ID", id, now)
+func (r *UserRepository) DeleteUser(username string, now time.Time) (bool, error) {
+	rootUser, err := r.repo.FindByField("Username", username, now)
 	if err != nil || rootUser == nil {
 		return false, err
 	}
 
 	if rootUser != nil && rootUser.IsRootUser {
-		return false, fmt.Errorf("cannot delete root user: %s", id)
+		return false, fmt.Errorf("cannot delete root user: %s", username)
 	}
 
 	return r.repo.Delete(rootUser.ID, now)

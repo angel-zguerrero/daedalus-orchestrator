@@ -52,7 +52,7 @@ func Test_CreatesRootIfMissing(t *testing.T) {
 
 	store.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1)
 
-	err = db.BootstrapRootUser(*repo, config.DefaultRootUser, "hashed", time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", config.DefaultRootUser, "noemail@daedalus.com", "hashed", time.Now())
 	assert.NoError(t, err)
 	err = uow.Commit() // Commit should now take time
 	assert.NoError(t, err)
@@ -72,7 +72,7 @@ func Test_ErrorGettingRoot(t *testing.T) {
 
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", errors.New("boom")).Times(1)
 
-	err = db.BootstrapRootUser(*repo, config.DefaultRootUser, "hashed", time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", config.DefaultRootUser, "noemail@daedalus.com", "hashed", time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get default root")
 
@@ -97,7 +97,7 @@ func Test_PutsRootIfMissingInUsers(t *testing.T) {
 	store.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx-u:Email:noemail@daedalus.com", mock.Anything).Return(false, nil).Times(1)
 	store.On("Exists", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return(false, nil).Times(1)
 	store.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1)
-	err = db.BootstrapRootUser(*repo, config.DefaultRootUser, "hashed", time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", config.DefaultRootUser, "noemail@daedalus.com", "hashed", time.Now())
 	assert.NoError(t, err)
 	err = uow.Commit()
 	assert.NoError(t, err)
@@ -127,7 +127,7 @@ func Test_SkipsIfUserExists(t *testing.T) {
 	// No Write should be called if user exists
 	store.On("Write", mock.Anything, mock.Anything).Return(nil).Times(1) // This line was causing issues, Write is not always called
 
-	err = db.BootstrapRootUser(*repo, config.DefaultRootUser, "hashed", time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", config.DefaultRootUser, "noemail@daedalus.com", "hashed", time.Now())
 	assert.NoError(t, err)
 	err = uow.Commit() // Commit might have no operations if root exists and no other changes
 
@@ -150,7 +150,7 @@ func Test_ErrorFetchingUser(t *testing.T) {
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return([]db.KeyValuePair{{Value: []byte("123")}}, "", nil)
 	store.On("Get", db.AdminFC, db.AdminFCSector, "admin_schema:users:data:123", mock.Anything).Return(nil, errors.New("read error")).Once()
 
-	err = db.BootstrapRootUser(*repo, config.DefaultRootUser, "hashed", time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", config.DefaultRootUser, "noemail@daedalus.com", "hashed", time.Now())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "read error")
 	store.AssertExpectations(t)
@@ -181,7 +181,7 @@ func Test_ErrorPutsRoot(t *testing.T) {
 
 	store.On("Write", mock.Anything, mock.Anything).Return(errors.New("write fail")).Once()
 
-	err = db.BootstrapRootUser(*repo, config.DefaultRootUser, "hashed", time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", config.DefaultRootUser, "noemail@daedalus.com", "hashed", time.Now())
 	assert.NoError(t, err)
 
 	err = uow.Commit()
@@ -202,7 +202,7 @@ func TestBootstrapRootUser_MissingConfigUser(t *testing.T) {
 	}
 
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(1)
-	err = db.BootstrapRootUser(*repo, cfg.DefaultRootUser, cfg.DefaultRootPassword, time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", cfg.DefaultRootUser, "noemail@daedalus.com", cfg.DefaultRootPassword, time.Now())
 
 	assert.NoError(t, err)
 
@@ -221,7 +221,7 @@ func TestBootstrapRootUser_MissingConfigPassword(t *testing.T) {
 	}
 
 	store.On("SearchByPatternPaginatedKV", db.AdminFC, db.AdminFCSector, "admin_schema:users:idx:IsRootUser:true:*", "", 1, mock.Anything).Return(nil, "", nil).Times(1)
-	err = db.BootstrapRootUser(*repo, cfg.DefaultRootUser, cfg.DefaultRootPassword, time.Now())
+	err = db.BootstrapRootUser(*repo, "test-id", cfg.DefaultRootUser, "noemail@daedalus.com", cfg.DefaultRootPassword, time.Now())
 
 	assert.NoError(t, err)
 	store.AssertExpectations(t)
