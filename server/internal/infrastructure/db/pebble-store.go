@@ -29,10 +29,10 @@ type PebbleStore struct {
 func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamilyNames []string) (*PebbleStore, error) {
 	// Tuned for minimal memory footprint per shard instance.
 	// Dragonboat manages its own WAL for durability, so we minimize Pebble's overhead.
-	cache := pebble.NewCache(0)
+	cache := pebble.NewCache(64 * 1024 * 1024) // 64MB
 	opts := &pebble.Options{
-		MaxManifestFileSize: 1024 * 32, // 32KB
-		MemTableSize:        1024 * 32, // 32KB instead of default 4MB
+		MaxManifestFileSize: 10 * 1024 * 1024, // 10MB
+		MemTableSize:        4 * 1024 * 1024,  // 4MB
 		Cache:               cache,
 	}
 	dbPath = filepath.Join(dbPath, "pebble")
