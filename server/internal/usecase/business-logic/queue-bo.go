@@ -20,15 +20,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 type QueueBO struct {
-	Config *common.ServerConfing
+	Config     *common.ServerConfing
+	queueCache *lru.Cache
 }
 
 func NewQueueBO(Config *common.ServerConfing) *QueueBO {
+	cache, _ := lru.New(10000) // Cache up to 10k queues in memory
 	return &QueueBO{
-		Config: Config,
+		Config:     Config,
+		queueCache: cache,
 	}
 }
 
@@ -135,10 +139,25 @@ func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, 
 		return nil, err
 	}
 
+	if bo.queueCache != nil {
+		for _, q := range created {
+			cacheKey := fmt.Sprintf("%s|%s|%s", tenant.Code, q.VNamespace, q.Code)
+			bo.queueCache.Add(cacheKey, q)
+		}
+	}
+
 	return created, nil
 }
 
 func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, includeHeaders bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Queue, error) {
+	var cacheKey string
+	if !includeHeaders && bo.queueCache != nil {
+		cacheKey = fmt.Sprintf("%s|%s|%s", tenant.Code, vnamespace, queueCode)
+		if cachedQueue, ok := bo.queueCache.Get(cacheKey); ok {
+			return cachedQueue.(models.Queue), nil
+		}
+	}
+
 	findQueueCommand := &queue_command.FindQueueCommand{
 		Code:           queueCode,
 		VNamespace:     vnamespace,
@@ -160,6 +179,13 @@ func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, i
 			return models.Queue{}, errors.New("Queue not found")
 		}
 		return models.Queue{}, fmt.Errorf("find queue command failed: %w", err)
+	}
+
+	if bo.queueCache != nil {
+		if cacheKey == "" {
+			cacheKey = fmt.Sprintf("%s|%s|%s", tenant.Code, vnamespace, queueCode)
+		}
+		bo.queueCache.Add(cacheKey, queue)
 	}
 
 	return queue, nil
@@ -214,6 +240,12 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, c
 	}
 
 	bo.Config.Logger.Info().Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("queue deleted successfully")
+	
+	if bo.queueCache != nil {
+		cacheKey := fmt.Sprintf("%s|%s|%s", tenant.Code, vnamespace, queueCode)
+		bo.queueCache.Remove(cacheKey)
+	}
+
 	return nil
 }
 

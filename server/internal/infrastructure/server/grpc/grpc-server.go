@@ -48,11 +48,11 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	authInterceptor := UnaryAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
 	tenantBO := bo.NewTenantBO(cfg)
 	tenantInterceptor := UnaryTenantInterceptor(tenantBO, cfg, cfg.Logger)
-	rateLimitInterceptor := UnaryRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 300)
+	rateLimitInterceptor := UnaryRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 50000)
 
 	streamAuthInterceptor := StreamAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
 	streamTenantInterceptor := StreamTenantInterceptor(tenantBO, cfg, cfg.Logger)
-	streamRateLimitInterceptor := StreamRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 300)
+	streamRateLimitInterceptor := StreamRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 50000)
 
 	server := grpc.NewServer(
 		grpc.StatsHandler(otelHandler),
