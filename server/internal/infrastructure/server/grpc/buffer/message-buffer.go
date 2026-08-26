@@ -10,6 +10,7 @@ import (
 	"time"
 
 	configPkg "deadalus-orch/server/internal/pkg/config"
+	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	"github.com/rs/zerolog"
 )
 
@@ -61,6 +62,68 @@ type PublishConfirmation struct {
 type EnqueueConfirmation struct {
 	MessageID string
 	Error     error
+}
+
+type AckBufferedMessage struct {
+	LeaseID    string
+	CF         string
+	CFS        string
+	Tenant     *models.TenantInMaster
+	TenantNode *dragonboat.RaftNode
+	ResponseChan chan AckConfirmation
+}
+
+func (a AckBufferedMessage) GetGroupKey() string {
+	return fmt.Sprintf("%d-%d-%s-%s", a.TenantNode.ShardID, a.TenantNode.ReplicaID, a.CF, a.CFS)
+}
+
+type AckConfirmation struct {
+	Success             bool
+	Message             string
+	QueueCode           string
+	VNamespace          string
+	ProcessingLatencyMs float64
+	QueueLatencyMs      float64
+	Pending             uint64
+	InProcess           uint64
+	Error               error
+}
+
+type DeliveredBufferedMessage struct {
+	LeaseID    string
+	CF         string
+	CFS        string
+	TenantNode *dragonboat.RaftNode
+	ResponseChan chan DeliveredConfirmation
+}
+
+func (d DeliveredBufferedMessage) GetGroupKey() string {
+	return fmt.Sprintf("%d-%d-%s-%s", d.TenantNode.ShardID, d.TenantNode.ReplicaID, d.CF, d.CFS)
+}
+
+type DeliveredConfirmation struct {
+	Success bool
+	Error   error
+}
+
+type DequeueBufferedMessage struct {
+	QueueID                      string
+	JobWorkerID                  string
+	LeaseDuration                time.Duration
+	JobWorkerCapacityPolicyIndex int
+	CF                           string
+	CFS                          string
+	TenantNode                   *dragonboat.RaftNode
+	ResponseChan                 chan DequeueConfirmation
+}
+
+func (d DequeueBufferedMessage) GetGroupKey() string {
+	return fmt.Sprintf("%d-%d-%s-%s", d.TenantNode.ShardID, d.TenantNode.ReplicaID, d.CF, d.CFS)
+}
+
+type DequeueConfirmation struct {
+	Result *queue_command.DequeueResult
+	Error  error
 }
 
 type MessageBuffer[T BufferedItem] struct {

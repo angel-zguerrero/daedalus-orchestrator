@@ -33,28 +33,47 @@ func (r *QueuePartitionRepository) UpdateQueuePartition(input *models.QueueParti
 	return r.Update(input, now)
 }
 
+func (r *QueuePartitionRepository) GetQueuePartitionByID(id string, now time.Time) (*models.QueuePartition, error) {
+	return r.FindByField("ID", id, now)
+}
+
 func (r *QueuePartitionRepository) GetQueuePartitionByQueueIDAndPriority(queueID string, priority int, now time.Time) (*models.QueuePartition, error) {
-	query := fmt.Sprintf("QueueID = '%s' & Priority = %d", queueID, priority)
-	result, err := r.Find(query, 1, "", now)
+	partitionID := fmt.Sprintf("%s-p-%d", queueID, priority)
+	p, err := r.FindByField("ID", partitionID, now)
+	if err == nil && p != nil {
+		return p, nil
+	}
+
+	query := fmt.Sprintf("QueueID = '%s'", queueID)
+	result, err := r.Find(query, 1000, "", now)
 	if err != nil {
 		return nil, err
 	}
-	if len(result.Entities) == 0 {
-		return nil, nil
+	for _, item := range result.Entities {
+		if item.Priority == priority {
+			return &item, nil
+		}
 	}
-	return &result.Entities[0], nil
+	return nil, nil
 }
 
 // GetNonEmptyPartitionsByQueueID returns all partitions that belong to queueID and
 // have at least one message (MessagesCount > 0). The result is unbounded in page size
 // so callers should be aware that a queue may have many priority levels.
 func (r *QueuePartitionRepository) GetNonEmptyPartitionsByQueueID(queueID string, now time.Time) ([]models.QueuePartition, error) {
-	query := fmt.Sprintf("QueueID = '%s' & MessagesCount > 0", queueID)
+	query := fmt.Sprintf("QueueID = '%s'", queueID)
 	// Use a generous page size; real deployments rarely have more than a few hundred
 	// distinct priority levels per queue.
 	result, err := r.Find(query, 1000, "", now)
 	if err != nil {
 		return nil, err
 	}
-	return result.Entities, nil
+	
+	var filtered []models.QueuePartition
+	for _, p := range result.Entities {
+		if p.MessagesCount > 0 {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered, nil
 }

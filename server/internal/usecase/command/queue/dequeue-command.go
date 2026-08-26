@@ -42,6 +42,7 @@ type DequeueCommand struct {
 	JobWorkerCapacityPolicyIndex int
 	CF                           string
 	CFS                          string
+	Limit                        int // Number of messages to dequeue (defaults to 1)
 }
 
 func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {

@@ -8,22 +8,71 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/jobworker"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/buffer"
+	configPkg "deadalus-orch/server/internal/pkg/config"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
+	"deadalus-orch/server/internal/infrastructure/db"
 )
 
 type JobWorkerService struct {
 	pb.UnimplementedJobWorkerServiceServer
-	startTime   time.Time
-	Config      *common.ServerConfing
-	JobWorkerBO *bo.JobWorkerBO
+	startTime      time.Time
+	Config         *common.ServerConfing
+	JobWorkerBO    *bo.JobWorkerBO
+	ackBuffer      *buffer.MessageBuffer[buffer.AckBufferedMessage]
+	deliveredBuffer *buffer.MessageBuffer[buffer.DeliveredBufferedMessage]
 }
 
 func NewJobWorkerService(config *common.ServerConfing) *JobWorkerService {
+	ackBuffer := buffer.NewMessageBuffer[buffer.AckBufferedMessage](
+		time.Duration(config.PublishBufferFlushIntervalMs)*time.Millisecond,
+		config.PublishBufferMaxSize,
+		config.Logger,
+		buffer.NewAckFlusher(config.Logger, configPkg.GlobalConfiguration.ApiRaftTimeout),
+	)
+	
+	deliveredBuffer := buffer.NewMessageBuffer[buffer.DeliveredBufferedMessage](
+		time.Duration(config.PublishBufferFlushIntervalMs)*time.Millisecond,
+		config.PublishBufferMaxSize,
+		config.Logger,
+		buffer.NewDeliveredFlusher(config.Logger, configPkg.GlobalConfiguration.ApiRaftTimeout),
+	)
+
+	dequeueBuffer := buffer.NewMessageBuffer[buffer.DequeueBufferedMessage](
+		time.Duration(config.PublishBufferFlushIntervalMs)*time.Millisecond,
+		config.PublishBufferMaxSize,
+		config.Logger,
+		buffer.NewDequeueFlusher(config.Logger, configPkg.GlobalConfiguration.ApiRaftTimeout),
+	)
+
+	dequeueFunc := func(ctx context.Context, req bo.DequeueRequestMessage) (bo.DequeueResponseMessage, error) {
+		resChan := make(chan buffer.DequeueConfirmation, 1)
+		dequeueBuffer.Add(ctx, buffer.DequeueBufferedMessage{
+			QueueID:                      req.QueueID,
+			JobWorkerID:                  req.JobWorkerID,
+			LeaseDuration:                req.LeaseDuration,
+			JobWorkerCapacityPolicyIndex: req.JobWorkerCapacityPolicyIndex,
+			CF:                           req.CF,
+			CFS:                          req.CFS,
+			TenantNode:                   req.TenantNode,
+			ResponseChan:                 resChan,
+		})
+
+		select {
+		case conf := <-resChan:
+			return bo.DequeueResponseMessage{Result: conf.Result}, conf.Error
+		case <-ctx.Done():
+			return bo.DequeueResponseMessage{}, ctx.Err()
+		}
+	}
+
 	return &JobWorkerService{
-		startTime:   time.Now(),
-		Config:      config,
-		JobWorkerBO: bo.NewJobWorkerBO(config),
+		startTime:       time.Now(),
+		Config:          config,
+		JobWorkerBO:     bo.NewJobWorkerBO(config, dequeueFunc),
+		ackBuffer:       ackBuffer,
+		deliveredBuffer: deliveredBuffer,
 	}
 }
 
@@ -162,6 +211,24 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 				s.Config.Logger.Error().Err(err).Msg("Failed to send message to stream")
 				return err
 			}
+			
+			// Mark lease as delivered via the buffer
+			resChan := make(chan buffer.DeliveredConfirmation, 1)
+			s.deliveredBuffer.Add(stream.Context(), buffer.DeliveredBufferedMessage{
+				LeaseID:      claimed.Lease.ID,
+				CF:           claimed.CF,
+				CFS:          claimed.CFS,
+				TenantNode:   claimed.TenantNode,
+				ResponseChan: resChan,
+			})
+			
+			// Fire and forget, or log errors asynchronously
+			go func(lID string, rc chan buffer.DeliveredConfirmation) {
+				res := <-rc
+				if !res.Success {
+					s.Config.Logger.Error().Err(res.Error).Str("leaseID", lID).Msg("❌ Failed to mark lease delivered")
+				}
+			}(claimed.Lease.ID, resChan)
 
 			s.Config.Logger.Debug().
 				Str("messageID", claimed.Message.ID).
@@ -180,17 +247,53 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 }
 
 func (s *JobWorkerService) AckMessage(ctx context.Context, req *pb.AckMessageRequest) (*pb.AckMessageResponse, error) {
-	err := s.JobWorkerBO.AckMessage(ctx, req.LeaseID, req.TenantCode)
-	if err != nil {
-		s.Config.Logger.Error().Err(err).Msg("Failed to ack message")
-		return &pb.AckMessageResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
+	if req.LeaseID == "" {
+		return &pb.AckMessageResponse{Success: false, Message: "leaseID is required"}, nil
+	}
+	if req.TenantCode == "" {
+		return &pb.AckMessageResponse{Success: false, Message: "tenantCode is required"}, nil
 	}
 
-	return &pb.AckMessageResponse{
-		Success: true,
-		Message: "Message acknowledged successfully",
-	}, nil
+	tenantBO := bo.NewTenantBO(s.Config)
+	tenant, tenantNode, _, err := tenantBO.GetTenant(ctx, req.TenantCode)
+	if err != nil {
+		s.Config.Logger.Error().Err(err).Msg("Failed to get tenant")
+		return &pb.AckMessageResponse{Success: false, Message: err.Error()}, nil
+	}
+	if tenantNode == nil {
+		s.Config.Logger.Error().Str("tenantCode", req.TenantCode).Msg("No node found for tenant")
+		return &pb.AckMessageResponse{Success: false, Message: "tenant node not available"}, nil
+	}
+
+	cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
+	cfs := tenant.ID
+
+	responseChan := make(chan buffer.AckConfirmation, 1)
+
+	bufferedMessage := buffer.AckBufferedMessage{
+		LeaseID:      req.LeaseID,
+		CF:           cf,
+		CFS:          cfs,
+		Tenant:       &tenant,
+		TenantNode:   tenantNode,
+		ResponseChan: responseChan,
+	}
+
+	s.ackBuffer.Add(ctx, bufferedMessage)
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case confirmation := <-responseChan:
+		if confirmation.Error != nil {
+			return &pb.AckMessageResponse{
+				Success: false,
+				Message: confirmation.Error.Error(),
+			}, nil
+		}
+		return &pb.AckMessageResponse{
+			Success: true,
+			Message: confirmation.Message,
+		}, nil
+	}
 }

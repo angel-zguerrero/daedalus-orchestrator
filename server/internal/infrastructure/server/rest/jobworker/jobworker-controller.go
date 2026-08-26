@@ -1,11 +1,16 @@
 package jobworker
 
 import (
+	"context"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
 	"net/http"
 	"strconv"
+
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	configPkg "deadalus-orch/server/internal/pkg/config"
+	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,9 +21,26 @@ type JobWorkerController struct {
 }
 
 func NewJobWorkerController(Config *common.ServerConfing) *JobWorkerController {
+	dequeueFunc := func(ctx context.Context, req bo.DequeueRequestMessage) (bo.DequeueResponseMessage, error) {
+		dequeueCmd := &queue_command.DequeueCommand{
+			QueueID:                      req.QueueID,
+			JobWorkerID:                  req.JobWorkerID,
+			LeaseDuration:                req.LeaseDuration,
+			JobWorkerCapacityPolicyIndex: req.JobWorkerCapacityPolicyIndex,
+			CF:                           req.CF,
+			CFS:                          req.CFS,
+		}
+		result, err := dragonboat.ExecuteRepositoryCommand[queue_command.DequeueResult](
+			req.TenantNode, ctx, dequeueCmd, configPkg.GlobalConfiguration.ApiRaftTimeout, Config.Logger, "dequeue message")
+		if err != nil {
+			return bo.DequeueResponseMessage{}, err
+		}
+		return bo.DequeueResponseMessage{Result: &result}, nil
+	}
+
 	api := &JobWorkerController{
 		Config:      Config,
-		JobWorkerBO: bo.NewJobWorkerBO(Config),
+		JobWorkerBO: bo.NewJobWorkerBO(Config, dequeueFunc),
 	}
 	return api
 }

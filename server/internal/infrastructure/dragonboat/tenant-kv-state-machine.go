@@ -238,14 +238,29 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return dequeueCommand.Execute(uow, now)
 	}
 
+	bulkDequeueCommand, ok := cmd.(queue_command.BulkDequeueCommand)
+	if ok {
+		return bulkDequeueCommand.Execute(uow, now)
+	}
+
 	ackMessageCommand, ok := cmd.(queue_command.AckMessageCommand)
 	if ok {
 		return ackMessageCommand.Execute(uow, now)
 	}
 
+	bulkAckMessageCommand, ok := cmd.(queue_command.BulkAckMessageCommand)
+	if ok {
+		return bulkAckMessageCommand.Execute(uow, now)
+	}
+
 	markLeaseDeliveredCommand, ok := cmd.(queue_command.MarkLeaseDeliveredCommand)
 	if ok {
 		return markLeaseDeliveredCommand.Execute(uow, now)
+	}
+
+	bulkMarkLeaseDeliveredCommand, ok := cmd.(queue_command.BulkMarkLeaseDeliveredCommand)
+	if ok {
+		return bulkMarkLeaseDeliveredCommand.Execute(uow, now)
 	}
 
 	processExpiredLeasesCommand, ok := cmd.(queue_command.ProcessExpiredLeasesCommand)

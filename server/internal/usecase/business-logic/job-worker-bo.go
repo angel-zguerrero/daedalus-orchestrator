@@ -24,6 +24,9 @@ type ClaimedMessage struct {
 	Message    models.QueueMessage
 	Lease      models.QueueMessageLease
 	TenantCode string
+	CF         string
+	CFS        string
+	TenantNode *dragonboat.RaftNode
 }
 
 // claimCursorKey identifies a pagination cursor stored in the registry.
@@ -65,46 +68,80 @@ func (r *claimCursorRegistry) set(key claimCursorKey, cursor string) {
 	}
 }
 
+type DequeueRequestMessage struct {
+	QueueID                      string
+	JobWorkerID                  string
+	LeaseDuration                time.Duration
+	JobWorkerCapacityPolicyIndex int
+	CF                           string
+	CFS                          string
+	TenantNode                   *dragonboat.RaftNode
+}
+
+type DequeueResponseMessage struct {
+	Result *queue_command.DequeueResult
+}
+
+type DequeueFunc func(ctx context.Context, req DequeueRequestMessage) (DequeueResponseMessage, error)
+
 type JobWorkerBO struct {
 	Config         *common.ServerConfing
 	stoppers       map[string]bool
 	stoppersMu     sync.Mutex
 	cursorRegistry *claimCursorRegistry
+	lastHeartbeats map[string]time.Time
+	heartbeatsMu   sync.Mutex
+	dequeueFunc    DequeueFunc
 }
 
-func NewJobWorkerBO(Config *common.ServerConfing) *JobWorkerBO {
+func NewJobWorkerBO(Config *common.ServerConfing, dequeueFunc DequeueFunc) *JobWorkerBO {
 	return &JobWorkerBO{
 		Config:         Config,
 		stoppers:       make(map[string]bool),
 		cursorRegistry: newClaimCursorRegistry(),
+		lastHeartbeats: make(map[string]time.Time),
+		dequeueFunc:    dequeueFunc,
 	}
 }
 
 func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerName string, Information map[string]string, ClaimWorkCapacityPolicies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) error {
-	// Upsert the JobWorker: update LastHeartbeat and TTL on every ClaimWork call
-	upsertCmd := &job_worker_command.UpsertJobWorkerCommand{
-		JobWorkers: []models.JobWorker{
-			{
-				ID:                        workerId,
-				Name:                      workerName,
-				Information:               Information,
-				ClaimWorkCapacityPolicies: ClaimWorkCapacityPolicies,
-				ConnectionStatus:          models.JobWorkerConnectionStatusConnected,
-			},
-		},
-		ApplyHeartbeat: true,
-	}
+	logger := bo.Config.Logger.With().Str("workerID", workerId).Logger()
 
-	_, err := dragonboat.ExecuteRepositoryCommand[[]models.JobWorker](
-		bo.Config.MasterNode,
-		ctx,
-		upsertCmd,
-		config.GlobalConfiguration.ApiRaftTimeout,
-		bo.Config.Logger,
-		"upsert job worker",
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert job worker: %w", err)
+	// Check if heartbeat is needed (only every 15 seconds per worker)
+	bo.heartbeatsMu.Lock()
+	lastHB, exists := bo.lastHeartbeats[workerId]
+	if !exists || time.Since(lastHB) > 15*time.Second {
+		bo.lastHeartbeats[workerId] = time.Now()
+		bo.heartbeatsMu.Unlock()
+
+		// Upsert the JobWorker: update LastHeartbeat and TTL on every ClaimWork call
+		upsertCmd := &job_worker_command.UpsertJobWorkerCommand{
+			JobWorkers: []models.JobWorker{
+				{
+					ID:                        workerId,
+					Name:                      workerName,
+					Information:               Information,
+					ClaimWorkCapacityPolicies: ClaimWorkCapacityPolicies,
+					ConnectionStatus:          models.JobWorkerConnectionStatusConnected,
+				},
+			},
+			ApplyHeartbeat: true,
+		}
+
+		_, err := dragonboat.ExecuteRepositoryCommand[[]models.JobWorker](
+			bo.Config.MasterNode,
+			ctx,
+			upsertCmd,
+			config.GlobalConfiguration.ApiRaftTimeout,
+			bo.Config.Logger,
+			"upsert job worker",
+		)
+		if err != nil {
+			logger.Error().Err(err).Msg("❌ Failed to upsert job worker in ClaimWork")
+			return err
+		}
+	} else {
+		bo.heartbeatsMu.Unlock()
 	}
 
 	// Check if a stopper is already running for this worker.
@@ -403,26 +440,17 @@ func (bo *JobWorkerBO) dequeueMessage(
 	messageChan chan<- ClaimedMessage,
 ) bool {
 
-	// Crear el comando de dequeue
-	dequeueCmd := &queue_command.DequeueCommand{
+	req := DequeueRequestMessage{
 		QueueID:                      queue.ID,
 		JobWorkerID:                  workerID,
 		LeaseDuration:                config.GlobalConfiguration.MessageLeaseDuration,
 		JobWorkerCapacityPolicyIndex: policyIndex,
 		CF:                           cf,
 		CFS:                          cfs,
+		TenantNode:                   tenantNode,
 	}
 
-	// Ejecutar el comando en el nodo de tenant correspondiente
-	result, err := dragonboat.ExecuteRepositoryCommand[queue_command.DequeueResult](
-		tenantNode,
-		ctx,
-		dequeueCmd,
-		config.GlobalConfiguration.ApiRaftTimeout,
-		bo.Config.Logger,
-		"dequeue message",
-	)
-
+	conf, err := bo.dequeueFunc(ctx, req)
 	if err != nil {
 		if strings.Contains(err.Error(), "is empty") {
 			bo.Config.Logger.Debug().
@@ -439,12 +467,20 @@ func (bo *JobWorkerBO) dequeueMessage(
 		}
 		return false
 	}
+	if conf.Result == nil {
+		return false
+	}
+
+	result := conf.Result
 
 	// Send the claimed message through the channel
 	claimedMsg := ClaimedMessage{
 		Message:    result.Message,
 		Lease:      result.Lease,
 		TenantCode: tenant.Code,
+		CF:         cf,
+		CFS:        cfs,
+		TenantNode: tenantNode,
 	}
 
 	if bo.Config.MetricsCollector != nil {
@@ -455,31 +491,11 @@ func (bo *JobWorkerBO) dequeueMessage(
 	case messageChan <- claimedMsg:
 		bo.Config.Logger.Debug().Str("messageID", result.Message.ID).Msg("📤 Sent message to stream")
 
-		// Marcar el lease como entregado en la base de datos de forma asíncrona
-		go func(lID string, tNode *dragonboat.RaftNode, columnF, columnFS string) {
-			ctxBg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			cmd := &queue_command.MarkLeaseDeliveredCommand{
-				LeaseID: lID,
-				CF:      columnF,
-				CFS:     columnFS,
-			}
-			_, err := dragonboat.ExecuteRepositoryCommand[queue_command.MarkLeaseDeliveredResult](
-				tNode,
-				ctxBg,
-				cmd,
-				config.GlobalConfiguration.ApiRaftTimeout,
-				bo.Config.Logger,
-				"mark lease delivered",
-			)
-			if err != nil {
-				bo.Config.Logger.Error().Err(err).Str("leaseID", lID).Msg("❌ Failed to mark lease delivered")
-			}
-		}(result.Lease.ID, tenantNode, cf, cfs)
-
 		if bo.Config.MetricsCollector != nil {
 			bo.Config.MetricsCollector.RecordDelivery(tenant.Code, queue.Code, queue.VNamespace, 1)
 		}
+		return true
+
 	case <-ctx.Done():
 		bo.Config.Logger.Warn().Str("messageID", result.Message.ID).Msg("⚠️ Context cancelled, message not sent")
 	}

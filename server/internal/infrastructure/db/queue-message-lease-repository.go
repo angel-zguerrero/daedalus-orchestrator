@@ -30,6 +30,10 @@ func (r *QueueMessageLeaseRepository) CreateQueueMessageLease(input *models.Queu
 	return r.Create(input, now)
 }
 
+func (r *QueueMessageLeaseRepository) BulkCreateQueueMessageLease(inputs []*models.QueueMessageLease, now time.Time) ([]string, error) {
+	return r.BulkCreate(inputs, now)
+}
+
 // GetQueueMessageLeaseByID retrieves a single lease by its primary key.
 func (r *QueueMessageLeaseRepository) GetQueueMessageLeaseByID(id string, now time.Time) (*models.QueueMessageLease, error) {
 	return r.FindByField("ID", id, now)

@@ -30,7 +30,11 @@ func (app *Application) StartGrpcAPI() {
 			PublishBufferMaxSize:         config.GlobalConfiguration.PublishBufferMaxSize,
 			PublishBufferFlushIntervalMs: config.GlobalConfiguration.PublishBufferFlushIntervalMs,
 		}
-		grpcAPI, _ := grpc_server.NewGrpcServer(serverConfig)
+		grpcAPI, err := grpc_server.NewGrpcServer(serverConfig)
+		if err != nil {
+			log.Error().Err(err).Msg("❌ failed to create grpc server")
+			return
+		}
 		app.GrpcAPI = grpcAPI
 
 		go func() {

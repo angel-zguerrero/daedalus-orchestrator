@@ -33,6 +33,13 @@ func (r *QueueMessageRepository) UpdateQueueMessage(input *models.QueueMessage, 
 	return r.Update(input, now)
 }
 
+func (r *QueueMessageRepository) BulkUpdateQueueMessage(inputs []*models.QueueMessage, now time.Time) ([]bool, error) {
+	for _, input := range inputs {
+		input.UpdatedAt = now
+	}
+	return r.BulkUpdate(inputs, now)
+}
+
 func (r *QueueMessageRepository) GetQueueMessageById(id string, now time.Time) (*models.QueueMessage, error) {
 	return r.FindByField("ID", id, now)
 }

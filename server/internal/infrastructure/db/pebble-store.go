@@ -439,7 +439,7 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cur
 	// Manejo de cursor
 	if cursor != "" {
 		cursorBytes := []byte(cursor)
-		startKey := append(cfPrefix, cursorBytes...)
+		startKey := append(append([]byte(nil), cfPrefix...), cursorBytes...)
 
 		if iter.SeekGE(startKey) {
 			if bytes.Equal(iter.Key(), startKey) {
@@ -447,7 +447,15 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cur
 			}
 		}
 	} else {
-		iter.First()
+		if strings.HasSuffix(pattern, "*") && !strings.HasPrefix(pattern, "*") {
+			startKey := append(append([]byte(nil), cfPrefix...), []byte(strings.TrimSuffix(pattern, "*"))...)
+			iter.SeekGE(startKey)
+		} else if !strings.Contains(pattern, "*") {
+			startKey := append(append([]byte(nil), cfPrefix...), []byte(pattern)...)
+			iter.SeekGE(startKey)
+		} else {
+			iter.First()
+		}
 	}
 
 	for ; iter.Valid(); iter.Next() {
@@ -503,6 +511,12 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cur
 			results = append(results, KeyValuePair{Key: keyStr, Value: val})
 			nextCursor = keyStr
 			count++
+		} else {
+			if strings.HasSuffix(pattern, "*") && !strings.HasPrefix(pattern, "*") {
+				// We seeked to the exact prefix. If it no longer matches, 
+				// we've moved past all possible matches.
+				break
+			}
 		}
 	}
 
