@@ -14,6 +14,7 @@ import (
 	"deadalus-orch/shared/models"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
+	"deadalus-orch/server/internal/usecase/command/queue"
 )
 
 type JobWorkerService struct {
@@ -91,10 +92,37 @@ func NewJobWorkerService(config *common.ServerConfing) *JobWorkerService {
 		return nil
 	}
 
+	batchDequeueFunc := func(ctx context.Context, req bo.BatchDequeueRequestMessage) (bo.BatchDequeueResponseMessage, error) {
+		cmd := &queue.BatchDequeueCommand{
+			CF:                           req.CF,
+			CFS:                          req.CFS,
+			QueueID:                      req.QueueID,
+			JobWorkerID:                  req.JobWorkerID,
+			LeaseDuration:                req.LeaseDuration,
+			JobWorkerCapacityPolicyIndex: req.JobWorkerCapacityPolicyIndex,
+			Count:                        req.Count,
+		}
+
+		res, err := dragonboat.ExecuteRepositoryCommand[queue.BatchDequeueResult](
+			req.TenantNode,
+			ctx,
+			cmd,
+			configPkg.GlobalConfiguration.ApiRaftTimeout,
+			config.Logger,
+			"BatchDequeueCommand",
+		)
+
+		if err != nil {
+			return bo.BatchDequeueResponseMessage{}, err
+		}
+
+		return bo.BatchDequeueResponseMessage{Results: res.Results}, nil
+	}
+
 	return &JobWorkerService{
 		startTime:       time.Now(),
 		Config:          config,
-		JobWorkerBO:     bo.NewJobWorkerBO(config, dequeueFunc, heartbeatFunc),
+		JobWorkerBO:     bo.NewJobWorkerBO(config, dequeueFunc, batchDequeueFunc, heartbeatFunc),
 		ackBuffer:       ackBuffer,
 		deliveredBuffer: deliveredBuffer,
 	}

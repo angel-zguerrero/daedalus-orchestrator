@@ -52,7 +52,7 @@ func (app *Application) reviewJobWorkersHeartbeat() {
 }
 
 func (app *Application) getJobWorkerBO() *business_logic.JobWorkerBO {
-	return business_logic.NewJobWorkerBO(app.getServerConfig(), nil, nil)
+	return business_logic.NewJobWorkerBO(app.getServerConfig(), nil, nil, nil)
 }
 
 func (app *Application) getServerConfig() *common.ServerConfing {

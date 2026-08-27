@@ -243,6 +243,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return bulkDequeueCommand.Execute(uow, now)
 	}
 
+	batchDequeueCommand, ok := cmd.(queue_command.BatchDequeueCommand)
+	if ok {
+		return batchDequeueCommand.Execute(uow, now)
+	}
+
 	ackMessageCommand, ok := cmd.(queue_command.AckMessageCommand)
 	if ok {
 		return ackMessageCommand.Execute(uow, now)

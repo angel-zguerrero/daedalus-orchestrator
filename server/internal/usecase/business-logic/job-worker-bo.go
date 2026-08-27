@@ -82,7 +82,23 @@ type DequeueResponseMessage struct {
 	Result *queue_command.DequeueResult
 }
 
+type BatchDequeueRequestMessage struct {
+	QueueID                      string
+	JobWorkerID                  string
+	LeaseDuration                time.Duration
+	JobWorkerCapacityPolicyIndex int
+	CF                           string
+	CFS                          string
+	TenantNode                   *dragonboat.RaftNode
+	Count                        int
+}
+
+type BatchDequeueResponseMessage struct {
+	Results []queue_command.DequeueResult
+}
+
 type DequeueFunc func(ctx context.Context, req DequeueRequestMessage) (DequeueResponseMessage, error)
+type BatchDequeueFunc func(ctx context.Context, req BatchDequeueRequestMessage) (BatchDequeueResponseMessage, error)
 type HeartbeatFunc func(ctx context.Context, worker models.JobWorker, masterNode *dragonboat.RaftNode) error
 
 type JobWorkerBO struct {
@@ -93,16 +109,18 @@ type JobWorkerBO struct {
 	lastHeartbeats map[string]time.Time
 	heartbeatsMu   sync.Mutex
 	dequeueFunc    DequeueFunc
+	batchDequeueFunc BatchDequeueFunc
 	heartbeatFunc  HeartbeatFunc
 }
 
-func NewJobWorkerBO(Config *common.ServerConfing, dequeueFunc DequeueFunc, heartbeatFunc HeartbeatFunc) *JobWorkerBO {
+func NewJobWorkerBO(Config *common.ServerConfing, dequeueFunc DequeueFunc, batchDequeueFunc BatchDequeueFunc, heartbeatFunc HeartbeatFunc) *JobWorkerBO {
 	return &JobWorkerBO{
 		Config:         Config,
 		stoppers:       make(map[string]bool),
 		cursorRegistry: newClaimCursorRegistry(),
 		lastHeartbeats: make(map[string]time.Time),
 		dequeueFunc:    dequeueFunc,
+		batchDequeueFunc: batchDequeueFunc,
 		heartbeatFunc:  heartbeatFunc,
 	}
 }
@@ -330,54 +348,62 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 								break queueLoop
 							}
 
-							// ── Round-robin drain: cycle through all queues until the policy
-							// is satisfied or a full round yields no new messages. ─────────────
-							for {
+							// ── Batch drain: cycle through all queues and extract in bulk ─────────────
+							for i := range allQueues {
+								queue := &allQueues[i]
+
 								claimMu.Lock()
 								if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
 									claimMu.Unlock()
 									break queueLoop
 								}
+
+								limit := 5000 // default max batch size per queue
+								if policy.MaxQueueMessages > 0 {
+									limit = policy.MaxQueueMessages - claimedByPolicy[policyCode]
+								}
 								claimMu.Unlock()
 
-								claimedInRound := 0
-								for i := range allQueues {
-									queue := &allQueues[i]
+								req := BatchDequeueRequestMessage{
+									QueueID:                      queue.ID,
+									JobWorkerID:                  workerID,
+									LeaseDuration:                config.GlobalConfiguration.MessageLeaseDuration,
+									JobWorkerCapacityPolicyIndex: policyIndex,
+									CF:                           cf,
+									CFS:                          cfs,
+									TenantNode:                   g.node,
+									Count:                        limit,
+								}
 
-									claimMu.Lock()
-									if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
-										claimMu.Unlock()
-										break queueLoop
-									}
-
-									// Respect the queue's own delivering-message cap (0 = unlimited).
-									// MessagesCount > 0 is already guaranteed by the DB query.
-									if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
-										claimMu.Unlock()
+								res, err := bo.batchDequeueFunc(stopperCtx, req)
+								if err != nil {
+									if strings.Contains(err.Error(), "is empty") {
 										continue
 									}
+									bo.Config.Logger.Error().Err(err).
+										Str("workerID", workerID).
+										Str("queueCode", queue.Code).
+										Msg("❌ Failed to batch dequeue message")
+									continue
+								}
 
-									// Optimistically reserve the slot
+								if len(res.Results) > 0 {
+									for _, result := range res.Results {
+										messageChan <- ClaimedMessage{
+											Message:    result.Message,
+											Lease:      result.Lease,
+											TenantCode: tenant.Code,
+											CF:         cf,
+											CFS:        cfs,
+											TenantNode: g.node,
+										}
+									}
+
+									claimMu.Lock()
 									if policy.MaxQueueMessages > 0 {
-										claimedByPolicy[policyCode]++
+										claimedByPolicy[policyCode] += len(res.Results)
 									}
 									claimMu.Unlock()
-
-									// ── Dequeue message ──
-									if bo.dequeueMessage(stopperCtx, workerID, policyCode, policyIndex, queue, &tenant, g.node, cf, cfs, messageChan) {
-										queue.CurrentDeliveringMessages++
-										claimedInRound++
-									} else {
-										// Failed to dequeue, refund the slot
-										claimMu.Lock()
-										if policy.MaxQueueMessages > 0 {
-											claimedByPolicy[policyCode]--
-										}
-										claimMu.Unlock()
-									}
-								}
-								if claimedInRound == 0 {
-									break // No queue delivered a message this round; all queues exhausted.
 								}
 							}
 
