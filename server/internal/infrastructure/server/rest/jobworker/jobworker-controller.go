@@ -40,7 +40,7 @@ func NewJobWorkerController(Config *common.ServerConfing) *JobWorkerController {
 
 	api := &JobWorkerController{
 		Config:      Config,
-		JobWorkerBO: bo.NewJobWorkerBO(Config, dequeueFunc),
+		JobWorkerBO: bo.NewJobWorkerBO(Config, dequeueFunc, nil),
 	}
 	return api
 }

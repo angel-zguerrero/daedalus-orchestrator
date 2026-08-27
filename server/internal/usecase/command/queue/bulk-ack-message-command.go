@@ -89,14 +89,7 @@ func (cmd *BulkAckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 			continue
 		}
 		if lease == nil {
-			allLeases, _ := leaseRepo.Find("", 10, "", now)
-			var ids []string
-			if allLeases != nil {
-				for _, l := range allLeases.Entities {
-					ids = append(ids, l.ID)
-				}
-			}
-			res.Message = fmt.Sprintf("lease %s not found. Available IDs: %v", leaseID, ids)
+			res.Message = fmt.Sprintf("lease %s not found", leaseID)
 			results[i] = res
 			continue
 		}

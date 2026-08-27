@@ -12,14 +12,14 @@ const (
 
 type QueueMessageLease struct {
 	ID             string `orm:"primary-key"`
-	QueueMessageID string
-	WorkerID       string
+	QueueMessageID string `orm:"data-only"`
+	WorkerID       string `orm:"data-only"`
 	LeaseStatus    QueueMessageLeaseStatus
 	LeaseUntil     time.Time
 
-	IsDelivered                       bool // True if the message was successfully delivered to the worker stream.
-	JobWorkerCapacityPolicyIndexMatch int  // Index of the capacity policy that matched when the lease was created, used for worker capacity management and scheduling decisions.
-	CreatedAt                         time.Time
+	IsDelivered                       bool `orm:"data-only"`
+	JobWorkerCapacityPolicyIndexMatch int  `orm:"data-only"`
+	CreatedAt                         time.Time `orm:"data-only"`
 }
 
 func (QueueMessageLease) TableName() string {

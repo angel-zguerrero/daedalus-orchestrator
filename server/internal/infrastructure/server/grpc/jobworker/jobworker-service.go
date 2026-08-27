@@ -13,6 +13,7 @@ import (
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"deadalus-orch/shared/models"
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/infrastructure/dragonboat"
 )
 
 type JobWorkerService struct {
@@ -67,10 +68,33 @@ func NewJobWorkerService(config *common.ServerConfing) *JobWorkerService {
 		}
 	}
 
+	heartbeatBuffer := buffer.NewMessageBuffer[buffer.JobWorkerHeartbeatBufferedMessage](
+		time.Duration(config.PublishBufferFlushIntervalMs)*time.Millisecond,
+		config.PublishBufferMaxSize,
+		config.Logger,
+		buffer.NewJobWorkerHeartbeatFlusher(config.Logger, configPkg.GlobalConfiguration.ApiRaftTimeout),
+	)
+
+	heartbeatFunc := func(ctx context.Context, worker models.JobWorker, masterNode *dragonboat.RaftNode) error {
+		resChan := make(chan buffer.HeartbeatConfirmation, 1)
+		heartbeatBuffer.Add(ctx, buffer.JobWorkerHeartbeatBufferedMessage{
+			JobWorker:    worker,
+			MasterNode:   masterNode,
+			ResponseChan: resChan,
+		})
+		go func(wID string, rc chan buffer.HeartbeatConfirmation) {
+			res := <-rc
+			if !res.Success {
+				config.Logger.Error().Err(res.Error).Str("workerID", wID).Msg("❌ Failed to upsert job worker heartbeat")
+			}
+		}(worker.ID, resChan)
+		return nil
+	}
+
 	return &JobWorkerService{
 		startTime:       time.Now(),
 		Config:          config,
-		JobWorkerBO:     bo.NewJobWorkerBO(config, dequeueFunc),
+		JobWorkerBO:     bo.NewJobWorkerBO(config, dequeueFunc, heartbeatFunc),
 		ackBuffer:       ackBuffer,
 		deliveredBuffer: deliveredBuffer,
 	}

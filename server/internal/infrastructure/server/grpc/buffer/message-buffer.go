@@ -126,6 +126,24 @@ type DequeueConfirmation struct {
 	Error  error
 }
 
+type JobWorkerHeartbeatBufferedMessage struct {
+	JobWorker    models.JobWorker
+	MasterNode   *dragonboat.RaftNode
+	ResponseChan chan HeartbeatConfirmation
+}
+
+func (h JobWorkerHeartbeatBufferedMessage) GetGroupKey() string {
+	if h.MasterNode == nil {
+		return "nil-master"
+	}
+	return fmt.Sprintf("%d-%d", h.MasterNode.ShardID, h.MasterNode.ReplicaID)
+}
+
+type HeartbeatConfirmation struct {
+	Success bool
+	Error   error
+}
+
 type MessageBuffer[T BufferedItem] struct {
 	mu            sync.Mutex
 	messages      []T

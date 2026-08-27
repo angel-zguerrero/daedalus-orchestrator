@@ -10,11 +10,11 @@ type QueuePartition struct {
 
 	MessagesCount int
 
-	FirstQueueMessageID string
-	LastQueueMessageID  string
+	FirstQueueMessageID string `orm:"data-only"`
+	LastQueueMessageID  string `orm:"data-only"`
 
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt time.Time `orm:"data-only"`
+	UpdatedAt time.Time `orm:"data-only"`
 }
 
 func (QueuePartition) TableName() string {

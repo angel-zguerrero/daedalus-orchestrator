@@ -83,6 +83,7 @@ type DequeueResponseMessage struct {
 }
 
 type DequeueFunc func(ctx context.Context, req DequeueRequestMessage) (DequeueResponseMessage, error)
+type HeartbeatFunc func(ctx context.Context, worker models.JobWorker, masterNode *dragonboat.RaftNode) error
 
 type JobWorkerBO struct {
 	Config         *common.ServerConfing
@@ -92,53 +93,58 @@ type JobWorkerBO struct {
 	lastHeartbeats map[string]time.Time
 	heartbeatsMu   sync.Mutex
 	dequeueFunc    DequeueFunc
+	heartbeatFunc  HeartbeatFunc
 }
 
-func NewJobWorkerBO(Config *common.ServerConfing, dequeueFunc DequeueFunc) *JobWorkerBO {
+func NewJobWorkerBO(Config *common.ServerConfing, dequeueFunc DequeueFunc, heartbeatFunc HeartbeatFunc) *JobWorkerBO {
 	return &JobWorkerBO{
 		Config:         Config,
 		stoppers:       make(map[string]bool),
 		cursorRegistry: newClaimCursorRegistry(),
 		lastHeartbeats: make(map[string]time.Time),
 		dequeueFunc:    dequeueFunc,
+		heartbeatFunc:  heartbeatFunc,
 	}
 }
 
 func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerName string, Information map[string]string, ClaimWorkCapacityPolicies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) error {
 	logger := bo.Config.Logger.With().Str("workerID", workerId).Logger()
 
-	// Check if heartbeat is needed (only every 15 seconds per worker)
+	// Check if heartbeat is needed (only every 5 seconds per worker)
 	bo.heartbeatsMu.Lock()
 	lastHB, exists := bo.lastHeartbeats[workerId]
-	if !exists || time.Since(lastHB) > 15*time.Second {
+	if !exists || time.Since(lastHB) > 5*time.Second {
 		bo.lastHeartbeats[workerId] = time.Now()
 		bo.heartbeatsMu.Unlock()
 
-		// Upsert the JobWorker: update LastHeartbeat and TTL on every ClaimWork call
-		upsertCmd := &job_worker_command.UpsertJobWorkerCommand{
-			JobWorkers: []models.JobWorker{
-				{
-					ID:                        workerId,
-					Name:                      workerName,
-					Information:               Information,
-					ClaimWorkCapacityPolicies: ClaimWorkCapacityPolicies,
-					ConnectionStatus:          models.JobWorkerConnectionStatusConnected,
-				},
-			},
-			ApplyHeartbeat: true,
+		worker := models.JobWorker{
+			ID:                        workerId,
+			Name:                      workerName,
+			Information:               Information,
+			ClaimWorkCapacityPolicies: ClaimWorkCapacityPolicies,
+			ConnectionStatus:          models.JobWorkerConnectionStatusConnected,
 		}
 
-		_, err := dragonboat.ExecuteRepositoryCommand[[]models.JobWorker](
-			bo.Config.MasterNode,
-			ctx,
-			upsertCmd,
-			config.GlobalConfiguration.ApiRaftTimeout,
-			bo.Config.Logger,
-			"upsert job worker",
-		)
-		if err != nil {
-			logger.Error().Err(err).Msg("❌ Failed to upsert job worker in ClaimWork")
-			return err
+		if bo.heartbeatFunc != nil {
+			if err := bo.heartbeatFunc(ctx, worker, bo.Config.MasterNode); err != nil {
+				logger.Error().Err(err).Msg("❌ Failed to send heartbeat to buffer")
+			}
+		} else {
+			upsertCmd := &job_worker_command.UpsertJobWorkerCommand{
+				JobWorkers:     []models.JobWorker{worker},
+				ApplyHeartbeat: true,
+			}
+			_, err := dragonboat.ExecuteRepositoryCommand[[]models.JobWorker](
+				bo.Config.MasterNode,
+				ctx,
+				upsertCmd,
+				config.GlobalConfiguration.ApiRaftTimeout,
+				bo.Config.Logger,
+				"upsert job worker",
+			)
+			if err != nil {
+				logger.Error().Err(err).Msg("❌ Failed to upsert job worker in ClaimWork")
+			}
 		}
 	} else {
 		bo.heartbeatsMu.Unlock()
@@ -320,37 +326,8 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 
 							var allQueues []models.Queue = queuesResult.Entities
 
-							if len(allQueues) == 0 && queueCursor == "" {
-								// No queues match this policy. Let's check if the tenant is completely empty.
-								hasMessages := false
-								emptyCursor := ""
-								for {
-									qCtx2, qCancel2 := context.WithTimeout(stopperCtx, 2*time.Second)
-									allQueuesPaginated, err2 := queueBO.GetQueues(qCtx2, "", emptyCursor, 50, "", false, cf, cfs, &tenant, g.node, false)
-									qCancel2()
-
-									if err2 != nil {
-										hasMessages = true // Prevent deactivation on error
-										break
-									}
-
-									for i := range allQueuesPaginated.Entities {
-										q := &allQueuesPaginated.Entities[i]
-										if q.MessagesCount > 0 || q.CurrentDeliveringMessages > 0 {
-											hasMessages = true
-											break
-										}
-									}
-
-									if hasMessages || allQueuesPaginated.Cursor == "" || len(allQueuesPaginated.Entities) < 50 {
-										break
-									}
-									emptyCursor = allQueuesPaginated.Cursor
-								}
-
-								if !hasMessages {
-									bo.deactivateTenant(tenant.ID, g.node, cf, cfs)
-								}
+							if len(allQueues) == 0 {
+								break queueLoop
 							}
 
 							// ── Round-robin drain: cycle through all queues until the policy
