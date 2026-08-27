@@ -26,6 +26,17 @@ function deserialize_jobworker_AckMessageResponse(buffer_arg) {
   return jobworker_pb.AckMessageResponse.deserializeBinary(new Uint8Array(buffer_arg));
 }
 
+function serialize_jobworker_BulkAckMessageRequest(arg) {
+  if (!(arg instanceof jobworker_pb.BulkAckMessageRequest)) {
+    throw new Error('Expected argument of type jobworker.BulkAckMessageRequest');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_jobworker_BulkAckMessageRequest(buffer_arg) {
+  return jobworker_pb.BulkAckMessageRequest.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
 function serialize_jobworker_ClaimWorkRequest(arg) {
   if (!(arg instanceof jobworker_pb.ClaimWorkRequest)) {
     throw new Error('Expected argument of type jobworker.ClaimWorkRequest');
@@ -69,6 +80,17 @@ var JobWorkerServiceService = exports.JobWorkerServiceService = {
     responseType: jobworker_pb.AckMessageResponse,
     requestSerialize: serialize_jobworker_AckMessageRequest,
     requestDeserialize: deserialize_jobworker_AckMessageRequest,
+    responseSerialize: serialize_jobworker_AckMessageResponse,
+    responseDeserialize: deserialize_jobworker_AckMessageResponse,
+  },
+  bulkAckMessages: {
+    path: '/jobworker.JobWorkerService/BulkAckMessages',
+    requestStream: false,
+    responseStream: false,
+    requestType: jobworker_pb.BulkAckMessageRequest,
+    responseType: jobworker_pb.AckMessageResponse,
+    requestSerialize: serialize_jobworker_BulkAckMessageRequest,
+    requestDeserialize: deserialize_jobworker_BulkAckMessageRequest,
     responseSerialize: serialize_jobworker_AckMessageResponse,
     responseDeserialize: deserialize_jobworker_AckMessageResponse,
   },

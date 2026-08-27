@@ -10,7 +10,7 @@ import { QueueServiceClient } from './proto/queue_grpc_pb';
 import { BindingServiceClient } from './proto/binding_grpc_pb';
 
 import { LoginRequest } from './proto/auth_pb';
-import { ClaimWorkRequest, ClaimWorkCapacityPolicy as PBClaimWorkCapacityPolicy, ClaimWorkFilter as PBClaimWorkFilter, ClaimWorkStreamMessage, AckMessageRequest } from './proto/jobworker_pb';
+import { ClaimWorkRequest, ClaimWorkCapacityPolicy as PBClaimWorkCapacityPolicy, ClaimWorkFilter as PBClaimWorkFilter, ClaimWorkStreamMessage, AckMessageRequest, BulkAckMessageRequest } from './proto/jobworker_pb';
 import { AssertTenantRequest } from './proto/tenant_pb';
 import { CreateExchangeRequest, PublishMessageRequest, QueueMessage as ExchangeQueueMessage, PublishStreamRequest } from './proto/exchange_pb';
 import { CreateQueueRequest, EnqueueMessageRequest, EnqueueStreamRequest } from './proto/queue_pb';
@@ -374,6 +374,33 @@ export class DaedalusSDK {
     });
   }
 
+  async bulkAckMessages(leaseIDs: string[], tenantCode: string): Promise<void> {
+    if (leaseIDs.length === 0) return;
+    
+    return new Promise((resolve, reject) => {
+      const req = new BulkAckMessageRequest();
+      req.setLeaseidsList(leaseIDs);
+      req.setTenantcode(tenantCode);
+
+      this.jobWorkerClient!.bulkAckMessages(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to bulk ack messages:', err.message);
+            return reject(err);
+          }
+          const respObj = response.toObject();
+          if (!respObj.success) {
+            console.error('❌ Bulk ack messages failed:', respObj.message);
+            return reject(new Error(respObj.message));
+          }
+          resolve();
+        }
+      );
+    });
+  }
+
   async assertTenant(input: AssertTenantInput): Promise<any> {
     return new Promise((resolve, reject) => {
       const req = new AssertTenantRequest();
@@ -705,6 +732,8 @@ export class DaedalusSDK {
 
     let consecutiveFailures = 0;
     const run = async () => {
+      const pendingAcks = new Map<string, { leaseIDs: string[], policyIndices: number[] }>();
+
       try {
         if (!this.token) {
           console.log('⚠️ Not authenticated. Attempting to log in...');
@@ -778,11 +807,21 @@ export class DaedalusSDK {
                 }
 
                 const ackCallback: AckCallback = async () => {
-                  await this.ackMessage(leaseObj.getId(), claimed.getTenantcode());
-                  if (policyIdx >= 0 && policyIdx < currentCounts.length) {
-                    currentCounts[policyIdx] = Math.max(0, currentCounts[policyIdx] - 1);
+                  let tenantData = pendingAcks.get(claimed.getTenantcode());
+                  if (!tenantData) {
+                    tenantData = { leaseIDs: [], policyIndices: [] };
+                    pendingAcks.set(claimed.getTenantcode(), tenantData);
                   }
-                  triggerClaimRequest();
+                  tenantData.leaseIDs.push(leaseObj.getId());
+                  tenantData.policyIndices.push(policyIdx);
+
+                  if (tenantData.leaseIDs.length >= 100) {
+                    // Cannot await flushAcks here easily without hoisting or moving declaration,
+                    // but we can just call it asynchronously as fire-and-forget from the callback's perspective.
+                    // To avoid ReferenceError, we can use a setTimeout or just let the interval handle it,
+                    // but calling it directly is fine if it's hoisted (which it isn't with const).
+                    // We'll define a hoisted function or just wait for the 50ms interval.
+                  }
                 };
 
                 Promise.resolve(onMessage(claimedMessage, ackCallback)).catch((handlerError: any) => {
@@ -874,6 +913,27 @@ export class DaedalusSDK {
           }, 50); // 50ms debounce
         };
 
+        const flushAcks = async () => {
+          if (pendingAcks.size === 0) return;
+          
+          const currentAcks = new Map(pendingAcks);
+          pendingAcks.clear();
+
+          for (const [tenantCode, data] of currentAcks.entries()) {
+            try {
+              await this.bulkAckMessages(data.leaseIDs, tenantCode);
+              for (const policyIdx of data.policyIndices) {
+                if (policyIdx >= 0 && policyIdx < currentCounts.length) {
+                  currentCounts[policyIdx] = Math.max(0, currentCounts[policyIdx] - 1);
+                }
+              }
+              triggerClaimRequest();
+            } catch (err: any) {
+              console.error(`❌ Failed to bulk ack for tenant ${tenantCode}:`, err.message);
+            }
+          }
+        };
+
         // Send initial claim request
         sendClaimRequest();
 
@@ -882,10 +942,14 @@ export class DaedalusSDK {
           sendClaimRequest();
         }, intervalMs);
 
+        // Flush ACKs periodically
+        const ackFlushInterval = setInterval(flushAcks, 50);
+
         await streamPromise;
 
         clearInterval(claimInterval);
         clearInterval(sysInfoInterval);
+        clearInterval(ackFlushInterval);
 
         if (!connected) {
           throw new Error('Failed to establish stream connection');

@@ -229,6 +229,23 @@ func (sdk *DaedalusSDK) AckMessage(ctx context.Context, leaseID, tenantCode stri
 	return nil
 }
 
+// BulkAckMessages acknowledges multiple claimed messages by their lease IDs for a specific tenant.
+func (sdk *DaedalusSDK) BulkAckMessages(ctx context.Context, leaseIDs []string, tenantCode string) error {
+	resp, err := sdk.jobWorkerClient.BulkAckMessages(sdk.authCtx(ctx), &jobworkerpb.BulkAckMessageRequest{
+		LeaseIDs:   leaseIDs,
+		TenantCode: tenantCode,
+	})
+	if err != nil {
+		log.Printf("❌ Failed to bulk ack messages: %v", err)
+		return fmt.Errorf("bulk ack messages failed: %w", err)
+	}
+	if !resp.Success {
+		log.Printf("❌ Bulk ack messages failed: %s", resp.Message)
+		return fmt.Errorf("bulk ack messages failed: %s", resp.Message)
+	}
+	return nil
+}
+
 // AssertTenant upserts a tenant in the orchestrator.
 func (sdk *DaedalusSDK) AssertTenant(ctx context.Context, input AssertTenantInput) (*tenantpb.Tenant, error) {
 	resp, err := sdk.tenantClient.AssertTenant(sdk.authCtx(ctx), &tenantpb.AssertTenantRequest{
@@ -736,6 +753,40 @@ func (sdk *DaedalusSDK) runWorkerStream(
 		}
 	}
 
+	type pendingAckData struct {
+		leaseIDs      []string
+		policyIndices []int32
+	}
+	var pendingAcksMu sync.Mutex
+	pendingAcks := make(map[string]*pendingAckData)
+
+	flushAcks := func() {
+		pendingAcksMu.Lock()
+		if len(pendingAcks) == 0 {
+			pendingAcksMu.Unlock()
+			return
+		}
+		currentAcks := pendingAcks
+		pendingAcks = make(map[string]*pendingAckData)
+		pendingAcksMu.Unlock()
+
+		for tenantCode, data := range currentAcks {
+			err := sdk.BulkAckMessages(ctx, data.leaseIDs, tenantCode)
+			if err == nil {
+				countsMu.Lock()
+				for _, policyIdx := range data.policyIndices {
+					if policyIdx >= 0 && int(policyIdx) < len(currentCounts) {
+						currentCounts[policyIdx] = int32(math.Max(0, float64(currentCounts[policyIdx]-1)))
+					}
+				}
+				countsMu.Unlock()
+				triggerClaimRequest()
+			} else {
+				log.Printf("❌ Failed to bulk ack for tenant %s: %v", tenantCode, err)
+			}
+		}
+	}
+
 	// Handle incoming messages from server in a goroutine
 	go func() {
 		defer close(streamDone)
@@ -801,16 +852,22 @@ func (sdk *DaedalusSDK) runWorkerStream(
 					}
 
 					ackCallback := func() error {
-						err := sdk.AckMessage(ctx, claimed.Lease.ID, claimed.TenantCode)
-						if err == nil {
-							if policyIdx >= 0 && int(policyIdx) < len(currentCounts) {
-								countsMu.Lock()
-								currentCounts[policyIdx] = int32(math.Max(0, float64(currentCounts[policyIdx]-1)))
-								countsMu.Unlock()
-							}
-							triggerClaimRequest()
+						pendingAcksMu.Lock()
+						data, ok := pendingAcks[claimed.TenantCode]
+						if !ok {
+							data = &pendingAckData{}
+							pendingAcks[claimed.TenantCode] = data
 						}
-						return err
+						data.leaseIDs = append(data.leaseIDs, claimed.Lease.ID)
+						data.policyIndices = append(data.policyIndices, policyIdx)
+						
+						shouldFlush := len(data.leaseIDs) >= 100
+						pendingAcksMu.Unlock()
+
+						if shouldFlush {
+							go flushAcks()
+						}
+						return nil
 					}
 
 					go func() {
@@ -858,6 +915,9 @@ func (sdk *DaedalusSDK) runWorkerStream(
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	ackFlushTicker := time.NewTicker(50 * time.Millisecond)
+	defer ackFlushTicker.Stop()
+
 	var lastClaimRequest time.Time
 
 	for {
@@ -898,6 +958,8 @@ func (sdk *DaedalusSDK) runWorkerStream(
 				log.Printf("❌ Error sending claim request: %v", err)
 				return err
 			}
+		case <-ackFlushTicker.C:
+			flushAcks()
 		}
 	}
 }

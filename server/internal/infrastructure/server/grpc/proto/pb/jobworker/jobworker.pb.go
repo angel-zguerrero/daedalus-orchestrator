@@ -779,6 +779,58 @@ func (x *AckMessageResponse) GetMessage() string {
 	return ""
 }
 
+type BulkAckMessageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LeaseIDs      []string               `protobuf:"bytes,1,rep,name=leaseIDs,proto3" json:"leaseIDs,omitempty"`
+	TenantCode    string                 `protobuf:"bytes,2,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkAckMessageRequest) Reset() {
+	*x = BulkAckMessageRequest{}
+	mi := &file_jobworker_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkAckMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkAckMessageRequest) ProtoMessage() {}
+
+func (x *BulkAckMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_jobworker_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkAckMessageRequest.ProtoReflect.Descriptor instead.
+func (*BulkAckMessageRequest) Descriptor() ([]byte, []int) {
+	return file_jobworker_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *BulkAckMessageRequest) GetLeaseIDs() []string {
+	if x != nil {
+		return x.LeaseIDs
+	}
+	return nil
+}
+
+func (x *BulkAckMessageRequest) GetTenantCode() string {
+	if x != nil {
+		return x.TenantCode
+	}
+	return ""
+}
+
 var File_jobworker_proto protoreflect.FileDescriptor
 
 const file_jobworker_proto_rawDesc = "" +
@@ -865,11 +917,17 @@ const file_jobworker_proto_rawDesc = "" +
 	"tenantCode\"H\n" +
 	"\x12AckMessageResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xae\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"S\n" +
+	"\x15BulkAckMessageRequest\x12\x1a\n" +
+	"\bleaseIDs\x18\x01 \x03(\tR\bleaseIDs\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x02 \x01(\tR\n" +
+	"tenantCode2\x82\x02\n" +
 	"\x10JobWorkerService\x12O\n" +
 	"\tClaimWork\x12\x1b.jobworker.ClaimWorkRequest\x1a!.jobworker.ClaimWorkStreamMessage(\x010\x01\x12I\n" +
 	"\n" +
-	"AckMessage\x12\x1c.jobworker.AckMessageRequest\x1a\x1d.jobworker.AckMessageResponseB\x18Z\x16pb/jobworker;jobworkerb\x06proto3"
+	"AckMessage\x12\x1c.jobworker.AckMessageRequest\x1a\x1d.jobworker.AckMessageResponse\x12R\n" +
+	"\x0fBulkAckMessages\x12 .jobworker.BulkAckMessageRequest\x1a\x1d.jobworker.AckMessageResponseB\x18Z\x16pb/jobworker;jobworkerb\x06proto3"
 
 var (
 	file_jobworker_proto_rawDescOnce sync.Once
@@ -883,7 +941,7 @@ func file_jobworker_proto_rawDescGZIP() []byte {
 	return file_jobworker_proto_rawDescData
 }
 
-var file_jobworker_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_jobworker_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_jobworker_proto_goTypes = []any{
 	(*ClaimWorkFilter)(nil),         // 0: jobworker.ClaimWorkFilter
 	(*ClaimWorkCapacityPolicy)(nil), // 1: jobworker.ClaimWorkCapacityPolicy
@@ -895,15 +953,16 @@ var file_jobworker_proto_goTypes = []any{
 	(*ClaimWorkStreamMessage)(nil),  // 7: jobworker.ClaimWorkStreamMessage
 	(*AckMessageRequest)(nil),       // 8: jobworker.AckMessageRequest
 	(*AckMessageResponse)(nil),      // 9: jobworker.AckMessageResponse
-	nil,                             // 10: jobworker.QueueMessage.HeadersEntry
-	nil,                             // 11: jobworker.QueueMessage.ParametersEntry
-	nil,                             // 12: jobworker.ClaimWorkRequest.InformationEntry
+	(*BulkAckMessageRequest)(nil),   // 10: jobworker.BulkAckMessageRequest
+	nil,                             // 11: jobworker.QueueMessage.HeadersEntry
+	nil,                             // 12: jobworker.QueueMessage.ParametersEntry
+	nil,                             // 13: jobworker.ClaimWorkRequest.InformationEntry
 }
 var file_jobworker_proto_depIdxs = []int32{
 	0,  // 0: jobworker.ClaimWorkCapacityPolicy.claimWorkFilter:type_name -> jobworker.ClaimWorkFilter
-	10, // 1: jobworker.QueueMessage.Headers:type_name -> jobworker.QueueMessage.HeadersEntry
-	11, // 2: jobworker.QueueMessage.Parameters:type_name -> jobworker.QueueMessage.ParametersEntry
-	12, // 3: jobworker.ClaimWorkRequest.information:type_name -> jobworker.ClaimWorkRequest.InformationEntry
+	11, // 1: jobworker.QueueMessage.Headers:type_name -> jobworker.QueueMessage.HeadersEntry
+	12, // 2: jobworker.QueueMessage.Parameters:type_name -> jobworker.QueueMessage.ParametersEntry
+	13, // 3: jobworker.ClaimWorkRequest.information:type_name -> jobworker.ClaimWorkRequest.InformationEntry
 	1,  // 4: jobworker.ClaimWorkRequest.capacityPolicies:type_name -> jobworker.ClaimWorkCapacityPolicy
 	2,  // 5: jobworker.ClaimedQueueMessage.message:type_name -> jobworker.QueueMessage
 	5,  // 6: jobworker.ClaimedQueueMessage.lease:type_name -> jobworker.QueueMessageLease
@@ -911,10 +970,12 @@ var file_jobworker_proto_depIdxs = []int32{
 	6,  // 8: jobworker.ClaimWorkStreamMessage.claimedMessage:type_name -> jobworker.ClaimedQueueMessage
 	3,  // 9: jobworker.JobWorkerService.ClaimWork:input_type -> jobworker.ClaimWorkRequest
 	8,  // 10: jobworker.JobWorkerService.AckMessage:input_type -> jobworker.AckMessageRequest
-	7,  // 11: jobworker.JobWorkerService.ClaimWork:output_type -> jobworker.ClaimWorkStreamMessage
-	9,  // 12: jobworker.JobWorkerService.AckMessage:output_type -> jobworker.AckMessageResponse
-	11, // [11:13] is the sub-list for method output_type
-	9,  // [9:11] is the sub-list for method input_type
+	10, // 11: jobworker.JobWorkerService.BulkAckMessages:input_type -> jobworker.BulkAckMessageRequest
+	7,  // 12: jobworker.JobWorkerService.ClaimWork:output_type -> jobworker.ClaimWorkStreamMessage
+	9,  // 13: jobworker.JobWorkerService.AckMessage:output_type -> jobworker.AckMessageResponse
+	9,  // 14: jobworker.JobWorkerService.BulkAckMessages:output_type -> jobworker.AckMessageResponse
+	12, // [12:15] is the sub-list for method output_type
+	9,  // [9:12] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -935,7 +996,7 @@ func file_jobworker_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobworker_proto_rawDesc), len(file_jobworker_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

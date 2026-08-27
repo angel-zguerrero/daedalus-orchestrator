@@ -369,3 +369,28 @@ export namespace AckMessageResponse {
         message: string,
     }
 }
+
+export class BulkAckMessageRequest extends jspb.Message { 
+    clearLeaseidsList(): void;
+    getLeaseidsList(): Array<string>;
+    setLeaseidsList(value: Array<string>): BulkAckMessageRequest;
+    addLeaseids(value: string, index?: number): string;
+    getTenantcode(): string;
+    setTenantcode(value: string): BulkAckMessageRequest;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): BulkAckMessageRequest.AsObject;
+    static toObject(includeInstance: boolean, msg: BulkAckMessageRequest): BulkAckMessageRequest.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: BulkAckMessageRequest, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): BulkAckMessageRequest;
+    static deserializeBinaryFromReader(message: BulkAckMessageRequest, reader: jspb.BinaryReader): BulkAckMessageRequest;
+}
+
+export namespace BulkAckMessageRequest {
+    export type AsObject = {
+        leaseidsList: Array<string>,
+        tenantcode: string,
+    }
+}

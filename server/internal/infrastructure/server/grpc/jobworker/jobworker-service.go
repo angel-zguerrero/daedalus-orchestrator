@@ -321,3 +321,68 @@ func (s *JobWorkerService) AckMessage(ctx context.Context, req *pb.AckMessageReq
 		}, nil
 	}
 }
+
+func (s *JobWorkerService) BulkAckMessages(ctx context.Context, req *pb.BulkAckMessageRequest) (*pb.AckMessageResponse, error) {
+	if len(req.LeaseIDs) == 0 {
+		return &pb.AckMessageResponse{Success: false, Message: "leaseIDs is required"}, nil
+	}
+	if req.TenantCode == "" {
+		return &pb.AckMessageResponse{Success: false, Message: "tenantCode is required"}, nil
+	}
+
+	tenantBO := bo.NewTenantBO(s.Config)
+	tenant, tenantNode, _, err := tenantBO.GetTenant(ctx, req.TenantCode)
+	if err != nil {
+		s.Config.Logger.Error().Err(err).Msg("Failed to get tenant")
+		return &pb.AckMessageResponse{Success: false, Message: err.Error()}, nil
+	}
+	if tenantNode == nil {
+		s.Config.Logger.Error().Str("tenantCode", req.TenantCode).Msg("No node found for tenant")
+		return &pb.AckMessageResponse{Success: false, Message: "tenant node not available"}, nil
+	}
+
+	cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
+	cfs := tenant.ID
+
+	responseChan := make(chan buffer.AckConfirmation, len(req.LeaseIDs))
+
+	for _, leaseID := range req.LeaseIDs {
+		bufferedMessage := buffer.AckBufferedMessage{
+			LeaseID:      leaseID,
+			CF:           cf,
+			CFS:          cfs,
+			Tenant:       &tenant,
+			TenantNode:   tenantNode,
+			ResponseChan: responseChan,
+		}
+		s.ackBuffer.Add(ctx, bufferedMessage)
+	}
+
+	successCount := 0
+	var lastErr error
+
+	for i := 0; i < len(req.LeaseIDs); i++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case confirmation := <-responseChan:
+			if confirmation.Error != nil {
+				lastErr = confirmation.Error
+			} else {
+				successCount++
+			}
+		}
+	}
+
+	if lastErr != nil {
+		return &pb.AckMessageResponse{
+			Success: false,
+			Message: fmt.Sprintf("Bulk ACK partially failed. Success: %d/%d. Last error: %v", successCount, len(req.LeaseIDs), lastErr),
+		}, nil
+	}
+
+	return &pb.AckMessageResponse{
+		Success: true,
+		Message: "ok",
+	}, nil
+}
