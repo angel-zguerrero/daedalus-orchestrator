@@ -29,7 +29,7 @@ type Binding struct {
 	VNamespace string `orm:"unique-compound:1"`
 	Code       string `orm:"unique-compound:1"`
 
-	ExchangeID string
+	ExchangeID string `orm:"group-index"`
 	QueueID    string
 
 	TargetExchangeID    string

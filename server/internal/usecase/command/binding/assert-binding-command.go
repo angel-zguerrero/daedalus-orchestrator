@@ -391,9 +391,104 @@ func (cmd *AssertBindingCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 		}
 	}
 
+	// ── Maintain the Route Table ─────────────────────────────────────────────
+	// The route table provides O(1) routing lookup during message publish.
+	// We update it here (inside the same Raft command) so it stays consistent with the binding state.
+	if err := cmd.updateRouteTable(uow, exchange, &binding, now); err != nil {
+		commandResult.Error = fmt.Sprintf("failed to update route table: %v", err)
+		return *commandResult
+	}
+
 	commandResult.Result = binding
 	return *commandResult
 }
+
+// updateRouteTable maintains the route table for the given exchange and binding.
+// This is called atomically as part of AssertBindingCommand.
+func (cmd *AssertBindingCommand) updateRouteTable(uow *db.UnitOfWork, exchange *models.Exchange, binding *models.Binding, now time.Time) error {
+	rt := db.NewRouteTable(uow.KVStore, cmd.CF, cmd.CFS, "admin_schema")
+	batch := db.NewWriteBatch()
+
+	var target string
+	if binding.TargetExchangeType == models.TargetExchangeTypeExchange && binding.TargetExchangeID != "" {
+		target = "e:" + binding.TargetExchangeID
+	} else if binding.QueueID != "" {
+		target = "q:" + binding.QueueID
+	}
+
+	if target == "" {
+		// Nothing to route to
+		return nil
+	}
+
+	switch exchange.Type {
+	case models.Direct:
+		// Classic binding with a direct routing key → register target under routingKey
+		if binding.BindingType == models.BindingTypeClassic && binding.RoutingKey != "" {
+			if err := rt.AddDirectRoute(batch, exchange.ID, binding.RoutingKey, target, now); err != nil {
+				return fmt.Errorf("direct route: %w", err)
+			}
+		} else if binding.BindingType == models.BindingTypeDynamic {
+			if err := rt.AddDynamicRoute(batch, exchange.ID, now); err != nil {
+				return fmt.Errorf("dynamic direct route: %w", err)
+			}
+		}
+
+	case models.Fanout:
+		// All classic bindings get added to the fanout list
+		if binding.BindingType == models.BindingTypeClassic {
+			if err := rt.AddFanoutRoute(batch, exchange.ID, target, now); err != nil {
+				return fmt.Errorf("fanout route: %w", err)
+			}
+		} else if binding.BindingType == models.BindingTypeDynamic {
+			if err := rt.AddDynamicRoute(batch, exchange.ID, now); err != nil {
+				return fmt.Errorf("dynamic fanout route: %w", err)
+			}
+		}
+
+	case models.Topic:
+		// Store the pattern → target mapping for lazy cache resolution
+		if binding.BindingType == models.BindingTypeClassic && binding.Pattern != "" {
+			if err := rt.AddTopicPattern(batch, exchange.ID, binding.Pattern, target, binding.ID, now); err != nil {
+				return fmt.Errorf("topic pattern: %w", err)
+			}
+		} else if binding.BindingType == models.BindingTypeDynamic {
+			if err := rt.AddDynamicRoute(batch, exchange.ID, now); err != nil {
+				return fmt.Errorf("dynamic topic route: %w", err)
+			}
+		}
+
+	case models.Headers:
+		// Store a lightweight headers binding entry (the actual matching happens in ExchangeBO)
+		if binding.BindingType == models.BindingTypeClassic {
+			headersMap := cmd.Headers
+			if headersMap == nil {
+				headersMap = map[string]string{}
+			}
+			xmatch := string(binding.XMatch)
+			if xmatch == "" {
+				xmatch = string(models.XMatchTypeAll)
+			}
+			if err := rt.AddHeadersBinding(batch, exchange.ID, binding.ID, headersMap, xmatch, target, now); err != nil {
+				return fmt.Errorf("headers binding: %w", err)
+			}
+		} else if binding.BindingType == models.BindingTypeDynamic {
+			if err := rt.AddDynamicRoute(batch, exchange.ID, now); err != nil {
+				return fmt.Errorf("dynamic headers route: %w", err)
+			}
+		}
+	}
+
+	// Always add dynamic routes for Direct as well (above switch handled only Fanout/Topic/Headers)
+	// Actually, wait, the switch is complete, let's fix the Direct case too.
+
+	if batch.Count() > 0 {
+		return uow.KVStore.Write(batch)
+	}
+	return nil
+}
+
+
 
 // validateBindingParams validates binding parameters according to Exchange Type and BindingType
 func (cmd *AssertBindingCommand) validateBindingParams(exchangeType models.ExchangeType) error {

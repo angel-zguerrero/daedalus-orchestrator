@@ -59,6 +59,11 @@ type FieldDefinition struct {
 	DataOnly bool
 	// Virtual indicates whether this field should be completely excluded from storage and queries.
 	Virtual bool
+	// GroupIndex indicates whether this field maintains a group membership index:
+	// a single KV entry per distinct field value that stores the list of all entity IDs with that value.
+	// This enables O(1) lookup of all entities belonging to a group without paginated scans.
+	// Key format: {schema}:{table}:grp:{FieldName}:{value}
+	GroupIndex bool
 }
 
 // TableDefinition describes the schema of a table in the key-value store.
@@ -983,6 +988,21 @@ func (r *Repository[T]) BulkCreate(entities []*T, now time.Time) ([]string, erro
 			}
 		}
 
+		// Maintain group indexes
+		for _, def := range r.definition.Fields {
+			if !def.GroupIndex {
+				continue
+			}
+			fieldVal, err := getNestedFieldValue(entityPtrVal, def.Name)
+			if err != nil || !fieldVal.IsValid() {
+				continue
+			}
+			fieldValue := fmt.Sprintf("%v", fieldVal.Interface())
+			if err := r.addToGroupIndex(batch, def.Name, fieldValue, id, now); err != nil {
+				return nil, fmt.Errorf("error updating group index for field '%s' id '%s': %w", def.Name, id, err)
+			}
+		}
+
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 		dataBytes, err := r.marshalWithoutVirtual(entity)
 		if err != nil {
@@ -1370,6 +1390,29 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 			}
 		}
 
+		// Update group indexes for changed group-index fields
+		for _, def := range r.definition.Fields {
+			if !def.GroupIndex {
+				continue
+			}
+			oldFieldVal, errOld := getNestedFieldValue(currentEntityReflectVal, def.Name)
+			newFieldVal, errNew := getNestedFieldValue(newEntityReflectVal, def.Name)
+			if errOld != nil || errNew != nil || !oldFieldVal.IsValid() || !newFieldVal.IsValid() {
+				continue
+			}
+			oldValue := fmt.Sprintf("%v", oldFieldVal.Interface())
+			newValue := fmt.Sprintf("%v", newFieldVal.Interface())
+			if oldValue != newValue {
+				if err := r.removeFromGroupIndex(batch, def.Name, oldValue, id, now); err != nil {
+					return nil, fmt.Errorf("error removing from group index field '%s' id '%s': %w", def.Name, id, err)
+				}
+				if err := r.addToGroupIndex(batch, def.Name, newValue, id, now); err != nil {
+					return nil, fmt.Errorf("error adding to group index field '%s' id '%s': %w", def.Name, id, err)
+				}
+				changed = true
+			}
+		}
+
 		if changed {
 			dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
 			// Marshal the modified currentEntityStored, which now contains the merged changes
@@ -1505,6 +1548,11 @@ func (r *Repository[T]) BulkDelete(ids []string, now time.Time) ([]bool, error) 
 				idxUKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, fieldValue)
 				batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, idxUKey, now)
 			}
+			if def.GroupIndex {
+				if err := r.removeFromGroupIndex(batch, def.Name, fieldValue, id, now); err != nil {
+					fmt.Printf("Warning: could not remove from group index field '%s' for entity ID '%s': %v\n", def.Name, id, err)
+				}
+			}
 		}
 
 		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
@@ -1535,6 +1583,117 @@ func (r *Repository[T]) Delete(id string, now time.Time) (bool, error) {
 		return false, err
 	}
 	return results[0], nil
+}
+
+// groupIndexKey returns the KV key for a group index entry.
+func (r *Repository[T]) groupIndexKey(fieldName, fieldValue string) string {
+	return fmt.Sprintf("%s:%s:grp:%s:%s", r.definition.Schema, r.definition.Name, fieldName, fieldValue)
+}
+
+// addToGroupIndex appends entityID to the group set for (fieldName, fieldValue).
+// The operation is performed via a read-then-write; the updated set is queued into the batch.
+func (r *Repository[T]) addToGroupIndex(batch *WriteBatch, fieldName, fieldValue, entityID string, now time.Time) error {
+	key := r.groupIndexKey(fieldName, fieldValue)
+	existing, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, key, now)
+	if err != nil {
+		return err
+	}
+	var ids []string
+	if len(existing) > 0 {
+		if err := json.Unmarshal(existing, &ids); err != nil {
+			return fmt.Errorf("corrupted group index for key '%s': %w", key, err)
+		}
+	}
+	// Avoid duplicate entries
+	for _, existingID := range ids {
+		if existingID == entityID {
+			return nil
+		}
+	}
+	ids = append(ids, entityID)
+	data, err := json.Marshal(ids)
+	if err != nil {
+		return err
+	}
+	batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, key, data, now)
+	return nil
+}
+
+// removeFromGroupIndex removes entityID from the group set for (fieldName, fieldValue).
+func (r *Repository[T]) removeFromGroupIndex(batch *WriteBatch, fieldName, fieldValue, entityID string, now time.Time) error {
+	key := r.groupIndexKey(fieldName, fieldValue)
+	existing, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, key, now)
+	if err != nil {
+		return err
+	}
+	if len(existing) == 0 {
+		return nil // Nothing to remove
+	}
+	var ids []string
+	if err := json.Unmarshal(existing, &ids); err != nil {
+		return fmt.Errorf("corrupted group index for key '%s': %w", key, err)
+	}
+	newIDs := ids[:0]
+	for _, id := range ids {
+		if id != entityID {
+			newIDs = append(newIDs, id)
+		}
+	}
+	if len(newIDs) == 0 {
+		batch.Delete(r.definition.ColumnFamily, r.definition.ColumnFamilySector, key, now)
+	} else {
+		data, err := json.Marshal(newIDs)
+		if err != nil {
+			return err
+		}
+		batch.Put(r.definition.ColumnFamily, r.definition.ColumnFamilySector, key, data, now)
+	}
+	return nil
+}
+
+// FindByGroup retrieves all entities whose field value matches the given value,
+// using the group index for O(1) ID lookup instead of paginated index scans.
+// The field must have the `orm:"group-index"` tag.
+func (r *Repository[T]) FindByGroup(field, value string, now time.Time) ([]T, error) {
+	def, ok := r.definition.Fields[field]
+	if !ok {
+		return nil, fmt.Errorf("unknown field '%s'", field)
+	}
+	if !def.GroupIndex {
+		return nil, fmt.Errorf("field '%s' does not have a group-index; use Find() instead", field)
+	}
+
+	key := r.groupIndexKey(field, value)
+	data, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, key, now)
+	if err != nil {
+		return nil, fmt.Errorf("error reading group index for field '%s' value '%s': %w", field, value, err)
+	}
+	if len(data) == 0 {
+		return []T{}, nil // No entities in this group
+	}
+
+	var ids []string
+	if err := json.Unmarshal(data, &ids); err != nil {
+		return nil, fmt.Errorf("corrupted group index for field '%s' value '%s': %w", field, value, err)
+	}
+
+	results := make([]T, 0, len(ids))
+	for _, id := range ids {
+		dataKey := fmt.Sprintf("%s:%s:data:%s", r.definition.Schema, r.definition.Name, id)
+		entityBytes, err := r.kvStore.Get(r.definition.ColumnFamily, r.definition.ColumnFamilySector, dataKey, now)
+		if err != nil {
+			return nil, fmt.Errorf("error reading entity '%s' from group: %w", id, err)
+		}
+		if len(entityBytes) == 0 {
+			continue // Entity was deleted but group index not cleaned up
+		}
+		var entity T
+		if err := json.Unmarshal(entityBytes, &entity); err != nil {
+			return nil, fmt.Errorf("error unmarshaling entity '%s': %w", id, err)
+		}
+		results = append(results, entity)
+	}
+	return results, nil
 }
 
 // DefaultIDGeneratorFactory is a default implementation of IDGeneratorFactory
@@ -1683,6 +1842,18 @@ func NewRepository[T ORMEntity](kvStore KVStore, ColumnFamily, columnFamilySecto
 			}
 			if def.TTL {
 				return nil, fmt.Errorf("field '%s' cannot be both virtual and TTL in struct %s", def.Name, t.Name())
+			}
+		}
+		// Validate group-index field constraints
+		if def.GroupIndex {
+			if def.Primary {
+				return nil, fmt.Errorf("field '%s' cannot be both group-index and primary key in struct %s", def.Name, t.Name())
+			}
+			if def.DataOnly {
+				return nil, fmt.Errorf("field '%s' cannot be both group-index and data-only in struct %s", def.Name, t.Name())
+			}
+			if def.Virtual {
+				return nil, fmt.Errorf("field '%s' cannot be both group-index and virtual in struct %s", def.Name, t.Name())
 			}
 		}
 	}
@@ -1863,6 +2034,8 @@ func createFieldDefinition(field reflect.StructField, prefix string) (FieldDefin
 			def.DataOnly = true
 		case rule == "virtual":
 			def.Virtual = true
+		case rule == "group-index":
+			def.GroupIndex = true
 		case rule == "":
 			// ignore empty rule
 		default:

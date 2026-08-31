@@ -297,68 +297,139 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 		return nil, fmt.Errorf("failed to get exchange: %w", err)
 	}
 
-	// Get bindings for this exchange
-	bindings, err := bo.getBindingsByExchange(ctx, exchange.ID, vnamespace, cf, cfs, tenantNode)
+	resolveCmd := &binding_command.ResolveRoutesCommand{
+		ExchangeID:     exchange.ID,
+		ExchangeType:   exchange.Type,
+		RoutingKey:     routingKeyOrPatternOrQueueCode,
+		MessageHeaders: message.Headers,
+		CF:             cf,
+		CFS:            cfs,
+	}
+
+	resolveResult, err := dragonboat.ExecuteRepositoryQuery[binding_command.ResolveRoutesResult](
+		tenantNode,
+		ctx,
+		resolveCmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"resolve routes",
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bindings for exchange: %w", err)
+		return nil, fmt.Errorf("failed to resolve routes: %w", err)
 	}
 
 	var resultQueues []models.Queue
-	visitedExchanges := make(map[string]bool) // To prevent infinite recursion
+	var queueIDs []string
 
-	// Process each binding
-	for _, binding := range bindings {
-		queues, err := bo.processBinding(ctx, binding, routingKeyOrPatternOrQueueCode, message, cf, cfs, visitedExchanges, tenant, tenantNode)
-		if err != nil {
-			return nil, fmt.Errorf("failed to process binding: %w", err)
+	// Process targets
+	for _, target := range resolveResult.Targets {
+		if strings.HasPrefix(target, "q:") {
+			queueIDs = append(queueIDs, strings.TrimPrefix(target, "q:"))
+		} else if strings.HasPrefix(target, "e:") {
+			targetExID := strings.TrimPrefix(target, "e:")
+			// Lookup target exchange by ID
+			findExchangeCmd := &exchange_command.FindExchangeByIDCommand{
+				ID:         targetExID,
+				VNamespace: vnamespace,
+				CF:         cf,
+				CFS:        cfs,
+			}
+			targetEx, err := dragonboat.ExecuteRepositoryQuery[models.Exchange](
+				tenantNode, ctx, findExchangeCmd, config.GlobalConfiguration.ApiRaftTimeout, bo.Config.Logger, "find target exchange",
+			)
+			if err != nil {
+				bo.Config.Logger.Error().Err(err).Str("TargetExchangeID", targetExID).Msg("Failed to find target exchange")
+				continue
+			}
+
+			// Recursively resolve
+			targetQueues, err := bo.GetQueuesFromExchange(ctx, targetEx.Code, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs, tenant, tenantNode)
+			if err != nil {
+				bo.Config.Logger.Error().Err(err).Str("TargetExchangeCode", targetEx.Code).Msg("Failed recursive routing")
+				continue
+			}
+			resultQueues = append(resultQueues, targetQueues...)
 		}
-		resultQueues = append(resultQueues, queues...)
+	}
+
+	// Fetch queues in bulk
+	if len(queueIDs) > 0 {
+		findQueuesByIDsCommand := &queue.FindQueueByIDsCommand{
+			IDs:            queueIDs,
+			VNamespace:     vnamespace,
+			IncludeHeaders: true,
+			CF:             cf,
+			CFS:            cfs,
+		}
+
+		foundQueues, err := dragonboat.ExecuteRepositoryQuery[[]models.Queue](
+			tenantNode,
+			ctx,
+			findQueuesByIDsCommand,
+			config.GlobalConfiguration.ApiRaftTimeout,
+			bo.Config.Logger,
+			"find queues by IDs",
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find queues by IDs: %w", err)
+		}
+		resultQueues = append(resultQueues, foundQueues...)
+	}
+
+	// Handle dynamic bindings (fallback if the route table indicates they exist)
+	if resolveResult.HasDynamic {
+		// Only direct exchanges use dynamic queue resolution directly from routing key
+		if exchange.Type == models.Direct {
+			findQueueCommand := &queue.FindQueueCommand{
+				Code:           routingKeyOrPatternOrQueueCode,
+				VNamespace:     vnamespace,
+				IncludeHeaders: false,
+				CF:             cf,
+				CFS:            cfs,
+			}
+			foundQueue, err := dragonboat.ExecuteRepositoryQuery[models.Queue](
+				tenantNode, ctx, findQueueCommand, config.GlobalConfiguration.ApiRaftTimeout, bo.Config.Logger, "find queue by code",
+			)
+			if err == nil {
+				resultQueues = append(resultQueues, foundQueue)
+			}
+		}
+		// For other types with dynamic bindings, we would need to fetch them.
+		// However, dynamic bindings on Fanout/Topic are currently not fully supported by AssertBindingCommand anyway.
 	}
 
 	return bo.deduplicateQueues(resultQueues), nil
 }
 
-// Helper method to get bindings by exchange ID
+// Helper method to get bindings by exchange ID using the group index for O(1) lookup
 func (bo *ExchangeBO) getBindingsByExchange(ctx context.Context, exchangeID, vnamespace, cf, cfs string, tenantNode *dragonboat.RaftNode) ([]models.Binding, error) {
-	var allBindings []models.Binding
-	cursor := ""
-	pageSize := 100
-
-	for {
-		paginateBindingsCommand := &binding_command.PaginateByExchangeBindingsCommand{
-			ExchangeID:     exchangeID,
-			Cursor:         cursor,
-			PageSize:       pageSize,
-			VNamespace:     vnamespace, // All namespaces
-			IncludeObjects: true,       // Include exchange, queue objects
-			CF:             cf,
-			CFS:            cfs,
-		}
-
-		findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Binding]](
-			tenantNode,
-			ctx,
-			paginateBindingsCommand,
-			config.GlobalConfiguration.ApiRaftTimeout,
-			bo.Config.Logger,
-			"get bindings by exchange",
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get bindings: %w", err)
-		}
-
-		// Filter bindings for this specific exchange and add to collection
-		allBindings = append(allBindings, findResult.Entities...)
-
-		// Check if there are more pages
-		if findResult.Cursor == "" || len(findResult.Entities) < pageSize {
-			break
-		}
-		cursor = findResult.Cursor
+	// Use a read query directly on the state machine to get bindings via FindByGroup
+	paginateBindingsCommand := &binding_command.PaginateByExchangeBindingsCommand{
+		ExchangeID:     exchangeID,
+		Cursor:         "",
+		PageSize:       1, // Minimal; we're switching to GroupIndex below
+		VNamespace:     vnamespace,
+		IncludeObjects: true,
+		CF:             cf,
+		CFS:            cfs,
+		UseGroupIndex:  true, // Signal to use FindByGroup
 	}
 
-	return allBindings, nil
+	findResult, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Binding]](
+		tenantNode,
+		ctx,
+		paginateBindingsCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"get bindings by exchange (group index)",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bindings: %w", err)
+	}
+
+	return findResult.Entities, nil
 }
+
 
 // Process a single binding to determine if it matches and return queues
 func (bo *ExchangeBO) processBinding(ctx context.Context, binding models.Binding, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, cf, cfs string, visitedExchanges map[string]bool, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {

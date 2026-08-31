@@ -159,6 +159,11 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return getQueueGaugesCommand.Execute(uow, now)
 	}
 
+	resolveRoutesCommand, ok := cmd.(binding_command.ResolveRoutesCommand)
+	if ok {
+		return resolveRoutesCommand.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 	return *commandResult

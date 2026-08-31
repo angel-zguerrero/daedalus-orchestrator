@@ -77,6 +77,13 @@ func (r *BindingRepository) DeleteBinding(id string, now time.Time) (bool, error
 	return r.Delete(id, now)
 }
 
+// GetBindingsByExchangeID retrieves all bindings for a given exchange using the group index.
+// This is an O(1) KV lookup instead of paginated index scans - much faster for exchanges with many bindings.
+func (r *BindingRepository) GetBindingsByExchangeID(exchangeID string, now time.Time) ([]models.Binding, error) {
+	return r.FindByGroup("ExchangeID", exchangeID, now)
+}
+
+
 func (r *BindingRepository) ClearAlternateExchangeId(bindingID string, now time.Time) (bool, error) {
 	// Get the binding first
 	binding, err := r.GetBindingById(bindingID, now)

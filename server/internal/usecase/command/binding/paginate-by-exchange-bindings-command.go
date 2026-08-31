@@ -21,6 +21,9 @@ type PaginateByExchangeBindingsCommand struct {
 	IncludeObjects bool
 	CF             string
 	CFS            string
+	// UseGroupIndex if true, uses the group index for O(1) lookup of all bindings by ExchangeID.
+	// This bypasses pagination and returns all bindings in a single read.
+	UseGroupIndex bool
 }
 
 func (cmd *PaginateByExchangeBindingsCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -33,11 +36,31 @@ func (cmd *PaginateByExchangeBindingsCommand) Execute(uow *db.UnitOfWork, now ti
 		return *commandResult
 	}
 
-	// Siempre usar el método normal de paginación
-	findResult, err := bindingRepo.PaginateByExchangeID(cmd.ExchangeID, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
-	if err != nil {
-		commandResult.Error = err.Error()
-		return *commandResult
+	var entities []models.Binding
+	var cursor string
+
+	if cmd.UseGroupIndex {
+		// O(1) group index lookup - single KV read returns all IDs, then bulk data fetch
+		entities, err = bindingRepo.GetBindingsByExchangeID(cmd.ExchangeID, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		cursor = "" // Group index returns all at once, no pagination needed
+	} else {
+		// Siempre usar el método normal de paginación
+		findResult, err := bindingRepo.PaginateByExchangeID(cmd.ExchangeID, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+		entities = findResult.Entities
+		cursor = findResult.Cursor
+	}
+
+	result := db.FindResult[models.Binding]{
+		Entities: entities,
+		Cursor:   cursor,
 	}
 
 	if cmd.IncludeObjects {
@@ -62,8 +85,8 @@ func (cmd *PaginateByExchangeBindingsCommand) Execute(uow *db.UnitOfWork, now ti
 		}
 
 		// Poblar los campos virtuales de cada binding
-		for i := range findResult.Entities {
-			binding := &findResult.Entities[i]
+		for i := range result.Entities {
+			binding := &result.Entities[i]
 
 			// Obtener el exchange
 			if exchange, err := exchangeRepo.GetExchangeById(binding.ExchangeID, now); err == nil && exchange != nil {
@@ -109,6 +132,6 @@ func (cmd *PaginateByExchangeBindingsCommand) Execute(uow *db.UnitOfWork, now ti
 		}
 	}
 
-	commandResult.Result = *findResult
+	commandResult.Result = result
 	return *commandResult
 }
