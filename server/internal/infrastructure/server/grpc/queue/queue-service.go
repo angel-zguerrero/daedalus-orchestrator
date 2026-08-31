@@ -170,6 +170,12 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 		if queue.MaxAttempts == 0 {
 			queue.MaxAttempts = 1
 		}
+
+		// Default to normal priority (single level, drain all) when no thresholds configured
+		if len(queue.DesiredPriorityThresholds) == 0 {
+			queue.DesiredPriorityThresholds = map[int]int{0: 0}
+		}
+
 		queues = append(queues, queue)
 	}
 

@@ -186,6 +186,12 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			DeadLetterExchangeId:                  t.DeadLetterExchangeId,
 			DeadLetterExchangeRoutingKeyOrPattern: t.DeadLetterExchangeRoutingKeyOrPattern,
 		}
+
+		// Default to normal priority (single level, drain all) when no thresholds configured
+		if len(queue.DesiredPriorityThresholds) == 0 {
+			queue.DesiredPriorityThresholds = map[int]int{0: 0}
+		}
+
 		queues = append(queues, queue)
 	}
 
