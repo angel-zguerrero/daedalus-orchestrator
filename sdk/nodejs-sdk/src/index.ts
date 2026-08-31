@@ -13,7 +13,7 @@ import { LoginRequest } from './proto/auth_pb';
 import { ClaimWorkRequest, ClaimWorkCapacityPolicy as PBClaimWorkCapacityPolicy, ClaimWorkFilter as PBClaimWorkFilter, ClaimWorkStreamMessage, AckMessageRequest, BulkAckMessageRequest } from './proto/jobworker_pb';
 import { AssertTenantRequest } from './proto/tenant_pb';
 import { CreateExchangeRequest, PublishMessageRequest, QueueMessage as ExchangeQueueMessage, PublishStreamRequest } from './proto/exchange_pb';
-import { CreateQueueRequest, EnqueueMessageRequest, EnqueueStreamRequest } from './proto/queue_pb';
+import { CreateQueueRequest, EnqueueMessageRequest, EnqueueStreamRequest, BulkCreateQueueRequest, CreateQueueItem } from './proto/queue_pb';
 import { CreateBindingRequest } from './proto/binding_pb';
 
 export async function getSystemInfo(): Promise<Record<string, string>> {
@@ -129,6 +129,11 @@ export interface AssertQueueInput {
   priorityType?: 'normal' | 'fair';
   desiredPriorityThresholds?: Record<number, number>;
   headers?: Record<string, string>;
+}
+
+export interface BulkAssertQueuesInput {
+  tenantCode: string;
+  queues: AssertQueueInput[];
 }
 
 export interface AssertBindingInput {
@@ -494,6 +499,58 @@ export class DaedalusSDK {
           }
           console.log(`✅ Queue asserted: ${input.code}`);
           resolve(response.toObject().result);
+        }
+      );
+    });
+  }
+
+  async bulkAssertQueues(input: BulkAssertQueuesInput): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const req = new BulkCreateQueueRequest();
+      req.setTenantcode(input.tenantCode);
+
+      for (const q of input.queues) {
+        const item = new CreateQueueItem();
+        item.setCode(q.code);
+        item.setName(q.name);
+        item.setType(q.type ?? 'standard');
+        item.setState(q.state ?? 'active');
+        item.setVnamespace(q.vnamespace ?? '');
+        item.setDefaultqueuemessagettl(q.defaultQueueMessageTTL ?? 0);
+        item.setDefaultqueuemessagedelaytime(q.defaultQueueMessageDelayTime ?? 0);
+        item.setQueueexpires(q.queueExpires ?? 0);
+        item.setAllowduplicated(q.allowDuplicated ?? false);
+        item.setMaxattempts(q.maxAttempts ?? 0);
+        item.setMaxqueuesize(q.maxQueueSize ?? 0);
+        item.setMaxdeliveringmessages(q.maxDeliveringMessages ?? 0);
+
+        if (q.priorityType !== 'normal' && q.desiredPriorityThresholds) {
+          const priorityMap = item.getDesiredprioritythresholdsMap();
+          for (const [k, v] of Object.entries(q.desiredPriorityThresholds)) {
+            priorityMap.set(Number(k), v);
+          }
+        }
+
+        if (q.headers) {
+          const headersMap = item.getHeadersMap();
+          for (const [k, v] of Object.entries(q.headers)) {
+            headersMap.set(k, v);
+          }
+        }
+
+        req.addQueues(item);
+      }
+
+      this.queueClient!.bulkCreateQueue(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to bulk assert queues:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Bulk Queues asserted: ${input.queues.length}`);
+          resolve(response.toObject().resultList);
         }
       );
     });

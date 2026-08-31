@@ -112,6 +112,12 @@ type AssertQueueInput struct {
 	Headers                   map[string]string
 }
 
+// BulkAssertQueuesInput defines the parameters for upserting multiple queues in bulk.
+type BulkAssertQueuesInput struct {
+	TenantCode string
+	Queues     []AssertQueueInput
+}
+
 // AssertBindingInput defines the parameters for upserting a binding.
 type AssertBindingInput struct {
 	TenantCode          string

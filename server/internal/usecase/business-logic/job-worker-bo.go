@@ -352,6 +352,16 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 							for i := range allQueues {
 								queue := &allQueues[i]
 
+								// Skip if all messages are currently delivering
+								if queue.MessagesCount <= queue.CurrentDeliveringMessages {
+									continue
+								}
+
+								// Respect the queue's own delivering-message cap (0 = unlimited).
+								if queue.MaxDeliveringMessages > 0 && queue.CurrentDeliveringMessages >= queue.MaxDeliveringMessages {
+									continue
+								}
+
 								claimMu.Lock()
 								if allPoliciesSatisfied() || (policy.MaxQueueMessages > 0 && claimedByPolicy[policyCode] >= policy.MaxQueueMessages) {
 									claimMu.Unlock()

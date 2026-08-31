@@ -323,6 +323,60 @@ func (sdk *DaedalusSDK) AssertQueue(ctx context.Context, input AssertQueueInput)
 	return resp.Result, nil
 }
 
+// BulkAssertQueues upserts multiple queues in the orchestrator.
+func (sdk *DaedalusSDK) BulkAssertQueues(ctx context.Context, input BulkAssertQueuesInput) ([]*queuepb.Queue, error) {
+	req := &queuepb.BulkCreateQueueRequest{
+		TenantCode: input.TenantCode,
+		Queues:     make([]*queuepb.CreateQueueItem, len(input.Queues)),
+	}
+
+	for i, q := range input.Queues {
+		queueType := q.Type
+		if queueType == "" {
+			queueType = "standard"
+		}
+		state := q.State
+		if state == "" {
+			state = "active"
+		}
+
+		var desiredThresholds map[int32]int32
+		if q.PriorityType == "normal" {
+			desiredThresholds = map[int32]int32{}
+		} else if q.DesiredPriorityThresholds != nil {
+			desiredThresholds = q.DesiredPriorityThresholds
+		} else {
+			desiredThresholds = map[int32]int32{}
+		}
+
+		req.Queues[i] = &queuepb.CreateQueueItem{
+			Code:                         q.Code,
+			Name:                         q.Name,
+			Type:                         queueType,
+			State:                        state,
+			Vnamespace:                   q.VNamespace,
+			DefaultQueueMessageTTL:       q.DefaultQueueMessageTTL,
+			DefaultQueueMessageDelayTime: q.DefaultQueueMessageDelayTime,
+			QueueExpires:                 q.QueueExpires,
+			AllowDuplicated:              q.AllowDuplicated,
+			MaxAttempts:                  q.MaxAttempts,
+			MaxQueueSize:                 q.MaxQueueSize,
+			MaxDeliveringMessages:        q.MaxDeliveringMessages,
+			DesiredPriorityThresholds:    desiredThresholds,
+			Headers:                      q.Headers,
+		}
+	}
+
+	resp, err := sdk.queueClient.BulkCreateQueue(sdk.authCtx(ctx), req)
+	if err != nil {
+		log.Printf("❌ Failed to bulk assert queues: %v", err)
+		return nil, fmt.Errorf("bulk assert queues failed: %w", err)
+	}
+
+	log.Printf("✅ Bulk Queues asserted: %d", len(input.Queues))
+	return resp.Result, nil
+}
+
 // AssertBinding upserts a binding in the orchestrator.
 func (sdk *DaedalusSDK) AssertBinding(ctx context.Context, input AssertBindingInput) (*bindingpb.Binding, error) {
 	bindingType := input.BindingType
