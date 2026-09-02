@@ -3,6 +3,7 @@ package business_logic
 import (
 	"bytes"
 	"context"
+	"deadalus-orch/server/internal/infrastructure/cache"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
@@ -115,7 +116,13 @@ func (bo *ExchangeBO) GetExchange(ctx context.Context, exchangeCode, vnamespace,
 		return models.Exchange{}, fmt.Errorf("find exchange failed: %w", err)
 	}
 
-	// Para exchanges globales no hay nodo específico
+	// Populate exchange cache so the publish hot path can skip KV lookups
+	cache.GlobalExchangeCache().Set(exchangeCode, vnamespace, cache.ExchangeInfo{
+		ID:   exchange.ID,
+		Code: exchange.Code,
+		Type: exchange.Type,
+	})
+
 	return exchange, nil
 }
 
@@ -168,6 +175,12 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespa
 	}
 
 	bo.Config.Logger.Info().Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("exchange deleted successfully")
+
+	// Invalidate exchange cache
+	cache.GlobalExchangeCache().Invalidate(exchangeCode, vnamespace)
+	// Also invalidate route cache since all bindings for this exchange are now invalid
+	cache.GlobalRouteCache().InvalidateExchange(exchangeCode)
+
 	return nil
 }
 
@@ -291,95 +304,58 @@ func (bo *ExchangeBO) PublishMessage(ctx context.Context, exchangeCode, routingK
 }
 
 func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, routingKeyOrPatternOrQueueCode string, message models.QueueMessage, vnamespace string, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Queue, error) {
-	// First, get the exchange
-	exchange, err := bo.GetExchange(ctx, exchangeCode, vnamespace, cf, cfs, tenant, tenantNode)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get exchange: %w", err)
+	// ── In-memory cache check (skips Raft entirely on hit) ──────────────────
+	routeCache := cache.GlobalRouteCache()
+	if cached, ok := routeCache.Get(exchangeCode, routingKeyOrPatternOrQueueCode, vnamespace); ok {
+		return cached, nil
 	}
 
-	resolveCmd := &binding_command.ResolveRoutesCommand{
-		ExchangeID:     exchange.ID,
-		ExchangeType:   exchange.Type,
+	// ── Cache miss: single Raft query ───────────────────────────────────────
+	combinedCmd := &binding_command.ResolveAndFetchQueuesCommand{
+		ExchangeCode:   exchangeCode,
 		RoutingKey:     routingKeyOrPatternOrQueueCode,
 		MessageHeaders: message.Headers,
+		VNamespace:     vnamespace,
 		CF:             cf,
 		CFS:            cfs,
 	}
 
-	resolveResult, err := dragonboat.ExecuteRepositoryQuery[binding_command.ResolveRoutesResult](
+	// Try to inject cached exchange data to skip the exchange KV lookup
+	// inside the state machine.
+	exCache := cache.GlobalExchangeCache()
+	if exInfo, ok := exCache.Get(exchangeCode, vnamespace); ok {
+		combinedCmd.ExchangeID = exInfo.ID
+		combinedCmd.ExchangeType = exInfo.Type
+	}
+
+	result, err := dragonboat.ExecuteRepositoryQuery[binding_command.ResolveAndFetchQueuesResult](
 		tenantNode,
 		ctx,
-		resolveCmd,
+		combinedCmd,
 		config.GlobalConfiguration.ApiRaftTimeout,
 		bo.Config.Logger,
-		"resolve routes",
+		"resolve and fetch queues",
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve routes: %w", err)
+		return nil, fmt.Errorf("failed to resolve and fetch queues: %w", err)
 	}
 
 	var resultQueues []models.Queue
-	var queueIDs []string
+	resultQueues = append(resultQueues, result.Queues...)
 
-	// Process targets
-	for _, target := range resolveResult.Targets {
-		if strings.HasPrefix(target, "q:") {
-			queueIDs = append(queueIDs, strings.TrimPrefix(target, "q:"))
-		} else if strings.HasPrefix(target, "e:") {
-			targetExID := strings.TrimPrefix(target, "e:")
-			// Lookup target exchange by ID
-			findExchangeCmd := &exchange_command.FindExchangeByIDCommand{
-				ID:         targetExID,
-				VNamespace: vnamespace,
-				CF:         cf,
-				CFS:        cfs,
-			}
-			targetEx, err := dragonboat.ExecuteRepositoryQuery[models.Exchange](
-				tenantNode, ctx, findExchangeCmd, config.GlobalConfiguration.ApiRaftTimeout, bo.Config.Logger, "find target exchange",
-			)
-			if err != nil {
-				bo.Config.Logger.Error().Err(err).Str("TargetExchangeID", targetExID).Msg("Failed to find target exchange")
-				continue
-			}
-
-			// Recursively resolve
-			targetQueues, err := bo.GetQueuesFromExchange(ctx, targetEx.Code, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs, tenant, tenantNode)
-			if err != nil {
-				bo.Config.Logger.Error().Err(err).Str("TargetExchangeCode", targetEx.Code).Msg("Failed recursive routing")
-				continue
-			}
-			resultQueues = append(resultQueues, targetQueues...)
-		}
-	}
-
-	// Fetch queues in bulk
-	if len(queueIDs) > 0 {
-		findQueuesByIDsCommand := &queue.FindQueueByIDsCommand{
-			IDs:            queueIDs,
-			VNamespace:     vnamespace,
-			IncludeHeaders: true,
-			CF:             cf,
-			CFS:            cfs,
-		}
-
-		foundQueues, err := dragonboat.ExecuteRepositoryQuery[[]models.Queue](
-			tenantNode,
-			ctx,
-			findQueuesByIDsCommand,
-			config.GlobalConfiguration.ApiRaftTimeout,
-			bo.Config.Logger,
-			"find queues by IDs",
-		)
+	// Handle exchange-to-exchange targets (recursive resolution)
+	for _, exTarget := range result.ExchangeTargets {
+		targetQueues, err := bo.GetQueuesFromExchange(ctx, exTarget.Code, routingKeyOrPatternOrQueueCode, message, vnamespace, cf, cfs, tenant, tenantNode)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find queues by IDs: %w", err)
+			bo.Config.Logger.Error().Err(err).Str("TargetExchangeCode", exTarget.Code).Msg("Failed recursive routing")
+			continue
 		}
-		resultQueues = append(resultQueues, foundQueues...)
+		resultQueues = append(resultQueues, targetQueues...)
 	}
 
 	// Handle dynamic bindings (fallback if the route table indicates they exist)
-	if resolveResult.HasDynamic {
-		// Only direct exchanges use dynamic queue resolution directly from routing key
-		if exchange.Type == models.Direct {
+	if result.HasDynamic {
+		if result.ExchangeType == models.Direct {
 			findQueueCommand := &queue.FindQueueCommand{
 				Code:           routingKeyOrPatternOrQueueCode,
 				VNamespace:     vnamespace,
@@ -388,17 +364,24 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 				CFS:            cfs,
 			}
 			foundQueue, err := dragonboat.ExecuteRepositoryQuery[models.Queue](
-				tenantNode, ctx, findQueueCommand, config.GlobalConfiguration.ApiRaftTimeout, bo.Config.Logger, "find queue by code",
+				tenantNode, ctx, findQueueCommand, config.GlobalConfiguration.ApiRaftTimeout, bo.Config.Logger, "find queue by code (dynamic)",
 			)
 			if err == nil {
 				resultQueues = append(resultQueues, foundQueue)
 			}
 		}
-		// For other types with dynamic bindings, we would need to fetch them.
-		// However, dynamic bindings on Fanout/Topic are currently not fully supported by AssertBindingCommand anyway.
 	}
 
-	return bo.deduplicateQueues(resultQueues), nil
+	finalQueues := bo.deduplicateQueues(resultQueues)
+
+	// ── Populate cache (only for non-dynamic, non-recursive results) ────────
+	// We cache the final deduplicated result so subsequent publishes with the
+	// same exchange+routingKey skip Raft entirely.
+	if len(result.ExchangeTargets) == 0 && !result.HasDynamic {
+		routeCache.Set(exchangeCode, routingKeyOrPatternOrQueueCode, vnamespace, finalQueues)
+	}
+
+	return finalQueues, nil
 }
 
 // Helper method to get bindings by exchange ID using the group index for O(1) lookup

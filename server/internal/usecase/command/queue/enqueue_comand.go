@@ -83,6 +83,12 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		return *commandResult
 	}
 
+	activeQueueRepo, err := db.NewActiveQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// First pass: Group messages by QueueID and validate QueueIDs
 	messagesByQueue := make(map[string][]models.QueueMessage)
 	queuesCache := make(map[string]*models.Queue)
@@ -280,6 +286,16 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 	// Sixth pass: Update queue message counts
 	for queueID, messages := range messagesByQueue {
 		queue := queuesCache[queueID]
+
+		// ACTIVE QUEUE REGISTRY: Add to ActiveQueues unconditionally to avoid race conditions
+		// where a concurrent dequeue empties and deletes the queue from the registry while
+		// this transaction still sees MessagesCount > 0 in its initial cache.
+		_, err = activeQueueRepo.PutActiveQueue(queue, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+
 		queue.MessagesCount += len(messages)
 		_, err = queueRepo.UpdateQueue(queue, now)
 		if err != nil {

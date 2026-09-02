@@ -28,13 +28,13 @@ func (cmd *PaginateQueuesWithFilterCommand) Execute(uow *db.UnitOfWork, now time
 	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
-	queueRepo, err := db.NewQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	activeQueueRepo, err := db.NewActiveQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
 
-	result, err := queueRepo.PaginateWithClaimWorkFilter(cmd.Filter, cmd.PageSize, cmd.Cursor, now)
+	result, err := activeQueueRepo.PaginateWithClaimWorkFilter(cmd.Filter, cmd.PageSize, cmd.Cursor, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

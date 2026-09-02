@@ -29,6 +29,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	activeQueueRepo, err := db.NewActiveQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	bindingRepo, err := db.NewBindingRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -63,6 +69,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 	if queue == nil {
 		commandResult.Error = "queue not found"
+		return *commandResult
+	}
+
+	// ACTIVE QUEUE REGISTRY: Delete from active queues
+	if _, err = activeQueueRepo.DeleteActiveQueue(queue.ID, now); err != nil {
+		commandResult.Error = fmt.Sprintf("failed to delete active queue %s: %s", queue.ID, err.Error())
 		return *commandResult
 	}
 

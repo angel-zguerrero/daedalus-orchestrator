@@ -345,6 +345,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 							var allQueues []models.Queue = queuesResult.Entities
 
 							if len(allQueues) == 0 {
+								bo.cursorRegistry.set(tenantQueueKey, "")
 								break queueLoop
 							}
 
@@ -352,8 +353,8 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 							for i := range allQueues {
 								queue := &allQueues[i]
 
-								// Skip if all messages are currently delivering
-								if queue.MessagesCount <= queue.CurrentDeliveringMessages {
+								// Skip if there are no pending messages
+								if queue.MessagesCount <= 0 {
 									continue
 								}
 
@@ -417,10 +418,11 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 								}
 							}
 
-							bo.cursorRegistry.set(tenantQueueKey, queuesResult.Cursor)
 							if queuesResult.Cursor == "" || len(queuesResult.Entities) < queuePageSize {
+								bo.cursorRegistry.set(tenantQueueKey, "")
 								break
 							}
+							bo.cursorRegistry.set(tenantQueueKey, queuesResult.Cursor)
 							queueCursor = queuesResult.Cursor
 						}
 					}

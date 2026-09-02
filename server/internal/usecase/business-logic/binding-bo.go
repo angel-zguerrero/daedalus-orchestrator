@@ -2,6 +2,7 @@ package business_logic
 
 import (
 	"context"
+	"deadalus-orch/server/internal/infrastructure/cache"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
@@ -109,6 +110,10 @@ func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchang
 		return models.Binding{}, err
 	}
 
+	// Invalidate route cache for this exchange so subsequent publishes
+	// pick up the new binding immediately.
+	cache.GlobalRouteCache().InvalidateExchange(exchangeCode)
+
 	return created, nil
 }
 
@@ -155,7 +160,16 @@ func (bo *BindingBO) DeleteBinding(ctx context.Context, code, vnamespace, cf, cf
 		bo.Config.Logger,
 		"delete binding",
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Invalidate route cache — we don't know which exchange this binding
+	// belonged to from here, so flush everything. This is a rare operation
+	// compared to publish, so it's acceptable.
+	cache.GlobalRouteCache().InvalidateAll()
+
+	return nil
 }
 
 func (bo *BindingBO) GetBindings(ctx context.Context, q string, cursor string, pageSize int, vNamespace string, includeObjects bool, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (db.FindResult[models.Binding], error) {

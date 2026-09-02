@@ -79,6 +79,12 @@ func (cmd *ProcessExpiredLeasesCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		return *commandResult
 	}
 
+	activeQueueRepo, err := db.NewActiveQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// ── 1. find expired leases ───────────────────────────────────────────────────
 
 	expiredLeases, err := leaseRepo.FindExpiredLeases(cmd.Limit, cmd.Offset, now)
@@ -145,7 +151,8 @@ func (cmd *ProcessExpiredLeasesCommand) Execute(uow *db.UnitOfWork, now time.Tim
 			result.DeletedMessages++
 		} else {
 			// Requeue message and delete lease
-			if err := cmd.requeueMessageAndDeleteLease(queueMessageRepo, leaseRepo, queueRepo, queuePartitionRepo, message, &lease, queue, now); err != nil {
+			err = cmd.requeueMessageAndDeleteLease(queueMessageRepo, leaseRepo, queueRepo, queuePartitionRepo, activeQueueRepo, message, &lease, queue, now)
+			if err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("failed to requeue message %s: %s", message.ID, err.Error()))
 				continue
 			}
@@ -231,6 +238,7 @@ func (cmd *ProcessExpiredLeasesCommand) requeueMessageAndDeleteLease(
 	leaseRepo *db.QueueMessageLeaseRepository,
 	queueRepo *db.QueueRepository,
 	partitionRepo *db.QueuePartitionRepository,
+	activeQueueRepo *db.ActiveQueueRepository,
 	message *models.QueueMessage,
 	lease *models.QueueMessageLease,
 	queue *models.Queue,
@@ -278,6 +286,10 @@ func (cmd *ProcessExpiredLeasesCommand) requeueMessageAndDeleteLease(
 	}
 
 	// 5. Update queue counters: message returns to available pool
+	// ACTIVE QUEUE REGISTRY: Add to ActiveQueues unconditionally to avoid race conditions
+	if _, err := activeQueueRepo.PutActiveQueue(queue, now); err != nil {
+		return fmt.Errorf("failed to put active queue: %w", err)
+	}
 	queue.MessagesCount++
 	queue.CurrentDeliveringMessages--
 	if queue.CurrentDeliveringMessages < 0 {

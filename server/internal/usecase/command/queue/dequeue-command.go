@@ -89,6 +89,12 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 		return *commandResult
 	}
 
+	activeQueueRepo, err := db.NewActiveQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	// ── 1. load queue ────────────────────────────────────────────────────────────
 
 	queue, err := queueRepo.GetQueueById(cmd.QueueID, now)
@@ -213,8 +219,13 @@ func (cmd *DequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 	// ── 6. update queue counters ─────────────────────────────────────────────────
 
 	queue.MessagesCount--
-	if queue.MessagesCount < 0 {
+	if queue.MessagesCount <= 0 {
 		queue.MessagesCount = 0
+		// ACTIVE QUEUE REGISTRY: Queue is now empty, remove from ActiveQueues
+		if _, err = activeQueueRepo.DeleteActiveQueue(queue.ID, now); err != nil {
+			commandResult.Error = fmt.Sprintf("failed to delete active queue %s: %s", queue.ID, err.Error())
+			return *commandResult
+		}
 	}
 	queue.CurrentDeliveringMessages++
 

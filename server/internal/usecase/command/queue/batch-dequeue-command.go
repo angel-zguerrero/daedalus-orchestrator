@@ -62,6 +62,12 @@ func (cmd *BatchDequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 		return *commandResult
 	}
 
+	activeQueueRepo, err := db.NewActiveQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	queue, err := queueRepo.GetQueueById(cmd.QueueID, now)
 	if err != nil || queue == nil {
 		commandResult.Error = "queue not found"
@@ -152,8 +158,14 @@ func (cmd *BatchDequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 		partitionsToUpdateMap[selectedPartition.ID] = selectedPartition
 
 		queue.MessagesCount--
-		if queue.MessagesCount < 0 {
+		if queue.MessagesCount <= 0 {
 			queue.MessagesCount = 0
+			// ACTIVE QUEUE REGISTRY: Queue is now empty, remove from ActiveQueues
+			_, err = activeQueueRepo.DeleteActiveQueue(queue.ID, now)
+			if err != nil {
+				commandResult.Error = err.Error()
+				return *commandResult
+			}
 		}
 		queue.CurrentDeliveringMessages++
 

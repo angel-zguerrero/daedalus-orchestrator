@@ -74,6 +74,12 @@ func (cmd *BulkDequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
+	activeQueueRepo, err := db.NewActiveQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	cachedQueues := make(map[string]*models.Queue)
 	cachedPartitions := make(map[string][]models.QueuePartition)
 
@@ -174,8 +180,13 @@ func (cmd *BulkDequeueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		}
 
 		queue.MessagesCount--
-		if queue.MessagesCount < 0 {
+		if queue.MessagesCount <= 0 {
 			queue.MessagesCount = 0
+			// ACTIVE QUEUE REGISTRY: Queue is now empty, remove from ActiveQueues
+			if _, err = activeQueueRepo.DeleteActiveQueue(queue.ID, now); err != nil {
+				commandResult.Error = fmt.Sprintf("failed to delete active queue %s: %s", queue.ID, err.Error())
+				return *commandResult
+			}
 		}
 		queue.CurrentDeliveringMessages++
 

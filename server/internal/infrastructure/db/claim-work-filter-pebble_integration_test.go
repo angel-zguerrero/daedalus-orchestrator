@@ -77,7 +77,7 @@ func setupCWFStore(t *testing.T) db.KVStore {
 		require.NoError(t, err)
 		for _, ns := range cwfVNamespaces {
 			for _, code := range cwfQueues {
-				_, err := repo.CreateQueue(&models.Queue{
+				q := &models.Queue{
 					Code:          code,
 					Name:          code,
 					VNamespace:    ns,
@@ -85,8 +85,14 @@ func setupCWFStore(t *testing.T) db.KVStore {
 					State:         models.QueueActive,
 					MessagesCount: 5,
 					MaxAttempts:   1,
-				}, now)
+				}
+				_, err := repo.CreateQueue(q, now)
 				require.NoError(t, err, "create queue %s/%s", ns, code)
+
+				activeRepo, err := db.NewActiveQueueRepository(uow, &db.DefaultIDGeneratorFactory{}, db.AdminFC, cwfQueueSector)
+				require.NoError(t, err)
+				_, err = activeRepo.PutActiveQueue(q, now)
+				require.NoError(t, err, "put active queue %s/%s", ns, code)
 			}
 		}
 		require.NoError(t, uow.Commit())
@@ -114,6 +120,14 @@ func cwfQueueRepo(t *testing.T, store db.KVStore) *db.QueueRepository {
 	t.Helper()
 	uow := db.NewUnitOfWork(store, nil)
 	repo, err := db.NewQueueRepository(uow, &db.DefaultIDGeneratorFactory{}, db.AdminFC, cwfQueueSector)
+	require.NoError(t, err)
+	return repo
+}
+
+func cwfActiveQueueRepo(t *testing.T, store db.KVStore) *db.ActiveQueueRepository {
+	t.Helper()
+	uow := db.NewUnitOfWork(store, nil)
+	repo, err := db.NewActiveQueueRepository(uow, &db.DefaultIDGeneratorFactory{}, db.AdminFC, cwfQueueSector)
 	require.NoError(t, err)
 	return repo
 }
@@ -628,7 +642,7 @@ func TestPebbleClaimWorkFilter_Queues(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := cwfQueueRepo(t, store)
+			repo := cwfActiveQueueRepo(t, store)
 			result, err := repo.PaginateWithClaimWorkFilter(tc.filter, cwfPageSize, "", now)
 			require.NoError(t, err)
 			assert.Len(t, result.Entities, tc.wantTotalCount, "unique codes: %v", uniqueCodes(result))
@@ -662,7 +676,7 @@ func TestPebbleClaimWorkFilter_Queues_ZeroMessagesExcluded(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, uow.Commit())
 	}
-	repo := cwfQueueRepo(t, store)
+	repo := cwfActiveQueueRepo(t, store)
 	result, err := repo.PaginateWithClaimWorkFilter(
 		models.ClaimWorkFilter{
 			QueueCodes:  []string{"empty-queue"},

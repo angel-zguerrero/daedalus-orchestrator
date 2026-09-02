@@ -161,14 +161,95 @@ func (r *QueueRepository) DeleteQueueById(id string, now time.Time) (bool, error
 	return r.Delete(id, now)
 }
 
-// PaginateWithClaimWorkFilter paginates queues applying the DB-level rules from the ClaimWorkFilter.
-// Only queues with MessagesCount > 0 are returned. Inclusion lists, exact exclusions, and NOT LIKE
-// pattern exclusions are all pushed to the DB query.
-func (r *QueueRepository) PaginateWithClaimWorkFilter(f models.ClaimWorkFilter, pageSize int, cursor string, now time.Time) (*FindResult[models.Queue], error) {
-	fq := BuildQueueFilterQuery(f)
-
-	return r.Find(fq.DBQuery, pageSize, cursor, now)
+// matchPattern provides simple wildcard matching.
+func matchPattern(val, pattern string) bool {
+	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") {
+		return strings.Contains(val, strings.Trim(pattern, "*"))
+	}
+	if strings.HasPrefix(pattern, "*") {
+		return strings.HasSuffix(val, strings.TrimPrefix(pattern, "*"))
+	}
+	if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(val, strings.TrimSuffix(pattern, "*"))
+	}
+	return val == pattern
 }
+
+func matchPatternsAny(val string, patterns []string) bool {
+	for _, p := range patterns {
+		if matchPattern(val, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(arr []string, val string) bool {
+	for _, s := range arr {
+		if s == val {
+			return true
+		}
+	}
+	return false
+}
+
+func matchClaimWorkFilter(q *models.Queue, f models.ClaimWorkFilter) bool {
+	if q.MessagesCount <= 0 {
+		return false
+	}
+
+	// Code match (Inclusion)
+	hasCodeInc := len(f.QueueCodes) > 0
+	hasCodePatInc := len(f.QueuePatterns) > 0
+	if hasCodeInc || hasCodePatInc {
+		matched := false
+		if hasCodeInc && containsString(f.QueueCodes, q.Code) {
+			matched = true
+		}
+		if !matched && hasCodePatInc && matchPatternsAny(q.Code, f.QueuePatterns) {
+			matched = true
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	// Code match (Exclusion)
+	if len(f.ExcludeQueueCodes) > 0 && containsString(f.ExcludeQueueCodes, q.Code) {
+		return false
+	}
+	if len(f.ExcludeQueuePatterns) > 0 && matchPatternsAny(q.Code, f.ExcludeQueuePatterns) {
+		return false
+	}
+
+	// VNamespace match (Inclusion)
+	hasVNsInc := len(f.VNamespaces) > 0
+	hasVNsPatInc := len(f.VNamespacePatterns) > 0
+	if hasVNsInc || hasVNsPatInc {
+		matched := false
+		if hasVNsInc && containsString(f.VNamespaces, q.VNamespace) {
+			matched = true
+		}
+		if !matched && hasVNsPatInc && matchPatternsAny(q.VNamespace, f.VNamespacePatterns) {
+			matched = true
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	// VNamespace match (Exclusion)
+	if len(f.ExcludeVNamespaces) > 0 && containsString(f.ExcludeVNamespaces, q.VNamespace) {
+		return false
+	}
+	if len(f.ExcludeVNamespacePatterns) > 0 && matchPatternsAny(q.VNamespace, f.ExcludeVNamespacePatterns) {
+		return false
+	}
+
+	return true
+}
+
+
 
 // isValidQueueType validates if the queue type is one of the allowed types
 func isValidQueueType(queueType models.QueueType) bool {
