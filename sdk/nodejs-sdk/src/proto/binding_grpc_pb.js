@@ -4,6 +4,28 @@
 var grpc = require('@grpc/grpc-js');
 var binding_pb = require('./binding_pb.js');
 
+function serialize_binding_BulkCreateBindingRequest(arg) {
+  if (!(arg instanceof binding_pb.BulkCreateBindingRequest)) {
+    throw new Error('Expected argument of type binding.BulkCreateBindingRequest');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_binding_BulkCreateBindingRequest(buffer_arg) {
+  return binding_pb.BulkCreateBindingRequest.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
+function serialize_binding_BulkCreateBindingResponse(arg) {
+  if (!(arg instanceof binding_pb.BulkCreateBindingResponse)) {
+    throw new Error('Expected argument of type binding.BulkCreateBindingResponse');
+  }
+  return Buffer.from(arg.serializeBinary());
+}
+
+function deserialize_binding_BulkCreateBindingResponse(buffer_arg) {
+  return binding_pb.BulkCreateBindingResponse.deserializeBinary(new Uint8Array(buffer_arg));
+}
+
 function serialize_binding_CreateBindingRequest(arg) {
   if (!(arg instanceof binding_pb.CreateBindingRequest)) {
     throw new Error('Expected argument of type binding.CreateBindingRequest');
@@ -104,6 +126,17 @@ var BindingServiceService = exports.BindingServiceService = {
     requestDeserialize: deserialize_binding_CreateBindingRequest,
     responseSerialize: serialize_binding_CreateBindingResponse,
     responseDeserialize: deserialize_binding_CreateBindingResponse,
+  },
+  bulkCreateBinding: {
+    path: '/binding.BindingService/BulkCreateBinding',
+    requestStream: false,
+    responseStream: false,
+    requestType: binding_pb.BulkCreateBindingRequest,
+    responseType: binding_pb.BulkCreateBindingResponse,
+    requestSerialize: serialize_binding_BulkCreateBindingRequest,
+    requestDeserialize: deserialize_binding_BulkCreateBindingRequest,
+    responseSerialize: serialize_binding_BulkCreateBindingResponse,
+    responseDeserialize: deserialize_binding_BulkCreateBindingResponse,
   },
   getBinding: {
     path: '/binding.BindingService/GetBinding',

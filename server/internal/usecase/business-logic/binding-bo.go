@@ -13,6 +13,7 @@ import (
 	"deadalus-orch/shared/models"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -115,6 +116,91 @@ func (bo *BindingBO) CreateBinding(ctx context.Context, code, queueCode, exchang
 	cache.GlobalRouteCache().InvalidateExchange(exchangeCode)
 
 	return created, nil
+}
+
+type BulkCreateBindingItemParam struct {
+	Code                  string
+	QueueCode             string
+	ExchangeCode          string
+	TargetExchangeCode    string
+	AlternateExchangeCode string
+	VNamespace            string
+	RoutingKey            string
+	Pattern               string
+	XMatch                models.XMatchType
+	BindingType           models.BindingType
+	TargetExchangeType    models.TargetExchangeType
+	Headers               map[string]string
+}
+
+func (bo *BindingBO) BulkCreateBindings(ctx context.Context, items []BulkCreateBindingItemParam, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) ([]models.Binding, error) {
+	if tenant.Status == models.PendingForDeletion {
+		return nil, errors.New("cannot create bindings when tenant is pending for deletion")
+	}
+
+	if len(items) == 0 {
+		return []models.Binding{}, nil
+	}
+
+	cmdItems := make([]binding_command.BulkAssertBindingItem, len(items))
+	exchangesToInvalidate := make(map[string]bool)
+
+	for i, item := range items {
+		if item.Code == "" {
+			return nil, fmt.Errorf("item %d: code is required", i)
+		}
+		targetExType := item.TargetExchangeType
+		if targetExType == "" {
+			targetExType = models.TargetExchangeTypeQueue
+		}
+		bindingType := item.BindingType
+		if bindingType == "" {
+			bindingType = models.BindingTypeClassic
+		}
+
+		cmdItems[i] = binding_command.BulkAssertBindingItem{
+			NewBindingID:          strings.ReplaceAll(uuid.New().String(), "-", ""),
+			Code:                  item.Code,
+			QueueCode:             item.QueueCode,
+			ExchangeCode:          item.ExchangeCode,
+			TargetExchangeCode:    item.TargetExchangeCode,
+			AlternateExchangeCode: item.AlternateExchangeCode,
+			VNamespace:            item.VNamespace,
+			RoutingKey:            item.RoutingKey,
+			Pattern:               item.Pattern,
+			XMatch:                item.XMatch,
+			BindingType:           bindingType,
+			TargetExchangeType:    targetExType,
+			Headers:               item.Headers,
+		}
+		if item.ExchangeCode != "" {
+			exchangesToInvalidate[item.ExchangeCode] = true
+		}
+	}
+
+	cmd := &binding_command.BulkAssertBindingCommand{
+		Items: cmdItems,
+		CF:    cf,
+		CFS:   cfs,
+	}
+
+	result, err := dragonboat.ExecuteRepositoryCommand[binding_command.BulkAssertBindingResult](
+		tenantNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout*time.Duration(len(items)),
+		bo.Config.Logger,
+		"bulk create bindings",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for exCode := range exchangesToInvalidate {
+		cache.GlobalRouteCache().InvalidateExchange(exCode)
+	}
+
+	return result.Results, nil
 }
 
 func (bo *BindingBO) GetBinding(ctx context.Context, exchangeCode, queueCode, vnamespace, cf, cfs string, tenant *models.TenantInMaster, tenantNode *dragonboat.RaftNode) (models.Binding, error) {

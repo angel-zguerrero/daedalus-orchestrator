@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	BindingService_CreateBinding_FullMethodName = "/binding.BindingService/CreateBinding"
-	BindingService_GetBinding_FullMethodName    = "/binding.BindingService/GetBinding"
-	BindingService_GetBindings_FullMethodName   = "/binding.BindingService/GetBindings"
-	BindingService_DeleteBinding_FullMethodName = "/binding.BindingService/DeleteBinding"
+	BindingService_CreateBinding_FullMethodName     = "/binding.BindingService/CreateBinding"
+	BindingService_BulkCreateBinding_FullMethodName = "/binding.BindingService/BulkCreateBinding"
+	BindingService_GetBinding_FullMethodName        = "/binding.BindingService/GetBinding"
+	BindingService_GetBindings_FullMethodName       = "/binding.BindingService/GetBindings"
+	BindingService_DeleteBinding_FullMethodName     = "/binding.BindingService/DeleteBinding"
 )
 
 // BindingServiceClient is the client API for BindingService service.
@@ -30,6 +31,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BindingServiceClient interface {
 	CreateBinding(ctx context.Context, in *CreateBindingRequest, opts ...grpc.CallOption) (*CreateBindingResponse, error)
+	BulkCreateBinding(ctx context.Context, in *BulkCreateBindingRequest, opts ...grpc.CallOption) (*BulkCreateBindingResponse, error)
 	GetBinding(ctx context.Context, in *GetBindingRequest, opts ...grpc.CallOption) (*GetBindingResponse, error)
 	GetBindings(ctx context.Context, in *GetBindingsRequest, opts ...grpc.CallOption) (*GetBindingsResponse, error)
 	DeleteBinding(ctx context.Context, in *DeleteBindingRequest, opts ...grpc.CallOption) (*DeleteBindingResponse, error)
@@ -47,6 +49,16 @@ func (c *bindingServiceClient) CreateBinding(ctx context.Context, in *CreateBind
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateBindingResponse)
 	err := c.cc.Invoke(ctx, BindingService_CreateBinding_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *bindingServiceClient) BulkCreateBinding(ctx context.Context, in *BulkCreateBindingRequest, opts ...grpc.CallOption) (*BulkCreateBindingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BulkCreateBindingResponse)
+	err := c.cc.Invoke(ctx, BindingService_BulkCreateBinding_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +100,7 @@ func (c *bindingServiceClient) DeleteBinding(ctx context.Context, in *DeleteBind
 // for forward compatibility.
 type BindingServiceServer interface {
 	CreateBinding(context.Context, *CreateBindingRequest) (*CreateBindingResponse, error)
+	BulkCreateBinding(context.Context, *BulkCreateBindingRequest) (*BulkCreateBindingResponse, error)
 	GetBinding(context.Context, *GetBindingRequest) (*GetBindingResponse, error)
 	GetBindings(context.Context, *GetBindingsRequest) (*GetBindingsResponse, error)
 	DeleteBinding(context.Context, *DeleteBindingRequest) (*DeleteBindingResponse, error)
@@ -103,6 +116,9 @@ type UnimplementedBindingServiceServer struct{}
 
 func (UnimplementedBindingServiceServer) CreateBinding(context.Context, *CreateBindingRequest) (*CreateBindingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateBinding not implemented")
+}
+func (UnimplementedBindingServiceServer) BulkCreateBinding(context.Context, *BulkCreateBindingRequest) (*BulkCreateBindingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BulkCreateBinding not implemented")
 }
 func (UnimplementedBindingServiceServer) GetBinding(context.Context, *GetBindingRequest) (*GetBindingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBinding not implemented")
@@ -148,6 +164,24 @@ func _BindingService_CreateBinding_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BindingServiceServer).CreateBinding(ctx, req.(*CreateBindingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BindingService_BulkCreateBinding_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkCreateBindingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BindingServiceServer).BulkCreateBinding(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BindingService_BulkCreateBinding_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BindingServiceServer).BulkCreateBinding(ctx, req.(*BulkCreateBindingRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -216,6 +250,10 @@ var BindingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateBinding",
 			Handler:    _BindingService_CreateBinding_Handler,
+		},
+		{
+			MethodName: "BulkCreateBinding",
+			Handler:    _BindingService_BulkCreateBinding_Handler,
 		},
 		{
 			MethodName: "GetBinding",

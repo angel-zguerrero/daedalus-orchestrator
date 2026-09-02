@@ -90,6 +90,71 @@ func (s *BindingService) CreateBinding(ctx context.Context, r *pb.CreateBindingR
 	}, nil
 }
 
+func (s *BindingService) BulkCreateBinding(ctx context.Context, r *pb.BulkCreateBindingRequest) (*pb.BulkCreateBindingResponse, error) {
+	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
+
+	items := make([]bo.BulkCreateBindingItemParam, len(r.Bindings))
+	for i, item := range r.Bindings {
+		targetExType := models.TargetExchangeTypeQueue
+		if item.TargetExchangeType != "" {
+			targetExType = models.TargetExchangeType(item.TargetExchangeType)
+		}
+		bindingType := models.BindingTypeClassic
+		if item.BindingType != "" {
+			bindingType = models.BindingType(item.BindingType)
+		}
+		xMatch := models.XMatchTypeAll
+		if item.XMatch != "" {
+			xMatch = models.XMatchType(item.XMatch)
+		}
+
+		items[i] = bo.BulkCreateBindingItemParam{
+			Code:                  item.Code,
+			QueueCode:             item.QueueCode,
+			ExchangeCode:          item.ExchangeCode,
+			TargetExchangeCode:    item.TargetExchangeCode,
+			AlternateExchangeCode: item.AlternateExchangeCode,
+			VNamespace:            item.Vnamespace,
+			RoutingKey:            item.RoutingKey,
+			Pattern:               item.Pattern,
+			XMatch:                xMatch,
+			BindingType:           bindingType,
+			TargetExchangeType:    targetExType,
+			Headers:               item.Headers,
+		}
+	}
+
+	bindings, err := s.BindingBO.BulkCreateBindings(ctx, items, cf, cfs, tenant, tenantNode)
+	if err != nil {
+		return nil, err
+	}
+
+	pbResults := make([]*pb.Binding, len(bindings))
+	for i, b := range bindings {
+		pbResults[i] = &pb.Binding{
+			Id:                    b.ID,
+			Code:                  b.Code,
+			ExchangeCode:          b.ExchangeCode,
+			QueueCode:             b.QueueCode,
+			TargetExchangeCode:    b.TargetExchangeCode,
+			AlternateExchangeCode: b.AlternateExchangeCode,
+			Vnamespace:            b.VNamespace,
+			RoutingKey:            b.RoutingKey,
+			Pattern:               b.Pattern,
+			XMatch:                string(b.XMatch),
+			BindingType:           string(b.BindingType),
+			TargetExchangeType:    string(b.TargetExchangeType),
+			CreatedAt:             b.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:             b.UpdatedAt.Format(time.RFC3339),
+		}
+	}
+
+	return &pb.BulkCreateBindingResponse{
+		Message: fmt.Sprintf("%d bindings created", len(bindings)),
+		Results: pbResults,
+	}, nil
+}
+
 func (s *BindingService) GetBinding(ctx context.Context, r *pb.GetBindingRequest) (*pb.GetBindingResponse, error) {
 	tenant, tenantNode, cf, cfs := common.MustGetTenantData(ctx)
 

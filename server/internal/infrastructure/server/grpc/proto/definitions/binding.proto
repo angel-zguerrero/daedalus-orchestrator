@@ -6,6 +6,7 @@ option go_package = "pb/binding;binding";
 
 service BindingService {
   rpc CreateBinding (CreateBindingRequest) returns (CreateBindingResponse);
+  rpc BulkCreateBinding (BulkCreateBindingRequest) returns (BulkCreateBindingResponse);
   rpc GetBinding (GetBindingRequest) returns (GetBindingResponse);
   rpc GetBindings (GetBindingsRequest) returns (GetBindingsResponse);
   rpc DeleteBinding (DeleteBindingRequest) returns (DeleteBindingResponse);
@@ -30,6 +31,31 @@ message CreateBindingRequest {
 message CreateBindingResponse {
   string message = 1;
   Binding result = 2;
+}
+
+message BulkCreateBindingRequest {
+  string tenantCode = 1;
+  repeated CreateBindingItem bindings = 2;
+}
+
+message CreateBindingItem {
+  string code = 1;
+  string exchangeCode = 2;
+  string queueCode = 3;
+  string targetExchangeCode = 4;
+  string alternateExchangeCode = 5;
+  string vnamespace = 6;
+  string routingKey = 7;
+  string pattern = 8;
+  string xMatch = 9;
+  string bindingType = 10;
+  string targetExchangeType = 11;
+  map<string, string> headers = 12;
+}
+
+message BulkCreateBindingResponse {
+  string message = 1;
+  repeated Binding results = 2;
 }
 
 message GetBindingRequest {

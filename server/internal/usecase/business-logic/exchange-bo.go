@@ -377,7 +377,7 @@ func (bo *ExchangeBO) GetQueuesFromExchange(ctx context.Context, exchangeCode, r
 	// ── Populate cache (only for non-dynamic, non-recursive results) ────────
 	// We cache the final deduplicated result so subsequent publishes with the
 	// same exchange+routingKey skip Raft entirely.
-	if len(result.ExchangeTargets) == 0 && !result.HasDynamic {
+	if len(result.ExchangeTargets) == 0 && !result.HasDynamic && len(finalQueues) > 0 {
 		routeCache.Set(exchangeCode, routingKeyOrPatternOrQueueCode, vnamespace, finalQueues)
 	}
 

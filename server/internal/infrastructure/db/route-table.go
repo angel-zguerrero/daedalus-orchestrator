@@ -156,18 +156,81 @@ func (rt *RouteTable) GetFanoutRoutes(exchangeID string, now time.Time) ([]strin
 
 // AddTopicPattern registers a pattern → queueID entry for a topic exchange.
 func (rt *RouteTable) AddTopicPattern(batch *WriteBatch, exchangeID, pattern, queueID, bindingID string, now time.Time) error {
+	return rt.AddTopicPatternsBulk(batch, exchangeID, []TopicPatternEntry{{Pattern: pattern, QueueID: queueID, BindingID: bindingID}}, now)
+}
+
+// AddTopicPatternsBulk registers multiple pattern → queueID entries for a topic exchange.
+func (rt *RouteTable) AddTopicPatternsBulk(batch *WriteBatch, exchangeID string, newEntries []TopicPatternEntry, now time.Time) error {
+	if len(newEntries) == 0 {
+		return nil
+	}
 	key := rt.topicPatternsKey(exchangeID)
 	entries, err := rt.readTopicPatterns(key, now)
 	if err != nil {
 		return err
 	}
-	for _, e := range entries {
-		if e.BindingID == bindingID {
-			return nil // already present
+	entryMap := make(map[string]int)
+	for i, e := range entries {
+		entryMap[e.BindingID] = i
+	}
+	for _, ne := range newEntries {
+		if idx, exists := entryMap[ne.BindingID]; exists {
+			entries[idx].Pattern = ne.Pattern
+			entries[idx].QueueID = ne.QueueID
+		} else {
+			entryMap[ne.BindingID] = len(entries)
+			entries = append(entries, ne)
 		}
 	}
-	entries = append(entries, TopicPatternEntry{Pattern: pattern, QueueID: queueID, BindingID: bindingID})
 	return rt.writeTopicPatterns(batch, key, entries, now)
+}
+
+// AddFanoutRoutesBulk registers multiple queueIDs for a fanout exchange.
+func (rt *RouteTable) AddFanoutRoutesBulk(batch *WriteBatch, exchangeID string, queueIDs []string, now time.Time) error {
+	if len(queueIDs) == 0 {
+		return nil
+	}
+	key := rt.fanoutKey(exchangeID)
+	ids, err := rt.readStringSlice(key, now)
+	if err != nil {
+		return err
+	}
+	existing := make(map[string]bool)
+	for _, id := range ids {
+		existing[id] = true
+	}
+	for _, qid := range queueIDs {
+		if !existing[qid] {
+			existing[qid] = true
+			ids = append(ids, qid)
+		}
+	}
+	return rt.writeStringSlice(batch, key, ids, now)
+}
+
+// AddHeadersBindingsBulk registers multiple headers binding entries for a headers exchange.
+func (rt *RouteTable) AddHeadersBindingsBulk(batch *WriteBatch, exchangeID string, newEntries []HeadersBindingEntry, now time.Time) error {
+	if len(newEntries) == 0 {
+		return nil
+	}
+	key := rt.headersBindingsKey(exchangeID)
+	entries, err := rt.readHeadersBindings(key, now)
+	if err != nil {
+		return err
+	}
+	entryMap := make(map[string]int)
+	for i, e := range entries {
+		entryMap[e.BindingID] = i
+	}
+	for _, ne := range newEntries {
+		if idx, exists := entryMap[ne.BindingID]; exists {
+			entries[idx] = ne
+		} else {
+			entryMap[ne.BindingID] = len(entries)
+			entries = append(entries, ne)
+		}
+	}
+	return rt.writeHeadersBindings(batch, key, entries, now)
 }
 
 // RemoveTopicPattern removes all entries for bindingID from a topic exchange.
@@ -236,9 +299,12 @@ func (rt *RouteTable) AddHeadersBinding(batch *WriteBatch, exchangeID, bindingID
 	if err != nil {
 		return err
 	}
-	for _, e := range entries {
+	for i, e := range entries {
 		if e.BindingID == bindingID {
-			return nil
+			entries[i].Headers = headers
+			entries[i].XMatch = xmatch
+			entries[i].QueueID = queueID
+			return rt.writeHeadersBindings(batch, key, entries, now)
 		}
 	}
 	entries = append(entries, HeadersBindingEntry{

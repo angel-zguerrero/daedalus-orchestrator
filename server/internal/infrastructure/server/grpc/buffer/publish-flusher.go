@@ -122,7 +122,7 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 		} else {
 			// Resolve the exchange routing
 			queuesList, err = exchangeBO.GetQueuesFromExchange(ctx, item.ExchangeCode, item.RoutingKey, item.Message, item.VNamespace, cf, cfs, item.Tenant, tenantNode)
-			if err == nil {
+			if err == nil && len(queuesList) > 0 {
 				routingCache.Set(cacheKey, queuesList)
 			}
 		}

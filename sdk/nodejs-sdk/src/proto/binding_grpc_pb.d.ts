@@ -9,6 +9,7 @@ import * as binding_pb from "./binding_pb";
 
 interface IBindingServiceService extends grpc.ServiceDefinition<grpc.UntypedServiceImplementation> {
     createBinding: IBindingServiceService_ICreateBinding;
+    bulkCreateBinding: IBindingServiceService_IBulkCreateBinding;
     getBinding: IBindingServiceService_IGetBinding;
     getBindings: IBindingServiceService_IGetBindings;
     deleteBinding: IBindingServiceService_IDeleteBinding;
@@ -22,6 +23,15 @@ interface IBindingServiceService_ICreateBinding extends grpc.MethodDefinition<bi
     requestDeserialize: grpc.deserialize<binding_pb.CreateBindingRequest>;
     responseSerialize: grpc.serialize<binding_pb.CreateBindingResponse>;
     responseDeserialize: grpc.deserialize<binding_pb.CreateBindingResponse>;
+}
+interface IBindingServiceService_IBulkCreateBinding extends grpc.MethodDefinition<binding_pb.BulkCreateBindingRequest, binding_pb.BulkCreateBindingResponse> {
+    path: "/binding.BindingService/BulkCreateBinding";
+    requestStream: false;
+    responseStream: false;
+    requestSerialize: grpc.serialize<binding_pb.BulkCreateBindingRequest>;
+    requestDeserialize: grpc.deserialize<binding_pb.BulkCreateBindingRequest>;
+    responseSerialize: grpc.serialize<binding_pb.BulkCreateBindingResponse>;
+    responseDeserialize: grpc.deserialize<binding_pb.BulkCreateBindingResponse>;
 }
 interface IBindingServiceService_IGetBinding extends grpc.MethodDefinition<binding_pb.GetBindingRequest, binding_pb.GetBindingResponse> {
     path: "/binding.BindingService/GetBinding";
@@ -55,6 +65,7 @@ export const BindingServiceService: IBindingServiceService;
 
 export interface IBindingServiceServer extends grpc.UntypedServiceImplementation {
     createBinding: grpc.handleUnaryCall<binding_pb.CreateBindingRequest, binding_pb.CreateBindingResponse>;
+    bulkCreateBinding: grpc.handleUnaryCall<binding_pb.BulkCreateBindingRequest, binding_pb.BulkCreateBindingResponse>;
     getBinding: grpc.handleUnaryCall<binding_pb.GetBindingRequest, binding_pb.GetBindingResponse>;
     getBindings: grpc.handleUnaryCall<binding_pb.GetBindingsRequest, binding_pb.GetBindingsResponse>;
     deleteBinding: grpc.handleUnaryCall<binding_pb.DeleteBindingRequest, binding_pb.DeleteBindingResponse>;
@@ -64,6 +75,9 @@ export interface IBindingServiceClient {
     createBinding(request: binding_pb.CreateBindingRequest, callback: (error: grpc.ServiceError | null, response: binding_pb.CreateBindingResponse) => void): grpc.ClientUnaryCall;
     createBinding(request: binding_pb.CreateBindingRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: binding_pb.CreateBindingResponse) => void): grpc.ClientUnaryCall;
     createBinding(request: binding_pb.CreateBindingRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: binding_pb.CreateBindingResponse) => void): grpc.ClientUnaryCall;
+    bulkCreateBinding(request: binding_pb.BulkCreateBindingRequest, callback: (error: grpc.ServiceError | null, response: binding_pb.BulkCreateBindingResponse) => void): grpc.ClientUnaryCall;
+    bulkCreateBinding(request: binding_pb.BulkCreateBindingRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: binding_pb.BulkCreateBindingResponse) => void): grpc.ClientUnaryCall;
+    bulkCreateBinding(request: binding_pb.BulkCreateBindingRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: binding_pb.BulkCreateBindingResponse) => void): grpc.ClientUnaryCall;
     getBinding(request: binding_pb.GetBindingRequest, callback: (error: grpc.ServiceError | null, response: binding_pb.GetBindingResponse) => void): grpc.ClientUnaryCall;
     getBinding(request: binding_pb.GetBindingRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: binding_pb.GetBindingResponse) => void): grpc.ClientUnaryCall;
     getBinding(request: binding_pb.GetBindingRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: binding_pb.GetBindingResponse) => void): grpc.ClientUnaryCall;
@@ -80,6 +94,9 @@ export class BindingServiceClient extends grpc.Client implements IBindingService
     public createBinding(request: binding_pb.CreateBindingRequest, callback: (error: grpc.ServiceError | null, response: binding_pb.CreateBindingResponse) => void): grpc.ClientUnaryCall;
     public createBinding(request: binding_pb.CreateBindingRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: binding_pb.CreateBindingResponse) => void): grpc.ClientUnaryCall;
     public createBinding(request: binding_pb.CreateBindingRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: binding_pb.CreateBindingResponse) => void): grpc.ClientUnaryCall;
+    public bulkCreateBinding(request: binding_pb.BulkCreateBindingRequest, callback: (error: grpc.ServiceError | null, response: binding_pb.BulkCreateBindingResponse) => void): grpc.ClientUnaryCall;
+    public bulkCreateBinding(request: binding_pb.BulkCreateBindingRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: binding_pb.BulkCreateBindingResponse) => void): grpc.ClientUnaryCall;
+    public bulkCreateBinding(request: binding_pb.BulkCreateBindingRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: binding_pb.BulkCreateBindingResponse) => void): grpc.ClientUnaryCall;
     public getBinding(request: binding_pb.GetBindingRequest, callback: (error: grpc.ServiceError | null, response: binding_pb.GetBindingResponse) => void): grpc.ClientUnaryCall;
     public getBinding(request: binding_pb.GetBindingRequest, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: binding_pb.GetBindingResponse) => void): grpc.ClientUnaryCall;
     public getBinding(request: binding_pb.GetBindingRequest, metadata: grpc.Metadata, options: Partial<grpc.CallOptions>, callback: (error: grpc.ServiceError | null, response: binding_pb.GetBindingResponse) => void): grpc.ClientUnaryCall;

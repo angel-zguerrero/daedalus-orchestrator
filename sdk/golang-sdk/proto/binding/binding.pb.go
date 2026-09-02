@@ -213,6 +213,242 @@ func (x *CreateBindingResponse) GetResult() *Binding {
 	return nil
 }
 
+type BulkCreateBindingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	Bindings      []*CreateBindingItem   `protobuf:"bytes,2,rep,name=bindings,proto3" json:"bindings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkCreateBindingRequest) Reset() {
+	*x = BulkCreateBindingRequest{}
+	mi := &file_binding_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkCreateBindingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkCreateBindingRequest) ProtoMessage() {}
+
+func (x *BulkCreateBindingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_binding_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkCreateBindingRequest.ProtoReflect.Descriptor instead.
+func (*BulkCreateBindingRequest) Descriptor() ([]byte, []int) {
+	return file_binding_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *BulkCreateBindingRequest) GetTenantCode() string {
+	if x != nil {
+		return x.TenantCode
+	}
+	return ""
+}
+
+func (x *BulkCreateBindingRequest) GetBindings() []*CreateBindingItem {
+	if x != nil {
+		return x.Bindings
+	}
+	return nil
+}
+
+type CreateBindingItem struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Code                  string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	ExchangeCode          string                 `protobuf:"bytes,2,opt,name=exchangeCode,proto3" json:"exchangeCode,omitempty"`
+	QueueCode             string                 `protobuf:"bytes,3,opt,name=queueCode,proto3" json:"queueCode,omitempty"`
+	TargetExchangeCode    string                 `protobuf:"bytes,4,opt,name=targetExchangeCode,proto3" json:"targetExchangeCode,omitempty"`
+	AlternateExchangeCode string                 `protobuf:"bytes,5,opt,name=alternateExchangeCode,proto3" json:"alternateExchangeCode,omitempty"`
+	Vnamespace            string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	RoutingKey            string                 `protobuf:"bytes,7,opt,name=routingKey,proto3" json:"routingKey,omitempty"`
+	Pattern               string                 `protobuf:"bytes,8,opt,name=pattern,proto3" json:"pattern,omitempty"`
+	XMatch                string                 `protobuf:"bytes,9,opt,name=xMatch,proto3" json:"xMatch,omitempty"`
+	BindingType           string                 `protobuf:"bytes,10,opt,name=bindingType,proto3" json:"bindingType,omitempty"`
+	TargetExchangeType    string                 `protobuf:"bytes,11,opt,name=targetExchangeType,proto3" json:"targetExchangeType,omitempty"`
+	Headers               map[string]string      `protobuf:"bytes,12,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *CreateBindingItem) Reset() {
+	*x = CreateBindingItem{}
+	mi := &file_binding_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBindingItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBindingItem) ProtoMessage() {}
+
+func (x *CreateBindingItem) ProtoReflect() protoreflect.Message {
+	mi := &file_binding_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBindingItem.ProtoReflect.Descriptor instead.
+func (*CreateBindingItem) Descriptor() ([]byte, []int) {
+	return file_binding_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CreateBindingItem) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetExchangeCode() string {
+	if x != nil {
+		return x.ExchangeCode
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetQueueCode() string {
+	if x != nil {
+		return x.QueueCode
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetTargetExchangeCode() string {
+	if x != nil {
+		return x.TargetExchangeCode
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetAlternateExchangeCode() string {
+	if x != nil {
+		return x.AlternateExchangeCode
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetVnamespace() string {
+	if x != nil {
+		return x.Vnamespace
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetRoutingKey() string {
+	if x != nil {
+		return x.RoutingKey
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetPattern() string {
+	if x != nil {
+		return x.Pattern
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetXMatch() string {
+	if x != nil {
+		return x.XMatch
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetBindingType() string {
+	if x != nil {
+		return x.BindingType
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetTargetExchangeType() string {
+	if x != nil {
+		return x.TargetExchangeType
+	}
+	return ""
+}
+
+func (x *CreateBindingItem) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+type BulkCreateBindingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Results       []*Binding             `protobuf:"bytes,2,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkCreateBindingResponse) Reset() {
+	*x = BulkCreateBindingResponse{}
+	mi := &file_binding_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkCreateBindingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkCreateBindingResponse) ProtoMessage() {}
+
+func (x *BulkCreateBindingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_binding_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkCreateBindingResponse.ProtoReflect.Descriptor instead.
+func (*BulkCreateBindingResponse) Descriptor() ([]byte, []int) {
+	return file_binding_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *BulkCreateBindingResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *BulkCreateBindingResponse) GetResults() []*Binding {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
 type GetBindingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantCode    string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
@@ -225,7 +461,7 @@ type GetBindingRequest struct {
 
 func (x *GetBindingRequest) Reset() {
 	*x = GetBindingRequest{}
-	mi := &file_binding_proto_msgTypes[2]
+	mi := &file_binding_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -237,7 +473,7 @@ func (x *GetBindingRequest) String() string {
 func (*GetBindingRequest) ProtoMessage() {}
 
 func (x *GetBindingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[2]
+	mi := &file_binding_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -250,7 +486,7 @@ func (x *GetBindingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBindingRequest.ProtoReflect.Descriptor instead.
 func (*GetBindingRequest) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{2}
+	return file_binding_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetBindingRequest) GetTenantCode() string {
@@ -291,7 +527,7 @@ type GetBindingResponse struct {
 
 func (x *GetBindingResponse) Reset() {
 	*x = GetBindingResponse{}
-	mi := &file_binding_proto_msgTypes[3]
+	mi := &file_binding_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -303,7 +539,7 @@ func (x *GetBindingResponse) String() string {
 func (*GetBindingResponse) ProtoMessage() {}
 
 func (x *GetBindingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[3]
+	mi := &file_binding_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -316,7 +552,7 @@ func (x *GetBindingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBindingResponse.ProtoReflect.Descriptor instead.
 func (*GetBindingResponse) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{3}
+	return file_binding_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetBindingResponse) GetMessage() string {
@@ -347,7 +583,7 @@ type GetBindingsRequest struct {
 
 func (x *GetBindingsRequest) Reset() {
 	*x = GetBindingsRequest{}
-	mi := &file_binding_proto_msgTypes[4]
+	mi := &file_binding_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +595,7 @@ func (x *GetBindingsRequest) String() string {
 func (*GetBindingsRequest) ProtoMessage() {}
 
 func (x *GetBindingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[4]
+	mi := &file_binding_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +608,7 @@ func (x *GetBindingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBindingsRequest.ProtoReflect.Descriptor instead.
 func (*GetBindingsRequest) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{4}
+	return file_binding_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetBindingsRequest) GetTenantCode() string {
@@ -432,7 +668,7 @@ type Exchange struct {
 
 func (x *Exchange) Reset() {
 	*x = Exchange{}
-	mi := &file_binding_proto_msgTypes[5]
+	mi := &file_binding_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -444,7 +680,7 @@ func (x *Exchange) String() string {
 func (*Exchange) ProtoMessage() {}
 
 func (x *Exchange) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[5]
+	mi := &file_binding_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -457,7 +693,7 @@ func (x *Exchange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Exchange.ProtoReflect.Descriptor instead.
 func (*Exchange) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{5}
+	return file_binding_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Exchange) GetId() string {
@@ -526,7 +762,7 @@ type Queue struct {
 
 func (x *Queue) Reset() {
 	*x = Queue{}
-	mi := &file_binding_proto_msgTypes[6]
+	mi := &file_binding_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -538,7 +774,7 @@ func (x *Queue) String() string {
 func (*Queue) ProtoMessage() {}
 
 func (x *Queue) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[6]
+	mi := &file_binding_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -551,7 +787,7 @@ func (x *Queue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Queue.ProtoReflect.Descriptor instead.
 func (*Queue) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{6}
+	return file_binding_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Queue) GetId() string {
@@ -644,7 +880,7 @@ type Binding struct {
 
 func (x *Binding) Reset() {
 	*x = Binding{}
-	mi := &file_binding_proto_msgTypes[7]
+	mi := &file_binding_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +892,7 @@ func (x *Binding) String() string {
 func (*Binding) ProtoMessage() {}
 
 func (x *Binding) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[7]
+	mi := &file_binding_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +905,7 @@ func (x *Binding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Binding.ProtoReflect.Descriptor instead.
 func (*Binding) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{7}
+	return file_binding_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Binding) GetId() string {
@@ -815,7 +1051,7 @@ type BindingFindResult struct {
 
 func (x *BindingFindResult) Reset() {
 	*x = BindingFindResult{}
-	mi := &file_binding_proto_msgTypes[8]
+	mi := &file_binding_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -827,7 +1063,7 @@ func (x *BindingFindResult) String() string {
 func (*BindingFindResult) ProtoMessage() {}
 
 func (x *BindingFindResult) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[8]
+	mi := &file_binding_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -840,7 +1076,7 @@ func (x *BindingFindResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BindingFindResult.ProtoReflect.Descriptor instead.
 func (*BindingFindResult) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{8}
+	return file_binding_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *BindingFindResult) GetEntities() []*Binding {
@@ -867,7 +1103,7 @@ type GetBindingsResponse struct {
 
 func (x *GetBindingsResponse) Reset() {
 	*x = GetBindingsResponse{}
-	mi := &file_binding_proto_msgTypes[9]
+	mi := &file_binding_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -879,7 +1115,7 @@ func (x *GetBindingsResponse) String() string {
 func (*GetBindingsResponse) ProtoMessage() {}
 
 func (x *GetBindingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[9]
+	mi := &file_binding_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -892,7 +1128,7 @@ func (x *GetBindingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBindingsResponse.ProtoReflect.Descriptor instead.
 func (*GetBindingsResponse) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{9}
+	return file_binding_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetBindingsResponse) GetMessage() string {
@@ -920,7 +1156,7 @@ type DeleteBindingRequest struct {
 
 func (x *DeleteBindingRequest) Reset() {
 	*x = DeleteBindingRequest{}
-	mi := &file_binding_proto_msgTypes[10]
+	mi := &file_binding_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -932,7 +1168,7 @@ func (x *DeleteBindingRequest) String() string {
 func (*DeleteBindingRequest) ProtoMessage() {}
 
 func (x *DeleteBindingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[10]
+	mi := &file_binding_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +1181,7 @@ func (x *DeleteBindingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBindingRequest.ProtoReflect.Descriptor instead.
 func (*DeleteBindingRequest) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{10}
+	return file_binding_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DeleteBindingRequest) GetTenantCode() string {
@@ -978,7 +1214,7 @@ type DeleteBindingResponse struct {
 
 func (x *DeleteBindingResponse) Reset() {
 	*x = DeleteBindingResponse{}
-	mi := &file_binding_proto_msgTypes[11]
+	mi := &file_binding_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1226,7 @@ func (x *DeleteBindingResponse) String() string {
 func (*DeleteBindingResponse) ProtoMessage() {}
 
 func (x *DeleteBindingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_binding_proto_msgTypes[11]
+	mi := &file_binding_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1239,7 @@ func (x *DeleteBindingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBindingResponse.ProtoReflect.Descriptor instead.
 func (*DeleteBindingResponse) Descriptor() ([]byte, []int) {
-	return file_binding_proto_rawDescGZIP(), []int{11}
+	return file_binding_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DeleteBindingResponse) GetMessage() string {
@@ -1044,7 +1280,36 @@ const file_binding_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"[\n" +
 	"\x15CreateBindingResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12(\n" +
-	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"\x95\x01\n" +
+	"\x06result\x18\x02 \x01(\v2\x10.binding.BindingR\x06result\"r\n" +
+	"\x18BulkCreateBindingRequest\x12\x1e\n" +
+	"\n" +
+	"tenantCode\x18\x01 \x01(\tR\n" +
+	"tenantCode\x126\n" +
+	"\bbindings\x18\x02 \x03(\v2\x1a.binding.CreateBindingItemR\bbindings\"\x92\x04\n" +
+	"\x11CreateBindingItem\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\"\n" +
+	"\fexchangeCode\x18\x02 \x01(\tR\fexchangeCode\x12\x1c\n" +
+	"\tqueueCode\x18\x03 \x01(\tR\tqueueCode\x12.\n" +
+	"\x12targetExchangeCode\x18\x04 \x01(\tR\x12targetExchangeCode\x124\n" +
+	"\x15alternateExchangeCode\x18\x05 \x01(\tR\x15alternateExchangeCode\x12\x1e\n" +
+	"\n" +
+	"vnamespace\x18\x06 \x01(\tR\n" +
+	"vnamespace\x12\x1e\n" +
+	"\n" +
+	"routingKey\x18\a \x01(\tR\n" +
+	"routingKey\x12\x18\n" +
+	"\apattern\x18\b \x01(\tR\apattern\x12\x16\n" +
+	"\x06xMatch\x18\t \x01(\tR\x06xMatch\x12 \n" +
+	"\vbindingType\x18\n" +
+	" \x01(\tR\vbindingType\x12.\n" +
+	"\x12targetExchangeType\x18\v \x01(\tR\x12targetExchangeType\x12A\n" +
+	"\aheaders\x18\f \x03(\v2'.binding.CreateBindingItem.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"a\n" +
+	"\x19BulkCreateBindingResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12*\n" +
+	"\aresults\x18\x02 \x03(\v2\x10.binding.BindingR\aresults\"\x95\x01\n" +
 	"\x11GetBindingRequest\x12\x1e\n" +
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
@@ -1133,9 +1398,10 @@ const file_binding_proto_rawDesc = "" +
 	"vnamespace\x18\x03 \x01(\tR\n" +
 	"vnamespace\"1\n" +
 	"\x15DeleteBindingResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2\xc1\x02\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage2\x9d\x03\n" +
 	"\x0eBindingService\x12N\n" +
-	"\rCreateBinding\x12\x1d.binding.CreateBindingRequest\x1a\x1e.binding.CreateBindingResponse\x12E\n" +
+	"\rCreateBinding\x12\x1d.binding.CreateBindingRequest\x1a\x1e.binding.CreateBindingResponse\x12Z\n" +
+	"\x11BulkCreateBinding\x12!.binding.BulkCreateBindingRequest\x1a\".binding.BulkCreateBindingResponse\x12E\n" +
 	"\n" +
 	"GetBinding\x12\x1a.binding.GetBindingRequest\x1a\x1b.binding.GetBindingResponse\x12H\n" +
 	"\vGetBindings\x12\x1b.binding.GetBindingsRequest\x1a\x1c.binding.GetBindingsResponse\x12N\n" +
@@ -1153,47 +1419,56 @@ func file_binding_proto_rawDescGZIP() []byte {
 	return file_binding_proto_rawDescData
 }
 
-var file_binding_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_binding_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_binding_proto_goTypes = []any{
-	(*CreateBindingRequest)(nil),  // 0: binding.CreateBindingRequest
-	(*CreateBindingResponse)(nil), // 1: binding.CreateBindingResponse
-	(*GetBindingRequest)(nil),     // 2: binding.GetBindingRequest
-	(*GetBindingResponse)(nil),    // 3: binding.GetBindingResponse
-	(*GetBindingsRequest)(nil),    // 4: binding.GetBindingsRequest
-	(*Exchange)(nil),              // 5: binding.Exchange
-	(*Queue)(nil),                 // 6: binding.Queue
-	(*Binding)(nil),               // 7: binding.Binding
-	(*BindingFindResult)(nil),     // 8: binding.BindingFindResult
-	(*GetBindingsResponse)(nil),   // 9: binding.GetBindingsResponse
-	(*DeleteBindingRequest)(nil),  // 10: binding.DeleteBindingRequest
-	(*DeleteBindingResponse)(nil), // 11: binding.DeleteBindingResponse
-	nil,                           // 12: binding.CreateBindingRequest.HeadersEntry
-	nil,                           // 13: binding.Binding.HeadersEntry
+	(*CreateBindingRequest)(nil),      // 0: binding.CreateBindingRequest
+	(*CreateBindingResponse)(nil),     // 1: binding.CreateBindingResponse
+	(*BulkCreateBindingRequest)(nil),  // 2: binding.BulkCreateBindingRequest
+	(*CreateBindingItem)(nil),         // 3: binding.CreateBindingItem
+	(*BulkCreateBindingResponse)(nil), // 4: binding.BulkCreateBindingResponse
+	(*GetBindingRequest)(nil),         // 5: binding.GetBindingRequest
+	(*GetBindingResponse)(nil),        // 6: binding.GetBindingResponse
+	(*GetBindingsRequest)(nil),        // 7: binding.GetBindingsRequest
+	(*Exchange)(nil),                  // 8: binding.Exchange
+	(*Queue)(nil),                     // 9: binding.Queue
+	(*Binding)(nil),                   // 10: binding.Binding
+	(*BindingFindResult)(nil),         // 11: binding.BindingFindResult
+	(*GetBindingsResponse)(nil),       // 12: binding.GetBindingsResponse
+	(*DeleteBindingRequest)(nil),      // 13: binding.DeleteBindingRequest
+	(*DeleteBindingResponse)(nil),     // 14: binding.DeleteBindingResponse
+	nil,                               // 15: binding.CreateBindingRequest.HeadersEntry
+	nil,                               // 16: binding.CreateBindingItem.HeadersEntry
+	nil,                               // 17: binding.Binding.HeadersEntry
 }
 var file_binding_proto_depIdxs = []int32{
-	12, // 0: binding.CreateBindingRequest.headers:type_name -> binding.CreateBindingRequest.HeadersEntry
-	7,  // 1: binding.CreateBindingResponse.result:type_name -> binding.Binding
-	7,  // 2: binding.GetBindingResponse.result:type_name -> binding.Binding
-	5,  // 3: binding.Binding.exchange:type_name -> binding.Exchange
-	6,  // 4: binding.Binding.queue:type_name -> binding.Queue
-	5,  // 5: binding.Binding.targetExchange:type_name -> binding.Exchange
-	5,  // 6: binding.Binding.alternateExchange:type_name -> binding.Exchange
-	13, // 7: binding.Binding.headers:type_name -> binding.Binding.HeadersEntry
-	7,  // 8: binding.BindingFindResult.entities:type_name -> binding.Binding
-	8,  // 9: binding.GetBindingsResponse.result:type_name -> binding.BindingFindResult
-	0,  // 10: binding.BindingService.CreateBinding:input_type -> binding.CreateBindingRequest
-	2,  // 11: binding.BindingService.GetBinding:input_type -> binding.GetBindingRequest
-	4,  // 12: binding.BindingService.GetBindings:input_type -> binding.GetBindingsRequest
-	10, // 13: binding.BindingService.DeleteBinding:input_type -> binding.DeleteBindingRequest
-	1,  // 14: binding.BindingService.CreateBinding:output_type -> binding.CreateBindingResponse
-	3,  // 15: binding.BindingService.GetBinding:output_type -> binding.GetBindingResponse
-	9,  // 16: binding.BindingService.GetBindings:output_type -> binding.GetBindingsResponse
-	11, // 17: binding.BindingService.DeleteBinding:output_type -> binding.DeleteBindingResponse
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	15, // 0: binding.CreateBindingRequest.headers:type_name -> binding.CreateBindingRequest.HeadersEntry
+	10, // 1: binding.CreateBindingResponse.result:type_name -> binding.Binding
+	3,  // 2: binding.BulkCreateBindingRequest.bindings:type_name -> binding.CreateBindingItem
+	16, // 3: binding.CreateBindingItem.headers:type_name -> binding.CreateBindingItem.HeadersEntry
+	10, // 4: binding.BulkCreateBindingResponse.results:type_name -> binding.Binding
+	10, // 5: binding.GetBindingResponse.result:type_name -> binding.Binding
+	8,  // 6: binding.Binding.exchange:type_name -> binding.Exchange
+	9,  // 7: binding.Binding.queue:type_name -> binding.Queue
+	8,  // 8: binding.Binding.targetExchange:type_name -> binding.Exchange
+	8,  // 9: binding.Binding.alternateExchange:type_name -> binding.Exchange
+	17, // 10: binding.Binding.headers:type_name -> binding.Binding.HeadersEntry
+	10, // 11: binding.BindingFindResult.entities:type_name -> binding.Binding
+	11, // 12: binding.GetBindingsResponse.result:type_name -> binding.BindingFindResult
+	0,  // 13: binding.BindingService.CreateBinding:input_type -> binding.CreateBindingRequest
+	2,  // 14: binding.BindingService.BulkCreateBinding:input_type -> binding.BulkCreateBindingRequest
+	5,  // 15: binding.BindingService.GetBinding:input_type -> binding.GetBindingRequest
+	7,  // 16: binding.BindingService.GetBindings:input_type -> binding.GetBindingsRequest
+	13, // 17: binding.BindingService.DeleteBinding:input_type -> binding.DeleteBindingRequest
+	1,  // 18: binding.BindingService.CreateBinding:output_type -> binding.CreateBindingResponse
+	4,  // 19: binding.BindingService.BulkCreateBinding:output_type -> binding.BulkCreateBindingResponse
+	6,  // 20: binding.BindingService.GetBinding:output_type -> binding.GetBindingResponse
+	12, // 21: binding.BindingService.GetBindings:output_type -> binding.GetBindingsResponse
+	14, // 22: binding.BindingService.DeleteBinding:output_type -> binding.DeleteBindingResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_binding_proto_init() }
@@ -1207,7 +1482,7 @@ func file_binding_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_binding_proto_rawDesc), len(file_binding_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

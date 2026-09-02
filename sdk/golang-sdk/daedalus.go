@@ -407,6 +407,45 @@ func (sdk *DaedalusSDK) AssertBinding(ctx context.Context, input AssertBindingIn
 	return resp.Result, nil
 }
 
+// BulkAssertBindings upserts multiple bindings in the orchestrator in a single batch.
+func (sdk *DaedalusSDK) BulkAssertBindings(ctx context.Context, input BulkAssertBindingsInput) ([]*bindingpb.Binding, error) {
+	items := make([]*bindingpb.CreateBindingItem, len(input.Bindings))
+	for i, b := range input.Bindings {
+		bindingType := b.BindingType
+		if bindingType == "" {
+			bindingType = "classic"
+		}
+		items[i] = &bindingpb.CreateBindingItem{
+			Code:                  b.Code,
+			ExchangeCode:          b.ExchangeCode,
+			QueueCode:             b.QueueCode,
+			TargetExchangeCode:    b.TargetExchangeCode,
+			AlternateExchangeCode: b.AlternateExchangeCode,
+			Vnamespace:            b.VNamespace,
+			RoutingKey:            b.RoutingKey,
+			Pattern:               b.Pattern,
+			XMatch:                b.XMatch,
+			BindingType:           bindingType,
+			TargetExchangeType:    b.TargetExchangeType,
+			Headers:               b.Headers,
+		}
+	}
+
+	req := &bindingpb.BulkCreateBindingRequest{
+		TenantCode: input.TenantCode,
+		Bindings:   items,
+	}
+
+	resp, err := sdk.bindingClient.BulkCreateBinding(sdk.authCtx(ctx), req)
+	if err != nil {
+		log.Printf("❌ Failed to bulk assert bindings: %v", err)
+		return nil, fmt.Errorf("bulk assert bindings failed: %w", err)
+	}
+
+	log.Printf("✅ Bulk Bindings asserted: %d", len(input.Bindings))
+	return resp.Results, nil
+}
+
 // ensureEnqueueStream makes sure the bidirectional enqueue stream is established.
 func (sdk *DaedalusSDK) ensureEnqueueStream(ctx context.Context) error {
 	sdk.enqueueStreamMu.Lock()

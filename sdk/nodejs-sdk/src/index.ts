@@ -14,7 +14,7 @@ import { ClaimWorkRequest, ClaimWorkCapacityPolicy as PBClaimWorkCapacityPolicy,
 import { AssertTenantRequest } from './proto/tenant_pb';
 import { CreateExchangeRequest, PublishMessageRequest, QueueMessage as ExchangeQueueMessage, PublishStreamRequest } from './proto/exchange_pb';
 import { CreateQueueRequest, EnqueueMessageRequest, EnqueueStreamRequest, BulkCreateQueueRequest, CreateQueueItem } from './proto/queue_pb';
-import { CreateBindingRequest } from './proto/binding_pb';
+import { CreateBindingRequest, BulkCreateBindingRequest, CreateBindingItem } from './proto/binding_pb';
 
 export async function getSystemInfo(): Promise<Record<string, string>> {
   try {
@@ -150,6 +150,11 @@ export interface AssertBindingInput {
   bindingType?: string;
   targetExchangeType?: string;
   headers?: Record<string, string>;
+}
+
+export interface BulkAssertBindingsInput {
+  tenantCode: string;
+  bindings: AssertBindingInput[];
 }
 
 export interface EnqueueOptions {
@@ -770,6 +775,51 @@ export class DaedalusSDK {
           }
           console.log(`✅ Binding asserted: ${input.code}`);
           resolve(response.toObject().result);
+        }
+      );
+    });
+  }
+
+  async bulkAssertBindings(input: BulkAssertBindingsInput): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const req = new BulkCreateBindingRequest();
+      req.setTenantcode(input.tenantCode);
+
+      const bindingItems: CreateBindingItem[] = input.bindings.map(b => {
+        const item = new CreateBindingItem();
+        item.setCode(b.code);
+        item.setExchangecode(b.exchangeCode);
+        item.setQueuecode(b.queueCode ?? '');
+        item.setTargetexchangecode(b.targetExchangeCode ?? '');
+        item.setAlternateexchangecode(b.alternateExchangeCode ?? '');
+        item.setVnamespace(b.vnamespace ?? '');
+        item.setRoutingkey(b.routingKey ?? '');
+        item.setPattern(b.pattern ?? '');
+        item.setXmatch(b.xMatch ?? '');
+        item.setBindingtype(b.bindingType ?? 'classic');
+        item.setTargetexchangetype(b.targetExchangeType ?? '');
+
+        if (b.headers) {
+          const headersMap = item.getHeadersMap();
+          for (const [k, v] of Object.entries(b.headers)) {
+            headersMap.set(k, v);
+          }
+        }
+        return item;
+      });
+
+      req.setBindingsList(bindingItems);
+
+      this.bindingClient!.bulkCreateBinding(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to bulk assert bindings:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Bulk Bindings asserted: ${input.bindings.length}`);
+          resolve(response.toObject().resultsList);
         }
       );
     });

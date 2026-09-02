@@ -120,19 +120,25 @@ type BulkAssertQueuesInput struct {
 
 // AssertBindingInput defines the parameters for upserting a binding.
 type AssertBindingInput struct {
-	TenantCode          string
-	Code                string
-	ExchangeCode        string
-	QueueCode           string
-	TargetExchangeCode  string
+	TenantCode            string
+	Code                  string
+	ExchangeCode          string
+	QueueCode             string
+	TargetExchangeCode    string
 	AlternateExchangeCode string
-	VNamespace          string
-	RoutingKey          string
-	Pattern             string
-	XMatch              string
-	BindingType         string
-	TargetExchangeType  string
-	Headers             map[string]string
+	VNamespace            string
+	RoutingKey            string
+	Pattern               string
+	XMatch                string
+	BindingType           string
+	TargetExchangeType    string
+	Headers               map[string]string
+}
+
+// BulkAssertBindingsInput defines the parameters for upserting multiple bindings in bulk.
+type BulkAssertBindingsInput struct {
+	TenantCode string
+	Bindings   []AssertBindingInput
 }
 
 // EnqueueOptions holds options for enqueueing a message via streaming.

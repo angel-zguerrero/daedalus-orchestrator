@@ -216,6 +216,11 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return assertBindingCommand.Execute(uow, now)
 	}
 
+	bulkAssertBindingCommand, ok := cmd.(binding_command.BulkAssertBindingCommand)
+	if ok {
+		return bulkAssertBindingCommand.Execute(uow, now)
+	}
+
 	deleteBindingCommand, ok := cmd.(binding_command.DeleteBindingCommand)
 	if ok {
 		return deleteBindingCommand.Execute(uow, now)

@@ -90,6 +90,111 @@ export namespace CreateBindingResponse {
     }
 }
 
+export class BulkCreateBindingRequest extends jspb.Message { 
+    getTenantcode(): string;
+    setTenantcode(value: string): BulkCreateBindingRequest;
+    clearBindingsList(): void;
+    getBindingsList(): Array<CreateBindingItem>;
+    setBindingsList(value: Array<CreateBindingItem>): BulkCreateBindingRequest;
+    addBindings(value?: CreateBindingItem, index?: number): CreateBindingItem;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): BulkCreateBindingRequest.AsObject;
+    static toObject(includeInstance: boolean, msg: BulkCreateBindingRequest): BulkCreateBindingRequest.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: BulkCreateBindingRequest, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): BulkCreateBindingRequest;
+    static deserializeBinaryFromReader(message: BulkCreateBindingRequest, reader: jspb.BinaryReader): BulkCreateBindingRequest;
+}
+
+export namespace BulkCreateBindingRequest {
+    export type AsObject = {
+        tenantcode: string,
+        bindingsList: Array<CreateBindingItem.AsObject>,
+    }
+}
+
+export class CreateBindingItem extends jspb.Message { 
+    getCode(): string;
+    setCode(value: string): CreateBindingItem;
+    getExchangecode(): string;
+    setExchangecode(value: string): CreateBindingItem;
+    getQueuecode(): string;
+    setQueuecode(value: string): CreateBindingItem;
+    getTargetexchangecode(): string;
+    setTargetexchangecode(value: string): CreateBindingItem;
+    getAlternateexchangecode(): string;
+    setAlternateexchangecode(value: string): CreateBindingItem;
+    getVnamespace(): string;
+    setVnamespace(value: string): CreateBindingItem;
+    getRoutingkey(): string;
+    setRoutingkey(value: string): CreateBindingItem;
+    getPattern(): string;
+    setPattern(value: string): CreateBindingItem;
+    getXmatch(): string;
+    setXmatch(value: string): CreateBindingItem;
+    getBindingtype(): string;
+    setBindingtype(value: string): CreateBindingItem;
+    getTargetexchangetype(): string;
+    setTargetexchangetype(value: string): CreateBindingItem;
+
+    getHeadersMap(): jspb.Map<string, string>;
+    clearHeadersMap(): void;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): CreateBindingItem.AsObject;
+    static toObject(includeInstance: boolean, msg: CreateBindingItem): CreateBindingItem.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: CreateBindingItem, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): CreateBindingItem;
+    static deserializeBinaryFromReader(message: CreateBindingItem, reader: jspb.BinaryReader): CreateBindingItem;
+}
+
+export namespace CreateBindingItem {
+    export type AsObject = {
+        code: string,
+        exchangecode: string,
+        queuecode: string,
+        targetexchangecode: string,
+        alternateexchangecode: string,
+        vnamespace: string,
+        routingkey: string,
+        pattern: string,
+        xmatch: string,
+        bindingtype: string,
+        targetexchangetype: string,
+
+        headersMap: Array<[string, string]>,
+    }
+}
+
+export class BulkCreateBindingResponse extends jspb.Message { 
+    getMessage(): string;
+    setMessage(value: string): BulkCreateBindingResponse;
+    clearResultsList(): void;
+    getResultsList(): Array<Binding>;
+    setResultsList(value: Array<Binding>): BulkCreateBindingResponse;
+    addResults(value?: Binding, index?: number): Binding;
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): BulkCreateBindingResponse.AsObject;
+    static toObject(includeInstance: boolean, msg: BulkCreateBindingResponse): BulkCreateBindingResponse.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: BulkCreateBindingResponse, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): BulkCreateBindingResponse;
+    static deserializeBinaryFromReader(message: BulkCreateBindingResponse, reader: jspb.BinaryReader): BulkCreateBindingResponse;
+}
+
+export namespace BulkCreateBindingResponse {
+    export type AsObject = {
+        message: string,
+        resultsList: Array<Binding.AsObject>,
+    }
+}
+
 export class GetBindingRequest extends jspb.Message { 
     getTenantcode(): string;
     setTenantcode(value: string): GetBindingRequest;
