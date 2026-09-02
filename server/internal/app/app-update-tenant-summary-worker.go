@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -11,8 +10,6 @@ import (
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -143,18 +140,10 @@ func (app *Application) processTenantSummariesFromNode(tenantNode *dragonboat.Ra
 			return err
 		}
 
-		buf := bytes.NewBuffer(result.([]byte))
-		dec := gob.NewDecoder(buf)
-		parsedResult := &commands.CommandResult{}
-		if err := dec.Decode(parsedResult); err != nil {
+		summariesResult, err := commands.DecodeCommandResult[db.FindResult[models.TenantSummary]](result.([]byte))
+		if err != nil {
 			return err
 		}
-
-		if parsedResult.Error != "" {
-			return fmt.Errorf("command error: %s", parsedResult.Error)
-		}
-
-		summariesResult := parsedResult.Result.(db.FindResult[models.TenantSummary])
 
 		// Process each summary and update master node
 		if len(summariesResult.Entities) > 0 {
@@ -166,6 +155,9 @@ func (app *Application) processTenantSummariesFromNode(tenantNode *dragonboat.Ra
 			// Since there's one summary per tenant, create a map by tenant code
 			summariesById := make(map[string]models.TenantSummary)
 			for _, summary := range summariesResult.Entities {
+				if summary.ID == "" {
+					continue
+				}
 				// Use the most recent summary if there are duplicates
 				if existing, exists := summariesById[summary.ID]; !exists || summary.UpdatedAt.After(existing.UpdatedAt) {
 					summariesById[summary.ID] = summary
@@ -174,6 +166,9 @@ func (app *Application) processTenantSummariesFromNode(tenantNode *dragonboat.Ra
 
 			// Update master node for each tenant ID
 			for tenantID, summary := range summariesById {
+				if tenantID == "" {
+					continue
+				}
 				err = app.updateMasterWithSummary(tenantID, summary)
 				if err != nil {
 					log.Err(err).
@@ -220,18 +215,7 @@ func (app *Application) getLastUpdateAtFromTenantNode(tenantNode *dragonboat.Raf
 		return time.Time{}, err
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		return time.Time{}, err
-	}
-
-	if parsedResult.Error != "" {
-		return time.Time{}, fmt.Errorf("command error: %s", parsedResult.Error)
-	}
-
-	return parsedResult.Result.(time.Time), nil
+	return commands.DecodeCommandResult[time.Time](result.([]byte))
 }
 
 func (app *Application) updateMasterWithSummary(_ string, summary models.TenantSummary) error {
@@ -264,16 +248,8 @@ func (app *Application) updateMasterWithSummary(_ string, summary models.TenantS
 		return ctx.Err()
 	}
 
-	buf := bytes.NewBuffer(writeResult.Result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		return err
-	}
-
-	if parsedResult.Error != "" {
-		return fmt.Errorf("command error: %s", parsedResult.Error)
-	}
+	_, err = commands.DecodeCommandResult[int](writeResult.Result.Data)
+	return err
 
 	return nil
 }
@@ -308,15 +284,9 @@ func (app *Application) refreshLastUpdateAtInTenantNode(tenantNode *dragonboat.R
 		return ctx.Err()
 	}
 
-	buf := bytes.NewBuffer(writeResult.Result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
+	_, err = commands.DecodeCommandResult[string](writeResult.Result.Data)
+	if err != nil {
 		return err
-	}
-
-	if parsedResult.Error != "" {
-		return fmt.Errorf("command error: %s", parsedResult.Error)
 	}
 
 	return nil

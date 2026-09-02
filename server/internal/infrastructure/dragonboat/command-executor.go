@@ -1,12 +1,10 @@
 package dragonboat
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
-	"encoding/gob"
 	"fmt"
 	"strings"
 	"time"
@@ -79,32 +77,8 @@ func ExecuteRepositoryCommand[T any](
 		return zero, fmt.Errorf("%s operation timed out: %w", operationName, writeCtx.Err())
 	}
 
-	// Decode result
-	buf := bytes.NewBuffer(writeResult.Result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		logger.Error().Err(err).Msgf("%s command returned unexpected result type", operationName)
-		return zero, fmt.Errorf("%s command returned decode error: %w", operationName, err)
-	}
-
-	// Check for command-level errors
-	if parsedResult.Error != "" {
-		return zero, fmt.Errorf("%s failed: %s", operationName, parsedResult.Error)
-	}
-
-	// Check for nil results
-	if parsedResult.Result == nil {
-		return zero, nil
-	}
-
-	// Parse to expected type
-	typedResult, ok := parsedResult.Result.(T)
-	if !ok {
-		return zero, fmt.Errorf("%s returned unexpected result type, expected %T", operationName, zero)
-	}
-
-	return typedResult, nil
+	// Decode result using JSON DecodeCommandResult[T]
+	return commands.DecodeCommandResult[T](writeResult.Result.Data)
 }
 
 // ExecuteRepositoryQuery executes a repository query (read operation) and parses the result to the specified type T.
@@ -163,30 +137,6 @@ func ExecuteRepositoryQuery[T any](
 		return zero, fmt.Errorf("failed to execute %s: %w", operationName, err)
 	}
 
-	// Decode result
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		logger.Error().Err(err).Msgf("%s query returned unexpected result type", operationName)
-		return zero, fmt.Errorf("%s query returned decode error: %w", operationName, err)
-	}
-
-	// Check for command-level errors
-	if parsedResult.Error != "" {
-		return zero, fmt.Errorf("%s failed: %s", operationName, parsedResult.Error)
-	}
-
-	// Check for nil results (entity not found)
-	if parsedResult.Result == nil {
-		return zero, nil
-	}
-
-	// Parse to expected type
-	typedResult, ok := parsedResult.Result.(T)
-	if !ok {
-		return zero, fmt.Errorf("%s returned unexpected result type, expected %T", operationName, zero)
-	}
-
-	return typedResult, nil
+	// Decode result using JSON DecodeCommandResult[T]
+	return commands.DecodeCommandResult[T](result.([]byte))
 }

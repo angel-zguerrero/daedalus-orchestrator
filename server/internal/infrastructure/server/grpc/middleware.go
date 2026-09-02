@@ -14,8 +14,6 @@ import (
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -273,18 +271,10 @@ func UnaryAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger
 				return nil, status.Errorf(codes.Internal, "failed to verify session")
 			}
 
-			buf := bytes.NewBuffer(result.([]byte))
-			dec := gob.NewDecoder(buf)
-			parsedResult := &commands.CommandResult{}
-			if err := dec.Decode(parsedResult); err != nil {
+			sessionExists, err := commands.DecodeCommandResult[bool](result.([]byte))
+			if err != nil {
 				logger.Error().Err(err).Msg("UnaryAuthInterceptor: Session does not exist or has been invalidated - decode error")
 				return nil, status.Errorf(codes.Internal, "failed to decode session verification result")
-			}
-
-			sessionExists, ok := parsedResult.Result.(bool)
-			if !ok {
-				logger.Error().Msg("UnaryAuthInterceptor: Unexpected type for session existence result")
-				return nil, status.Errorf(codes.Internal, "failed to interpret session verification result")
 			}
 
 			if !sessionExists {
@@ -370,18 +360,10 @@ func StreamAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logge
 				return status.Errorf(codes.Internal, "failed to verify session")
 			}
 
-			buf := bytes.NewBuffer(result.([]byte))
-			dec := gob.NewDecoder(buf)
-			parsedResult := &commands.CommandResult{}
-			if err := dec.Decode(parsedResult); err != nil {
+			sessionExists, err := commands.DecodeCommandResult[bool](result.([]byte))
+			if err != nil {
 				logger.Error().Err(err).Msg("StreamAuthInterceptor: Session does not exist or has been invalidated - decode error")
 				return status.Errorf(codes.Internal, "failed to decode session verification result")
-			}
-
-			sessionExists, ok := parsedResult.Result.(bool)
-			if !ok {
-				logger.Error().Msg("StreamAuthInterceptor: Unexpected type for session existence result")
-				return status.Errorf(codes.Internal, "failed to interpret session verification result")
 			}
 
 			if !sessionExists {

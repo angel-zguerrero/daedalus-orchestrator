@@ -1,7 +1,6 @@
 package tenant_summary_command
 
 import (
-	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
@@ -25,17 +24,15 @@ func (cmd *RefreshLastUpdateAtFromCommand) Execute(uow *db.UnitOfWork, now time.
 	// Prepare the key
 	key := "last-update-at-from"
 
-	// Serialize the time using gob
-	var buf bytes.Buffer
-	encoder := gob.NewEncoder(&buf)
-	err := encoder.Encode(cmd.LastUpdateAtFrom)
+	// Serialize the time using MarshalBinary
+	timeBytes, err := cmd.LastUpdateAtFrom.MarshalBinary()
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
 	}
 
 	// Store the serialized time
-	err = kvStore.Put(db.AdminFC, db.AdminFCSector, key, buf.Bytes(), 0, now)
+	err = kvStore.Put(db.AdminFC, db.AdminFCSector, key, timeBytes, 0, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

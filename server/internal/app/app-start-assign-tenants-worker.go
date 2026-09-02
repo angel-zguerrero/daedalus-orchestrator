@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -10,7 +9,6 @@ import (
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"fmt"
 	"strconv"
 	"time"
@@ -81,24 +79,11 @@ func (app *Application) AssignTenants() {
 			return
 		}
 
-		buf := bytes.NewBuffer(result.([]byte))
-		dec := gob.NewDecoder(buf)
-		parsedResult := &commands.CommandResult{}
-		if err := dec.Decode(parsedResult); err != nil {
-			//log.Fatal().Err(err).Msg("Paginate tenants command failed (decode)")
-
+		tenantsResult, err := commands.DecodeCommandResult[db.FindResult[models.TenantInMaster]](result.([]byte))
+		if err != nil {
 			fmt.Println("Paginate tenants command failed (decode)", err)
 			return
 		}
-
-		if parsedResult.Error != "" {
-			//log.Fatal().Str("error", parsedResult.Error).Msg("Paginate tenants command failed (business error)")
-
-			fmt.Println("Paginate tenants command failed (business error)", parsedResult.Error)
-			return
-		}
-
-		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
 		writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Hour)
 		defer writeCancel()
 
@@ -242,14 +227,8 @@ func (app *Application) AssignTenants() {
 					return
 				}
 
-				buf = bytes.NewBuffer(writeResult.Result.Data)
-				dec = gob.NewDecoder(buf)
-				if err := dec.Decode(parsedResult); err != nil || parsedResult.Error != "" {
-					//log.Fatal().
-					//	Strs("Codes", assignableTenantCodes).
-					//	Err(err).
-					//	Str("commandError", parsedResult.Error).
-					//	Msg("Shard assignment failed for one or more tenants")
+				_, err := commands.DecodeCommandResult[string](writeResult.Result.Data)
+				if err != nil {
 					fmt.Println("Shard assignment failed for one or more tenants", err)
 					return
 				}

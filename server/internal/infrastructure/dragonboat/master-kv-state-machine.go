@@ -34,6 +34,9 @@ func (r *MasterKVDBStateMachine) BelongsToShard(cfName string) bool {
 }
 
 func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
+	if c, ok := input.(commands.Command); ok {
+		return c.Execute(uow, now)
+	}
 
 	loginCmd, ok := input.(auth_command.LoginCommand)
 	if ok {
@@ -103,6 +106,9 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 }
 
 func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
+	if c, ok := cmd.(commands.Command); ok {
+		return c.Execute(uow, now)
+	}
 	bootstrapRootUserCmd, ok := cmd.(auth_command.BootstrapRootUserCommand)
 	if ok {
 		return bootstrapRootUserCmd.Execute(uow, now)

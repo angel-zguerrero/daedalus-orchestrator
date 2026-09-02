@@ -1,14 +1,12 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"fmt"
 	"time"
 
@@ -119,18 +117,10 @@ func (app *Application) aggregateDashboardSummary(now time.Time) (models.Dashboa
 			return summary, fmt.Errorf("failed to paginate tenants: %w", err)
 		}
 
-		buf := bytes.NewBuffer(result.([]byte))
-		dec := gob.NewDecoder(buf)
-		parsedResult := &commands.CommandResult{}
-		if err := dec.Decode(parsedResult); err != nil {
+		tenantsResult, err := commands.DecodeCommandResult[db.FindResult[models.TenantInMaster]](result.([]byte))
+		if err != nil {
 			return summary, fmt.Errorf("failed to decode paginate result: %w", err)
 		}
-
-		if parsedResult.Error != "" {
-			return summary, fmt.Errorf("paginate command error: %s", parsedResult.Error)
-		}
-
-		tenantsResult := parsedResult.Result.(db.FindResult[models.TenantInMaster])
 
 		for _, tenant := range tenantsResult.Entities {
 			summary.TenantsCount++
@@ -145,8 +135,7 @@ func (app *Application) aggregateDashboardSummary(now time.Time) (models.Dashboa
 			Int("tenants_so_far", summary.TenantsCount).
 			Msg("📊 Processing batch of tenants for dashboard summary")
 
-		// No more pages
-		if tenantsResult.Cursor == "" || len(tenantsResult.Entities) < pageSize {
+		if tenantsResult.Cursor == "" {
 			break
 		}
 		cursor = tenantsResult.Cursor
@@ -155,13 +144,12 @@ func (app *Application) aggregateDashboardSummary(now time.Time) (models.Dashboa
 	return summary, nil
 }
 
-// writeDashboardSummaryToMaster persists the aggregated summary to the master node via FSM write.
 func (app *Application) writeDashboardSummaryToMaster(summary models.DashboardSummary) error {
 	updateCommand := &tentant_command.UpdateDashboardSummaryCommand{
 		Summary: summary,
 	}
 
-	fsmCmd := general_command.FSM_Command{
+	fsm_cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: general_command.REPOSITORY_COMMAND,
 		CMD:  updateCommand,
@@ -170,11 +158,12 @@ func (app *Application) writeDashboardSummaryToMaster(summary models.DashboardSu
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resultChan, err := app.MasterNode.Write(ctx, fsmCmd)
+	resultChan, err := app.MasterNode.Write(ctx, fsm_cmd)
 	if err != nil {
 		return err
 	}
 
+	// Wait for the result since we need to process it
 	var writeResult dragonboat.WriteResult
 	select {
 	case writeResult = <-resultChan:
@@ -185,16 +174,6 @@ func (app *Application) writeDashboardSummaryToMaster(summary models.DashboardSu
 		return ctx.Err()
 	}
 
-	buf := bytes.NewBuffer(writeResult.Result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		return err
-	}
-
-	if parsedResult.Error != "" {
-		return fmt.Errorf("command error: %s", parsedResult.Error)
-	}
-
-	return nil
+	_, err = commands.DecodeCommandResult[models.DashboardSummary](writeResult.Result.Data)
+	return err
 }

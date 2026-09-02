@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -11,7 +10,6 @@ import (
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"fmt"
 	"strconv"
 	"sync"
@@ -93,22 +91,9 @@ func (app *Application) clearAllTenantsExpiredLeases(leaseBatchSize int) {
 			return
 		}
 
-		buf := bytes.NewBuffer(result.([]byte))
-		dec := gob.NewDecoder(buf)
-		parsedResult := &command.CommandResult{}
-		if err := dec.Decode(parsedResult); err != nil {
+		tenantsResult, err := command.DecodeCommandResult[db.FindResult[models.TenantInMaster]](result.([]byte))
+		if err != nil {
 			log.Err(err).Msg("❌ Failed to decode tenant pagination result")
-			return
-		}
-
-		if parsedResult.Error != "" {
-			log.Error().Str("error", parsedResult.Error).Msg("❌ Tenant pagination command returned error")
-			return
-		}
-
-		tenantsResult, ok := parsedResult.Result.(db.FindResult[models.TenantInMaster])
-		if !ok {
-			log.Warn().Str("type", fmt.Sprintf("%T", parsedResult.Result)).Msg("⚠️ Unexpected result type from tenant pagination")
 			return
 		}
 
@@ -204,10 +189,8 @@ func (app *Application) clearTenantExpiredLeases(
 			}
 
 			// Decode the result
-			buf := bytes.NewBuffer(writeResult.Result.Data)
-			dec := gob.NewDecoder(buf)
-			var commandResult command.CommandResult
-			if err := dec.Decode(&commandResult); err != nil {
+			result, err := command.DecodeCommandResult[queue_command.ProcessExpiredLeasesResult](writeResult.Result.Data)
+			if err != nil {
 				log.Err(err).
 					Str("tenant", tenant.Code).
 					Str("node", strconv.FormatUint(node.ShardID, 10)).
@@ -215,18 +198,7 @@ func (app *Application) clearTenantExpiredLeases(
 				return
 			}
 
-			if commandResult.Error != "" {
-				log.Error().
-					Str("tenant", tenant.Code).
-					Str("node", strconv.FormatUint(node.ShardID, 10)).
-					Str("error", commandResult.Error).
-					Msg("❌ Command returned error")
-				return
-			}
-
-			// Try to cast the result
-			if result, ok := commandResult.Result.(queue_command.ProcessExpiredLeasesResult); ok {
-				processedCount = result.ProcessedLeases
+			processedCount = result.ProcessedLeases
 
 				if processedCount > 0 {
 					log.Info().
@@ -260,14 +232,6 @@ func (app *Application) clearTenantExpiredLeases(
 					shouldContinue = true
 					offset += limit
 				}
-			} else {
-				log.Warn().
-					Str("tenant", tenant.Code).
-					Str("node", strconv.FormatUint(node.ShardID, 10)).
-					Str("type", fmt.Sprintf("%T", commandResult.Result)).
-					Msg("⚠️ Unexpected result type from ProcessExpiredLeasesCommand")
-				return
-			}
 
 		case <-ctx.Done():
 			cancel()

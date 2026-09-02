@@ -1,13 +1,11 @@
 package business_logic
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/cache"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
-	"encoding/gob"
 	"fmt"
 
 	"deadalus-orch/server/internal/pkg/config"
@@ -162,16 +160,10 @@ func (bo *ExchangeBO) DeleteExchange(ctx context.Context, exchangeCode, vnamespa
 		return errors.New("Delete exchange operation timed out: " + writeCtx.Err().Error())
 	}
 
-	buf := bytes.NewBuffer(writeResult.Result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Exchange deletion command returned unexpected result type")
-		return errors.New("Exchange deletion command returned unexpected error")
-	}
-
-	if parsedResult.Error != "" {
-		return errors.New("Failed to delete exchange error: " + parsedResult.Error)
+	_, err = commands.DecodeCommandResult[bool](writeResult.Result.Data)
+	if err != nil {
+		bo.Config.Logger.Error().Err(err).Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("Exchange deletion command returned error")
+		return fmt.Errorf("Failed to delete exchange: %w", err)
 	}
 
 	bo.Config.Logger.Info().Str("ExchangeCode", exchangeCode).Str("VNamespace", vnamespace).Msg("exchange deleted successfully")

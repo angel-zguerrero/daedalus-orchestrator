@@ -86,6 +86,12 @@ func (cmd *CreateTenantInMasterCommand) Execute(uow *db.UnitOfWork, now time.Tim
 	var resultTenants []models.TenantInMaster
 
 	for _, tenant := range cmd.Tenants {
+		if tenant.ID == "" {
+			if tenant.Code != "" {
+				tenant.ID = tenant.Code
+			}
+		}
+
 		lastShardId++
 		if lastShardId > config.GlobalConfiguration.MaxShards+1 {
 			lastShardId = 2

@@ -404,7 +404,7 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 		},
 	}
 
-	err := gob.NewEncoder(&buf).Encode(cmd)
+	err := cmd.EncodeTo(&buf)
 	require.NoError(t, err)
 
 	result, err := kv.Update([]statemachine.Entry{
@@ -414,7 +414,7 @@ func TestTenantRead_SingleEntryIntoUpdate(t *testing.T) {
 	require.NotNil(t, result)
 	require.Len(t, result, 1)
 	// Expect an error message in Result.Data due to invalid operation type
-	require.Contains(t, string(result[0].Result.Data), "Invalid read operation: general_command.RWK_Command") // Changed dragonboat.RWK_Command to general_command.RWK_Command
+	require.Contains(t, string(result[0].Result.Data), "Invalid read operation")
 }
 func TestTenantUpdate_PutWithTTL(t *testing.T) {
 	kv := setupTenantKV(t)

@@ -1,13 +1,10 @@
 package dragonboat
 
 import (
-	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
-	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"encoding/binary"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"io"
@@ -135,7 +132,7 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 
 	for i, ent := range ents {
 		var cmd general_command.FSM_Command
-		if err := gob.NewDecoder(bytes.NewReader(ent.Cmd)).Decode(&cmd); err != nil {
+		if err := cmd.DecodeFrom(ent.Cmd); err != nil {
 			parseErrors[i] = true
 			msg := fmt.Sprintf(
 				"failed to decode command for entry at index %d (Raft index %d): %v",
@@ -283,25 +280,15 @@ func (s *KVBaseStateMachine) Update(ents []statemachine.Entry) ([]statemachine.E
 		cmd := fsm_commands[idx].CMD
 		now := time.Unix(0, fsm_commands[idx].Now)
 		result := s.stateMachineImpl.Update(cmd, uow, now)
-		var buf bytes.Buffer
-
-		err := gob.NewEncoder(&buf).Encode(result)
-
+		data, err := commands.EncodeCommandResult(result)
 		if err != nil {
-			b, e := utils.ErrorToGobBytes(err)
-			if e != nil {
-				b = []byte(err.Error())
-			}
-			ents[idx].Result = statemachine.Result{
-				Value: uint64(len(ents[idx].Cmd)),
-				Data:  b,
-			}
-			continue
+			data, _ = commands.EncodeCommandResult(commands.CommandResult{
+				Error: fmt.Sprintf("failed to encode command result: %v", err),
+			})
 		}
-
 		ents[idx].Result = statemachine.Result{
 			Value: uint64(len(ents[idx].Cmd)),
-			Data:  buf.Bytes(),
+			Data:  data,
 		}
 	}
 
@@ -365,15 +352,11 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid query type: expected []byte, got %T", q)
 		}
-		if len(data) == 0 {
-			return nil, fmt.Errorf("empty query payload")
-		}
 		var query general_command.Query_Command
-		if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&query); err != nil {
+		if err := query.DecodeFrom(data); err != nil {
 			return nil, fmt.Errorf("failed to decode query command: %w", err)
 		}
 
-		// Validate Query_Command.Now field.
 		if query.Now <= 0 {
 			log.Warn().
 				Int64("provided_now", query.Now).
@@ -382,22 +365,37 @@ func (s *KVBaseStateMachine) Lookup(q interface{}) (interface{}, error) {
 		}
 
 		now := time.Unix(0, query.Now)
-		repo_command, ok := query.Command.(general_command.Repository_Command)
-		uow := db.NewUnitOfWork(kv_store, nil)
-		if ok {
-
-			var buf bytes.Buffer
-			result := s.stateMachineImpl.Lookup(repo_command.CMD, uow, now)
-			err := gob.NewEncoder(&buf).Encode(result)
-			if err != nil {
-				return nil, err
-			}
-			return buf.Bytes(), nil
+		var innerCmd any
+		if repoCmd, ok := query.Command.(general_command.Repository_Command); ok {
+			innerCmd = repoCmd.CMD
+		} else if repoCmdPtr, ok := query.Command.(*general_command.Repository_Command); ok && repoCmdPtr != nil {
+			innerCmd = repoCmdPtr.CMD
 		}
 
-		command, ok := query.Command.(general_command.RK_Command)
-		if !ok {
-			return nil, fmt.Errorf("expected command to be RK_Command, got %T", query.Command)
+		uow := db.NewUnitOfWork(kv_store, nil)
+		if innerCmd != nil {
+			result := s.stateMachineImpl.Lookup(innerCmd, uow, now)
+			data, err := commands.EncodeCommandResult(result)
+			if err != nil {
+				data, _ = commands.EncodeCommandResult(commands.CommandResult{
+					Error: fmt.Sprintf("failed to encode command result: %v", err),
+				})
+			}
+			return data, nil
+		}
+
+		var command general_command.RK_Command
+		var isRK bool
+		if cmdVal, ok := query.Command.(general_command.RK_Command); ok {
+			command = cmdVal
+			isRK = true
+		} else if cmdPtr, ok := query.Command.(*general_command.RK_Command); ok && cmdPtr != nil {
+			command = *cmdPtr
+			isRK = true
+		}
+
+		if !isRK {
+			return nil, fmt.Errorf("expected command to be RK_Command or Repository_Command, got %T", query.Command)
 		}
 
 		if s.closed {
@@ -494,7 +492,6 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 		return errors.New("db closed")
 	}
 
-	enc := gob.NewEncoder(w)
 	appliedIdxKey := s.appliedIndexKeyForShard()
 
 	// With a shared DB, we must only serialize entries belonging to THIS shard.
@@ -517,19 +514,7 @@ func (s *KVBaseStateMachine) SaveSnapshot(
 			return nil
 		}
 
-		entry := struct {
-			CFName    string
-			CFNSector string
-			Key       []byte
-			Value     []byte
-		}{
-			CFName:    cfName,
-			CFNSector: cfSector,
-			Key:       append([]byte(nil), key...),
-			Value:     append([]byte(nil), value...),
-		}
-
-		return enc.Encode(&entry)
+		return writeSnapshotEntry(w, cfName, cfSector, key, value)
 	})
 
 	if err != nil {
@@ -555,23 +540,10 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 	}
 
 	// Step 1: Delete this shard's existing data from the shared DB.
-	// Delete the shard's applied index key from meta CF.
 	appliedIdxKey := s.appliedIndexKeyForShard()
 	if err := kv_store.Delete(db.MetaFC, db.MetaFCSector, appliedIdxKey, time.Now()); err != nil {
 		log.Warn().Err(err).Str("key", appliedIdxKey).Msg("Failed to delete applied index key during snapshot recovery (may not exist yet)")
 	}
-
-	// Delete CFs that belong to this shard.
-	// We iterate all data and delete entries whose CF belongs to this shard.
-	// Note: For tenant shards, the CFs (cf-n-X) will be cleaned up by DeleteColumnFamily
-	// or by iterating. For the master shard, it owns the admin CF.
-	// A simpler approach: the snapshot will overwrite existing data, and since
-	// SaveSnapshot only serializes this shard's data, restoring it is safe.
-	// We only need to ensure stale keys are removed.
-	// For now, we rely on the fact that keys are deterministically generated,
-	// so the snapshot restore will overwrite all current values.
-
-	dec := gob.NewDecoder(r)
 
 	batch := db.NewWriteBatch()
 	count := 0
@@ -584,14 +556,8 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 		default:
 		}
 
-		var entry struct {
-			CFName    string
-			CFNSector string
-			Key       []byte
-			Value     []byte
-		}
-
-		if err := dec.Decode(&entry); err != nil {
+		cfName, cfSector, keyBytes, valBytes, err := readSnapshotEntry(r)
+		if err != nil {
 			if err == io.EOF {
 				break // End of snapshot
 			}
@@ -599,22 +565,22 @@ func (s *KVBaseStateMachine) RecoverFromSnapshot(
 		}
 
 		// Ensure Column Family exists in the shared DB
-		if !knownCFs[entry.CFName] {
-			exists, _, err := kv_store.ExistsColumnFamily(entry.CFName)
+		if !knownCFs[cfName] {
+			exists, _, err := kv_store.ExistsColumnFamily(cfName)
 			if err != nil {
 				return fmt.Errorf("failed to check column family existence: %w", err)
 			}
 			if !exists {
-				isTTL := strings.HasPrefix(entry.CFName, db.ColumnFamilyTTLPrefix)
-				if err := kv_store.CreateColumnFamily(entry.CFName, isTTL); err != nil {
-					return fmt.Errorf("failed to create column family %s: %w", entry.CFName, err)
+				isTTL := strings.HasPrefix(cfName, db.ColumnFamilyTTLPrefix)
+				if err := kv_store.CreateColumnFamily(cfName, isTTL); err != nil {
+					return fmt.Errorf("failed to create column family %s: %w", cfName, err)
 				}
-				log.Info().Str("cf_name", entry.CFName).Bool("is_ttl", isTTL).Msg("Created missing column family during snapshot recovery")
+				log.Info().Str("cf_name", cfName).Bool("is_ttl", isTTL).Msg("Created missing column family during snapshot recovery")
 			}
-			knownCFs[entry.CFName] = true
+			knownCFs[cfName] = true
 		}
 
-		batch.Put(entry.CFName, entry.CFNSector, string(entry.Key), entry.Value, time.Now())
+		batch.Put(cfName, cfSector, string(keyBytes), valBytes, time.Now())
 		count++
 
 		if count%10000 == 0 {
@@ -677,4 +643,81 @@ func (s *KVBaseStateMachine) Close() error {
 		return kv_store.Close()
 	}
 	return nil
+}
+
+func writeSnapshotEntry(w io.Writer, cfName, cfSector string, key, value []byte) error {
+	var scratch [4]byte
+	binary.LittleEndian.PutUint32(scratch[:], uint32(len(cfName)))
+	if _, err := w.Write(scratch[:4]); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte(cfName)); err != nil {
+		return err
+	}
+
+	binary.LittleEndian.PutUint32(scratch[:], uint32(len(cfSector)))
+	if _, err := w.Write(scratch[:4]); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte(cfSector)); err != nil {
+		return err
+	}
+
+	binary.LittleEndian.PutUint32(scratch[:], uint32(len(key)))
+	if _, err := w.Write(scratch[:4]); err != nil {
+		return err
+	}
+	if _, err := w.Write(key); err != nil {
+		return err
+	}
+
+	binary.LittleEndian.PutUint32(scratch[:], uint32(len(value)))
+	if _, err := w.Write(scratch[:4]); err != nil {
+		return err
+	}
+	if _, err := w.Write(value); err != nil {
+		return err
+	}
+	return nil
+}
+
+func readSnapshotEntry(r io.Reader) (string, string, []byte, []byte, error) {
+	var scratch [4]byte
+	if _, err := io.ReadFull(r, scratch[:4]); err != nil {
+		return "", "", nil, nil, err
+	}
+	cfNameLen := binary.LittleEndian.Uint32(scratch[:4])
+	cfNameBuf := make([]byte, cfNameLen)
+	if _, err := io.ReadFull(r, cfNameBuf); err != nil {
+		return "", "", nil, nil, err
+	}
+
+	if _, err := io.ReadFull(r, scratch[:4]); err != nil {
+		return "", "", nil, nil, err
+	}
+	cfSectorLen := binary.LittleEndian.Uint32(scratch[:4])
+	cfSectorBuf := make([]byte, cfSectorLen)
+	if _, err := io.ReadFull(r, cfSectorBuf); err != nil {
+		return "", "", nil, nil, err
+	}
+
+	if _, err := io.ReadFull(r, scratch[:4]); err != nil {
+		return "", "", nil, nil, err
+	}
+	keyLen := binary.LittleEndian.Uint32(scratch[:4])
+	keyBuf := make([]byte, keyLen)
+	if _, err := io.ReadFull(r, keyBuf); err != nil {
+		return "", "", nil, nil, err
+	}
+
+	if _, err := io.ReadFull(r, scratch[:4]); err != nil {
+		return "", "", nil, nil, err
+	}
+	valLen := binary.LittleEndian.Uint32(scratch[:4])
+	valBuf := make([]byte, valLen)
+	if _, err := io.ReadFull(r, valBuf); err != nil {
+		return "", "", nil, nil, err
+	}
+
+	return string(cfNameBuf), string(cfSectorBuf), keyBuf, valBuf, nil
 }

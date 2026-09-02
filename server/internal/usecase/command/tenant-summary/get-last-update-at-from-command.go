@@ -1,7 +1,6 @@
 package tenant_summary_command
 
 import (
-	"bytes"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/usecase/command"
 	"encoding/gob"
@@ -38,11 +37,9 @@ func (cmd *GetLastUpdateAtFromCommand) Execute(uow *db.UnitOfWork, now time.Time
 		return *commandResult
 	}
 
-	// Deserialize the time using gob
-	buf := bytes.NewBuffer(valueBytes)
-	decoder := gob.NewDecoder(buf)
+	// Deserialize the time using UnmarshalBinary
 	var lastUpdateAt time.Time
-	err = decoder.Decode(&lastUpdateAt)
+	err = lastUpdateAt.UnmarshalBinary(valueBytes)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

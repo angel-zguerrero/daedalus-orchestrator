@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/pkg/utils"
@@ -9,7 +8,6 @@ import (
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -91,21 +89,12 @@ func (app *Application) processOutboxEventsForNode(tenantNode *dragonboat.RaftNo
 		return
 	}
 
-	buf := bytes.NewBuffer(result.([]byte))
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
+	events, err := commands.DecodeCommandResult[[]models.OutboxEvent](result.([]byte))
+	if err != nil {
 		log.Err(err).Uint64("shard_id", tenantNode.ShardID).Msg("❌ Failed to decode outbox events")
 		return
 	}
-
-	if parsedResult.Error != "" {
-		log.Error().Str("error", parsedResult.Error).Uint64("shard_id", tenantNode.ShardID).Msg("❌ Command error reading outbox events")
-		return
-	}
-
-	events, ok := parsedResult.Result.([]models.OutboxEvent)
-	if !ok || len(events) == 0 {
+	if len(events) == 0 {
 		return // No events
 	}
 

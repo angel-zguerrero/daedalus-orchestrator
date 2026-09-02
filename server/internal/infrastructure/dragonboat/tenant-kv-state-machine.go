@@ -53,6 +53,9 @@ func (r *TenantKVBaseStateMachine) BelongsToShard(cfName string) bool {
 }
 
 func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
+	if c, ok := cmd.(commands.Command); ok {
+		return c.Execute(uow, now)
+	}
 
 	findExchangeCommand, ok := cmd.(exchange_command.FindExchangeCommand)
 	if ok {
@@ -175,6 +178,9 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 }
 
 func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Time) commands.CommandResult {
+	if c, ok := cmd.(commands.Command); ok {
+		return c.Execute(uow, now)
+	}
 
 	createColumnFamilyCommand, ok := cmd.(general_command.CreateColumnFamilyCommand)
 	if ok {

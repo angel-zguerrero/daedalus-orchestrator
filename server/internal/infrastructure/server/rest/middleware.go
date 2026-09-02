@@ -1,7 +1,6 @@
 package rest_server
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -12,7 +11,6 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
-	"encoding/gob"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -150,16 +148,12 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 			return
 		}
 
-		buf := bytes.NewBuffer(result.([]byte))
-		dec := gob.NewDecoder(buf)
-		parsedResult := &commands.CommandResult{}
-		if err := dec.Decode(parsedResult); err != nil {
+		sessionExists, err := commands.DecodeCommandResult[bool](result.([]byte))
+		if err != nil {
 			logger.Error().Err(err).Msg("Session does not exist or has been invalidated")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Session does not exist or has been invalidated:" + err.Error()})
 			return
 		}
-
-		sessionExists := parsedResult.Result.(bool)
 
 		if !sessionExists {
 			logger.Warn().Str("token_subject", claims.Subject).Msg("Session does not exist or has been invalidated")

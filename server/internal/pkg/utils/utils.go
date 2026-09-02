@@ -3,7 +3,6 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/gob"
 	"time"
 )
 
@@ -72,12 +71,4 @@ func IntToBytes(num int) ([]byte, error) {
 
 	binary.BigEndian.PutUint32(bytes, uint32(num))
 	return bytes, nil
-}
-func ErrorToGobBytes(err error) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if encodeErr := enc.Encode(err); encodeErr != nil {
-		return nil, encodeErr
-	}
-	return buf.Bytes(), nil
 }

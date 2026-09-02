@@ -1,7 +1,6 @@
 package business_logic
 
 import (
-	"bytes"
 	"context"
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
@@ -14,7 +13,6 @@ import (
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
-	"encoding/gob"
 	"errors"
 	"strings"
 	"time"
@@ -227,16 +225,10 @@ func (bo *QueueBO) DeleteQueue(ctx context.Context, queueCode, vnamespace, cf, c
 		return errors.New("Delete queue operation timed out: " + writeCtx.Err().Error())
 	}
 
-	buf := bytes.NewBuffer(writeResult.Result.Data)
-	dec := gob.NewDecoder(buf)
-	parsedResult := &commands.CommandResult{}
-	if err := dec.Decode(parsedResult); err != nil {
-		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Queue deletion command returned unexpected result type")
-		return errors.New("Queue deletion command returned unexpected error")
-	}
-
-	if parsedResult.Error != "" {
-		return errors.New("Failed to delete queue error: " + parsedResult.Error)
+	_, err = commands.DecodeCommandResult[bool](writeResult.Result.Data)
+	if err != nil {
+		bo.Config.Logger.Error().Err(err).Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("Queue deletion command returned error")
+		return fmt.Errorf("Failed to delete queue: %w", err)
 	}
 
 	bo.Config.Logger.Info().Str("QueueCode", queueCode).Str("VNamespace", vnamespace).Msg("queue deleted successfully")

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
-	"encoding/gob"
 	"errors"
 	"math"
 	"os/signal"
@@ -22,6 +21,12 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	appConfig "deadalus-orch/server/internal/pkg/config"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
 
 // RaftNode represents a single node (replica) participating in a Dragonboat Raft consensus group (shard).
 // It encapsulates the Dragonboat NodeHost, configuration for the replica, and methods to interact with it.
@@ -232,10 +237,17 @@ func (mn *RaftNode) SyncWrite(ctx context.Context, comand general_command.FSM_Co
 	}
 	cs := mn.GetClient()
 
-	var buf bytes.Buffer
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
 
-	gob.NewEncoder(&buf).Encode(comand)
-	return mn.NH.SyncPropose(ctx, cs, buf.Bytes())
+	if err := comand.EncodeTo(buf); err != nil {
+		bufPool.Put(buf)
+		return statemachine.Result{}, err
+	}
+	cmdBytes := bytes.Clone(buf.Bytes())
+	bufPool.Put(buf)
+
+	return mn.NH.SyncPropose(ctx, cs, cmdBytes)
 }
 
 // WriteResult encapsulates the result of an asynchronous write operation
@@ -274,14 +286,19 @@ func (mn *RaftNode) Write(ctx context.Context, command general_command.FSM_Comma
 	}
 
 	cs := mn.GetClient()
-	var buf bytes.Buffer
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
 
-	if err := gob.NewEncoder(&buf).Encode(command); err != nil {
+	if err := command.EncodeTo(buf); err != nil {
+		bufPool.Put(buf)
 		<-mn.writeSem // Release semaphore on encoding error
 		return nil, err
 	}
 
-	rs, err := mn.NH.Propose(cs, buf.Bytes(), 10*time.Second)
+	cmdBytes := bytes.Clone(buf.Bytes())
+	bufPool.Put(buf)
+
+	rs, err := mn.NH.Propose(cs, cmdBytes, 10*time.Second)
 	if err != nil {
 		<-mn.writeSem // Release semaphore on proposal error
 		return nil, err
@@ -330,10 +347,15 @@ func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command)
 		return nil, ctx.Err()
 	}
 
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(cmd); err != nil {
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+
+	if err := cmd.EncodeTo(buf); err != nil {
+		bufPool.Put(buf)
 		return nil, err
 	}
+	cmdBytes := bytes.Clone(buf.Bytes())
+	bufPool.Put(buf)
 
 	// In Dragonboat v4, ReadLocalNode requires a RequestState from ReadIndex to ensure linearizability.
 	rs, err := mn.NH.ReadIndex(mn.ShardID, 10*time.Second)
@@ -346,7 +368,7 @@ func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command)
 		if !res.Completed() {
 			return nil, errors.New("read index failed or timed out")
 		}
-		return mn.NH.ReadLocalNode(rs, buf.Bytes())
+		return mn.NH.ReadLocalNode(rs, cmdBytes)
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -358,11 +380,17 @@ func (mn *RaftNode) SyncRead(ctx context.Context, cmd general_command.Query_Comm
 	if mn.stopped {
 		return statemachine.Result{}, errors.New("raft node is stopped")
 	}
-	var buf bytes.Buffer
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
 
-	gob.NewEncoder(&buf).Encode(cmd)
+	if err := cmd.EncodeTo(buf); err != nil {
+		bufPool.Put(buf)
+		return nil, err
+	}
+	cmdBytes := bytes.Clone(buf.Bytes())
+	bufPool.Put(buf)
 
-	result, err := mn.NH.SyncRead(ctx, mn.ShardID, buf.Bytes())
+	result, err := mn.NH.SyncRead(ctx, mn.ShardID, cmdBytes)
 	return result, err
 }
 
