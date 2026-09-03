@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"deadalus-orch/server/internal/app"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/pkg/utils"
@@ -20,6 +21,8 @@ import (
 // The function will block until a system signal is received.
 func main() {
 	// Help flag handling and flag parsing is now done in config.LoadDefaultConfiguration()
+	log.Info().Msg("🔥🔥🔥 DAEDALUS HARMONIC FLOW SCHEDULER ACTIVE [BUILD-VER-2026-v2] 🔥🔥🔥")
+	fmt.Println("🔥🔥🔥 DAEDALUS HARMONIC FLOW SCHEDULER ACTIVE [BUILD-VER-2026-v2] 🔥🔥🔥")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)

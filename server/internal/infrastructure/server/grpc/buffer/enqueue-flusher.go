@@ -98,30 +98,51 @@ func processEnqueueGroup(ctx context.Context, items []EnqueueBufferedMessage, qu
 		return
 	}
 
-	enqueueCmd := queue.EnqueueCommand{
-		CF:       cf,
-		CFS:      cfs,
-		Messages: allMessages,
+	const MaxMicroBatchSize = 250
+
+	var combinedRes queue.EnqueueResult
+	var lastErr error
+
+	for batchStart := 0; batchStart < len(allMessages); batchStart += MaxMicroBatchSize {
+		batchEnd := batchStart + MaxMicroBatchSize
+		if batchEnd > len(allMessages) {
+			batchEnd = len(allMessages)
+		}
+
+		chunkMessages := allMessages[batchStart:batchEnd]
+		enqueueCmd := queue.EnqueueCommand{
+			CF:       cf,
+			CFS:      cfs,
+			Messages: chunkMessages,
+		}
+
+		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.EnqueueResult](
+			dragonboat.KindEnqueue,
+			tenantNode,
+			ctx,
+			&enqueueCmd,
+			raftTimeout,
+			logger,
+			"EnqueueCommand (Batch Enqueue)",
+		)
+
+		if err != nil {
+			lastErr = err
+			break
+		}
+
+		combinedRes.Gauges = append(combinedRes.Gauges, res.Gauges...)
 	}
 
-	res, err := dragonboat.ExecuteRepositoryCommand[queue.EnqueueResult](
-		tenantNode,
-		ctx,
-		&enqueueCmd,
-		raftTimeout,
-		logger,
-		"EnqueueCommand (Batch Enqueue)",
-	)
-
-	if err != nil {
+	if lastErr != nil {
 		for _, item := range items {
-			notifyEnqueueError(item, err)
+			notifyEnqueueError(item, lastErr)
 		}
 		return
 	}
 
 	if queueBO.Config.MetricsCollector != nil {
-		for _, gauge := range res.Gauges {
+		for _, gauge := range combinedRes.Gauges {
 			queueBO.Config.MetricsCollector.UpdateGauges(items[0].Tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
 		}
 		for key, count := range publishedCounts {

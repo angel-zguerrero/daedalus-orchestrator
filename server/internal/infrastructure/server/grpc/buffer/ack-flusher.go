@@ -54,31 +54,52 @@ func processAckGroup(ctx context.Context, items []AckBufferedMessage, logger zer
 		leaseIDs = append(leaseIDs, item.LeaseID)
 	}
 
-	ackCmd := queue.BulkAckMessageCommand{
-		CF:       cf,
-		CFS:      cfs,
-		LeaseIDs: leaseIDs,
+	const MaxMicroBatchSize = 250
+
+	combinedResults := make([]queue.AckMessageResult, 0, len(items))
+	var lastErr error
+
+	for batchStart := 0; batchStart < len(leaseIDs); batchStart += MaxMicroBatchSize {
+		batchEnd := batchStart + MaxMicroBatchSize
+		if batchEnd > len(leaseIDs) {
+			batchEnd = len(leaseIDs)
+		}
+
+		chunkLeaseIDs := leaseIDs[batchStart:batchEnd]
+		ackCmd := queue.BulkAckMessageCommand{
+			CF:       cf,
+			CFS:      cfs,
+			LeaseIDs: chunkLeaseIDs,
+		}
+
+		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.BulkAckMessageResult](
+			dragonboat.KindDequeue,
+			tenantNode,
+			ctx,
+			&ackCmd,
+			raftTimeout,
+			logger,
+			"BulkAckMessageCommand",
+		)
+
+		if err != nil {
+			lastErr = err
+			break
+		}
+
+		combinedResults = append(combinedResults, res.Results...)
 	}
 
-	res, err := dragonboat.ExecuteRepositoryCommand[queue.BulkAckMessageResult](
-		tenantNode,
-		ctx,
-		&ackCmd,
-		raftTimeout,
-		logger,
-		"BulkAckMessageCommand",
-	)
-
-	if err != nil {
+	if lastErr != nil {
 		for _, item := range items {
-			notifyAckError(item, err)
+			notifyAckError(item, lastErr)
 		}
 		return
 	}
 
 	for i, item := range items {
-		if i < len(res.Results) {
-			result := res.Results[i]
+		if i < len(combinedResults) {
+			result := combinedResults[i]
 			if !result.Success {
 				notifyAckError(item, fmt.Errorf(result.Message))
 			} else {

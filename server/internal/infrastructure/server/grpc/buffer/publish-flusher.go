@@ -168,34 +168,54 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 		return
 	}
 
-	// Execute batch enqueue
-	enqueueCmd := queue.EnqueueCommand{
-		CF:       cf,
-		CFS:      cfs,
-		Messages: allMessages,
+	const MaxMicroBatchSize = 250
+
+	var combinedRes queue.EnqueueResult
+	var lastErr error
+
+	for batchStart := 0; batchStart < len(allMessages); batchStart += MaxMicroBatchSize {
+		batchEnd := batchStart + MaxMicroBatchSize
+		if batchEnd > len(allMessages) {
+			batchEnd = len(allMessages)
+		}
+
+		chunkMessages := allMessages[batchStart:batchEnd]
+		enqueueCmd := queue.EnqueueCommand{
+			CF:       cf,
+			CFS:      cfs,
+			Messages: chunkMessages,
+		}
+
+		startEnqueue := time.Now()
+		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.EnqueueResult](
+			dragonboat.KindEnqueue,
+			tenantNode,
+			ctx,
+			&enqueueCmd,
+			raftTimeout,
+			logger,
+			"EnqueueCommand (Batch Publish)",
+		)
+		logger.Debug().Dur("duration", time.Since(startEnqueue)).Int("messages", len(chunkMessages)).Msg("EnqueueCommand executed in publish-flusher micro-batch")
+
+		if err != nil {
+			lastErr = err
+			break
+		}
+
+		combinedRes.Gauges = append(combinedRes.Gauges, res.Gauges...)
 	}
 
-	startEnqueue := time.Now()
-	res, err := dragonboat.ExecuteRepositoryCommand[queue.EnqueueResult](
-		tenantNode,
-		ctx,
-		&enqueueCmd,
-		raftTimeout,
-		logger,
-		"EnqueueCommand (Batch Publish)",
-	)
-	logger.Info().Dur("duration", time.Since(startEnqueue)).Int("messages", len(allMessages)).Msg("EnqueueCommand executed in publish-flusher")
-
 	// Notify results back
-	if err != nil {
+	if lastErr != nil {
 		for _, item := range items {
-			notifyPublishError(item, err)
+			notifyPublishError(item, lastErr)
 		}
 		return
 	}
 
 	if exchangeBO.Config.MetricsCollector != nil {
-		for _, gauge := range res.Gauges {
+		for _, gauge := range combinedRes.Gauges {
 			exchangeBO.Config.MetricsCollector.UpdateGauges(items[0].Tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
 		}
 		for key, count := range publishedCounts {

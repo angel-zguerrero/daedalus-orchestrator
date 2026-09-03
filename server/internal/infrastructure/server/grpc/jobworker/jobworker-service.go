@@ -103,7 +103,8 @@ func NewJobWorkerService(config *common.ServerConfing) *JobWorkerService {
 			Count:                        req.Count,
 		}
 
-		res, err := dragonboat.ExecuteRepositoryCommand[queue.BatchDequeueResult](
+		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.BatchDequeueResult](
+			dragonboat.KindDequeue,
 			req.TenantNode,
 			ctx,
 			cmd,

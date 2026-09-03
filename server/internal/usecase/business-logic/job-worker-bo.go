@@ -320,7 +320,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 						// Resume queue iteration from the last saved position for this tenant.
 						tenantQueueKey := claimCursorKey{policyCode: policyCode, tenantID: tenant.ID}
 						queueCursor := bo.cursorRegistry.get(tenantQueueKey)
-						const queuePageSize = 50
+						const queuePageSize = 250
 
 					queueLoop:
 						for {
@@ -369,9 +369,13 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 									break queueLoop
 								}
 
-								limit := 5000 // default max batch size per queue
+								const MaxMicroBatchSize = 250
+								limit := MaxMicroBatchSize // default max micro-batch size per queue
 								if policy.MaxQueueMessages > 0 {
-									limit = policy.MaxQueueMessages - claimedByPolicy[policyCode]
+									rem := policy.MaxQueueMessages - claimedByPolicy[policyCode]
+									if rem < limit {
+										limit = rem
+									}
 								}
 								claimMu.Unlock()
 

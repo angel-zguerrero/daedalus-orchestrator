@@ -48,31 +48,54 @@ func processDequeueGroup(ctx context.Context, items []DequeueBufferedMessage, lo
 		}
 	}
 
-	bulkDequeueCmd := &queue.BulkDequeueCommand{
-		CF:       cf,
-		CFS:      cfs,
-		Requests: requests,
+	const MaxMicroBatchSize = 250
+
+	combinedResults := make(map[int]queue.DequeueResult)
+	var lastErr error
+
+	for batchStart := 0; batchStart < len(requests); batchStart += MaxMicroBatchSize {
+		batchEnd := batchStart + MaxMicroBatchSize
+		if batchEnd > len(requests) {
+			batchEnd = len(requests)
+		}
+
+		chunkRequests := requests[batchStart:batchEnd]
+		bulkDequeueCmd := &queue.BulkDequeueCommand{
+			CF:       cf,
+			CFS:      cfs,
+			Requests: chunkRequests,
+		}
+
+		start := time.Now()
+		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.BulkDequeueResult](
+			dragonboat.KindDequeue,
+			tenantNode,
+			ctx,
+			bulkDequeueCmd,
+			raftTimeout,
+			logger,
+			"BulkDequeueCommand (Batch)",
+		)
+		logger.Debug().Dur("duration", time.Since(start)).Int("count", len(chunkRequests)).Msg("BulkDequeueCommand executed micro-batch")
+
+		if err != nil {
+			lastErr = err
+			break
+		}
+
+		for chunkIdx, dequeueRes := range res.Results {
+			globalIdx := batchStart + chunkIdx
+			combinedResults[globalIdx] = dequeueRes
+		}
 	}
-
-	start := time.Now()
-	res, err := dragonboat.ExecuteRepositoryCommand[queue.BulkDequeueResult](
-		tenantNode,
-		ctx,
-		bulkDequeueCmd,
-		raftTimeout,
-		logger,
-		"BulkDequeueCommand (Batch)",
-	)
-
-	logger.Info().Dur("duration", time.Since(start)).Int("count", len(items)).Msg("BulkDequeueCommand executed")
 
 	// Notify results back
 	for i, item := range items {
 		conf := DequeueConfirmation{
-			Error: err,
+			Error: lastErr,
 		}
-		if err == nil {
-			if result, ok := res.Results[i]; ok {
+		if lastErr == nil {
+			if result, ok := combinedResults[i]; ok {
 				conf.Result = &result
 			} else {
 				conf.Error = fmt.Errorf("queue is empty or unavailable")
