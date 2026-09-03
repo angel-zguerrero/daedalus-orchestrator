@@ -4,8 +4,10 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
+	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"
 	"deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -76,7 +78,8 @@ func processEnqueueGroup(ctx context.Context, items []EnqueueBufferedMessage, qu
 
 		msg := item.Message
 		msg.QueueID = q.ID
-		msg.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
+		u := uuid.New()
+		msg.ID = hex.EncodeToString(u[:])
 		if msg.MessageID == "" {
 			msg.MessageID = msg.ID
 		}
@@ -160,15 +163,31 @@ func processEnqueueGroup(ctx context.Context, items []EnqueueBufferedMessage, qu
 		msgIdx := itemToMessageIndices[i]
 		msg := allMessages[msgIdx]
 
-		item.ResponseChan <- EnqueueConfirmation{
-			MessageID: msg.MessageID,
-			Error:     nil,
+		if item.SendChan != nil {
+			item.SendChan <- &pbQueue.EnqueueStreamResponse{
+				ClientMessageId: item.ClientMessageID,
+				Confirmed:       true,
+				MessageId:       msg.MessageID,
+			}
+		} else if item.ResponseChan != nil {
+			item.ResponseChan <- EnqueueConfirmation{
+				MessageID: msg.MessageID,
+				Error:     nil,
+			}
 		}
 	}
 }
 
 func notifyEnqueueError(item EnqueueBufferedMessage, err error) {
-	item.ResponseChan <- EnqueueConfirmation{
-		Error: err,
+	if item.SendChan != nil {
+		item.SendChan <- &pbQueue.EnqueueStreamResponse{
+			ClientMessageId: item.ClientMessageID,
+			Confirmed:       false,
+			Error:           err.Error(),
+		}
+	} else if item.ResponseChan != nil {
+		item.ResponseChan <- EnqueueConfirmation{
+			Error: err,
+		}
 	}
 }

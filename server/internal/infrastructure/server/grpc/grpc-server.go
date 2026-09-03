@@ -3,7 +3,10 @@ package grpc_server
 import (
 	"fmt"
 	"net"
+	"os"
 	"time"
+
+	"deadalus-orch/shared/constants"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -44,7 +47,6 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 		return nil, fmt.Errorf("gRPC: failed to listen on %s: %w", listenAddr, err)
 	}
 
-	otelHandler := otelgrpc.NewServerHandler()
 	authInterceptor := UnaryAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
 	tenantBO := bo.NewTenantBO(cfg)
 	tenantInterceptor := UnaryTenantInterceptor(tenantBO, cfg, cfg.Logger)
@@ -54,11 +56,16 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	streamTenantInterceptor := StreamTenantInterceptor(tenantBO, cfg, cfg.Logger)
 	streamRateLimitInterceptor := StreamRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 50000)
 
-	server := grpc.NewServer(
-		grpc.StatsHandler(otelHandler),
+	var serverOpts []grpc.ServerOption
+	if os.Getenv(constants.EnvVarOtelActived) == constants.OTEL_ACTIVE_TRUE {
+		serverOpts = append(serverOpts, grpc.StatsHandler(otelgrpc.NewServerHandler()))
+	}
+	serverOpts = append(serverOpts,
 		grpc.ChainUnaryInterceptor(authInterceptor, tenantInterceptor, rateLimitInterceptor),
 		grpc.ChainStreamInterceptor(streamAuthInterceptor, streamTenantInterceptor, streamRateLimitInterceptor),
 	)
+
+	server := grpc.NewServer(serverOpts...)
 
 	// Registrar servicios
 	pb.RegisterMetricsServiceServer(server, healthmetrics.NewMetricsServer())

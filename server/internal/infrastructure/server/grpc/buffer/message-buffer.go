@@ -5,11 +5,14 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/shared/models"
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	configPkg "deadalus-orch/server/internal/pkg/config"
+	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"
+	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	"github.com/rs/zerolog"
 )
@@ -31,10 +34,14 @@ type PublishBufferedMessage struct {
 	Tenant          *models.TenantInMaster
 	TenantNode      *dragonboat.RaftNode
 	ResponseChan    chan PublishConfirmation
+	SendChan        chan<- *pbExchange.PublishStreamResponse
 }
 
 func (p PublishBufferedMessage) GetGroupKey() string {
-	return fmt.Sprintf("%d-%d-%s-%s", p.TenantNode.ShardID, p.TenantNode.ReplicaID, p.CF, p.CFS)
+	if p.TenantNode == nil {
+		return p.CF + "-" + p.CFS
+	}
+	return strconv.FormatUint(p.TenantNode.ShardID, 10) + "-" + strconv.FormatUint(p.TenantNode.ReplicaID, 10) + "-" + p.CF + "-" + p.CFS
 }
 
 // EnqueueBufferedMessage for EnqueueStream
@@ -48,10 +55,14 @@ type EnqueueBufferedMessage struct {
 	Tenant          *models.TenantInMaster
 	TenantNode      *dragonboat.RaftNode
 	ResponseChan    chan EnqueueConfirmation
+	SendChan        chan<- *pbQueue.EnqueueStreamResponse
 }
 
 func (e EnqueueBufferedMessage) GetGroupKey() string {
-	return fmt.Sprintf("%d-%d-%s-%s", e.TenantNode.ShardID, e.TenantNode.ReplicaID, e.CF, e.CFS)
+	if e.TenantNode == nil {
+		return e.CF + "-" + e.CFS
+	}
+	return strconv.FormatUint(e.TenantNode.ShardID, 10) + "-" + strconv.FormatUint(e.TenantNode.ReplicaID, 10) + "-" + e.CF + "-" + e.CFS
 }
 
 type PublishConfirmation struct {
@@ -74,7 +85,10 @@ type AckBufferedMessage struct {
 }
 
 func (a AckBufferedMessage) GetGroupKey() string {
-	return fmt.Sprintf("%d-%d-%s-%s", a.TenantNode.ShardID, a.TenantNode.ReplicaID, a.CF, a.CFS)
+	if a.TenantNode == nil {
+		return a.CF + "-" + a.CFS
+	}
+	return strconv.FormatUint(a.TenantNode.ShardID, 10) + "-" + strconv.FormatUint(a.TenantNode.ReplicaID, 10) + "-" + a.CF + "-" + a.CFS
 }
 
 type AckConfirmation struct {
@@ -98,7 +112,10 @@ type DeliveredBufferedMessage struct {
 }
 
 func (d DeliveredBufferedMessage) GetGroupKey() string {
-	return fmt.Sprintf("%d-%d-%s-%s", d.TenantNode.ShardID, d.TenantNode.ReplicaID, d.CF, d.CFS)
+	if d.TenantNode == nil {
+		return d.CF + "-" + d.CFS
+	}
+	return strconv.FormatUint(d.TenantNode.ShardID, 10) + "-" + strconv.FormatUint(d.TenantNode.ReplicaID, 10) + "-" + d.CF + "-" + d.CFS
 }
 
 type DeliveredConfirmation struct {

@@ -311,8 +311,6 @@ func (s *ExchangeService) PublishStream(stream pb.ExchangeService_PublishStreamS
 			ContentLength: int64(len(req.Message.Content)),
 		}
 
-		responseChan := make(chan buffer.PublishConfirmation, 1)
-
 		bufferedMessage := buffer.PublishBufferedMessage{
 			ClientMessageID: req.ClientMessageId,
 			ExchangeCode:    req.ExchangeCode,
@@ -323,41 +321,10 @@ func (s *ExchangeService) PublishStream(stream pb.ExchangeService_PublishStreamS
 			CFS:             tenantCtx.CFS,
 			Tenant:          tenantCtx.Tenant,
 			TenantNode:      tenantCtx.Node,
-			ResponseChan:    responseChan,
+			SendChan:        sendChan,
 		}
 
 		// Add to buffer (non-blocking unless flush happens)
 		s.publishBuffer.Add(ctx, bufferedMessage)
-
-		// Wait for response asynchronously and send back to client
-		go func(clientMsgId string, respChan <-chan buffer.PublishConfirmation) {
-			timer := time.NewTimer(30 * time.Second)
-			defer timer.Stop()
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-timer.C:
-				// Timeout: flusher never responded, prevent goroutine leak
-				sendChan <- &pb.PublishStreamResponse{
-					ClientMessageId: clientMsgId,
-					Confirmed:       false,
-					Error:           "server-side confirmation timeout",
-				}
-			case confirmation := <-respChan:
-				resp := &pb.PublishStreamResponse{
-					ClientMessageId: clientMsgId,
-				}
-				if confirmation.Error != nil {
-					resp.Confirmed = false
-					resp.Error = confirmation.Error.Error()
-				} else {
-					resp.Confirmed = true
-					resp.QueueMessages = confirmation.QueueMessages
-				}
-				// Ignore send error, client might have disconnected
-				sendChan <- resp
-			}
-		}(req.ClientMessageId, responseChan)
 	}
 }

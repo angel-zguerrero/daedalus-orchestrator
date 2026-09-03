@@ -664,7 +664,7 @@ func LoadDefaultConfiguration() error {
 		config.PublishBufferMaxSize = 200 // Default 200 messages
 	}
 	if config.PublishBufferFlushConcurrency == 0 {
-		config.PublishBufferFlushConcurrency = 6 // Default 6 workers
+		config.PublishBufferFlushConcurrency = 1 // Default 1 worker to eliminate Raft lock contention
 		log.Info().Msgf("PublishBufferFlushConcurrency not specified, defaulting to %d", config.PublishBufferFlushConcurrency)
 	}
 

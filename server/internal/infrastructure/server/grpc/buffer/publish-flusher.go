@@ -4,8 +4,10 @@ import (
 	"context"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
+	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"
 	"deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -97,22 +99,26 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 	publishedCounts := make(map[string]int)
 
 	for i, item := range items {
-		// Serialize headers deterministically for the cache key
-		var headerStr strings.Builder
-		if item.Message.Headers != nil {
-			// Sort keys to ensure deterministic cache key
+		var cacheKey string
+		if len(item.Message.Headers) == 0 {
+			cacheKey = cf + "|" + cfs + "|" + item.ExchangeCode + "|" + item.RoutingKey + "|" + item.VNamespace
+		} else {
+			var headerStr strings.Builder
 			keys := make([]string, 0, len(item.Message.Headers))
 			for k := range item.Message.Headers {
 				keys = append(keys, k)
 			}
-			sort.Strings(keys)
-
-			for _, k := range keys {
-				headerStr.WriteString(fmt.Sprintf("%s=%s;", k, item.Message.Headers[k]))
+			if len(keys) > 1 {
+				sort.Strings(keys)
 			}
+			for _, k := range keys {
+				headerStr.WriteString(k)
+				headerStr.WriteString("=")
+				headerStr.WriteString(item.Message.Headers[k])
+				headerStr.WriteString(";")
+			}
+			cacheKey = cf + "|" + cfs + "|" + item.ExchangeCode + "|" + item.RoutingKey + "|" + item.VNamespace + "|" + headerStr.String()
 		}
-
-		cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s", cf, cfs, item.ExchangeCode, item.RoutingKey, item.VNamespace, headerStr.String())
 
 		var queuesList []models.Queue
 		var err error
@@ -141,7 +147,8 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 		for _, q := range queuesList {
 			msg := item.Message // Copy
 			msg.QueueID = q.ID
-			msg.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
+			u := uuid.New()
+			msg.ID = hex.EncodeToString(u[:])
 			if msg.MessageID == "" {
 				msg.MessageID = msg.ID
 			}
@@ -237,15 +244,31 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 			queueMessages[queueCode] = msg.ID
 		}
 
-		item.ResponseChan <- PublishConfirmation{
-			QueueMessages: queueMessages,
-			Error:         nil,
+		if item.SendChan != nil {
+			item.SendChan <- &pb.PublishStreamResponse{
+				ClientMessageId: item.ClientMessageID,
+				Confirmed:       true,
+				QueueMessages:   queueMessages,
+			}
+		} else if item.ResponseChan != nil {
+			item.ResponseChan <- PublishConfirmation{
+				QueueMessages: queueMessages,
+				Error:         nil,
+			}
 		}
 	}
 }
 
 func notifyPublishError(item PublishBufferedMessage, err error) {
-	item.ResponseChan <- PublishConfirmation{
-		Error: err,
+	if item.SendChan != nil {
+		item.SendChan <- &pb.PublishStreamResponse{
+			ClientMessageId: item.ClientMessageID,
+			Confirmed:       false,
+			Error:           err.Error(),
+		}
+	} else if item.ResponseChan != nil {
+		item.ResponseChan <- PublishConfirmation{
+			Error: err,
+		}
 	}
 }
