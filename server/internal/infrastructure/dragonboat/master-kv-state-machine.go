@@ -79,7 +79,7 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return paginateJobWorkersCommand.Execute(uow, now)
 	}
 
-	getTenantSummaryCommand, ok := input.(tenant_command.GetTenantSummaryCommand)
+	getTenantSummaryCommand, ok := input.(tenant_command.GetTenantSummaryInMasterCommand)
 	if ok {
 		return getTenantSummaryCommand.Execute(uow, now)
 	}
@@ -144,7 +144,7 @@ func (r *MasterKVDBStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.Ti
 		return deleteTenantInMasterCommand.Execute(uow, now)
 	}
 
-	updateTenantSummaryCommand, ok := cmd.(tenant_command.UpdateTenantSummaryCommand)
+	updateTenantSummaryCommand, ok := cmd.(tenant_command.UpdateTenantSummaryInMasterCommand)
 	if ok {
 		return updateTenantSummaryCommand.Execute(uow, now)
 	}

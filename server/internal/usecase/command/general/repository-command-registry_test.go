@@ -212,3 +212,40 @@ func TestEncodeDecodeRepoCommand_WrappedInRepositoryCommand(t *testing.T) {
 		t.Errorf("Decoded content mismatch: got %v, want %v", refreshCmd.LastUpdateAtFrom, now)
 	}
 }
+
+func TestEncodeDecodeRepoCommand_UpdateTenantSummaryInMasterCommand(t *testing.T) {
+	cmd := &tentant_command.UpdateTenantSummaryInMasterCommand{
+		TenantSummaries: []models.TenantSummary{
+			{
+				ID:             "tenant-123",
+				ExchangesCount: 5,
+				QueuesCount:    10,
+				MessagesCount:  42,
+			},
+		},
+	}
+
+	typeName, jsonBytes, err := EncodeRepoCommand(cmd)
+	if err != nil {
+		t.Fatalf("EncodeRepoCommand failed: %v", err)
+	}
+
+	if typeName != "UpdateTenantSummaryInMasterCommand" {
+		t.Errorf("Expected typeName 'UpdateTenantSummaryInMasterCommand', got '%s'", typeName)
+	}
+
+	decodedCmd, err := DecodeRepoCommand(typeName, jsonBytes)
+	if err != nil {
+		t.Fatalf("DecodeRepoCommand failed: %v", err)
+	}
+
+	updateCmd, ok := decodedCmd.(*tentant_command.UpdateTenantSummaryInMasterCommand)
+	if !ok {
+		t.Fatalf("Expected *tentant_command.UpdateTenantSummaryInMasterCommand, got %T", decodedCmd)
+	}
+
+	if len(updateCmd.TenantSummaries) != 1 || updateCmd.TenantSummaries[0].ID != "tenant-123" {
+		t.Errorf("Decoded content mismatch: %+v", updateCmd)
+	}
+}
+

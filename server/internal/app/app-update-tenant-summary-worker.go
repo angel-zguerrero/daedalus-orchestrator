@@ -218,8 +218,11 @@ func (app *Application) getLastUpdateAtFromTenantNode(tenantNode *dragonboat.Raf
 	return commands.DecodeCommandResult[time.Time](result.([]byte))
 }
 
-func (app *Application) updateMasterWithSummary(_ string, summary models.TenantSummary) error {
-	updateCommand := &tentant_command.UpdateTenantSummaryCommand{
+func (app *Application) updateMasterWithSummary(tenantID string, summary models.TenantSummary) error {
+	if summary.ID == "" {
+		summary.ID = tenantID
+	}
+	updateCommand := &tentant_command.UpdateTenantSummaryInMasterCommand{
 		TenantSummaries: []models.TenantSummary{summary},
 	}
 

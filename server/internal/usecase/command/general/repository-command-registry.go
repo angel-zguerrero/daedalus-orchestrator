@@ -118,6 +118,8 @@ func init() {
 	RegisterRepoCommand("ResetTenantShardStateCommand", func() commands.Command { return &tentant_command.ResetTenantShardStateCommand{} })
 	RegisterRepoCommand("GetDashboardSummaryCommand", func() commands.Command { return &tentant_command.GetDashboardSummaryCommand{} })
 	RegisterRepoCommand("UpdateDashboardSummaryCommand", func() commands.Command { return &tentant_command.UpdateDashboardSummaryCommand{} })
+	RegisterRepoCommand("GetTenantSummaryInMasterCommand", func() commands.Command { return &tentant_command.GetTenantSummaryInMasterCommand{} })
+	RegisterRepoCommand("UpdateTenantSummaryInMasterCommand", func() commands.Command { return &tentant_command.UpdateTenantSummaryInMasterCommand{} })
 
 	// Queue commands
 	RegisterRepoCommand("EnqueueCommand", func() commands.Command { return &queue_command.EnqueueCommand{} })

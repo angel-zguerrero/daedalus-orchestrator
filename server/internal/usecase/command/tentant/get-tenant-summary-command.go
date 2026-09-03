@@ -10,17 +10,17 @@ import (
 )
 
 func init() {
-	gob.Register(GetTenantSummaryCommand{})
+	gob.Register(GetTenantSummaryInMasterCommand{})
 }
 
-type GetTenantSummaryCommand struct {
+type GetTenantSummaryInMasterCommand struct {
 	TenantCode string
 }
 
-func (cmd *GetTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+func (cmd *GetTenantSummaryInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
 
-	fmt.Println("Executing GetTenantSummaryCommand for TenantId:", cmd.TenantCode)
+	fmt.Println("Executing GetTenantSummaryInMasterCommand for TenantId:", cmd.TenantCode)
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 	tenantRepo, err := db.NewTenantInMasterRepository(uow, idFactory)

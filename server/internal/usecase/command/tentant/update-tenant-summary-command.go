@@ -9,14 +9,14 @@ import (
 )
 
 func init() {
-	gob.Register(UpdateTenantSummaryCommand{})
+	gob.Register(UpdateTenantSummaryInMasterCommand{})
 }
 
-type UpdateTenantSummaryCommand struct {
+type UpdateTenantSummaryInMasterCommand struct {
 	TenantSummaries []models.TenantSummary
 }
 
-func (cmd *UpdateTenantSummaryCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
+func (cmd *UpdateTenantSummaryInMasterCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
 	commandResult := &command.CommandResult{}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
