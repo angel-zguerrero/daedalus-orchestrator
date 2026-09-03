@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
 
 	"deadalus-orch/shared/constants"
 
@@ -50,19 +49,17 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	authInterceptor := UnaryAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
 	tenantBO := bo.NewTenantBO(cfg)
 	tenantInterceptor := UnaryTenantInterceptor(tenantBO, cfg, cfg.Logger)
-	rateLimitInterceptor := UnaryRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 50000)
 
 	streamAuthInterceptor := StreamAuthInterceptor(cfg.MasterNode, cfg.Logger, cfg.JwtKey)
 	streamTenantInterceptor := StreamTenantInterceptor(tenantBO, cfg, cfg.Logger)
-	streamRateLimitInterceptor := StreamRateLimitInterceptor(cfg.MasterNode, cfg.Logger, "token", time.Second, 50000)
 
 	var serverOpts []grpc.ServerOption
 	if os.Getenv(constants.EnvVarOtelActived) == constants.OTEL_ACTIVE_TRUE {
 		serverOpts = append(serverOpts, grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	}
 	serverOpts = append(serverOpts,
-		grpc.ChainUnaryInterceptor(authInterceptor, tenantInterceptor, rateLimitInterceptor),
-		grpc.ChainStreamInterceptor(streamAuthInterceptor, streamTenantInterceptor, streamRateLimitInterceptor),
+		grpc.ChainUnaryInterceptor(authInterceptor, tenantInterceptor),
+		grpc.ChainStreamInterceptor(streamAuthInterceptor, streamTenantInterceptor),
 	)
 
 	server := grpc.NewServer(serverOpts...)

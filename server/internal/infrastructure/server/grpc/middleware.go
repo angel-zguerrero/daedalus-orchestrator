@@ -378,7 +378,6 @@ func StreamAuthInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logge
 
 // UnaryRateLimitInterceptor returns a new unary server interceptor that rate-limits requests.
 func UnaryRateLimitInterceptor(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, keyStrategy string, period time.Duration, limit int64) grpc.UnaryServerInterceptor {
-
 	rate := limiter.Rate{
 		Period: period,
 		Limit:  limit,
