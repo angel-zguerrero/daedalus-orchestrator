@@ -211,15 +211,17 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 		}
 
 		startEnqueue := time.Now()
+		execCtx, execCancel := context.WithTimeout(context.Background(), raftTimeout)
 		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.EnqueueResult](
 			dragonboat.KindEnqueue,
 			tenantNode,
-			ctx,
+			execCtx,
 			&enqueueCmd,
 			raftTimeout,
 			logger,
 			"EnqueueCommand (Batch Publish)",
 		)
+		execCancel()
 		logger.Debug().Dur("duration", time.Since(startEnqueue)).Int("messages", len(chunkMessages)).Msg("EnqueueCommand executed in publish-flusher micro-batch")
 
 		if err != nil {

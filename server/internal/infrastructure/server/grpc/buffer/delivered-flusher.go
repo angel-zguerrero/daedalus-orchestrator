@@ -43,14 +43,16 @@ func NewDeliveredFlusher(logger zerolog.Logger, raftTimeout time.Duration) func(
 				CFS:      cfs,
 			}
 
+			execCtx, execCancel := context.WithTimeout(context.Background(), raftTimeout)
 			res, err := dragonboat.ExecuteRepositoryCommand[queue.BulkMarkLeaseDeliveredResult](
 				tenantNode,
-				ctx,
+				execCtx,
 				&cmd,
 				raftTimeout,
 				logger,
 				"BulkMarkLeaseDeliveredCommand",
 			)
+			execCancel()
 
 			if err != nil {
 				logger.Error().Err(err).Msg("❌ BulkMarkLeaseDeliveredCommand failed")

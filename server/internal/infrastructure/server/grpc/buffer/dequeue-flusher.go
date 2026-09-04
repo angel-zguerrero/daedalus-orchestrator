@@ -67,15 +67,17 @@ func processDequeueGroup(ctx context.Context, items []DequeueBufferedMessage, lo
 		}
 
 		start := time.Now()
+		execCtx, execCancel := context.WithTimeout(context.Background(), raftTimeout)
 		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.BulkDequeueResult](
 			dragonboat.KindDequeue,
 			tenantNode,
-			ctx,
+			execCtx,
 			bulkDequeueCmd,
 			raftTimeout,
 			logger,
 			"BulkDequeueCommand (Batch)",
 		)
+		execCancel()
 		logger.Debug().Dur("duration", time.Since(start)).Int("count", len(chunkRequests)).Msg("BulkDequeueCommand executed micro-batch")
 
 		if err != nil {

@@ -97,12 +97,11 @@ func (s *ShardScheduler) run() {
 func (s *ShardScheduler) executeTask(task ScheduledTask) {
 	var res TaskResult
 
-	writeCtx := task.Ctx
-	if _, hasDeadline := task.Ctx.Deadline(); !hasDeadline {
-		var writeCancel context.CancelFunc
-		writeCtx, writeCancel = context.WithTimeout(task.Ctx, task.Timeout)
-		defer writeCancel()
-	}
+	// Use a dedicated background context with timeout for Raft execution so that
+	// caller context cancellations (e.g., client stream disconnects or short deadlines)
+	// do not cancel the Raft transaction mid-flight or cause context canceled errors.
+	writeCtx, writeCancel := context.WithTimeout(context.Background(), task.Timeout)
+	defer writeCancel()
 
 	fsmCmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
@@ -113,7 +112,10 @@ func (s *ShardScheduler) executeTask(task ScheduledTask) {
 	resultChan, err := task.RaftNode.Write(writeCtx, fsmCmd)
 	if err != nil {
 		res.Err = fmt.Errorf("failed to start %s: %w", task.OperationName, err)
-		task.ResChan <- res
+		select {
+		case task.ResChan <- res:
+		default:
+		}
 		return
 	}
 
@@ -128,7 +130,10 @@ func (s *ShardScheduler) executeTask(task ScheduledTask) {
 		res.Err = fmt.Errorf("%s operation timed out: %w", task.OperationName, writeCtx.Err())
 	}
 
-	task.ResChan <- res
+	select {
+	case task.ResChan <- res:
+	default:
+	}
 }
 
 // ExecuteScheduledRepositoryCommand routes repository commands through the Raft Turn Scheduler
