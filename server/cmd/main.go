@@ -21,8 +21,8 @@ import (
 // The function will block until a system signal is received.
 func main() {
 	// Help flag handling and flag parsing is now done in config.LoadDefaultConfiguration()
-	log.Info().Msg("🔥🔥🔥 DAEDALUS HARMONIC FLOW SCHEDULER ACTIVE [BUILD-VER-2026-v2-V] 🔥🔥🔥")
-	fmt.Println("🔥🔥🔥 DAEDALUS HARMONIC FLOW SCHEDULER ACTIVE [BUILD-VER-2026-v2-V] 🔥🔥🔥")
+	log.Info().Msg("🔥🔥🔥 DAEDALUS HARMONIC FLOW SCHEDULER ACTIVE [BUILD-VER-2026-v2-IX] 🔥🔥🔥")
+	fmt.Println("🔥🔥🔥 DAEDALUS HARMONIC FLOW SCHEDULER ACTIVE [BUILD-VER-2026-v2-IX] 🔥🔥🔥")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)

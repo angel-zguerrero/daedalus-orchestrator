@@ -248,7 +248,7 @@ func (s *ExchangeService) PublishStream(stream pb.ExchangeService_PublishStreamS
 		}
 		recvCount++
 		if recvCount%100 == 0 {
-			s.Config.Logger.Info().Int("count", recvCount).Dur("duration", time.Since(startRecv)).Msg("Received 100 messages from stream.Recv()")
+			s.Config.Logger.Debug().Int("count", recvCount).Dur("duration", time.Since(startRecv)).Msg("Received 100 messages from stream.Recv()")
 			startRecv = time.Now()
 		}
 

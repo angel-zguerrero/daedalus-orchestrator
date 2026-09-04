@@ -193,13 +193,12 @@ func (mb *MessageBuffer[T]) Stop() {
 	if mb.timer != nil {
 		mb.timer.Stop()
 	}
-	mb.flush(context.Background())
+	mb.triggerFlush(context.Background())
 }
 
 func (mb *MessageBuffer[T]) Add(ctx context.Context, item T) {
 	mb.mu.Lock()
 	mb.messages = append(mb.messages, item)
-	needsFlush := len(mb.messages) >= mb.maxBufferSize
 	l := len(mb.messages)
 	m := mb.maxBufferSize
 	mb.mu.Unlock()
@@ -209,34 +208,34 @@ func (mb *MessageBuffer[T]) Add(ctx context.Context, item T) {
 		mb.logger.Info().Int("len", l).Int("max", m).Msg("MessageBuffer Add")
 	}
 
-	if needsFlush {
-		mb.timer.Stop()
-		mb.flush(ctx)
-		mb.timer.Reset(mb.flushInterval)
-	}
+	mb.triggerFlush(ctx)
 }
 
 func (mb *MessageBuffer[T]) flushTrigger() {
-	mb.flush(context.Background())
-	mb.timer.Reset(mb.flushInterval)
+	mb.triggerFlush(context.Background())
 }
 
-func (mb *MessageBuffer[T]) flush(ctx context.Context) {
-	mb.mu.Lock()
-	if len(mb.messages) == 0 {
-		mb.mu.Unlock()
-		return
-	}
-	itemsToFlush := mb.messages
-	mb.messages = make([]T, 0, mb.maxBufferSize)
-	mb.mu.Unlock()
+func (mb *MessageBuffer[T]) triggerFlush(ctx context.Context) {
+	select {
+	case mb.flushSem <- struct{}{}:
+		go func() {
+			defer func() { <-mb.flushSem }()
 
-	go func() {
-		// Acquire flush semaphore to limit concurrency
-		mb.flushSem <- struct{}{}
-		defer func() { <-mb.flushSem }()
-		
-		mb.flushFunc(ctx, itemsToFlush)
-	}()
+			for {
+				mb.mu.Lock()
+				if len(mb.messages) == 0 {
+					mb.mu.Unlock()
+					return
+				}
+				itemsToFlush := mb.messages
+				mb.messages = make([]T, 0, mb.maxBufferSize)
+				mb.mu.Unlock()
+
+				mb.flushFunc(ctx, itemsToFlush)
+			}
+		}()
+	default:
+		// An active flush worker is already running and will drain mb.messages in its loop
+	}
 }
 

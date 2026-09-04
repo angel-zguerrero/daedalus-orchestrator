@@ -81,7 +81,7 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 		return
 	}
 	
-	logger.Info().Int("items_count", len(items)).Msg("processPublishGroup started")
+	logger.Debug().Int("items_count", len(items)).Msg("processPublishGroup started")
 
 	// For all items in the group, we assume they share the same TenantNode, CF, CFS, and Tenant Code.
 	// We use the first item to get the common properties.

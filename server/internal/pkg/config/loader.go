@@ -658,13 +658,13 @@ func LoadDefaultConfiguration() error {
 	}
 
 	if config.PublishBufferFlushIntervalMs == 0 {
-		config.PublishBufferFlushIntervalMs = 50 // Default 50ms
+		config.PublishBufferFlushIntervalMs = 50 // Default 50ms safety fallback
 	}
 	if config.PublishBufferMaxSize == 0 {
-		config.PublishBufferMaxSize = 200 // Default 200 messages
+		config.PublishBufferMaxSize = 250 // Default 250 max buffer size
 	}
 	if config.PublishBufferFlushConcurrency == 0 {
-		config.PublishBufferFlushConcurrency = 1 // Default 1 worker to eliminate Raft lock contention
+		config.PublishBufferFlushConcurrency = 8 // Default 8 concurrent workers for parallel buffer flushing
 		log.Info().Msgf("PublishBufferFlushConcurrency not specified, defaulting to %d", config.PublishBufferFlushConcurrency)
 	}
 
