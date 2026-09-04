@@ -38,9 +38,17 @@ func NewRoutingCache(ttl time.Duration) *RoutingCache {
 
 func (rc *RoutingCache) Get(key string) ([]models.Queue, bool) {
 	rc.mu.RLock()
-	defer rc.mu.RUnlock()
 	entry, ok := rc.entries[key]
-	if !ok || time.Now().After(entry.expiresAt) {
+	rc.mu.RUnlock()
+
+	if !ok {
+		return nil, false
+	}
+
+	if time.Now().After(entry.expiresAt) {
+		rc.mu.Lock()
+		delete(rc.entries, key)
+		rc.mu.Unlock()
 		return nil, false
 	}
 	return entry.queues, true
@@ -52,6 +60,15 @@ func (rc *RoutingCache) Set(key string, queues []models.Queue) {
 	rc.entries[key] = routingCacheEntry{
 		queues:    queues,
 		expiresAt: time.Now().Add(rc.ttl),
+	}
+
+	if len(rc.entries) > 500 {
+		now := time.Now()
+		for k, e := range rc.entries {
+			if now.After(e.expiresAt) {
+				delete(rc.entries, k)
+			}
+		}
 	}
 }
 

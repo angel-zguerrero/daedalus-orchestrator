@@ -13,6 +13,7 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
@@ -76,6 +77,7 @@ type Application struct {
 	MetricsFlushWorkerStopper      *syncutil.Stopper
 	MetricsAggregationWorkerStopper *syncutil.Stopper
 	MetricsDownsampleWorkerStopper *syncutil.Stopper
+	MemoryScavengerStopper         *syncutil.Stopper
 
 	MetricsCollector *metrics.MetricsCollector
 
@@ -275,9 +277,35 @@ func (app *Application) Run() {
 
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
+	app.StartMemoryScavengerWorker(1 * time.Minute)
+
 	if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
 		app.StartRestAPI()
 	}
+}
+
+func (app *Application) StartMemoryScavengerWorker(interval time.Duration) {
+	app.MemoryScavengerStopper.RunWorker(func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				select {
+				case <-app.MemoryScavengerStopper.ShouldStop():
+					return
+				default:
+				}
+
+				debug.FreeOSMemory()
+
+			case <-app.MemoryScavengerStopper.ShouldStop():
+				log.Info().Msg("ℹ️  MemoryScavenger worker stopped gracefully")
+				return
+			}
+		}
+	})
 }
 
 func (app *Application) Stop() {
@@ -415,7 +443,10 @@ func (app *Application) Stop() {
 		if app.MetricsDownsampleWorkerStopper != nil {
 			app.MetricsDownsampleWorkerStopper.Stop()
 		}
-		log.Info().Msg("✅ OutboxRelayWorkerStopper and Metrics Workers stopped.")
+		if app.MemoryScavengerStopper != nil {
+			app.MemoryScavengerStopper.Stop()
+		}
+		log.Info().Msg("✅ OutboxRelayWorkerStopper, Metrics Workers and MemoryScavenger stopped.")
 	}()
 
 	// Stop Job Worker Heartbeat Monitor
@@ -467,6 +498,7 @@ func NewApplication() *Application {
 		OutboxRelayWorkerStopper:      syncutil.NewStopper(),
 		MetricsRelayWorkerStopper:     syncutil.NewStopper(),
 		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
+		MemoryScavengerStopper:        syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary: make(map[string]*dragonboat.RaftNode),
