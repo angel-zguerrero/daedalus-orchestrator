@@ -369,12 +369,17 @@ func (s *QueueService) EnqueueStream(stream pb.QueueService_EnqueueStreamServer)
 
 	// gRPC streams are not safe for concurrent sends, use a dedicated channel and sender goroutine
 	sendChan := make(chan *pb.EnqueueStreamResponse, s.Config.PublishBufferMaxSize*2)
+	defer close(sendChan)
+
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case resp := <-sendChan:
+			case resp, ok := <-sendChan:
+				if !ok {
+					return
+				}
 				_ = stream.Send(resp)
 			}
 		}

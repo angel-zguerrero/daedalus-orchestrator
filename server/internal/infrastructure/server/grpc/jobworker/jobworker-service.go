@@ -77,18 +77,11 @@ func NewJobWorkerService(config *common.ServerConfing) *JobWorkerService {
 	)
 
 	heartbeatFunc := func(ctx context.Context, worker models.JobWorker, masterNode *dragonboat.RaftNode) error {
-		resChan := make(chan buffer.HeartbeatConfirmation, 1)
 		heartbeatBuffer.Add(ctx, buffer.JobWorkerHeartbeatBufferedMessage{
 			JobWorker:    worker,
 			MasterNode:   masterNode,
-			ResponseChan: resChan,
+			ResponseChan: nil,
 		})
-		go func(wID string, rc chan buffer.HeartbeatConfirmation) {
-			res := <-rc
-			if !res.Success {
-				config.Logger.Error().Err(res.Error).Str("workerID", wID).Msg("❌ Failed to upsert job worker heartbeat")
-			}
-		}(worker.ID, resChan)
 		return nil
 	}
 
@@ -265,23 +258,14 @@ func (s *JobWorkerService) ClaimWork(stream pb.JobWorkerService_ClaimWorkServer)
 				return err
 			}
 			
-			// Mark lease as delivered via the buffer
-			resChan := make(chan buffer.DeliveredConfirmation, 1)
+			// Mark lease as delivered via the buffer (fire and forget, no channel/goroutine per msg)
 			s.deliveredBuffer.Add(stream.Context(), buffer.DeliveredBufferedMessage{
 				LeaseID:      claimed.Lease.ID,
 				CF:           claimed.CF,
 				CFS:          claimed.CFS,
 				TenantNode:   claimed.TenantNode,
-				ResponseChan: resChan,
+				ResponseChan: nil,
 			})
-			
-			// Fire and forget, or log errors asynchronously
-			go func(lID string, rc chan buffer.DeliveredConfirmation) {
-				res := <-rc
-				if !res.Success {
-					s.Config.Logger.Error().Err(res.Error).Str("leaseID", lID).Msg("❌ Failed to mark lease delivered")
-				}
-			}(claimed.Lease.ID, resChan)
 
 			s.Config.Logger.Debug().
 				Str("messageID", claimed.Message.ID).

@@ -119,15 +119,17 @@ func processEnqueueGroup(ctx context.Context, items []EnqueueBufferedMessage, qu
 			Messages: chunkMessages,
 		}
 
+		execCtx, execCancel := context.WithTimeout(context.Background(), raftTimeout)
 		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.EnqueueResult](
 			dragonboat.KindEnqueue,
 			tenantNode,
-			ctx,
+			execCtx,
 			&enqueueCmd,
 			raftTimeout,
 			logger,
 			"EnqueueCommand (Batch Enqueue)",
 		)
+		execCancel()
 
 		if err != nil {
 			lastErr = err

@@ -48,6 +48,7 @@ func exchangeKey(code, vnamespace string) string {
 }
 
 // Get returns cached exchange info. Second return is false on miss/expiry.
+// Expired entries are deleted immediately upon access.
 func (c *ExchangeCache) Get(code, vnamespace string) (ExchangeInfo, bool) {
 	key := exchangeKey(code, vnamespace)
 
@@ -55,7 +56,14 @@ func (c *ExchangeCache) Get(code, vnamespace string) (ExchangeInfo, bool) {
 	entry, ok := c.cache[key]
 	c.mu.RUnlock()
 
-	if !ok || time.Now().After(entry.expiresAt) {
+	if !ok {
+		return ExchangeInfo{}, false
+	}
+
+	if time.Now().After(entry.expiresAt) {
+		c.mu.Lock()
+		delete(c.cache, key)
+		c.mu.Unlock()
 		return ExchangeInfo{}, false
 	}
 	return entry.info, true
@@ -70,7 +78,39 @@ func (c *ExchangeCache) Set(code, vnamespace string, info ExchangeInfo) {
 		info:      info,
 		expiresAt: time.Now().Add(c.ttl),
 	}
+
+	if len(c.cache) > 500 {
+		now := time.Now()
+		for k, e := range c.cache {
+			if now.After(e.expiresAt) {
+				delete(c.cache, k)
+			}
+		}
+	}
 	c.mu.Unlock()
+}
+
+// PurgeExpired explicitly removes all expired entries from the cache.
+// Returns the number of purged entries.
+func (c *ExchangeCache) PurgeExpired() int {
+	now := time.Now()
+	purged := 0
+	c.mu.Lock()
+	for k, entry := range c.cache {
+		if now.After(entry.expiresAt) {
+			delete(c.cache, k)
+			purged++
+		}
+	}
+	c.mu.Unlock()
+	return purged
+}
+
+// Len returns the current number of cached entries.
+func (c *ExchangeCache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.cache)
 }
 
 // Invalidate removes a specific exchange entry.

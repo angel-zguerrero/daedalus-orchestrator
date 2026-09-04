@@ -72,15 +72,17 @@ func processAckGroup(ctx context.Context, items []AckBufferedMessage, logger zer
 			LeaseIDs: chunkLeaseIDs,
 		}
 
+		execCtx, execCancel := context.WithTimeout(context.Background(), raftTimeout)
 		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.BulkAckMessageResult](
 			dragonboat.KindDequeue,
 			tenantNode,
-			ctx,
+			execCtx,
 			&ackCmd,
 			raftTimeout,
 			logger,
 			"BulkAckMessageCommand",
 		)
+		execCancel()
 
 		if err != nil {
 			lastErr = err

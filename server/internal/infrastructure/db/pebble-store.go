@@ -31,9 +31,12 @@ func CreatePebbleStore(dbPath string, columnFamilyNames []string, ttlColumnFamil
 	// Dragonboat manages its own WAL for durability, so we minimize Pebble's overhead.
 	cache := pebble.NewCache(64 * 1024 * 1024) // 64MB
 	opts := &pebble.Options{
-		MaxManifestFileSize: 10 * 1024 * 1024, // 10MB
-		MemTableSize:        4 * 1024 * 1024,  // 4MB
-		Cache:               cache,
+		MaxManifestFileSize:         10 * 1024 * 1024, // 10MB
+		MemTableSize:                4 * 1024 * 1024,  // 4MB
+		Cache:                       cache,
+		MaxOpenFiles:                500,
+		L0CompactionThreshold:       2,
+		MemTableStopWritesThreshold: 2,
 	}
 	dbPath = filepath.Join(dbPath, "pebble")
 	err := utils.EnsureDirExists(dbPath)

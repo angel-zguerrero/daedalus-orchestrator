@@ -278,8 +278,8 @@ func (r *MetricsRepository) queryByPrefixFilterResolution(
 // DeleteOlderThan removes all metric buckets at the given resolution whose
 // timestamp is older than cutoff. This is used for data retention.
 func (r *MetricsRepository) DeleteOlderThan(resolution int, cutoff int64, now time.Time) (int, error) {
-	// Scan all metrics with this resolution and delete those older than cutoff.
-	pattern := fmt.Sprintf("%s:*:%d:*", MetricsKeyPrefix, resolution)
+	// Scan all metrics entries and delete those matching resolution and older than cutoff.
+	pattern := MetricsKeyPrefix + ":*"
 	cursor := ""
 	deleted := 0
 
@@ -299,7 +299,7 @@ func (r *MetricsRepository) DeleteOlderThan(resolution int, cutoff int64, now ti
 				continue
 			}
 
-			if bucket.Timestamp < cutoff {
+			if bucket.Resolution == resolution && bucket.Timestamp < cutoff {
 				batch.Delete(r.columnFamily, r.columnFamilySector, item.Key, now)
 				deleted++
 			}

@@ -38,9 +38,17 @@ func NewRoutingCache(ttl time.Duration) *RoutingCache {
 
 func (rc *RoutingCache) Get(key string) ([]models.Queue, bool) {
 	rc.mu.RLock()
-	defer rc.mu.RUnlock()
 	entry, ok := rc.entries[key]
-	if !ok || time.Now().After(entry.expiresAt) {
+	rc.mu.RUnlock()
+
+	if !ok {
+		return nil, false
+	}
+
+	if time.Now().After(entry.expiresAt) {
+		rc.mu.Lock()
+		delete(rc.entries, key)
+		rc.mu.Unlock()
 		return nil, false
 	}
 	return entry.queues, true
@@ -52,6 +60,15 @@ func (rc *RoutingCache) Set(key string, queues []models.Queue) {
 	rc.entries[key] = routingCacheEntry{
 		queues:    queues,
 		expiresAt: time.Now().Add(rc.ttl),
+	}
+
+	if len(rc.entries) > 500 {
+		now := time.Now()
+		for k, e := range rc.entries {
+			if now.After(e.expiresAt) {
+				delete(rc.entries, k)
+			}
+		}
 	}
 }
 
@@ -194,15 +211,17 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 		}
 
 		startEnqueue := time.Now()
+		execCtx, execCancel := context.WithTimeout(context.Background(), raftTimeout)
 		res, err := dragonboat.ExecuteScheduledRepositoryCommand[queue.EnqueueResult](
 			dragonboat.KindEnqueue,
 			tenantNode,
-			ctx,
+			execCtx,
 			&enqueueCmd,
 			raftTimeout,
 			logger,
 			"EnqueueCommand (Batch Publish)",
 		)
+		execCancel()
 		logger.Debug().Dur("duration", time.Since(startEnqueue)).Int("messages", len(chunkMessages)).Msg("EnqueueCommand executed in publish-flusher micro-batch")
 
 		if err != nil {

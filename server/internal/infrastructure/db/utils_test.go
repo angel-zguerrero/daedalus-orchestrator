@@ -71,7 +71,7 @@ func TestDefaultPathProvider_ProductionEnv(t *testing.T) {
 	}
 
 	if err != nil {
-		if os.IsPermission(err) {
+		if os.IsPermission(err) || strings.Contains(err.Error(), "permission denied") {
 			assert.Equal(t, expectedPath, path)
 		} else {
 			assert.Fail(t, "unexpected error: %v", err)

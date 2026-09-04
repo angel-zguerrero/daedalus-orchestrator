@@ -8,6 +8,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"fmt"
+	"sync"
 	"time"
 
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -17,6 +18,8 @@ import (
 )
 
 func (app *Application) StartDashboardSummaryWorker(interval time.Duration) {
+	var dashboardLock sync.Mutex
+
 	app.DashboardSummaryWorkerStopper.RunWorker(func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -24,24 +27,31 @@ func (app *Application) StartDashboardSummaryWorker(interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				if !app.MasterNodeIsReady {
-					log.Debug().Msg("⏳ DashboardSummary worker is waiting for the master node to be ready")
+				if !dashboardLock.TryLock() {
+					log.Debug().Msg("⏳ Skipping dashboard summary update: previous execution still in progress")
 					continue
-				}
-
-				if !app.MasterNodeIsLeader {
-					log.Debug().Msg("⏳ DashboardSummary worker is waiting for the master node to be leader")
-					continue
-				}
-
-				select {
-				case <-app.DashboardSummaryWorkerStopper.ShouldStop():
-					log.Info().Msg("🛑 DashboardSummary worker received stop signal before execution")
-					return
-				default:
 				}
 
 				go func() {
+					defer dashboardLock.Unlock()
+
+					if !app.MasterNodeIsReady {
+						log.Debug().Msg("⏳ DashboardSummary worker is waiting for the master node to be ready")
+						return
+					}
+
+					if !app.MasterNodeIsLeader {
+						log.Debug().Msg("⏳ DashboardSummary worker is waiting for the master node to be leader")
+						return
+					}
+
+					select {
+					case <-app.DashboardSummaryWorkerStopper.ShouldStop():
+						log.Info().Msg("🛑 DashboardSummary worker received stop signal before execution")
+						return
+					default:
+					}
+
 					app.updateDashboardSummary()
 				}()
 
