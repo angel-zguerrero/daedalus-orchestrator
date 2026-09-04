@@ -8,12 +8,15 @@ import (
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
 func (app *Application) StartOutboxRelayWorker(interval time.Duration) {
+	var relayLock sync.Mutex
+
 	app.OutboxRelayWorkerStopper.RunWorker(func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -21,24 +24,31 @@ func (app *Application) StartOutboxRelayWorker(interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				if !app.MasterNodeIsReady {
-					log.Debug().Msg("⏳ OutboxRelay worker is waiting for the master node to be ready")
+				if !relayLock.TryLock() {
+					log.Debug().Msg("⏳ Skipping outbox relay: previous execution still in progress")
 					continue
-				}
-
-				if !app.MasterNodeIsLeader {
-					log.Debug().Msg("⏳ OutboxRelay worker is waiting for the master node to be leader")
-					continue
-				}
-
-				select {
-				case <-app.OutboxRelayWorkerStopper.ShouldStop():
-					log.Info().Msg("🛑 OutboxRelay worker received stop signal before execution")
-					return
-				default:
 				}
 
 				go func() {
+					defer relayLock.Unlock()
+
+					if !app.MasterNodeIsReady {
+						log.Debug().Msg("⏳ OutboxRelay worker is waiting for the master node to be ready")
+						return
+					}
+
+					if !app.MasterNodeIsLeader {
+						log.Debug().Msg("⏳ OutboxRelay worker is waiting for the master node to be leader")
+						return
+					}
+
+					select {
+					case <-app.OutboxRelayWorkerStopper.ShouldStop():
+						log.Info().Msg("🛑 OutboxRelay worker received stop signal before execution")
+						return
+					default:
+					}
+
 					app.processOutboxRelays()
 				}()
 
@@ -52,6 +62,7 @@ func (app *Application) StartOutboxRelayWorker(interval time.Duration) {
 
 func (app *Application) processOutboxRelays() {
 	now := time.Now()
+	var wg sync.WaitGroup
 
 	for _, tenantNode := range app.TenantNodes {
 		select {
@@ -61,10 +72,14 @@ func (app *Application) processOutboxRelays() {
 		default:
 		}
 
+		wg.Add(1)
 		go func(node *dragonboat.RaftNode) {
+			defer wg.Done()
 			app.processOutboxEventsForNode(node, now)
 		}(tenantNode)
 	}
+
+	wg.Wait()
 }
 
 func (app *Application) processOutboxEventsForNode(tenantNode *dragonboat.RaftNode, now time.Time) {

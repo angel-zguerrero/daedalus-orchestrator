@@ -10,12 +10,15 @@ import (
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
 func (app *Application) StartTenantSummaryWorker(interval time.Duration) {
+	var summaryLock sync.Mutex
+
 	app.TenantSummaryWorkerStopper.RunWorker(func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -23,24 +26,31 @@ func (app *Application) StartTenantSummaryWorker(interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				if !app.MasterNodeIsReady {
-					log.Debug().Msg("⏳ TenantSummary worker is waiting for the master node to be ready")
+				if !summaryLock.TryLock() {
+					log.Debug().Msg("⏳ Skipping tenant summary update: previous execution still in progress")
 					continue
-				}
-
-				if !app.MasterNodeIsLeader {
-					log.Debug().Msg("⏳ TenantSummary worker is waiting for the master node to be leader")
-					continue
-				}
-
-				select {
-				case <-app.TenantSummaryWorkerStopper.ShouldStop():
-					log.Info().Msg("🛑 TenantSummary worker received stop signal before execution")
-					return
-				default:
 				}
 
 				go func() {
+					defer summaryLock.Unlock()
+
+					if !app.MasterNodeIsReady {
+						log.Debug().Msg("⏳ TenantSummary worker is waiting for the master node to be ready")
+						return
+					}
+
+					if !app.MasterNodeIsLeader {
+						log.Debug().Msg("⏳ TenantSummary worker is waiting for the master node to be leader")
+						return
+					}
+
+					select {
+					case <-app.TenantSummaryWorkerStopper.ShouldStop():
+						log.Info().Msg("🛑 TenantSummary worker received stop signal before execution")
+						return
+					default:
+					}
+
 					app.updateTenantSummaries()
 				}()
 
@@ -54,6 +64,7 @@ func (app *Application) StartTenantSummaryWorker(interval time.Duration) {
 
 func (app *Application) updateTenantSummaries() {
 	now := time.Now()
+	var wg sync.WaitGroup
 
 	log.Info().Msg("🔄 Starting tenant summaries update process")
 
@@ -66,10 +77,14 @@ func (app *Application) updateTenantSummaries() {
 		default:
 		}
 
+		wg.Add(1)
 		go func(node *dragonboat.RaftNode) {
+			defer wg.Done()
 			app.processTenantNode(node, now)
 		}(tenantNode)
 	}
+
+	wg.Wait()
 }
 
 func (app *Application) processTenantNode(tenantNode *dragonboat.RaftNode, now time.Time) {

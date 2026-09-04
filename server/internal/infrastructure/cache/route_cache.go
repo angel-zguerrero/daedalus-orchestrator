@@ -54,6 +54,7 @@ func cacheKey(exchangeCode, routingKey, vnamespace string) string {
 
 // Get returns cached queues for the given routing parameters.
 // The second return value is false on cache miss or expiry.
+// Expired entries are deleted immediately upon access.
 func (c *RouteCache) Get(exchangeCode, routingKey, vnamespace string) ([]models.Queue, bool) {
 	key := cacheKey(exchangeCode, routingKey, vnamespace)
 
@@ -61,7 +62,14 @@ func (c *RouteCache) Get(exchangeCode, routingKey, vnamespace string) ([]models.
 	entry, ok := c.cache[key]
 	c.mu.RUnlock()
 
-	if !ok || time.Now().After(entry.expiresAt) {
+	if !ok {
+		return nil, false
+	}
+
+	if time.Now().After(entry.expiresAt) {
+		c.mu.Lock()
+		delete(c.cache, key)
+		c.mu.Unlock()
 		return nil, false
 	}
 
@@ -84,7 +92,33 @@ func (c *RouteCache) Set(exchangeCode, routingKey, vnamespace string, queues []m
 		queues:    stored,
 		expiresAt: time.Now().Add(c.ttl),
 	}
+
+	// Periodic inline cleanup when cache size grows
+	if len(c.cache) > 500 {
+		now := time.Now()
+		for k, e := range c.cache {
+			if now.After(e.expiresAt) {
+				delete(c.cache, k)
+			}
+		}
+	}
 	c.mu.Unlock()
+}
+
+// PurgeExpired explicitly removes all expired entries from the cache.
+// Returns the number of purged entries.
+func (c *RouteCache) PurgeExpired() int {
+	now := time.Now()
+	purged := 0
+	c.mu.Lock()
+	for k, entry := range c.cache {
+		if now.After(entry.expiresAt) {
+			delete(c.cache, k)
+			purged++
+		}
+	}
+	c.mu.Unlock()
+	return purged
 }
 
 // InvalidateExchange removes ALL cached entries for the given exchange code

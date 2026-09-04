@@ -10,12 +10,15 @@ import (
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/shared/models"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
 func (app *Application) StartMetricsRelayWorker(interval time.Duration) {
+	var relayLock sync.Mutex
+
 	app.MetricsRelayWorkerStopper.RunWorker(func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -23,24 +26,31 @@ func (app *Application) StartMetricsRelayWorker(interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				if !app.MasterNodeIsReady {
-					log.Debug().Msg("⏳ MetricsRelay worker is waiting for the master node to be ready")
+				if !relayLock.TryLock() {
+					log.Debug().Msg("⏳ Skipping metrics relay: previous execution still in progress")
 					continue
-				}
-
-				if !app.MasterNodeIsLeader {
-					log.Debug().Msg("⏳ MetricsRelay worker is waiting for the master node to be leader")
-					continue
-				}
-
-				select {
-				case <-app.MetricsRelayWorkerStopper.ShouldStop():
-					log.Info().Msg("🛑 MetricsRelay worker received stop signal before execution")
-					return
-				default:
 				}
 
 				go func() {
+					defer relayLock.Unlock()
+
+					if !app.MasterNodeIsReady {
+						log.Debug().Msg("⏳ MetricsRelay worker is waiting for the master node to be ready")
+						return
+					}
+
+					if !app.MasterNodeIsLeader {
+						log.Debug().Msg("⏳ MetricsRelay worker is waiting for the master node to be leader")
+						return
+					}
+
+					select {
+					case <-app.MetricsRelayWorkerStopper.ShouldStop():
+						log.Info().Msg("🛑 MetricsRelay worker received stop signal before execution")
+						return
+					default:
+					}
+
 					app.processMetricsRelays()
 				}()
 
@@ -54,6 +64,7 @@ func (app *Application) StartMetricsRelayWorker(interval time.Duration) {
 
 func (app *Application) processMetricsRelays() {
 	now := time.Now()
+	var wg sync.WaitGroup
 
 	for _, tenantNode := range app.TenantNodes {
 		select {
@@ -63,10 +74,14 @@ func (app *Application) processMetricsRelays() {
 		default:
 		}
 
+		wg.Add(1)
 		go func(node *dragonboat.RaftNode) {
+			defer wg.Done()
 			app.processMetricsEventsForNode(node, now)
 		}(tenantNode)
 	}
+
+	wg.Wait()
 }
 
 func (app *Application) processMetricsEventsForNode(tenantNode *dragonboat.RaftNode, now time.Time) {

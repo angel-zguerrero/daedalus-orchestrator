@@ -26,7 +26,7 @@ func (d DefaultPathProvider) GetDatabasePath() (string, error) {
 	}
 
 	if err := mkdirAll(path, 0755); err != nil {
-		return "", fmt.Errorf("could not create database directory at %q: %w", path, err)
+		return path, fmt.Errorf("could not create database directory at %q: %w", path, err)
 	}
 
 	return path, nil
