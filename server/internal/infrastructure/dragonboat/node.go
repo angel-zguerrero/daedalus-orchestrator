@@ -191,6 +191,7 @@ func (mn *RaftNode) RequestAddReplica(replicaID uint64, member Member) error {
 	if err != nil {
 		return err
 	}
+	defer rs.Release()
 	// Wait for the result of the request.
 	r := <-rs.ResultC()
 	if r.Completed() {
@@ -310,6 +311,7 @@ func (mn *RaftNode) Write(ctx context.Context, command general_command.FSM_Comma
 	go func() {
 		defer func() { <-mn.writeSem }() // Release semaphore when done
 		defer close(resultChan)
+		defer rs.Release()
 
 		select {
 		case result := <-rs.ResultC():
@@ -362,6 +364,7 @@ func (mn *RaftNode) Read(ctx context.Context, cmd general_command.Query_Command)
 	if err != nil {
 		return nil, err
 	}
+	defer rs.Release()
 
 	select {
 	case res := <-rs.ResultC():

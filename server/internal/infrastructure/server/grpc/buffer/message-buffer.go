@@ -175,10 +175,6 @@ type MessageBuffer[T BufferedItem] struct {
 }
 
 func NewMessageBuffer[T BufferedItem](flushInterval time.Duration, maxBufferSize int, logger zerolog.Logger, flushFunc func(ctx context.Context, items []T)) *MessageBuffer[T] {
-	concurrency := 1
-	if configPkg.GlobalConfiguration != nil && configPkg.GlobalConfiguration.PublishBufferFlushConcurrency > 0 {
-		concurrency = configPkg.GlobalConfiguration.PublishBufferFlushConcurrency
-	}
 	mb := &MessageBuffer[T]{
 		messages:      make([]T, 0, maxBufferSize),
 		flushInterval: flushInterval,
@@ -186,7 +182,7 @@ func NewMessageBuffer[T BufferedItem](flushInterval time.Duration, maxBufferSize
 		flushFunc:     flushFunc,
 		logger:        logger,
 		stopChan:      make(chan struct{}),
-		flushSem:      make(chan struct{}, concurrency), // Configurable concurrency
+		flushSem:      make(chan struct{}, configPkg.GlobalConfiguration.PublishBufferFlushConcurrency), // Configurable concurrency
 	}
 	mb.timer = time.AfterFunc(mb.flushInterval, mb.flushTrigger)
 	return mb
@@ -197,7 +193,7 @@ func (mb *MessageBuffer[T]) Stop() {
 	if mb.timer != nil {
 		mb.timer.Stop()
 	}
-	mb.triggerFlush()
+	mb.triggerFlush(context.Background())
 }
 
 func (mb *MessageBuffer[T]) Add(ctx context.Context, item T) {
@@ -212,14 +208,14 @@ func (mb *MessageBuffer[T]) Add(ctx context.Context, item T) {
 		mb.logger.Info().Int("len", l).Int("max", m).Msg("MessageBuffer Add")
 	}
 
-	mb.triggerFlush()
+	mb.triggerFlush(ctx)
 }
 
 func (mb *MessageBuffer[T]) flushTrigger() {
-	mb.triggerFlush()
+	mb.triggerFlush(context.Background())
 }
 
-func (mb *MessageBuffer[T]) triggerFlush() {
+func (mb *MessageBuffer[T]) triggerFlush(ctx context.Context) {
 	select {
 	case mb.flushSem <- struct{}{}:
 		go func() {
@@ -235,7 +231,7 @@ func (mb *MessageBuffer[T]) triggerFlush() {
 				mb.messages = make([]T, 0, mb.maxBufferSize)
 				mb.mu.Unlock()
 
-				mb.flushFunc(context.Background(), itemsToFlush)
+				mb.flushFunc(ctx, itemsToFlush)
 			}
 		}()
 	default:
