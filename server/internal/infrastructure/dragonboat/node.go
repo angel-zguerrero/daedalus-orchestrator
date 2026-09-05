@@ -75,27 +75,27 @@ func RecommendRaftParamsForShards() RaftTuningParams {
 	var baseHeartbeatRTT int
 	switch {
 	case numShards <= 100:
-		baseHeartbeatRTT = 2 // Increased from 1 for better stability
+		baseHeartbeatRTT = 4
 	case numShards <= 200:
-		baseHeartbeatRTT = 3
-	case numShards <= 500:
 		baseHeartbeatRTT = 5
-	default:
+	case numShards <= 500:
 		baseHeartbeatRTT = 8
+	default:
+		baseHeartbeatRTT = 10
 	}
 
 	var baseElectionRTT int
 	// ElectionRTT should grow as shard count increases, to avoid split votes.
 	if numShards <= 100 {
-		baseElectionRTT = 20 // Increased from 10 for better stability
+		baseElectionRTT = 40
 	} else if numShards <= 300 {
-		baseElectionRTT = 30
-	} else if numShards <= 600 {
 		baseElectionRTT = 50
-	} else if numShards <= 1000 {
+	} else if numShards <= 600 {
 		baseElectionRTT = 80
-	} else {
+	} else if numShards <= 1000 {
 		baseElectionRTT = 100
+	} else {
+		baseElectionRTT = 120
 	}
 
 	// Apply environment-specific multipliers

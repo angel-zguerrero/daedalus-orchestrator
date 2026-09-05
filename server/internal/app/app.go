@@ -247,9 +247,9 @@ func (app *Application) Run() {
 
 	app.StartNodeReadyWatcherWorker(3 * time.Second)
 
-	app.StartNodeClearExpiredTTLWorker(1*time.Minute, 10)
+	app.StartNodeClearExpiredTTLWorker(5*time.Minute, 10)
 
-	app.StartNodeClearExpiredLeasesWorker(30*time.Second, 50)
+	app.StartNodeClearExpiredLeasesWorker(2*time.Minute, 50)
 
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
