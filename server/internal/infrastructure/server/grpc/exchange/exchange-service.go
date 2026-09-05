@@ -222,7 +222,6 @@ func (s *ExchangeService) PublishStream(stream pb.ExchangeService_PublishStreamS
 
 	// gRPC streams are not safe for concurrent sends, use a dedicated channel and sender goroutine
 	sendChan := make(chan *pb.PublishStreamResponse, s.Config.PublishBufferMaxSize*2)
-	defer close(sendChan)
 
 	go func() {
 		for {
@@ -327,6 +326,7 @@ func (s *ExchangeService) PublishStream(stream pb.ExchangeService_PublishStreamS
 			Tenant:          tenantCtx.Tenant,
 			TenantNode:      tenantCtx.Node,
 			SendChan:        sendChan,
+			StreamCtx:       ctx,
 		}
 
 		// Add to buffer (non-blocking unless flush happens)

@@ -35,6 +35,7 @@ type PublishBufferedMessage struct {
 	TenantNode      *dragonboat.RaftNode
 	ResponseChan    chan PublishConfirmation
 	SendChan        chan<- *pbExchange.PublishStreamResponse
+	StreamCtx       context.Context
 }
 
 func (p PublishBufferedMessage) GetGroupKey() string {
@@ -56,6 +57,7 @@ type EnqueueBufferedMessage struct {
 	TenantNode      *dragonboat.RaftNode
 	ResponseChan    chan EnqueueConfirmation
 	SendChan        chan<- *pbQueue.EnqueueStreamResponse
+	StreamCtx       context.Context
 }
 
 func (e EnqueueBufferedMessage) GetGroupKey() string {
