@@ -255,11 +255,11 @@ func (app *Application) Run() {
 
 	app.StartDashboardSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
-	// Outbox worker should run frequently, e.g. every 1 second
-	app.StartOutboxRelayWorker(1 * time.Second)
+	// Outbox worker interval set to 5 seconds to reduce idle Raft ReadIndex CPU overhead
+	app.StartOutboxRelayWorker(5 * time.Second)
 
-	// Metrics Relay worker should also run frequently, e.g. every 2 seconds
-	app.StartMetricsRelayWorker(2 * time.Second)
+	// Metrics Relay worker interval set to 10 seconds to reduce idle Raft ReadIndex CPU overhead
+	app.StartMetricsRelayWorker(10 * time.Second)
 
 	// Start TSDB Metrics Workers
 	resolution := config.GlobalConfiguration.MetricsBucketResolution
@@ -277,7 +277,7 @@ func (app *Application) Run() {
 
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
-	app.StartMemoryScavengerWorker(1 * time.Minute)
+	app.StartMemoryScavengerWorker(5 * time.Minute)
 
 	if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
 		app.StartRestAPI()

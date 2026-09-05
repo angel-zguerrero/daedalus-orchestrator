@@ -447,22 +447,26 @@ func (mn *RaftNode) StartNodeReadyWatcher(ctx context.Context, interval time.Dur
 				}
 				mn.mu.RUnlock()
 
-				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-
-				queryCmd := general_command.Query_Command{
-					Now: time.Now().UnixNano(),
-					Command: general_command.RK_Command{
-						Key:                "readiness-check",
-						Op:                 general_command.GetOp,
-						ColumnFamilyName:   db.MetaFC,
-						ColumnFamilySector: db.MetaFCSector,
-					},
+				var currentReady bool
+				if !lastReady {
+					checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+					queryCmd := general_command.Query_Command{
+						Now: time.Now().UnixNano(),
+						Command: general_command.RK_Command{
+							Key:                "readiness-check",
+							Op:                 general_command.GetOp,
+							ColumnFamilyName:   db.MetaFC,
+							ColumnFamilySector: db.MetaFCSector,
+						},
+					}
+					_, err := mn.Read(checkCtx, queryCmd)
+					cancel()
+					currentReady = (err == nil)
+				} else {
+					// Once initially ready, perform a zero-I/O in-memory leader check
+					_, _, valid, _ := mn.NH.GetLeaderID(mn.ShardID)
+					currentReady = valid
 				}
-
-				_, err := mn.Read(checkCtx, queryCmd)
-				cancel()
-
-				currentReady := (err == nil)
 				if !initialized || currentReady != lastReady {
 					lastReady = currentReady
 					initialized = true

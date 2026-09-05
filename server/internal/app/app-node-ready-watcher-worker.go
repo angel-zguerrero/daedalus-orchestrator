@@ -57,6 +57,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 		}()
 
 		for {
+			// Non-blocking drain of masterReadyCh
 			select {
 			case isReady, ok := <-masterReadyCh:
 				if !ok {
@@ -64,21 +65,22 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 					return
 				}
 				readyMap[masterKey] = isReady
-
 			default:
-				for i, ch := range tenantReadyChs {
-					select {
-					case ready, ok := <-ch:
-						if !ok {
-							log.Warn().Int("tenant", i).Msg("🛑 Tenant node watcher closed.")
-							return
-						}
-						if !ready && app.MasterNodeIsReady {
-							log.Warn().Int("tenant", i).Msg("⚠️️ Tenant node does not respond.")
-						}
-						readyMap[i] = ready
-					default:
+			}
+
+			// Non-blocking drain of tenantReadyChs
+			for i, ch := range tenantReadyChs {
+				select {
+				case ready, ok := <-ch:
+					if !ok {
+						log.Warn().Int("tenant", i).Msg("🛑 Tenant node watcher closed.")
+						return
 					}
+					if !ready && app.MasterNodeIsReady {
+						log.Warn().Int("tenant", i).Msg("⚠️️ Tenant node does not respond.")
+					}
+					readyMap[i] = ready
+				default:
 				}
 			}
 
@@ -90,14 +92,8 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 				}
 			}
 
-			go func() {
-				leaderID, _, valid, _ := app.MasterNode.NH.GetLeaderID(uint64(dragonboat.MasterShardID))
-				if valid && leaderID == config.GlobalConfiguration.ReplicaID {
-					app.MasterNodeIsLeader = true
-				} else {
-					app.MasterNodeIsLeader = false
-				}
-			}()
+			leaderID, _, valid, _ := app.MasterNode.NH.GetLeaderID(uint64(dragonboat.MasterShardID))
+			app.MasterNodeIsLeader = (valid && leaderID == config.GlobalConfiguration.ReplicaID)
 
 			if allReady {
 				if !app.MasterNodeIsReady {
