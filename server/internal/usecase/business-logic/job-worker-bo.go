@@ -191,9 +191,14 @@ func (bo *JobWorkerBO) ClaimWork(ctx context.Context, workerId string, workerNam
 // It terminates when all ClaimWorkCapacityPolicies are satisfied or all pagination is exhausted,
 // after which a subsequent ClaimWork call is allowed to spawn a new stopper.
 func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string, policies map[string]models.ClaimWorkCapacityPolicy, messageChan chan<- ClaimedMessage) {
+	var totalClaimedInCycle int
+
 	// Always release the stopper slot when the goroutine exits so the next ClaimWork call
 	// can spawn a new one.
 	defer func() {
+		if totalClaimedInCycle == 0 {
+			time.Sleep(100 * time.Millisecond)
+		}
 		bo.stoppersMu.Lock()
 		bo.stoppers[workerID] = false
 		bo.stoppersMu.Unlock()
@@ -415,6 +420,7 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 									}
 
 									claimMu.Lock()
+									totalClaimedInCycle += len(res.Results)
 									if policy.MaxQueueMessages > 0 {
 										claimedByPolicy[policyCode] += len(res.Results)
 									}
