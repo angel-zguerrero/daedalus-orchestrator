@@ -150,6 +150,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		}
 
 		for _, message := range messagesResult.Entities {
+			if message.ScheduledJobID != "" {
+				scheduledJobRepo, errJobRepo := db.NewScheduledJobRepository(uow, idFactory, cmd.CF, cmd.CFS)
+				if errJobRepo == nil {
+					_ = scheduledJobRepo.HandleCompletion(message.ScheduledJobID, now)
+				}
+			}
 			// Delete the message
 			_, err = queueMessageRepo.Delete(message.ID, now)
 			if err != nil {
