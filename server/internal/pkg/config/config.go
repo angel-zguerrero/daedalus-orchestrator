@@ -89,6 +89,9 @@ type Config struct {
 	PublishBufferMaxSize int
 	// PublishBufferFlushConcurrency specifies number of concurrent flush workers for publish/enqueue buffers. Default: 6.
 	PublishBufferFlushConcurrency int
+
+	// ScheduledJobsBatchSize specifies the batch size for scheduled jobs poller range scans. Default: 1000.
+	ScheduledJobsBatchSize int
 }
 
 // ConfigFromMap is an unexported struct used as an intermediary when loading
@@ -125,6 +128,7 @@ type ConfigFromMap struct {
 	publish_buffer_max_size            int
 	// publish_buffer_flush_concurrency specifies number of concurrent flush workers. Default: 6.
 	publish_buffer_flush_concurrency int
+	scheduled_jobs_batch_size        int
 }
 
 // ConfigFromMapToConfig converts a configFromMap struct (typically derived from a config file)
@@ -165,6 +169,7 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		MessageLeaseDuration:           time.Duration(configFromMapInstance.message_lease_duration) * time.Second,
 		PublishBufferFlushIntervalMs:   configFromMapInstance.publish_buffer_flush_interval_ms,
 		PublishBufferMaxSize:           configFromMapInstance.publish_buffer_max_size,
+		ScheduledJobsBatchSize:         configFromMapInstance.scheduled_jobs_batch_size,
 
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration
 		// after considering flags and env vars. We need to pass the raw string from the config file if present.

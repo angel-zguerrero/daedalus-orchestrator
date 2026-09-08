@@ -8,6 +8,7 @@ import { TenantServiceClient } from './proto/tenant_grpc_pb';
 import { ExchangeServiceClient } from './proto/exchange_grpc_pb';
 import { QueueServiceClient } from './proto/queue_grpc_pb';
 import { BindingServiceClient } from './proto/binding_grpc_pb';
+import { ScheduledJobServiceClient } from './proto/scheduled_job_grpc_pb';
 
 import { LoginRequest } from './proto/auth_pb';
 import { ClaimWorkRequest, ClaimWorkCapacityPolicy as PBClaimWorkCapacityPolicy, ClaimWorkFilter as PBClaimWorkFilter, ClaimWorkStreamMessage, AckMessageRequest, BulkAckMessageRequest } from './proto/jobworker_pb';
@@ -15,6 +16,13 @@ import { AssertTenantRequest } from './proto/tenant_pb';
 import { CreateExchangeRequest, PublishMessageRequest, QueueMessage as ExchangeQueueMessage, PublishStreamRequest } from './proto/exchange_pb';
 import { CreateQueueRequest, EnqueueMessageRequest, EnqueueStreamRequest, BulkCreateQueueRequest, CreateQueueItem } from './proto/queue_pb';
 import { CreateBindingRequest, BulkCreateBindingRequest, CreateBindingItem } from './proto/binding_pb';
+import {
+  CreateOneOffScheduledJobRequest,
+  CreateRecurringScheduledJobRequest,
+  GetScheduledJobRequest,
+  ListScheduledJobsRequest,
+  DeleteScheduledJobRequest
+} from './proto/scheduled_job_pb';
 
 export async function getSystemInfo(): Promise<Record<string, string>> {
   try {
@@ -207,6 +215,68 @@ export interface PublishMessageInput {
   options?: PublishOptions;
 }
 
+export interface ScheduledJob {
+  id: string;
+  tenantId: string;
+  targetType: string;
+  targetId: string;
+  targetCode: string;
+  routingKeyOrPatternOrQueueCode: string;
+  vnamespace: string;
+  content: string;
+  contentType: string;
+  headers: Record<string, string>;
+  handler: string;
+  parameters: Record<string, string>;
+  priority: number;
+  state: string;
+  type: string;
+  every: string;
+  cronExpression: string;
+  runAt: string;
+  runAfter: string;
+  nextRunAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOneOffScheduledJobInput {
+  tenantCode: string;
+  targetType: string; // "queue" or "exchange"
+  targetCode: string; // exchangeCode or routingKeyOrPatternOrQueueCode
+  vnamespace?: string;
+  content: string | Buffer;
+  contentType?: string;
+  headers?: Record<string, string>;
+  handler?: string;
+  parameters?: Record<string, string>;
+  priority?: number;
+  runAt?: string;
+  runAfter?: string;
+}
+
+export interface CreateRecurringScheduledJobInput {
+  tenantCode: string;
+  targetType: string; // "queue" or "exchange"
+  targetCode: string; // exchangeCode or routingKeyOrPatternOrQueueCode
+  vnamespace?: string;
+  content: string | Buffer;
+  contentType?: string;
+  headers?: Record<string, string>;
+  handler?: string;
+  parameters?: Record<string, string>;
+  priority?: number;
+  every?: string;
+  cronExpression?: string;
+}
+
+export interface ListScheduledJobsInput {
+  tenantCode: string;
+  vnamespace?: string;
+  cursor?: string;
+  pageSize?: number;
+}
+
 export interface SDKConfig {
   uri: string;
   username: string;
@@ -223,6 +293,7 @@ export class DaedalusSDK {
   private exchangeClient?: ExchangeServiceClient;
   private queueClient?: QueueServiceClient;
   private bindingClient?: BindingServiceClient;
+  private scheduledJobClient?: ScheduledJobServiceClient;
   private token: string | null = null;
 
   private publishStream: any = null;
@@ -298,6 +369,11 @@ export class DaedalusSDK {
       target,
       grpc.credentials.createInsecure()
     );
+
+    this.scheduledJobClient = new ScheduledJobServiceClient(
+      target,
+      grpc.credentials.createInsecure()
+    );
   }
 
   private async login() {
@@ -340,6 +416,9 @@ export class DaedalusSDK {
     }
     if (this.bindingClient) {
       this.bindingClient.close();
+    }
+    if (this.scheduledJobClient) {
+      this.scheduledJobClient.close();
     }
     if (this.publishStream) {
       this.publishStream.end();
@@ -775,6 +854,161 @@ export class DaedalusSDK {
           }
           console.log(`✅ Binding asserted: ${input.code}`);
           resolve(response.toObject().result);
+        }
+      );
+    });
+  }
+
+  async createOneOffScheduledJob(input: CreateOneOffScheduledJobInput): Promise<ScheduledJob> {
+    const contentBytes = Buffer.isBuffer(input.content) ? input.content.toString('utf8') : input.content;
+    return new Promise((resolve, reject) => {
+      const req = new CreateOneOffScheduledJobRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setTargettype(input.targetType);
+      req.setTargetcode(input.targetCode);
+      req.setVnamespace(input.vnamespace ?? '');
+      req.setContent(contentBytes);
+      req.setContenttype(input.contentType ?? 'text/plain');
+      req.setHandler(input.handler ?? '');
+      req.setPriority(input.priority ?? 0);
+      req.setRunat(input.runAt ?? '');
+      req.setRunafter(input.runAfter ?? '');
+
+      if (input.headers) {
+        const headersMap = req.getHeadersMap();
+        for (const [k, v] of Object.entries(input.headers)) {
+          headersMap.set(k, v);
+        }
+      }
+
+      if (input.parameters) {
+        const paramsMap = req.getParametersMap();
+        for (const [k, v] of Object.entries(input.parameters)) {
+          paramsMap.set(k, v);
+        }
+      }
+
+      this.scheduledJobClient!.createOneOffScheduledJob(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to create one-off scheduled job:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ One-Off scheduled job created: ${response.toObject().result?.id}`);
+          resolve(response.toObject().result);
+        }
+      );
+    });
+  }
+
+  async createRecurringScheduledJob(input: CreateRecurringScheduledJobInput): Promise<ScheduledJob> {
+    const contentBytes = Buffer.isBuffer(input.content) ? input.content.toString('utf8') : input.content;
+    return new Promise((resolve, reject) => {
+      const req = new CreateRecurringScheduledJobRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setTargettype(input.targetType);
+      req.setTargetcode(input.targetCode);
+      req.setVnamespace(input.vnamespace ?? '');
+      req.setContent(contentBytes);
+      req.setContenttype(input.contentType ?? 'text/plain');
+      req.setHandler(input.handler ?? '');
+      req.setPriority(input.priority ?? 0);
+      req.setEvery(input.every ?? '');
+      req.setCronexpression(input.cronExpression ?? '');
+
+      if (input.headers) {
+        const headersMap = req.getHeadersMap();
+        for (const [k, v] of Object.entries(input.headers)) {
+          headersMap.set(k, v);
+        }
+      }
+
+      if (input.parameters) {
+        const paramsMap = req.getParametersMap();
+        for (const [k, v] of Object.entries(input.parameters)) {
+          paramsMap.set(k, v);
+        }
+      }
+
+      this.scheduledJobClient!.createRecurringScheduledJob(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to create recurring scheduled job:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Recurring scheduled job created: ${response.toObject().result?.id}`);
+          resolve(response.toObject().result);
+        }
+      );
+    });
+  }
+
+  async getScheduledJob(tenantCode: string, id: string): Promise<ScheduledJob> {
+    return new Promise((resolve, reject) => {
+      const req = new GetScheduledJobRequest();
+      req.setTenantcode(tenantCode);
+      req.setId(id);
+
+      this.scheduledJobClient!.getScheduledJob(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to get scheduled job:', err.message);
+            return reject(err);
+          }
+          resolve(response.toObject().result);
+        }
+      );
+    });
+  }
+
+  async listScheduledJobs(input: ListScheduledJobsInput): Promise<{ entities: ScheduledJob[], cursor: string }> {
+    return new Promise((resolve, reject) => {
+      const req = new ListScheduledJobsRequest();
+      req.setTenantcode(input.tenantCode);
+      req.setVnamespace(input.vnamespace ?? '');
+      req.setCursor(input.cursor ?? '');
+      req.setPagesize(input.pageSize ?? 50);
+
+      this.scheduledJobClient!.listScheduledJobs(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to list scheduled jobs:', err.message);
+            return reject(err);
+          }
+          const resObj = response.toObject().result;
+          resolve({
+            entities: resObj?.entitiesList ?? [],
+            cursor: resObj?.cursor ?? ''
+          });
+        }
+      );
+    });
+  }
+
+  async deleteScheduledJob(tenantCode: string, id: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const req = new DeleteScheduledJobRequest();
+      req.setTenantcode(tenantCode);
+      req.setId(id);
+
+      this.scheduledJobClient!.deleteScheduledJob(
+        req,
+        this.getMetadata(),
+        (err: any, response: any) => {
+          if (err) {
+            console.error('❌ Failed to delete scheduled job:', err.message);
+            return reject(err);
+          }
+          console.log(`✅ Scheduled job deleted: ${id}`);
+          resolve();
         }
       );
     });
