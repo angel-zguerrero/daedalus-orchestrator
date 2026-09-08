@@ -19,6 +19,7 @@ import { IconDirective } from '@coreui/icons-angular';
 import { ExchangesComponent } from './exchanges/exchanges.component';
 import { QueuesComponent } from './queues/queues.component';
 import { BindingsComponent } from './bindings/bindings.component';
+import { ScheduledJobsComponent } from './scheduled-jobs/scheduled-jobs.component';
 import { TenantsService } from '../services/tenants.service';
 import { TSDBMetricsService } from '../services/tsdb-metrics.service';
 import { ChartjsModule } from '@coreui/angular-chartjs';
@@ -45,6 +46,7 @@ import { SpinnerComponent } from '@coreui/angular';
     ExchangesComponent,
     QueuesComponent,
     BindingsComponent,
+    ScheduledJobsComponent,
     ChartjsModule,
     SpinnerComponent,
     TooltipModule

@@ -1,0 +1,265 @@
+<c-alert color="danger" dismissible [(visible)]="showAlert" *ngIf="showAlert">
+  {{ errorMessage }}
+</c-alert>
+
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-clock" class="me-2"></svg>
+      Scheduled Jobs
+    </h5>
+    <button cButton color="primary" size="sm" (click)="openCreateModal()">
+      <svg cIcon name="cil-plus" class="me-1"></svg>
+      Schedule Job
+    </button>
+  </c-card-header>
+
+  <c-card-body>
+    <!-- Filter Section -->
+    <c-row class="mb-3">
+      <c-col md="4">
+        <mat-form-field appearance="outline" class="w-100 density-compact">
+          <mat-label>Filter by VNamespace</mat-label>
+          <input
+            type="text"
+            matInput
+            [formControl]="vnamespaceFilterCtrl"
+            [matAutocomplete]="autoFilterVNamespace"
+            placeholder="Type vnamespace..."
+          />
+          <mat-autocomplete
+            #autoFilterVNamespace="matAutocomplete"
+            (optionSelected)="onVNamespaceFilterChange($event.option.value.code)"
+          >
+            <mat-option [value]="{ code: '' }">
+              <em>All Namespaces</em>
+            </mat-option>
+            <mat-option *ngFor="let vn of filteredFilterVNamespaces | async" [value]="vn">
+              {{ vn.code }}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+    </c-row>
+
+    <!-- Table -->
+    <div class="table-responsive">
+      <table cTable [hover]="true" [responsive]="true" align="middle" class="mb-0 border">
+        <thead class="bg-dark">
+          <tr>
+            <th>Type</th>
+            <th>Target</th>
+            <th>VNamespace</th>
+            <th>Schedule</th>
+            <th>Next Run At</th>
+            <th>State</th>
+            <th>Created At</th>
+            <th class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let job of scheduledJobs">
+            <td>
+              <c-badge [color]="getTypeBadgeColor(job.Type)">
+                {{ job.Type }}
+              </c-badge>
+            </td>
+            <td>
+              <strong>{{ job.TargetType | uppercase }}:</strong> {{ job.TargetCode }}
+            </td>
+            <td>{{ job.VNamespace || 'default' }}</td>
+            <td>
+              <code>{{ getScheduleDisplay(job) }}</code>
+            </td>
+            <td>{{ job.NextRunAt | date:'medium' }}</td>
+            <td>
+              <c-badge [color]="getStateBadgeColor(job.State)">
+                {{ job.State }}
+              </c-badge>
+            </td>
+            <td>{{ job.CreatedAt | date:'short' }}</td>
+            <td class="text-center">
+              <button
+                cButton
+                color="info"
+                variant="outline"
+                size="sm"
+                class="me-1"
+                (click)="openDetailsModal(job)"
+                title="View Details"
+              >
+                <svg cIcon name="cil-info"></svg>
+              </button>
+              <button
+                cButton
+                color="danger"
+                variant="outline"
+                size="sm"
+                (click)="openDeleteModal(job)"
+                title="Delete Job"
+              >
+                <svg cIcon name="cil-trash"></svg>
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="scheduledJobs.length === 0 && !loading">
+            <td colspan="8" class="text-center py-4 text-muted">
+              No scheduled jobs found for this tenant.
+            </td>
+          </tr>
+          <tr *ngIf="loading">
+            <td colspan="8" class="text-center py-4">
+              <c-spinner size="sm" color="primary"></c-spinner> Loading scheduled jobs...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex justify-content-between align-items-center mt-3">
+      <button cButton color="secondary" variant="outline" size="sm" [disabled]="cursors.length <= 1" (click)="previousPage()">
+        Previous
+      </button>
+      <button cButton color="secondary" variant="outline" size="sm" [disabled]="!cursor" (click)="nextPage()">
+        Next
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create Scheduled Job Modal -->
+<c-modal [visible]="createModalVisible" (visibleChange)="createModalVisible = $event" id="createJobModal" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>Schedule New Task</h5>
+    <button (click)="createModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-nav variant="tabs" class="mb-3">
+      <c-nav-item>
+        <a cNavLink [active]="activeCreateTab === 'one-off'" (click)="activeCreateTab = 'one-off'" style="cursor: pointer;">
+          One-Off (Delayed)
+        </a>
+      </c-nav-item>
+      <c-nav-item>
+        <a cNavLink [active]="activeCreateTab === 'recurring'" (click)="activeCreateTab = 'recurring'" style="cursor: pointer;">
+          Recurring (Interval/Cron)
+        </a>
+      </c-nav-item>
+    </c-nav>
+
+    <!-- One-Off Form -->
+    <form *ngIf="activeCreateTab === 'one-off'" [formGroup]="oneOffForm" (ngSubmit)="createOneOffJob()">
+      <c-row class="g-3">
+        <c-col md="6">
+          <label cLabel>Target Type</label>
+          <select cSelect formControlName="targetType">
+            <option value="queue">Queue</option>
+            <option value="exchange">Exchange</option>
+          </select>
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Target Code (Queue or Exchange Code)</label>
+          <input cFormControl formControlName="targetCode" placeholder="e.g. email-queue" />
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Run After (Duration)</label>
+          <input cFormControl formControlName="runAfter" placeholder="e.g. 5m, 1h, 2d" />
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Run At (Specific UTC ISO Time)</label>
+          <input cFormControl formControlName="runAt" placeholder="e.g. 2025-12-31T23:59:00Z" />
+        </c-col>
+        <c-col md="12">
+          <label cLabel>Content Payload</label>
+          <textarea cFormControl formControlName="content" rows="3" placeholder='{"key": "value"}'></textarea>
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Content Type</label>
+          <input cFormControl formControlName="contentType" placeholder="application/json" />
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Handler</label>
+          <input cFormControl formControlName="handler" placeholder="e.g. email.send" />
+        </c-col>
+      </c-row>
+      <div class="mt-4 text-end">
+        <button cButton color="secondary" type="button" class="me-2" (click)="createModalVisible = false">Cancel</button>
+        <button cButton color="primary" type="submit" [disabled]="loading">Create One-Off Job</button>
+      </div>
+    </form>
+
+    <!-- Recurring Form -->
+    <form *ngIf="activeCreateTab === 'recurring'" [formGroup]="recurringForm" (ngSubmit)="createRecurringJob()">
+      <c-row class="g-3">
+        <c-col md="6">
+          <label cLabel>Target Type</label>
+          <select cSelect formControlName="targetType">
+            <option value="queue">Queue</option>
+            <option value="exchange">Exchange</option>
+          </select>
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Target Code (Queue or Exchange Code)</label>
+          <input cFormControl formControlName="targetCode" placeholder="e.g. weekly-reports" />
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Every (Interval Duration)</label>
+          <input cFormControl formControlName="every" placeholder="e.g. 5m, 1h, 12h" />
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Cron Expression</label>
+          <input cFormControl formControlName="cronExpression" placeholder="e.g. 0 0 * * 0" />
+        </c-col>
+        <c-col md="12">
+          <label cLabel>Content Payload</label>
+          <textarea cFormControl formControlName="content" rows="3" placeholder='{"key": "value"}'></textarea>
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Content Type</label>
+          <input cFormControl formControlName="contentType" placeholder="application/json" />
+        </c-col>
+        <c-col md="6">
+          <label cLabel>Handler</label>
+          <input cFormControl formControlName="handler" placeholder="e.g. report.generate" />
+        </c-col>
+      </c-row>
+      <div class="mt-4 text-end">
+        <button cButton color="secondary" type="button" class="me-2" (click)="createModalVisible = false">Cancel</button>
+        <button cButton color="primary" type="submit" [disabled]="loading">Create Recurring Job</button>
+      </div>
+    </form>
+  </c-modal-body>
+</c-modal>
+
+<!-- Details Modal -->
+<c-modal [visible]="detailsModalVisible" (visibleChange)="detailsModalVisible = $event" id="detailsJobModal">
+  <c-modal-header>
+    <h5 cModalTitle>Scheduled Job Details</h5>
+    <button (click)="detailsModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedJob">
+    <div class="mb-2"><strong>ID:</strong> <code>{{ selectedJob.ID }}</code></div>
+    <div class="mb-2"><strong>Type:</strong> {{ selectedJob.Type }}</div>
+    <div class="mb-2"><strong>Target:</strong> {{ selectedJob.TargetType }} - {{ selectedJob.TargetCode }}</div>
+    <div class="mb-2"><strong>State:</strong> {{ selectedJob.State }}</div>
+    <div class="mb-2"><strong>Next Run At:</strong> {{ selectedJob.NextRunAt | date:'medium' }}</div>
+    <div class="mb-2"><strong>Content:</strong></div>
+    <pre class="bg-dark p-2 rounded text-light"><code>{{ selectedJob.Content }}</code></pre>
+  </c-modal-body>
+</c-modal>
+
+<!-- Delete Modal -->
+<c-modal [visible]="deleteModalVisible" (visibleChange)="deleteModalVisible = $event" id="deleteJobModal">
+  <c-modal-header>
+    <h5 cModalTitle>Delete Scheduled Job</h5>
+    <button (click)="deleteModalVisible = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedJob">
+    Are you sure you want to delete scheduled job <code>{{ selectedJob.ID }}</code>?
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" (click)="deleteModalVisible = false">Cancel</button>
+    <button cButton color="danger" (click)="deleteJob()" [disabled]="loading">Delete</button>
+  </c-modal-footer>
+</c-modal>

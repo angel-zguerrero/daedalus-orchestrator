@@ -103,6 +103,7 @@ func init() {
 	RegisterRepoCommand("PaginateTenantUpdatedAtFromCommand", func() commands.Command { return &tenant_summary_command.PaginateTenantUpdatedAtFromCommand{} })
 	RegisterRepoCommand("GetTenantSummaryCommand", func() commands.Command { return &tenant_summary_command.GetTenantSummaryCommand{} })
 	RegisterRepoCommand("UpdateTenantSummaryCommand", func() commands.Command { return &tenant_summary_command.UpdateTenantSummaryCommand{} })
+	RegisterRepoCommand("GetLastUpdateAtFromCommand", func() commands.Command { return &tenant_summary_command.GetLastUpdateAtFromCommand{} })
 
 	// Tenant commands
 	RegisterRepoCommand("GetOutboxEventsCommand", func() commands.Command { return &tentant_command.GetOutboxEventsCommand{} })

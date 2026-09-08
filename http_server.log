@@ -1,0 +1,74 @@
+Starting up http-server, serving web-admin/dist/daedalus-web-admin/browser
+
+http-server version: 14.1.1
+
+http-server settings:
+CORS: disabled
+Cache: 3600 seconds
+Connection Timeout: 120 seconds
+Directory Listings: visible
+AutoIndex: visible
+Serve GZIP Files: false
+Serve Brotli Files: false
+Default File Extension: none
+
+Available on:
+  http://127.0.0.1:4200
+  http://192.168.0.2:4200
+Hit CTRL-C to stop the server
+
+[2026-09-08T17:07:14.519Z]  "GET /" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+(node:1072543) [DEP0066] DeprecationWarning: OutgoingMessage.prototype._headers is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2026-09-08T17:07:14.624Z]  "GET /chunk-FWBNIQZM.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:14.625Z]  "GET /chunk-P2NONKOF.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:14.626Z]  "GET /chunk-VF6WWLP2.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:14.627Z]  "GET /chunk-ESJYUATY.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:14.628Z]  "GET /polyfills-OCYAX7SR.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:14.633Z]  "GET /main-MXIQDUXH.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:14.670Z]  "GET /styles-26L77SPT.css" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:15.260Z]  "GET /chunk-ORVD53QP.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:15.294Z]  "GET /rest-api/auth/status" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:15.295Z]  "GET /rest-api/auth/status" Error (404): "Not found"
+[2026-09-08T17:07:15.316Z]  "GET /rest-api/auth/status" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:15.318Z]  "GET /rest-api/auth/status" Error (404): "Not found"
+[2026-09-08T17:07:15.324Z]  "GET /chunk-WVOW4Y5R.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:07:15.328Z]  "GET /chunk-RMA36GQ4.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.004Z]  "GET /" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.016Z]  "GET /chunk-FWBNIQZM.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.026Z]  "GET /chunk-P2NONKOF.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.027Z]  "GET /chunk-VF6WWLP2.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.028Z]  "GET /chunk-ESJYUATY.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.028Z]  "GET /polyfills-OCYAX7SR.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.029Z]  "GET /main-MXIQDUXH.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.029Z]  "GET /styles-26L77SPT.css" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.160Z]  "GET /chunk-DWTSTJT6.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.176Z]  "GET /rest-api/auth/status" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.178Z]  "GET /rest-api/auth/status" Error (404): "Not found"
+[2026-09-08T17:08:49.188Z]  "GET /rest-api/auth/status" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.191Z]  "GET /rest-api/auth/status" Error (404): "Not found"
+[2026-09-08T17:08:49.198Z]  "GET /chunk-WVOW4Y5R.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.204Z]  "GET /chunk-ORVD53QP.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.205Z]  "GET /chunk-RMA36GQ4.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.216Z]  "GET /rest-api/auth/status" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.218Z]  "GET /rest-api/auth/status" Error (404): "Not found"
+[2026-09-08T17:08:49.223Z]  "GET /chunk-TTJRUZ2Z.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.228Z]  "GET /chunk-PLZPWC3K.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.229Z]  "GET /chunk-TXJ6Z6HB.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.253Z]  "GET /chunk-VNKJN4F4.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.254Z]  "GET /chunk-ZI65DRRC.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.254Z]  "GET /chunk-PW3JQNF4.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.418Z]  "GET /chunk-CBLL6IAV.js" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.424Z]  "GET /rest-api/tenants/default" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.425Z]  "GET /rest-api/tenants/default" Error (404): "Not found"
+[2026-09-08T17:08:49.427Z]  "GET /rest-api/tenants/default/summary" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.429Z]  "GET /rest-api/tenants/default/metrics/tsdb?resolution=5&startTime=1788886729&endTime=1788887329" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.430Z]  "GET /rest-api/tenants/default/summary" Error (404): "Not found"
+[2026-09-08T17:08:49.430Z]  "GET /rest-api/tenants/default/metrics/tsdb?resolution=5&startTime=1788886729&endTime=1788887329" Error (404): "Not found"
+[2026-09-08T17:08:49.531Z]  "GET /assets/brand/Daedalous.svg" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:49.610Z]  "GET /assets/images/avatars/Icon-avatar.png" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:51.375Z]  "GET /rest-api/tenants/default/scheduled-jobs?cursor=&pageSize=20" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:51.377Z]  "GET /rest-api/tenants/default/scheduled-jobs?cursor=&pageSize=20" Error (404): "Not found"
+[2026-09-08T17:08:51.677Z]  "GET /rest-api/tenants/default/vnamespaces?cursor=&pageSize=20&q=" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+[2026-09-08T17:08:51.679Z]  "GET /rest-api/tenants/default/vnamespaces?cursor=&pageSize=20&q=" Error (404): "Not found"
+http-server stopped.
