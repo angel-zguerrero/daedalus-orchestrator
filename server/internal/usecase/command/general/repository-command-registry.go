@@ -9,6 +9,7 @@ import (
 	jobworker_command "deadalus-orch/server/internal/usecase/command/job-worker"
 	metrics_command "deadalus-orch/server/internal/usecase/command/metrics"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
+	scheduled_job_command "deadalus-orch/server/internal/usecase/command/scheduled-job"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	user_command "deadalus-orch/server/internal/usecase/command/user"
@@ -181,6 +182,14 @@ func init() {
 	RegisterRepoCommand("QueryMetricsRangeCommand", func() commands.Command { return &metrics_command.QueryMetricsRangeCommand{} })
 	RegisterRepoCommand("DeleteExpiredMetricsCommand", func() commands.Command { return &metrics_command.DeleteExpiredMetricsCommand{} })
 	RegisterRepoCommand("DownsampleMetricsCommand", func() commands.Command { return &metrics_command.DownsampleMetricsCommand{} })
+
+	// Scheduled Job commands
+	RegisterRepoCommand("CreateScheduledJobCommand", func() commands.Command { return &scheduled_job_command.CreateScheduledJobCommand{} })
+	RegisterRepoCommand("GetScheduledJobCommand", func() commands.Command { return &scheduled_job_command.GetScheduledJobCommand{} })
+	RegisterRepoCommand("PaginateScheduledJobsCommand", func() commands.Command { return &scheduled_job_command.PaginateScheduledJobsCommand{} })
+	RegisterRepoCommand("DeleteScheduledJobCommand", func() commands.Command { return &scheduled_job_command.DeleteScheduledJobCommand{} })
+	RegisterRepoCommand("ProcessDueScheduledJobsCommand", func() commands.Command { return &scheduled_job_command.ProcessDueScheduledJobsCommand{} })
+	RegisterRepoCommand("HandleScheduledJobCompletionCommand", func() commands.Command { return &scheduled_job_command.HandleScheduledJobCompletionCommand{} })
 
 	// General commands
 	RegisterRepoCommand("CreateColumnFamilyCommand", func() commands.Command { return &CreateColumnFamilyCommand{} })

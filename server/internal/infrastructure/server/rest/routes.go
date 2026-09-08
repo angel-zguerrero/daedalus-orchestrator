@@ -9,6 +9,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
+	"deadalus-orch/server/internal/infrastructure/server/rest/scheduledjob"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/rest/user"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
@@ -32,6 +33,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	clusterController := cluster.NewClusterController(s.Config)
 	dashboardController := dashboard.NewDashboardController(s.Config)
 	userController := user.NewUserController(s.Config)
+	scheduledJobController := scheduledjob.NewScheduledJobController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -81,6 +83,12 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.DELETE("/:code/binding/:bindingCode/:vnamespace", bindingController.DeleteBindingHandler)
 
 				tenantsGroup.GET("/:code/vnamespaces", vnamespaceController.GetVNamespacesHandler)
+
+				tenantsGroup.POST("/:code/scheduled-job/one-off", scheduledJobController.CreateOneOffScheduledJobHandler)
+				tenantsGroup.POST("/:code/scheduled-job/recurring", scheduledJobController.CreateRecurringScheduledJobHandler)
+				tenantsGroup.GET("/:code/scheduled-jobs", scheduledJobController.GetScheduledJobsHandler)
+				tenantsGroup.GET("/:code/scheduled-job/:id", scheduledJobController.GetScheduledJobHandler)
+				tenantsGroup.DELETE("/:code/scheduled-job/:id", scheduledJobController.DeleteScheduledJobHandler)
 			}
 		}
 

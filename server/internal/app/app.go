@@ -68,6 +68,7 @@ type Application struct {
 	NodeReadyWatcherStopper        *syncutil.Stopper
 	NodeClearExpiredTTLStopper     *syncutil.Stopper
 	NodeClearExpiredLeasesStopper  *syncutil.Stopper
+	ScheduledJobsPollerStopper     *syncutil.Stopper
 	AssignTenantsStopper           *syncutil.Stopper
 	TenantSummaryWorkerStopper     *syncutil.Stopper
 	DashboardSummaryWorkerStopper  *syncutil.Stopper
@@ -251,6 +252,12 @@ func (app *Application) Run() {
 
 	app.StartNodeClearExpiredLeasesWorker(30*time.Second, 50)
 
+	batchSize := config.GlobalConfiguration.ScheduledJobsBatchSize
+	if batchSize <= 0 {
+		batchSize = 1000
+	}
+	app.StartScheduledJobsPollerWorker(1*time.Second, batchSize)
+
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
 	app.StartDashboardSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
@@ -395,6 +402,14 @@ func (app *Application) Stop() {
 		log.Info().Msg("✅ NodeClearExpiredLeasesStopper stopped.")
 	}()
 
+	// Stop ScheduledJobsPoller Worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		app.ScheduledJobsPollerStopper.Stop()
+		log.Info().Msg("✅ ScheduledJobsPollerStopper stopped.")
+	}()
+
 	// Stop Assign Tenants Worker
 	wg.Add(1)
 	go func() {
@@ -492,6 +507,7 @@ func NewApplication() *Application {
 		NodeReadyWatcherStopper:       syncutil.NewStopper(),
 		NodeClearExpiredTTLStopper:    syncutil.NewStopper(),
 		NodeClearExpiredLeasesStopper: syncutil.NewStopper(),
+		ScheduledJobsPollerStopper:     syncutil.NewStopper(),
 		AssignTenantsStopper:          syncutil.NewStopper(),
 		TenantSummaryWorkerStopper:    syncutil.NewStopper(),
 		DashboardSummaryWorkerStopper: syncutil.NewStopper(),
