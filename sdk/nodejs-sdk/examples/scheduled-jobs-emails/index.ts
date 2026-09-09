@@ -87,6 +87,7 @@ async function main() {
     };
 
     const oneOffJob = await sdk.createOneOffScheduledJob({
+      code: "welcome-job-1",
       tenantCode: tenantCode,
       targetType: 'exchange',
       targetCode: 'email-events',
@@ -110,6 +111,7 @@ async function main() {
     };
 
     const recurringJob = await sdk.createRecurringScheduledJob({
+      code: "weekly-reports-job-1",
       tenantCode: tenantCode,
       targetType: 'queue',
       targetCode: 'weekly-reports',
@@ -117,7 +119,7 @@ async function main() {
       content: JSON.stringify(recurringReportPayload),
       contentType: 'application/json',
       handler: 'report.generate',
-      every: '10s',
+      every: '16s',
       priority: 2,
     });
     console.log(`✅ Recurring Scheduled Job Created! ID: ${recurringJob.id} | Every: ${recurringJob.every} | NextRunAt: ${recurringJob.nextRunAt}`);
