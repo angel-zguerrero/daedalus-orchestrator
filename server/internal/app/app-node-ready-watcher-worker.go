@@ -60,8 +60,11 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			select {
 			case isReady, ok := <-masterReadyCh:
 				if !ok {
-					log.Warn().Msg("🛑 Master node watcher closed.")
+					log.Warn().Uint64("ShardID", app.MasterNode.ShardID).Uint64("ReplicaID", app.MasterNode.ReplicaID).Msg("🛑 Master node watcher channel closed.")
 					return
+				}
+				if readyMap[masterKey] != isReady {
+					log.Info().Bool("isReady", isReady).Uint64("ShardID", app.MasterNode.ShardID).Msg("🔄 Master node readiness changed.")
 				}
 				readyMap[masterKey] = isReady
 
@@ -70,11 +73,21 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 					select {
 					case ready, ok := <-ch:
 						if !ok {
-							log.Warn().Int("tenant", i).Msg("🛑 Tenant node watcher closed.")
+							shardID := uint64(0)
+							replicaID := uint64(0)
+							if i < len(app.TenantNodes) && app.TenantNodes[i] != nil {
+								shardID = app.TenantNodes[i].ShardID
+								replicaID = app.TenantNodes[i].ReplicaID
+							}
+							log.Warn().Int("tenantIndex", i).Uint64("ShardID", shardID).Uint64("ReplicaID", replicaID).Msg("🛑 Tenant node watcher channel closed.")
 							return
 						}
 						if !ready && app.MasterNodeIsReady {
-							log.Warn().Int("tenant", i).Msg("⚠️️ Tenant node does not respond.")
+							shardID := uint64(0)
+							if i < len(app.TenantNodes) && app.TenantNodes[i] != nil {
+								shardID = app.TenantNodes[i].ShardID
+							}
+							log.Warn().Int("tenantIndex", i).Uint64("ShardID", shardID).Msg("⚠️️ Tenant node does not respond during readiness check.")
 						}
 						readyMap[i] = ready
 					default:
@@ -106,8 +119,11 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 				}
 
 				if !app.MasterNodeBootstrapped {
-					defineColumnFamilies(app)
-					log.Info().Msg("📦 Database column families defined.")
+					if err := defineColumnFamilies(app); err != nil {
+						log.Error().Err(err).Msg("❌ Failed to define column families, will retry on next check")
+					} else {
+						log.Info().Msg("📦 Database column families defined.")
+					}
 
 					if dragonboat.ContainsRole(app.MasterNode.Roles, dragonboat.RoleConsensus) {
 						username := config.GlobalConfiguration.DefaultRootUser
@@ -171,7 +187,20 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 			}
 
 			if !allReady && app.MasterNodeIsReady {
-				log.Warn().Msg("⚠️️ One or more nodes are not ready (transient unreadiness). APIs and workers remain active.")
+				unreadyDetails := []string{}
+				if !readyMap[masterKey] {
+					unreadyDetails = append(unreadyDetails, "MasterNode")
+				}
+				for i := range tenantReadyChs {
+					if !readyMap[i] {
+						shardID := uint64(0)
+						if i < len(app.TenantNodes) && app.TenantNodes[i] != nil {
+							shardID = app.TenantNodes[i].ShardID
+						}
+						unreadyDetails = append(unreadyDetails, strconv.FormatUint(shardID, 10))
+					}
+				}
+				log.Warn().Strs("unreadyShards", unreadyDetails).Msg("⚠️️ One or more nodes are not ready (transient unreadiness). APIs and workers remain active.")
 				app.MasterNodeIsReady = false
 			}
 
@@ -193,7 +222,7 @@ func (app *Application) StartNodeReadyWatcherWorker(interval time.Duration) {
 
 }
 
-func defineColumnFamilies(app *Application) {
+func defineColumnFamilies(app *Application) error {
 	for _, tenantNode := range app.TenantNodes {
 		for i := 0; i < config.GlobalConfiguration.MaxColumnFamilies; i++ {
 
@@ -208,21 +237,26 @@ func defineColumnFamilies(app *Application) {
 				CMD:  createColumnFamilyCommand,
 			}
 
-			writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Hour)
-			defer writeCancel()
+			writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Minute*2)
 
 			resultChan, err := tenantNode.Write(writeCtx, ccfCmd)
 			if err != nil {
-				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to start create column family operation for Shard")
+				writeCancel()
+				log.Error().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to start create column family operation for Shard")
+				return err
 			}
 			// Wait for the result since column family creation is critical
 			select {
 			case writeResult := <-resultChan:
+				writeCancel()
 				if writeResult.Error != nil {
-					log.Fatal().Err(writeResult.Error).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to create column family for Shard")
+					log.Error().Err(writeResult.Error).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Failed to create column family for Shard")
+					return writeResult.Error
 				}
 			case <-writeCtx.Done():
-				log.Fatal().Err(writeCtx.Err()).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Column family creation timed out for Shard")
+				writeCancel()
+				log.Error().Err(writeCtx.Err()).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommand.Name).Msg("Column family creation timed out for Shard")
+				return writeCtx.Err()
 			}
 
 			createColumnFamilyCommandTtl := &general_command.CreateColumnFamilyCommand{
@@ -236,19 +270,28 @@ func defineColumnFamilies(app *Application) {
 				CMD:  createColumnFamilyCommandTtl,
 			}
 
-			resultChan, err = tenantNode.Write(writeCtx, ccfCmdTtl)
+			writeCtxTtl, writeCancelTtl := context.WithTimeout(context.Background(), time.Minute*2)
+
+			resultChan, err = tenantNode.Write(writeCtxTtl, ccfCmdTtl)
 			if err != nil {
-				log.Fatal().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to start create TTL column family operation for Shard")
+				writeCancelTtl()
+				log.Error().Err(err).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to start create TTL column family operation for Shard")
+				return err
 			}
 			// Wait for the result since TTL column family creation is critical
 			select {
 			case writeResult := <-resultChan:
+				writeCancelTtl()
 				if writeResult.Error != nil {
-					log.Fatal().Err(writeResult.Error).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to create column family for Shard")
+					log.Error().Err(writeResult.Error).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("Failed to create column family for Shard")
+					return writeResult.Error
 				}
-			case <-writeCtx.Done():
-				log.Fatal().Err(writeCtx.Err()).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("TTL column family creation timed out for Shard")
+			case <-writeCtxTtl.Done():
+				writeCancelTtl()
+				log.Error().Err(writeCtxTtl.Err()).Int("ShardID", int(tenantNode.GetClient().ShardID)).Str("ColumnFamily", createColumnFamilyCommandTtl.Name).Msg("TTL column family creation timed out for Shard")
+				return writeCtxTtl.Err()
 			}
 		}
 	}
+	return nil
 }

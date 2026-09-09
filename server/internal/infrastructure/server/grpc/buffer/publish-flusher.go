@@ -264,10 +264,21 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 		}
 
 		if item.SendChan != nil {
-			item.SendChan <- &pb.PublishStreamResponse{
-				ClientMessageId: item.ClientMessageID,
-				Confirmed:       true,
-				QueueMessages:   queueMessages,
+			if item.StreamCtx != nil {
+				select {
+				case <-item.StreamCtx.Done():
+				case item.SendChan <- &pb.PublishStreamResponse{
+					ClientMessageId: item.ClientMessageID,
+					Confirmed:       true,
+					QueueMessages:   queueMessages,
+				}:
+				}
+			} else {
+				item.SendChan <- &pb.PublishStreamResponse{
+					ClientMessageId: item.ClientMessageID,
+					Confirmed:       true,
+					QueueMessages:   queueMessages,
+				}
 			}
 		} else if item.ResponseChan != nil {
 			item.ResponseChan <- PublishConfirmation{
@@ -280,10 +291,21 @@ func processPublishGroup(ctx context.Context, items []PublishBufferedMessage, ex
 
 func notifyPublishError(item PublishBufferedMessage, err error) {
 	if item.SendChan != nil {
-		item.SendChan <- &pb.PublishStreamResponse{
-			ClientMessageId: item.ClientMessageID,
-			Confirmed:       false,
-			Error:           err.Error(),
+		if item.StreamCtx != nil {
+			select {
+			case <-item.StreamCtx.Done():
+			case item.SendChan <- &pb.PublishStreamResponse{
+				ClientMessageId: item.ClientMessageID,
+				Confirmed:       false,
+				Error:           err.Error(),
+			}:
+			}
+		} else {
+			item.SendChan <- &pb.PublishStreamResponse{
+				ClientMessageId: item.ClientMessageID,
+				Confirmed:       false,
+				Error:           err.Error(),
+			}
 		}
 	} else if item.ResponseChan != nil {
 		item.ResponseChan <- PublishConfirmation{

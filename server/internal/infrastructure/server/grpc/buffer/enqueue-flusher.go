@@ -166,10 +166,21 @@ func processEnqueueGroup(ctx context.Context, items []EnqueueBufferedMessage, qu
 		msg := allMessages[msgIdx]
 
 		if item.SendChan != nil {
-			item.SendChan <- &pbQueue.EnqueueStreamResponse{
-				ClientMessageId: item.ClientMessageID,
-				Confirmed:       true,
-				MessageId:       msg.MessageID,
+			if item.StreamCtx != nil {
+				select {
+				case <-item.StreamCtx.Done():
+				case item.SendChan <- &pbQueue.EnqueueStreamResponse{
+					ClientMessageId: item.ClientMessageID,
+					Confirmed:       true,
+					MessageId:       msg.MessageID,
+				}:
+				}
+			} else {
+				item.SendChan <- &pbQueue.EnqueueStreamResponse{
+					ClientMessageId: item.ClientMessageID,
+					Confirmed:       true,
+					MessageId:       msg.MessageID,
+				}
 			}
 		} else if item.ResponseChan != nil {
 			item.ResponseChan <- EnqueueConfirmation{
@@ -182,10 +193,21 @@ func processEnqueueGroup(ctx context.Context, items []EnqueueBufferedMessage, qu
 
 func notifyEnqueueError(item EnqueueBufferedMessage, err error) {
 	if item.SendChan != nil {
-		item.SendChan <- &pbQueue.EnqueueStreamResponse{
-			ClientMessageId: item.ClientMessageID,
-			Confirmed:       false,
-			Error:           err.Error(),
+		if item.StreamCtx != nil {
+			select {
+			case <-item.StreamCtx.Done():
+			case item.SendChan <- &pbQueue.EnqueueStreamResponse{
+				ClientMessageId: item.ClientMessageID,
+				Confirmed:       false,
+				Error:           err.Error(),
+			}:
+			}
+		} else {
+			item.SendChan <- &pbQueue.EnqueueStreamResponse{
+				ClientMessageId: item.ClientMessageID,
+				Confirmed:       false,
+				Error:           err.Error(),
+			}
 		}
 	} else if item.ResponseChan != nil {
 		item.ResponseChan <- EnqueueConfirmation{
