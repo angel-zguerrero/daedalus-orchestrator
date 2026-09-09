@@ -47,7 +47,57 @@ func ParseScheduledJobIndexKey(key string) (int64, string, error) {
 	return ts, parts[1], nil
 }
 
+func (r *ScheduledJobRepository) GetScheduledJobByCode(code string, now time.Time) (*models.ScheduledJob, error) {
+	if code == "" {
+		return nil, nil
+	}
+	return r.FindByField("Code", code, now)
+}
+
 func (r *ScheduledJobRepository) CreateScheduledJob(job *models.ScheduledJob, now time.Time) (string, error) {
+	job.State = models.ScheduledJobIdle
+
+	if job.Code != "" {
+		existingJob, err := r.GetScheduledJobByCode(job.Code, now)
+		if err == nil && existingJob != nil {
+			oldNextRunAt := existingJob.NextRunAt
+
+			existingJob.TenantID = job.TenantID
+			existingJob.TargetType = job.TargetType
+			existingJob.TargetID = job.TargetID
+			existingJob.VNamespace = job.VNamespace
+			existingJob.Type = job.Type
+			existingJob.RunAt = job.RunAt
+			existingJob.RunAfter = job.RunAfter
+			existingJob.Every = job.Every
+			existingJob.CronExpression = job.CronExpression
+			existingJob.NextRunAt = job.NextRunAt
+			existingJob.Content = job.Content
+			existingJob.ContentType = job.ContentType
+			existingJob.Handler = job.Handler
+			existingJob.Priority = job.Priority
+			existingJob.Headers = job.Headers
+			existingJob.State = models.ScheduledJobIdle
+
+			_, updateErr := r.UpdateScheduledJobStateAndRunAt(existingJob, &oldNextRunAt, now)
+			if updateErr != nil {
+				return "", updateErr
+			}
+			*job = *existingJob
+			return existingJob.ID, nil
+		}
+	}
+
+	if job.ID == "" {
+		generatedID := r.idGeneratorFactory.GenerateID()
+		if generatedID != "" {
+			job.ID = generatedID
+		} else {
+			defaultFactory := &DefaultIDGeneratorFactory{}
+			job.ID = defaultFactory.GenerateID()
+		}
+	}
+
 	job.CreatedAt = now
 	job.UpdatedAt = now
 

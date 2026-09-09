@@ -87,7 +87,6 @@ async function main() {
     };
 
     const oneOffJob = await sdk.createOneOffScheduledJob({
-      code: "welcome-job-1",
       tenantCode: tenantCode,
       targetType: 'exchange',
       targetCode: 'email-events',
@@ -111,7 +110,6 @@ async function main() {
     };
 
     const recurringJob = await sdk.createRecurringScheduledJob({
-      code: "weekly-reports-job-1",
       tenantCode: tenantCode,
       targetType: 'queue',
       targetCode: 'weekly-reports',

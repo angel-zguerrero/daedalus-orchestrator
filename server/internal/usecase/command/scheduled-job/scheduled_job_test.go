@@ -175,6 +175,83 @@ func TestScheduledJob_CodeResolutionAndCreation(t *testing.T) {
 
 		_ = jobRepo
 	})
+
+	t.Run("CreateOrUpdateScheduledJob_UpsertByCode", func(t *testing.T) {
+		uow1 := db.NewUnitOfWork(store, nil)
+		idFactory := &db.DeterministicIDGeneratorFactory{}
+		jobRepo1, err := db.NewScheduledJobRepository(uow1, idFactory, TestFC, TestCFS)
+		require.NoError(t, err)
+
+		// 1. Initial creation with unique Code
+		initialNextRunAt := startTime.Add(10 * time.Minute)
+		job1 := models.ScheduledJob{
+			TenantID:   TestCFS,
+			TargetType: "queue",
+			TargetID:   queue.ID,
+			TargetCode: queue.Code,
+			VNamespace: "default",
+			Code:       "upsert-test-code-1",
+			Content:    "Initial Content",
+			Type:       models.ScheduledJobOneOff,
+			RunAfter:   "10m",
+			NextRunAt:  initialNextRunAt,
+			State:      models.ScheduledJobIdle,
+		}
+
+		id1, err := jobRepo1.CreateScheduledJob(&job1, startTime)
+		require.NoError(t, err)
+		require.NotEmpty(t, id1)
+		require.NoError(t, uow1.Commit())
+
+		// Verify initial index key exists
+		indexKey1 := db.FormatScheduledJobIndexKey(initialNextRunAt, id1)
+		exists1, err := store.Exists(TestFC, TestCFS, indexKey1, startTime)
+		require.NoError(t, err)
+		assert.True(t, exists1, "Initial index key must exist")
+
+		// 2. Secondary creation with SAME Code (Upsert)
+		uow2 := db.NewUnitOfWork(store, nil)
+		jobRepo2, err := db.NewScheduledJobRepository(uow2, idFactory, TestFC, TestCFS)
+		require.NoError(t, err)
+
+		updatedNextRunAt := startTime.Add(30 * time.Minute)
+		job2 := models.ScheduledJob{
+			TenantID:   TestCFS,
+			TargetType: "queue",
+			TargetID:   queue.ID,
+			TargetCode: queue.Code,
+			VNamespace: "default",
+			Code:       "upsert-test-code-1", // Same code
+			Content:    "Updated Content Payload",
+			Type:       models.ScheduledJobOneOff,
+			RunAfter:   "30m",
+			NextRunAt:  updatedNextRunAt,
+			State:      models.ScheduledJobIdle,
+		}
+
+		id2, err := jobRepo2.CreateScheduledJob(&job2, startTime)
+		require.NoError(t, err, "Creating with existing code must NOT fail with duplicate error")
+		assert.Equal(t, id1, id2, "ID should remain unchanged on upsert")
+		require.NoError(t, uow2.Commit())
+
+		// Verify ORM persistence of updated values
+		uowVerify := db.NewUnitOfWork(store, nil)
+		repoVerify, _ := db.NewScheduledJobRepository(uowVerify, idFactory, TestFC, TestCFS)
+		updatedJob, err := repoVerify.GetScheduledJobByID(id1, startTime)
+		require.NoError(t, err)
+		require.NotNil(t, updatedJob)
+		assert.Equal(t, "Updated Content Payload", updatedJob.Content)
+		assert.Equal(t, updatedNextRunAt, updatedJob.NextRunAt)
+
+		// Verify OLD index key deleted and NEW index key created
+		existsOldIndex, _ := store.Exists(TestFC, TestCFS, indexKey1, startTime)
+		assert.False(t, existsOldIndex, "Old index key must be deleted on upsert")
+
+		indexKey2 := db.FormatScheduledJobIndexKey(updatedNextRunAt, id1)
+		existsNewIndex, err := store.Exists(TestFC, TestCFS, indexKey2, startTime)
+		require.NoError(t, err)
+		assert.True(t, existsNewIndex, "New index key must exist after upsert")
+	})
 }
 
 func TestScheduledJob_PollerTimeTravelAndEnqueue(t *testing.T) {
