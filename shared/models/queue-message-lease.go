@@ -12,7 +12,7 @@ const (
 
 type QueueMessageLease struct {
 	ID             string `orm:"primary-key"`
-	QueueMessageID string `orm:"data-only"`
+	QueueMessageID string
 	WorkerID       string `orm:"data-only"`
 	LeaseStatus    QueueMessageLeaseStatus
 	LeaseUntil     time.Time
