@@ -24,6 +24,7 @@ func NewScheduledJobController(config *common.ServerConfing) *ScheduledJobContro
 }
 
 type createOneOffScheduledJobRequest struct {
+	Code        string            `json:"code"`
 	TargetType  string            `json:"targetType" binding:"required"`
 	TargetCode  string            `json:"targetCode" binding:"required"`
 	VNamespace  string            `json:"vnamespace" binding:"required"`
@@ -38,6 +39,7 @@ type createOneOffScheduledJobRequest struct {
 }
 
 type createRecurringScheduledJobRequest struct {
+	Code           string            `json:"code"`
 	TargetType     string            `json:"targetType" binding:"required"`
 	TargetCode     string            `json:"targetCode" binding:"required"`
 	VNamespace     string            `json:"vnamespace" binding:"required"`
@@ -74,6 +76,7 @@ func (ctrl *ScheduledJobController) CreateOneOffScheduledJobHandler(c *gin.Conte
 
 	job, err := ctrl.ScheduledJobBO.CreateOneOffScheduledJob(
 		c.Request.Context(),
+		req.Code,
 		tenantCode,
 		req.TargetType,
 		req.TargetCode,
@@ -114,6 +117,7 @@ func (ctrl *ScheduledJobController) CreateRecurringScheduledJobHandler(c *gin.Co
 
 	job, err := ctrl.ScheduledJobBO.CreateRecurringScheduledJob(
 		c.Request.Context(),
+		req.Code,
 		tenantCode,
 		req.TargetType,
 		req.TargetCode,

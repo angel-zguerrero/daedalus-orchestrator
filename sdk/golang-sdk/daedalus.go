@@ -455,6 +455,7 @@ func convertProtoScheduledJobToSDK(pbJob *scheduledjobpb.ScheduledJob) *Schedule
 	}
 	return &ScheduledJob{
 		ID:                             pbJob.Id,
+		Code:                           pbJob.Code,
 		TenantID:                       pbJob.TenantId,
 		TargetType:                     pbJob.TargetType,
 		TargetID:                       pbJob.TargetId,
@@ -492,6 +493,7 @@ func (sdk *DaedalusSDK) CreateOneOffScheduledJob(ctx context.Context, input Crea
 	}
 
 	resp, err := sdk.scheduledJobClient.CreateOneOffScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.CreateOneOffScheduledJobRequest{
+		Code:        input.Code,
 		TenantCode:  input.TenantCode,
 		TargetType:  input.TargetType,
 		TargetCode:  input.TargetCode,
@@ -522,6 +524,7 @@ func (sdk *DaedalusSDK) CreateRecurringScheduledJob(ctx context.Context, input C
 	}
 
 	resp, err := sdk.scheduledJobClient.CreateRecurringScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.CreateRecurringScheduledJobRequest{
+		Code:           input.Code,
 		TenantCode:     input.TenantCode,
 		TargetType:     input.TargetType,
 		TargetCode:     input.TargetCode,

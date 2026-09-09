@@ -25,6 +25,7 @@ message CreateOneOffScheduledJobRequest {
   int32 priority = 10;
   string runAt = 11;     // Specific UTC Date/Time ISO string
   string runAfter = 12;  // Duration string (e.g., "5m")
+  string code = 13;      // Optional unique idempotency code
 }
 
 message CreateRecurringScheduledJobRequest {
@@ -40,31 +41,33 @@ message CreateRecurringScheduledJobRequest {
   int32 priority = 10;
   string every = 11;           // Duration string (e.g., "5m", "1h")
   string cronExpression = 12;  // Cron expression (e.g., "0 0 * * *")
+  string code = 13;            // Optional unique idempotency code
 }
 
 message ScheduledJob {
   string id = 1;
-  string tenantId = 2;
-  string targetType = 3;
-  string targetId = 4;
-  string targetCode = 5;
-  string routingKeyOrPatternOrQueueCode = 6;
-  string vnamespace = 7;
-  string content = 8;
-  string contentType = 9;
-  map<string, string> headers = 10;
-  string handler = 11;
-  map<string, string> parameters = 12;
-  int32 priority = 13;
-  string state = 14;
-  string type = 15;
-  string every = 16;
-  string cronExpression = 17;
-  string runAt = 18;
-  string runAfter = 19;
-  string nextRunAt = 20;
-  string createdAt = 21;
-  string updatedAt = 22;
+  string code = 2;
+  string tenantId = 3;
+  string targetType = 4;
+  string targetId = 5;
+  string targetCode = 6;
+  string routingKeyOrPatternOrQueueCode = 7;
+  string vnamespace = 8;
+  string content = 9;
+  string contentType = 10;
+  map<string, string> headers = 11;
+  string handler = 12;
+  map<string, string> parameters = 13;
+  int32 priority = 14;
+  string state = 15;
+  string type = 16;
+  string every = 17;
+  string cronExpression = 18;
+  string runAt = 19;
+  string runAfter = 20;
+  string nextRunAt = 21;
+  string createdAt = 22;
+  string updatedAt = 23;
 }
 
 message CreateScheduledJobResponse {

@@ -24,7 +24,8 @@ const (
 )
 
 type ScheduledJob struct {
-	ID string `orm:"primary-key"`
+	ID   string `orm:"primary-key"`
+	Code string `orm:"unique"`
 
 	TenantID                       string
 	TargetType                     string // "queue" or "exchange"

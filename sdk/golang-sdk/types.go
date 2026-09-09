@@ -200,6 +200,7 @@ type PublishMessageInput struct {
 // ScheduledJob represents a scheduled job returned by the server.
 type ScheduledJob struct {
 	ID                             string
+	Code                           string
 	TenantID                       string
 	TargetType                     string
 	TargetID                       string
@@ -225,6 +226,7 @@ type ScheduledJob struct {
 
 // CreateOneOffScheduledJobInput defines parameters for scheduling a single execution task.
 type CreateOneOffScheduledJobInput struct {
+	Code        string
 	TenantCode  string
 	TargetType  string // "queue" or "exchange"
 	TargetCode  string // exchangeCode or routingKeyOrPatternOrQueueCode
@@ -241,6 +243,7 @@ type CreateOneOffScheduledJobInput struct {
 
 // CreateRecurringScheduledJobInput defines parameters for scheduling a recurring task.
 type CreateRecurringScheduledJobInput struct {
+	Code           string
 	TenantCode     string
 	TargetType     string // "queue" or "exchange"
 	TargetCode     string // exchangeCode or routingKeyOrPatternOrQueueCode

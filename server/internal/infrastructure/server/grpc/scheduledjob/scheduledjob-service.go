@@ -34,6 +34,7 @@ func ConvertScheduledJobToProto(m *models.ScheduledJob) *pb.ScheduledJob {
 	}
 	return &pb.ScheduledJob{
 		Id:                             m.ID,
+		Code:                           m.Code,
 		TenantId:                       m.TenantID,
 		TargetType:                     m.TargetType,
 		TargetId:                       m.TargetID,
@@ -75,6 +76,7 @@ func (s *ScheduledJobService) CreateOneOffScheduledJob(
 
 	job, err := s.ScheduledJobBO.CreateOneOffScheduledJob(
 		ctx,
+		r.Code,
 		r.TenantCode,
 		r.TargetType,
 		r.TargetCode,
@@ -109,6 +111,7 @@ func (s *ScheduledJobService) CreateRecurringScheduledJob(
 
 	job, err := s.ScheduledJobBO.CreateRecurringScheduledJob(
 		ctx,
+		r.Code,
 		r.TenantCode,
 		r.TargetType,
 		r.TargetCode,

@@ -149,9 +149,16 @@ func (cmd *ProcessDueScheduledJobsCommand) resolveTargetMessages(
 	}
 
 	if job.TargetType == string(models.ScheduledJobTargetExchange) {
+		routingKey := job.RoutingKeyOrPatternOrQueueCode
+		if rk, ok := job.Headers["routing_key"]; ok && rk != "" {
+			routingKey = rk
+		} else if rk, ok := job.Headers["routingKey"]; ok && rk != "" {
+			routingKey = rk
+		}
+
 		resolveCmd := &binding_command.ResolveAndFetchQueuesCommand{
 			ExchangeCode:   job.TargetCode,
-			RoutingKey:     job.RoutingKeyOrPatternOrQueueCode,
+			RoutingKey:     routingKey,
 			MessageHeaders: job.Headers,
 			VNamespace:     job.VNamespace,
 			CF:             cmd.CF,

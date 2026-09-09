@@ -60,6 +60,7 @@ func (bo *ScheduledJobBO) resolveTarget(
 
 func (bo *ScheduledJobBO) CreateOneOffScheduledJob(
 	ctx context.Context,
+	code string,
 	tenantCode string,
 	targetType string,
 	targetCode string,
@@ -85,6 +86,10 @@ func (bo *ScheduledJobBO) CreateOneOffScheduledJob(
 		return models.ScheduledJob{}, err
 	}
 
+	if code == "" {
+		code = uuid.New().String()
+	}
+
 	now := time.Now().UTC()
 	nextRunAt, err := utils.CalculateNextRunAt(
 		models.ScheduledJobOneOff,
@@ -100,6 +105,7 @@ func (bo *ScheduledJobBO) CreateOneOffScheduledJob(
 
 	job := models.ScheduledJob{
 		ID:                             uuid.New().String(),
+		Code:                           code,
 		TenantID:                       tenant.ID,
 		TargetType:                     targetType,
 		TargetID:                       targetID,
@@ -144,6 +150,7 @@ func (bo *ScheduledJobBO) CreateOneOffScheduledJob(
 
 func (bo *ScheduledJobBO) CreateRecurringScheduledJob(
 	ctx context.Context,
+	code string,
 	tenantCode string,
 	targetType string,
 	targetCode string,
@@ -169,6 +176,10 @@ func (bo *ScheduledJobBO) CreateRecurringScheduledJob(
 		return models.ScheduledJob{}, err
 	}
 
+	if code == "" {
+		code = uuid.New().String()
+	}
+
 	now := time.Now().UTC()
 	nextRunAt, err := utils.CalculateNextRunAt(
 		models.ScheduledJobRecurring,
@@ -184,6 +195,7 @@ func (bo *ScheduledJobBO) CreateRecurringScheduledJob(
 
 	job := models.ScheduledJob{
 		ID:                             uuid.New().String(),
+		Code:                           code,
 		TenantID:                       tenant.ID,
 		TargetType:                     targetType,
 		TargetID:                       targetID,

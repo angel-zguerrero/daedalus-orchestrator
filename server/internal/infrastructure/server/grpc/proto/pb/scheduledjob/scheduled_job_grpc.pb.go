@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.21.12
-// source: server/internal/infrastructure/server/grpc/proto/definitions/scheduled_job.proto
+// source: scheduled_job.proto
 
 package scheduledjob
 
@@ -245,5 +245,5 @@ var ScheduledJobService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "server/internal/infrastructure/server/grpc/proto/definitions/scheduled_job.proto",
+	Metadata: "scheduled_job.proto",
 }

@@ -33,6 +33,8 @@ export class CreateOneOffScheduledJobRequest extends jspb.Message {
     setRunat(value: string): CreateOneOffScheduledJobRequest;
     getRunafter(): string;
     setRunafter(value: string): CreateOneOffScheduledJobRequest;
+    getCode(): string;
+    setCode(value: string): CreateOneOffScheduledJobRequest;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): CreateOneOffScheduledJobRequest.AsObject;
@@ -60,6 +62,7 @@ export namespace CreateOneOffScheduledJobRequest {
         priority: number,
         runat: string,
         runafter: string,
+        code: string,
     }
 }
 
@@ -90,6 +93,8 @@ export class CreateRecurringScheduledJobRequest extends jspb.Message {
     setEvery(value: string): CreateRecurringScheduledJobRequest;
     getCronexpression(): string;
     setCronexpression(value: string): CreateRecurringScheduledJobRequest;
+    getCode(): string;
+    setCode(value: string): CreateRecurringScheduledJobRequest;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): CreateRecurringScheduledJobRequest.AsObject;
@@ -117,12 +122,15 @@ export namespace CreateRecurringScheduledJobRequest {
         priority: number,
         every: string,
         cronexpression: string,
+        code: string,
     }
 }
 
 export class ScheduledJob extends jspb.Message {
     getId(): string;
     setId(value: string): ScheduledJob;
+    getCode(): string;
+    setCode(value: string): ScheduledJob;
     getTenantid(): string;
     setTenantid(value: string): ScheduledJob;
     getTargettype(): string;
@@ -181,6 +189,7 @@ export class ScheduledJob extends jspb.Message {
 export namespace ScheduledJob {
     export type AsObject = {
         id: string,
+        code: string,
         tenantid: string,
         targettype: string,
         targetid: string,

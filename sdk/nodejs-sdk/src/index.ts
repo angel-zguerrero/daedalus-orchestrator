@@ -217,6 +217,7 @@ export interface PublishMessageInput {
 
 export interface ScheduledJob {
   id: string;
+  code: string;
   tenantId: string;
   targetType: string;
   targetId: string;
@@ -240,7 +241,38 @@ export interface ScheduledJob {
   updatedAt: string;
 }
 
+export function mapScheduledJobProto(raw: any): ScheduledJob {
+  if (!raw) return {} as any;
+  const obj = typeof raw.toObject === 'function' ? raw.toObject() : raw;
+  return {
+    id: obj.id,
+    code: obj.code,
+    tenantId: obj.tenantid ?? obj.tenantId,
+    targetType: obj.targettype ?? obj.targetType,
+    targetId: obj.targetid ?? obj.targetId,
+    targetCode: obj.targetcode ?? obj.targetCode,
+    routingKeyOrPatternOrQueueCode: obj.routingkeyorpatternorqueuecode ?? obj.routingKeyOrPatternOrQueueCode,
+    vnamespace: obj.vnamespace,
+    content: obj.content,
+    contentType: obj.contenttype ?? obj.contentType,
+    headers: obj.headersMap ? Object.fromEntries(obj.headersMap) : (obj.headers ?? {}),
+    handler: obj.handler,
+    parameters: obj.parametersMap ? Object.fromEntries(obj.parametersMap) : (obj.parameters ?? {}),
+    priority: obj.priority,
+    state: obj.state,
+    type: obj.type,
+    every: obj.every,
+    cronExpression: obj.cronexpression ?? obj.cronExpression,
+    runAt: obj.runat ?? obj.runAt,
+    runAfter: obj.runafter ?? obj.runAfter,
+    nextRunAt: obj.nextrunat ?? obj.nextRunAt,
+    createdAt: obj.createdat ?? obj.createdAt,
+    updatedAt: obj.updatedat ?? obj.updatedAt,
+  };
+}
+
 export interface CreateOneOffScheduledJobInput {
+  code?: string;
   tenantCode: string;
   targetType: string; // "queue" or "exchange"
   targetCode: string; // exchangeCode or routingKeyOrPatternOrQueueCode
@@ -256,6 +288,7 @@ export interface CreateOneOffScheduledJobInput {
 }
 
 export interface CreateRecurringScheduledJobInput {
+  code?: string;
   tenantCode: string;
   targetType: string; // "queue" or "exchange"
   targetCode: string; // exchangeCode or routingKeyOrPatternOrQueueCode
@@ -873,6 +906,7 @@ export class DaedalusSDK {
       req.setPriority(input.priority ?? 0);
       req.setRunat(input.runAt ?? '');
       req.setRunafter(input.runAfter ?? '');
+      req.setCode(input.code ?? '');
 
       if (input.headers) {
         const headersMap = req.getHeadersMap();
@@ -896,8 +930,9 @@ export class DaedalusSDK {
             console.error('❌ Failed to create one-off scheduled job:', err.message);
             return reject(err);
           }
-          console.log(`✅ One-Off scheduled job created: ${response.toObject().result?.id}`);
-          resolve(response.toObject().result);
+          const job = mapScheduledJobProto(response.getResult());
+          console.log(`✅ One-Off scheduled job created: ${job.id}`);
+          resolve(job);
         }
       );
     });
@@ -917,6 +952,7 @@ export class DaedalusSDK {
       req.setPriority(input.priority ?? 0);
       req.setEvery(input.every ?? '');
       req.setCronexpression(input.cronExpression ?? '');
+      req.setCode(input.code ?? '');
 
       if (input.headers) {
         const headersMap = req.getHeadersMap();
@@ -940,8 +976,9 @@ export class DaedalusSDK {
             console.error('❌ Failed to create recurring scheduled job:', err.message);
             return reject(err);
           }
-          console.log(`✅ Recurring scheduled job created: ${response.toObject().result?.id}`);
-          resolve(response.toObject().result);
+          const job = mapScheduledJobProto(response.getResult());
+          console.log(`✅ Recurring scheduled job created: ${job.id}`);
+          resolve(job);
         }
       );
     });
@@ -961,7 +998,7 @@ export class DaedalusSDK {
             console.error('❌ Failed to get scheduled job:', err.message);
             return reject(err);
           }
-          resolve(response.toObject().result);
+          resolve(mapScheduledJobProto(response.getResult()));
         }
       );
     });
@@ -983,10 +1020,11 @@ export class DaedalusSDK {
             console.error('❌ Failed to list scheduled jobs:', err.message);
             return reject(err);
           }
-          const resObj = response.toObject().result;
+          const resultPb = response.getResult();
+          const list = resultPb ? resultPb.getEntitiesList() : [];
           resolve({
-            entities: resObj?.entitiesList ?? [],
-            cursor: resObj?.cursor ?? ''
+            entities: list.map((item: any) => mapScheduledJobProto(item)),
+            cursor: resultPb ? resultPb.getCursor() : ''
           });
         }
       );
