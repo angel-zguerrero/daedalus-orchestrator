@@ -37,6 +37,7 @@
         <thead>
           <tr>
             <th style="min-width: 100px;">Type</th>
+            <th style="min-width: 120px;">Code</th>
             <th style="min-width: 150px;">Target</th>
             <th style="min-width: 120px;">VNamespace</th>
             <th style="min-width: 150px;">Schedule</th>
@@ -52,6 +53,9 @@
               <c-badge [color]="getTypeBadgeColor(job.Type)" shape="rounded-pill">
                 {{ job.Type }}
               </c-badge>
+            </td>
+            <td>
+              <code>{{ job.Code || '-' }}</code>
             </td>
             <td>
               <strong class="me-1">{{ job.TargetType | uppercase }}:</strong>
@@ -305,6 +309,10 @@
       <div class="col-md-6 mb-3">
         <label class="form-label fw-bold">ID</label>
         <div class="p-2 bg-dark rounded"><code>{{ selectedJob.ID }}</code></div>
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label fw-bold">Code</label>
+        <div class="p-2 bg-dark rounded"><code>{{ selectedJob.Code || '-' }}</code></div>
       </div>
       <div class="col-md-6 mb-3">
         <label class="form-label fw-bold">Type</label>

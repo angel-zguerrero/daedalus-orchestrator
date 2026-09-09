@@ -80,13 +80,16 @@ func (cmd *ProcessDueScheduledJobsCommand) Execute(uow *db.UnitOfWork, now time.
 
 		// Dispatch task message
 		messagesToEnqueue, err := cmd.resolveTargetMessages(uow, idFactory, job, now)
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("failed to resolve target for job %s: %s", job.ID, err.Error()))
-			continue
-		}
+		if err != nil || len(messagesToEnqueue) == 0 {
+			// Revert state back to idle so dispatch can be retried on next poll
+			job.State = models.ScheduledJobIdle
+			_, _ = scheduledJobRepo.UpdateScheduledJobStateAndRunAt(job, &oldNextRunAt, now)
 
-		if len(messagesToEnqueue) == 0 {
-			result.Errors = append(result.Errors, fmt.Sprintf("no active target queues found for job %s", job.ID))
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to resolve target for job %s: %s", job.ID, err.Error()))
+			} else {
+				result.Errors = append(result.Errors, fmt.Sprintf("no active target queues found for job %s", job.ID))
+			}
 			continue
 		}
 
@@ -98,6 +101,10 @@ func (cmd *ProcessDueScheduledJobsCommand) Execute(uow *db.UnitOfWork, now time.
 
 		enqueueResult := enqueueCmd.Execute(uow, now)
 		if enqueueResult.Error != "" {
+			// Revert state back to idle so dispatch can be retried on next poll
+			job.State = models.ScheduledJobIdle
+			_, _ = scheduledJobRepo.UpdateScheduledJobStateAndRunAt(job, &oldNextRunAt, now)
+
 			result.Errors = append(result.Errors, fmt.Sprintf("failed to enqueue message for job %s: %s", job.ID, enqueueResult.Error))
 			continue
 		}

@@ -168,9 +168,13 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 			// Validate priority against DesiredPriorityThresholds
 			_, priorityExists := queue.DesiredPriorityThresholds[message.Priority]
 			if !priorityExists {
-				commandResult.Error = fmt.Sprintf("Priority %d is not allowed for queue %s. Allowed priorities: %v",
-					message.Priority, queueID, getKeysFromMap(queue.DesiredPriorityThresholds))
-				return *commandResult
+				if _, zeroExists := queue.DesiredPriorityThresholds[0]; zeroExists || len(queue.DesiredPriorityThresholds) == 0 {
+					message.Priority = 0
+				} else {
+					commandResult.Error = fmt.Sprintf("Priority %d is not allowed for queue %s. Allowed priorities: %v",
+						message.Priority, queueID, getKeysFromMap(queue.DesiredPriorityThresholds))
+					return *commandResult
+				}
 			}
 
 			// Group by priority within queue

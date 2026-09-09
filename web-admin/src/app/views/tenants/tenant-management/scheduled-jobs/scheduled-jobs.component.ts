@@ -27,6 +27,7 @@ import { ErrorUtil } from '../../../../shared/utils/error.util';
 
 export interface ScheduledJob {
   ID: string;
+  Code?: string;
   TenantID: string;
   TargetType: string;
   TargetID: string;
