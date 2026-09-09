@@ -143,7 +143,7 @@ func (cmd *ProcessExpiredLeasesCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		if queue.MaxAttempts > 0 && message.Attempts >= queue.MaxAttempts {
 			fmt.Printf("Message %s has reached max attempts (%d), deleting message and lease\n", message.ID, message.Attempts)
 			// Delete message and lease
-			if err := cmd.deleteMessageAndLease(queueMessageRepo, leaseRepo, queueRepo, queuePartitionRepo, message, &lease, queue, now); err != nil {
+			if err := cmd.deleteMessageAndLease(uow, idFactory, queueMessageRepo, leaseRepo, queueRepo, queuePartitionRepo, message, &lease, queue, now); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("failed to delete message %s: %s", message.ID, err.Error()))
 				continue
 			}
@@ -198,6 +198,8 @@ func (cmd *ProcessExpiredLeasesCommand) Execute(uow *db.UnitOfWork, now time.Tim
 
 // deleteMessageAndLease deletes both the message and its lease when MaxAttempts is reached.
 func (cmd *ProcessExpiredLeasesCommand) deleteMessageAndLease(
+	uow *db.UnitOfWork,
+	idFactory db.IDGeneratorFactory,
 	messageRepo *db.QueueMessageRepository,
 	leaseRepo *db.QueueMessageLeaseRepository,
 	queueRepo *db.QueueRepository,
@@ -216,6 +218,13 @@ func (cmd *ProcessExpiredLeasesCommand) deleteMessageAndLease(
 	// Delete the message
 	if _, err := messageRepo.Delete(message.ID, now); err != nil {
 		return fmt.Errorf("failed to delete message: %w", err)
+	}
+
+	if message.ScheduledJobID != "" {
+		scheduledJobRepo, errJobRepo := db.NewScheduledJobRepository(uow, idFactory, cmd.CF, cmd.CFS)
+		if errJobRepo == nil {
+			_ = scheduledJobRepo.HandleCompletion(message.ScheduledJobID, now)
+		}
 	}
 
 	// Decrement delivering messages counter

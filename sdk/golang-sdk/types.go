@@ -196,3 +196,72 @@ type PublishMessageInput struct {
 	MessageID                     string
 	Options                       *PublishOptions
 }
+
+// ScheduledJob represents a scheduled job returned by the server.
+type ScheduledJob struct {
+	ID                             string
+	Code                           string
+	TenantID                       string
+	TargetType                     string
+	TargetID                       string
+	TargetCode                     string
+	RoutingKeyOrPatternOrQueueCode string
+	VNamespace                     string
+	Content                        string
+	ContentType                    string
+	Headers                        map[string]string
+	Handler                        string
+	Parameters                     map[string]string
+	Priority                       int32
+	State                          string
+	Type                           string
+	Every                          string
+	CronExpression                 string
+	RunAt                          string
+	RunAfter                       string
+	NextRunAt                      string
+	CreatedAt                      string
+	UpdatedAt                      string
+}
+
+// CreateOneOffScheduledJobInput defines parameters for scheduling a single execution task.
+type CreateOneOffScheduledJobInput struct {
+	Code        string
+	TenantCode  string
+	TargetType  string // "queue" or "exchange"
+	TargetCode  string // exchangeCode or routingKeyOrPatternOrQueueCode
+	VNamespace  string
+	Content     []byte
+	ContentType string
+	Headers     map[string]string
+	Handler     string
+	Parameters  map[string]string
+	Priority    int32
+	RunAt       *string // Optional RFC3339 string
+	RunAfter    string  // Optional duration e.g. "5m"
+}
+
+// CreateRecurringScheduledJobInput defines parameters for scheduling a recurring task.
+type CreateRecurringScheduledJobInput struct {
+	Code           string
+	TenantCode     string
+	TargetType     string // "queue" or "exchange"
+	TargetCode     string // exchangeCode or routingKeyOrPatternOrQueueCode
+	VNamespace     string
+	Content        []byte
+	ContentType    string
+	Headers        map[string]string
+	Handler        string
+	Parameters     map[string]string
+	Priority       int32
+	Every          string // Duration e.g. "5m", "1h"
+	CronExpression string // Cron expression e.g. "0 0 * * *"
+}
+
+// ListScheduledJobsInput defines parameters for paginating scheduled jobs.
+type ListScheduledJobsInput struct {
+	TenantCode string
+	VNamespace string
+	Cursor     string
+	PageSize   int32
+}

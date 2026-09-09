@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package scheduledjob;
+
+option go_package = "pb/scheduledjob;scheduledjob";
+
+service ScheduledJobService {
+  rpc CreateOneOffScheduledJob (CreateOneOffScheduledJobRequest) returns (CreateScheduledJobResponse);
+  rpc CreateRecurringScheduledJob (CreateRecurringScheduledJobRequest) returns (CreateScheduledJobResponse);
+  rpc GetScheduledJob (GetScheduledJobRequest) returns (GetScheduledJobResponse);
+  rpc ListScheduledJobs (ListScheduledJobsRequest) returns (ListScheduledJobsResponse);
+  rpc DeleteScheduledJob (DeleteScheduledJobRequest) returns (DeleteScheduledJobResponse);
+}
+
+message CreateOneOffScheduledJobRequest {
+  string tenantCode = 1;
+  string targetType = 2; // "queue" or "exchange"
+  string targetCode = 3; // exchangeCode or routingKeyOrPatternOrQueueCode
+  string vnamespace = 4;
+  string content = 5;
+  string contentType = 6;
+  map<string, string> headers = 7;
+  string handler = 8;
+  map<string, string> parameters = 9;
+  int32 priority = 10;
+  string runAt = 11;     // Specific UTC Date/Time ISO string
+  string runAfter = 12;  // Duration string (e.g., "5m")
+  string code = 13;      // Optional unique idempotency code
+}
+
+message CreateRecurringScheduledJobRequest {
+  string tenantCode = 1;
+  string targetType = 2; // "queue" or "exchange"
+  string targetCode = 3; // exchangeCode or routingKeyOrPatternOrQueueCode
+  string vnamespace = 4;
+  string content = 5;
+  string contentType = 6;
+  map<string, string> headers = 7;
+  string handler = 8;
+  map<string, string> parameters = 9;
+  int32 priority = 10;
+  string every = 11;           // Duration string (e.g., "5m", "1h")
+  string cronExpression = 12;  // Cron expression (e.g., "0 0 * * *")
+  string code = 13;            // Optional unique idempotency code
+}
+
+message ScheduledJob {
+  string id = 1;
+  string code = 2;
+  string tenantId = 3;
+  string targetType = 4;
+  string targetId = 5;
+  string targetCode = 6;
+  string routingKeyOrPatternOrQueueCode = 7;
+  string vnamespace = 8;
+  string content = 9;
+  string contentType = 10;
+  map<string, string> headers = 11;
+  string handler = 12;
+  map<string, string> parameters = 13;
+  int32 priority = 14;
+  string state = 15;
+  string type = 16;
+  string every = 17;
+  string cronExpression = 18;
+  string runAt = 19;
+  string runAfter = 20;
+  string nextRunAt = 21;
+  string createdAt = 22;
+  string updatedAt = 23;
+}
+
+message CreateScheduledJobResponse {
+  string message = 1;
+  ScheduledJob result = 2;
+}
+
+message GetScheduledJobRequest {
+  string tenantCode = 1;
+  string id = 2;
+}
+
+message GetScheduledJobResponse {
+  string message = 1;
+  ScheduledJob result = 2;
+}
+
+message ListScheduledJobsRequest {
+  string tenantCode = 1;
+  string vnamespace = 2;
+  string cursor = 3;
+  int32 pageSize = 4;
+}
+
+message ScheduledJobFindResult {
+  repeated ScheduledJob entities = 1;
+  string cursor = 2;
+}
+
+message ListScheduledJobsResponse {
+  string message = 1;
+  ScheduledJobFindResult result = 2;
+}
+
+message DeleteScheduledJobRequest {
+  string tenantCode = 1;
+  string id = 2;
+}
+
+message DeleteScheduledJobResponse {
+  string message = 1;
+}

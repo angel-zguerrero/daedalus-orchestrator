@@ -20,6 +20,7 @@ import (
 	exchangepb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/exchange"
 	jobworkerpb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/jobworker"
 	queuepb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/queue"
+	scheduledjobpb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/scheduledjob"
 	tenantpb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/tenant"
 )
 
@@ -32,8 +33,9 @@ type DaedalusSDK struct {
 	jobWorkerClient jobworkerpb.JobWorkerServiceClient
 	tenantClient    tenantpb.TenantServiceClient
 	exchangeClient  exchangepb.ExchangeServiceClient
-	queueClient     queuepb.QueueServiceClient
-	bindingClient   bindingpb.BindingServiceClient
+	queueClient        queuepb.QueueServiceClient
+	bindingClient      bindingpb.BindingServiceClient
+	scheduledJobClient scheduledjobpb.ScheduledJobServiceClient
 
 	token string
 	mu    sync.RWMutex
@@ -146,6 +148,7 @@ func (sdk *DaedalusSDK) connectOnce(ctx context.Context) error {
 	sdk.exchangeClient = exchangepb.NewExchangeServiceClient(conn)
 	sdk.queueClient = queuepb.NewQueueServiceClient(conn)
 	sdk.bindingClient = bindingpb.NewBindingServiceClient(conn)
+	sdk.scheduledJobClient = scheduledjobpb.NewScheduledJobServiceClient(conn)
 
 	// Perform initial login
 	if err := sdk.Login(ctx); err != nil {
@@ -444,6 +447,154 @@ func (sdk *DaedalusSDK) BulkAssertBindings(ctx context.Context, input BulkAssert
 
 	log.Printf("✅ Bulk Bindings asserted: %d", len(input.Bindings))
 	return resp.Results, nil
+}
+
+func convertProtoScheduledJobToSDK(pbJob *scheduledjobpb.ScheduledJob) *ScheduledJob {
+	if pbJob == nil {
+		return nil
+	}
+	return &ScheduledJob{
+		ID:                             pbJob.Id,
+		Code:                           pbJob.Code,
+		TenantID:                       pbJob.TenantId,
+		TargetType:                     pbJob.TargetType,
+		TargetID:                       pbJob.TargetId,
+		TargetCode:                     pbJob.TargetCode,
+		RoutingKeyOrPatternOrQueueCode: pbJob.RoutingKeyOrPatternOrQueueCode,
+		VNamespace:                     pbJob.Vnamespace,
+		Content:                        pbJob.Content,
+		ContentType:                    pbJob.ContentType,
+		Headers:                        pbJob.Headers,
+		Handler:                        pbJob.Handler,
+		Parameters:                     pbJob.Parameters,
+		Priority:                       pbJob.Priority,
+		State:                          pbJob.State,
+		Type:                           pbJob.Type,
+		Every:                          pbJob.Every,
+		CronExpression:                 pbJob.CronExpression,
+		RunAt:                          pbJob.RunAt,
+		RunAfter:                       pbJob.RunAfter,
+		NextRunAt:                      pbJob.NextRunAt,
+		CreatedAt:                      pbJob.CreatedAt,
+		UpdatedAt:                      pbJob.UpdatedAt,
+	}
+}
+
+// CreateOneOffScheduledJob creates a single-execution delayed scheduled job.
+func (sdk *DaedalusSDK) CreateOneOffScheduledJob(ctx context.Context, input CreateOneOffScheduledJobInput) (*ScheduledJob, error) {
+	runAtStr := ""
+	if input.RunAt != nil {
+		runAtStr = *input.RunAt
+	}
+
+	contentType := input.ContentType
+	if contentType == "" {
+		contentType = "text/plain"
+	}
+
+	resp, err := sdk.scheduledJobClient.CreateOneOffScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.CreateOneOffScheduledJobRequest{
+		Code:        input.Code,
+		TenantCode:  input.TenantCode,
+		TargetType:  input.TargetType,
+		TargetCode:  input.TargetCode,
+		Vnamespace:  input.VNamespace,
+		Content:     string(input.Content),
+		ContentType: contentType,
+		Headers:     input.Headers,
+		Handler:     input.Handler,
+		Parameters:  input.Parameters,
+		Priority:    input.Priority,
+		RunAt:       runAtStr,
+		RunAfter:    input.RunAfter,
+	})
+	if err != nil {
+		log.Printf("❌ Failed to create one-off scheduled job: %v", err)
+		return nil, fmt.Errorf("create one-off scheduled job failed: %w", err)
+	}
+
+	log.Printf("✅ One-Off scheduled job created: %s", resp.Result.Id)
+	return convertProtoScheduledJobToSDK(resp.Result), nil
+}
+
+// CreateRecurringScheduledJob creates a recurring scheduled job based on an interval or cron expression.
+func (sdk *DaedalusSDK) CreateRecurringScheduledJob(ctx context.Context, input CreateRecurringScheduledJobInput) (*ScheduledJob, error) {
+	contentType := input.ContentType
+	if contentType == "" {
+		contentType = "text/plain"
+	}
+
+	resp, err := sdk.scheduledJobClient.CreateRecurringScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.CreateRecurringScheduledJobRequest{
+		Code:           input.Code,
+		TenantCode:     input.TenantCode,
+		TargetType:     input.TargetType,
+		TargetCode:     input.TargetCode,
+		Vnamespace:     input.VNamespace,
+		Content:        string(input.Content),
+		ContentType:    contentType,
+		Headers:        input.Headers,
+		Handler:        input.Handler,
+		Parameters:     input.Parameters,
+		Priority:       input.Priority,
+		Every:          input.Every,
+		CronExpression: input.CronExpression,
+	})
+	if err != nil {
+		log.Printf("❌ Failed to create recurring scheduled job: %v", err)
+		return nil, fmt.Errorf("create recurring scheduled job failed: %w", err)
+	}
+
+	log.Printf("✅ Recurring scheduled job created: %s", resp.Result.Id)
+	return convertProtoScheduledJobToSDK(resp.Result), nil
+}
+
+// GetScheduledJob retrieves a scheduled job by ID.
+func (sdk *DaedalusSDK) GetScheduledJob(ctx context.Context, tenantCode, id string) (*ScheduledJob, error) {
+	resp, err := sdk.scheduledJobClient.GetScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.GetScheduledJobRequest{
+		TenantCode: tenantCode,
+		Id:         id,
+	})
+	if err != nil {
+		log.Printf("❌ Failed to get scheduled job: %v", err)
+		return nil, fmt.Errorf("get scheduled job failed: %w", err)
+	}
+
+	return convertProtoScheduledJobToSDK(resp.Result), nil
+}
+
+// ListScheduledJobs lists scheduled jobs with pagination.
+func (sdk *DaedalusSDK) ListScheduledJobs(ctx context.Context, input ListScheduledJobsInput) ([]*ScheduledJob, string, error) {
+	resp, err := sdk.scheduledJobClient.ListScheduledJobs(sdk.authCtx(ctx), &scheduledjobpb.ListScheduledJobsRequest{
+		TenantCode: input.TenantCode,
+		Vnamespace: input.VNamespace,
+		Cursor:     input.Cursor,
+		PageSize:   input.PageSize,
+	})
+	if err != nil {
+		log.Printf("❌ Failed to list scheduled jobs: %v", err)
+		return nil, "", fmt.Errorf("list scheduled jobs failed: %w", err)
+	}
+
+	jobs := make([]*ScheduledJob, len(resp.Result.Entities))
+	for i, entity := range resp.Result.Entities {
+		jobs[i] = convertProtoScheduledJobToSDK(entity)
+	}
+
+	return jobs, resp.Result.Cursor, nil
+}
+
+// DeleteScheduledJob deletes a scheduled job by ID.
+func (sdk *DaedalusSDK) DeleteScheduledJob(ctx context.Context, tenantCode, id string) error {
+	_, err := sdk.scheduledJobClient.DeleteScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.DeleteScheduledJobRequest{
+		TenantCode: tenantCode,
+		Id:         id,
+	})
+	if err != nil {
+		log.Printf("❌ Failed to delete scheduled job: %v", err)
+		return fmt.Errorf("delete scheduled job failed: %w", err)
+	}
+
+	log.Printf("✅ Scheduled job deleted: %s", id)
+	return nil
 }
 
 // ensureEnqueueStream makes sure the bidirectional enqueue stream is established.

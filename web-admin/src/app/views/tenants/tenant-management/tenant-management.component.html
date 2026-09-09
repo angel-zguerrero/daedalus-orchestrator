@@ -46,6 +46,10 @@
               <svg cIcon name="cil-link" class="me-2"></svg>
               Bindings
             </button>
+            <button cTab itemKey="scheduled-jobs">
+              <svg cIcon name="cil-clock" class="me-2"></svg>
+              Scheduled Jobs
+            </button>
           </c-tabs-list>
           
           <c-tabs-content>
@@ -249,6 +253,13 @@
             <c-tab-panel itemKey="bindings" class="p-3">
               <ng-container *ngIf="activeTab === 'bindings'">
                 <app-bindings [tenantCode]="tenantCode"></app-bindings>
+              </ng-container>
+            </c-tab-panel>
+
+            <!-- Scheduled Jobs Tab -->
+            <c-tab-panel itemKey="scheduled-jobs" class="p-3">
+              <ng-container *ngIf="activeTab === 'scheduled-jobs'">
+                <app-scheduled-jobs [tenantCode]="tenantCode"></app-scheduled-jobs>
               </ng-container>
             </c-tab-panel>
           </c-tabs-content>

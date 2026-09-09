@@ -24,6 +24,8 @@ import (
 	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"                 // Import new queue pb
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/queue" // Import new queue service
+	pbScheduledJob "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/scheduledjob"
+	"deadalus-orch/server/internal/infrastructure/server/grpc/scheduledjob"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/tenant"
 	"deadalus-orch/server/internal/pkg/config"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -88,6 +90,10 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	// Register new JobWorkerService
 	jobWorkerSvc := jobworker.NewJobWorkerService(cfg)
 	pbJobWorker.RegisterJobWorkerServiceServer(server, jobWorkerSvc)
+
+	// Register ScheduledJobService
+	scheduledJobSvc := scheduledjob.NewScheduledJobService(cfg)
+	pbScheduledJob.RegisterScheduledJobServiceServer(server, scheduledJobSvc)
 
 	return &GrpcServer{
 		Config:     cfg,

@@ -139,6 +139,14 @@ func (cmd *AckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) command
 		return *commandResult
 	}
 
+	// ── 6b. handle scheduled job completion if message is linked to scheduled job ─
+	if message.ScheduledJobID != "" {
+		scheduledJobRepo, errJobRepo := db.NewScheduledJobRepository(uow, idFactory, cmd.CF, cmd.CFS)
+		if errJobRepo == nil {
+			_ = scheduledJobRepo.HandleCompletion(message.ScheduledJobID, now)
+		}
+	}
+
 	// ── 7. update tenant summary ─────────────────────────────────────────────────
 
 	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, -1, 0, 0, 0, now)

@@ -27,6 +27,8 @@ type QueueMessage struct {
 
 	VNamespace string `orm:"data-only"`
 
+	ScheduledJobID string `orm:"data-only"` // Link to ScheduledJob
+
 	CreatedAt time.Time `orm:"data-only"`
 	UpdatedAt time.Time `orm:"data-only"`
 }
