@@ -103,7 +103,7 @@ func processAckGroup(ctx context.Context, items []AckBufferedMessage, logger zer
 		if i < len(combinedResults) {
 			result := combinedResults[i]
 			if !result.Success {
-				notifyAckError(item, fmt.Errorf(result.Message))
+				notifyAckError(item, fmt.Errorf("%s", result.Message))
 			} else {
 				select {
 				case item.ResponseChan <- AckConfirmation{

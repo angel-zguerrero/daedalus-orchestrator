@@ -14,6 +14,8 @@ const ScheduledJobIndexPrefix = "scheduled-jobs:"
 
 type ScheduledJobRepository struct {
 	*Repository[models.ScheduledJob]
+	uow       *UnitOfWork
+	idFactory IDGeneratorFactory
 }
 
 func NewScheduledJobRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs string) (*ScheduledJobRepository, error) {
@@ -24,7 +26,11 @@ func NewScheduledJobRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, 
 	if err != nil {
 		return nil, err
 	}
-	return &ScheduledJobRepository{Repository: repo}, nil
+	return &ScheduledJobRepository{
+		Repository: repo,
+		uow:        uow,
+		idFactory:  factory,
+	}, nil
 }
 
 func FormatScheduledJobIndexKey(nextRunAt time.Time, jobID string) string {
@@ -155,6 +161,73 @@ func (r *ScheduledJobRepository) DeleteScheduledJob(job *models.ScheduledJob, no
 
 func (r *ScheduledJobRepository) GetScheduledJobByID(id string, now time.Time) (*models.ScheduledJob, error) {
 	return r.FindByField("ID", id, now)
+}
+
+func (r *ScheduledJobRepository) UpdateTrackerAndHandleCompletion(
+	scheduledJobID string,
+	executionID string,
+	queueID string,
+	status models.ScheduledJobTrackerStatus,
+	now time.Time,
+) error {
+	if scheduledJobID == "" {
+		return nil
+	}
+
+	if executionID == "" {
+		return r.HandleCompletion(scheduledJobID, now)
+	}
+
+	trackerRepo, err := NewScheduledJobTrackerRepository(r.uow, r.idFactory, r.definition.ColumnFamily, r.definition.ColumnFamilySector)
+	if err != nil {
+		return err
+	}
+
+	// 1. Update specific tracker
+	tracker, err := trackerRepo.GetTracker(scheduledJobID, executionID, queueID, now)
+	if err != nil {
+		return fmt.Errorf("failed to get tracker for job %s exec %s queue %s: %w", scheduledJobID, executionID, queueID, err)
+	}
+
+	if tracker != nil {
+		tracker.Status = status
+		tracker.UpdatedAt = now
+		_, err = trackerRepo.Update(tracker, now)
+		if err != nil {
+			return fmt.Errorf("failed to update tracker status: %w", err)
+		}
+	} else {
+		return r.HandleCompletion(scheduledJobID, now)
+	}
+
+	// 2. Check routine for executionID: Query if ALL trackers for this executionID are finished
+	allTrackers, err := trackerRepo.GetTrackersByExecution(executionID, now)
+	if err != nil {
+		return fmt.Errorf("failed to get trackers for execution %s: %w", executionID, err)
+	}
+
+	if len(allTrackers) == 0 {
+		return r.HandleCompletion(scheduledJobID, now)
+	}
+
+	allFinished := true
+	for _, t := range allTrackers {
+		if t.Status != models.ScheduledJobTrackerCompleted && t.Status != models.ScheduledJobTrackerExhausted {
+			allFinished = false
+			break
+		}
+	}
+
+	// 3. If (and only if) ALL trackers are finished, execute parent job finalization logic and clean up trackers
+	if allFinished {
+		err = r.HandleCompletion(scheduledJobID, now)
+		if err != nil {
+			return err
+		}
+		_ = trackerRepo.DeleteTrackersForExecution(executionID, now)
+	}
+
+	return nil
 }
 
 func (r *ScheduledJobRepository) HandleCompletion(scheduledJobID string, now time.Time) error {
