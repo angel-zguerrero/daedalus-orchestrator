@@ -186,6 +186,9 @@ func (app *Application) processTenantScheduledJobs(
 				for _, gauge := range res.Gauges {
 					app.MetricsCollector.UpdateGauges(tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
 				}
+				for _, detail := range res.DispatchedDetails {
+					app.MetricsCollector.RecordPublish(tenant.Code, detail.QueueCode, detail.VNamespace, detail.Count)
+				}
 			}
 		}
 
