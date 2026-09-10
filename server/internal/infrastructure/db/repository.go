@@ -1271,7 +1271,7 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 		currentEntityDataVal := currentEntityReflectVal.Elem() // For setting fields if changed
 
 		for _, def := range r.definition.Fields {
-			if def.Primary || def.TTL || def.Virtual { // Primary key, TTL, and virtual fields managed separately
+			if def.Primary || def.TTL || def.DataOnly || def.Virtual { // Primary key, TTL, data-only and virtual fields managed separately
 				continue
 			}
 
@@ -1298,14 +1298,6 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 			newValue := fmt.Sprintf("%v", newFieldVal.Interface())
 
 			if oldValue != newValue || forceUdpate {
-				if def.DataOnly {
-					targetFieldToSet, errSet := getNestedFieldValue(currentEntityDataVal, def.Name)
-					if errSet == nil && targetFieldToSet.CanSet() {
-						targetFieldToSet.Set(newFieldVal)
-					}
-					changed = true
-					continue
-				}
 				if def.Unique {
 					// Always delete old unique index if value changed
 					oldUIdxKey := fmt.Sprintf("%s:%s:idx-u:%s:%s", r.definition.Schema, r.definition.Name, def.Name, oldValue)
