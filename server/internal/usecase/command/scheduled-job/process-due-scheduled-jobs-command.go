@@ -16,8 +16,6 @@ func init() {
 	gob.Register(ProcessDueScheduledJobsCommand{})
 	gob.Register(ProcessDueScheduledJobsResult{})
 	gob.Register(DispatchedMsgDetail{})
-	gob.Register(models.ScheduledJobTracker{})
-	gob.Register([]models.ScheduledJobTracker{})
 }
 
 type DispatchedMsgDetail struct {
@@ -54,12 +52,6 @@ func (cmd *ProcessDueScheduledJobsCommand) Execute(uow *db.UnitOfWork, now time.
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 
 	scheduledJobRepo, err := db.NewScheduledJobRepository(uow, idFactory, cmd.CF, cmd.CFS)
-	if err != nil {
-		commandResult.Error = err.Error()
-		return *commandResult
-	}
-
-	trackerRepo, err := db.NewScheduledJobTrackerRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
