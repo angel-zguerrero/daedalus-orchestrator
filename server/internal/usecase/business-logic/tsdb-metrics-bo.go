@@ -128,33 +128,29 @@ func (bo *TSDBMetricsBO) QueryGlobalMetrics(ctx context.Context, resolution int,
 
 	// Prepare final result
 	finalDatapoints := make([]models.MetricsDatapoint, 0)
-	
-	// We want them ordered by timestamp, let's collect them first
-	var minTs, maxTs int64
-	minTs = endTime
-	maxTs = startTime
-	
-	for ts := range aggregatedMap {
-		if ts < minTs {
-			minTs = ts
-		}
-		if ts > maxTs {
-			maxTs = ts
-		}
-	}
-	
-	// Ensure we generate the array linearly
+
+	// Ensure we generate the array linearly, carrying forward gauge values
+	// for time slots that have no recorded datapoint. This prevents the chart
+	// from incorrectly showing 0 pending messages during gaps where no
+	// throughput events occurred but the queue still had messages.
 	normalizedStartTime := (startTime / int64(resolution)) * int64(resolution)
 	normalizedEndTime := (endTime / int64(resolution)) * int64(resolution)
-	
+
+	var lastKnownPending uint64
+	var lastKnownInProcess uint64
+
 	for ts := normalizedStartTime; ts <= normalizedEndTime; ts += int64(resolution) {
 		agg, exists := aggregatedMap[ts]
 		if exists {
+			// Update last-known gauge state.
+			lastKnownPending = agg.Pending
+			lastKnownInProcess = agg.InProcess
+
 			avgLatency := float64(0)
 			if agg.LatencyCount > 0 {
 				avgLatency = agg.LatencySumMs / float64(agg.LatencyCount)
 			}
-			
+
 			finalDatapoints = append(finalDatapoints, models.MetricsDatapoint{
 				Timestamp:    ts,
 				Published:    agg.Published,
@@ -167,6 +163,17 @@ func (bo *TSDBMetricsBO) QueryGlobalMetrics(ctx context.Context, resolution int,
 				AvgLatencyMs: avgLatency,
 				MaxLatencyMs: agg.MaxLatencyMs,
 			})
+		} else {
+			// No data for this bucket. Emit a gauge-only datapoint so the
+			// frontend doesn't have to guess what the current backlog is.
+			// Only emit if we have seen at least one real gauge reading.
+			if lastKnownPending > 0 || lastKnownInProcess > 0 {
+				finalDatapoints = append(finalDatapoints, models.MetricsDatapoint{
+					Timestamp: ts,
+					Pending:   lastKnownPending,
+					InProcess: lastKnownInProcess,
+				})
+			}
 		}
 	}
 

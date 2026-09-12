@@ -328,6 +328,11 @@ func (s *JobWorkerService) AckMessage(ctx context.Context, req *pb.AckMessageReq
 				Message: confirmation.Error.Error(),
 			}, nil
 		}
+		if s.Config.MetricsCollector != nil {
+			s.Config.MetricsCollector.RecordAck(req.TenantCode, confirmation.QueueCode, confirmation.VNamespace, 1)
+			s.Config.MetricsCollector.RecordLatency(req.TenantCode, confirmation.QueueCode, confirmation.VNamespace, uint64(confirmation.ProcessingLatencyMs))
+			s.Config.MetricsCollector.UpdateGauges(req.TenantCode, confirmation.QueueCode, confirmation.VNamespace, confirmation.Pending, confirmation.InProcess)
+		}
 		return &pb.AckMessageResponse{
 			Success: true,
 			Message: confirmation.Message,
@@ -383,6 +388,11 @@ func (s *JobWorkerService) BulkAckMessages(ctx context.Context, req *pb.BulkAckM
 				lastErr = confirmation.Error
 			} else {
 				successCount++
+				if s.Config.MetricsCollector != nil {
+					s.Config.MetricsCollector.RecordAck(req.TenantCode, confirmation.QueueCode, confirmation.VNamespace, 1)
+					s.Config.MetricsCollector.RecordLatency(req.TenantCode, confirmation.QueueCode, confirmation.VNamespace, uint64(confirmation.ProcessingLatencyMs))
+					s.Config.MetricsCollector.UpdateGauges(req.TenantCode, confirmation.QueueCode, confirmation.VNamespace, confirmation.Pending, confirmation.InProcess)
+				}
 			}
 		}
 	}

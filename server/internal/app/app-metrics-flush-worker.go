@@ -7,8 +7,10 @@ import (
 	"deadalus-orch/server/internal/pkg/config"
 	metrics_command "deadalus-orch/server/internal/usecase/command/metrics"
 	"deadalus-orch/shared/models"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -77,7 +79,11 @@ func (app *Application) flushMetrics() {
 	}
 
 	for tenantCode, tenantBuckets := range bucketsByTenant {
-		app.writeMetricsBucketsToShard(tenantCode, tenantBuckets)
+		// Generate the OutboxEvent ID here (app layer) — command layer must not
+		// produce random values. Each flush cycle gets a unique UUID so that
+		// consecutive SaveBuckets calls don't overwrite each other in the KV store.
+		outboxEventID := strings.ReplaceAll(uuid.New().String(), "-", "")
+		app.writeMetricsBucketsToShard(tenantCode, tenantBuckets, outboxEventID)
 	}
 }
 
@@ -108,7 +114,7 @@ func flushedBucketsToModels(flushed []metrics.FlushedBucket, resolution int) []m
 // writeMetricsBucketsToShard finds the correct tenant shard and persists the
 // metric buckets via an FSM write command. If no shard is found for the tenant,
 // the buckets are silently discarded (this can happen during tenant migration).
-func (app *Application) writeMetricsBucketsToShard(tenantCode string, buckets []models.MetricsBucket) {
+func (app *Application) writeMetricsBucketsToShard(tenantCode string, buckets []models.MetricsBucket, outboxEventID string) {
 	tenantNode, ok := app.TenantNodesDictionary[tenantCode]
 	if !ok || tenantNode == nil {
 		log.Debug().
@@ -119,7 +125,8 @@ func (app *Application) writeMetricsBucketsToShard(tenantCode string, buckets []
 	}
 
 	cmd := metrics_command.SaveMetricsBucketsCommand{
-		Buckets: buckets,
+		Buckets:       buckets,
+		OutboxEventID: outboxEventID,
 		// No dynamic CF/CFS needed as it defaults to AdminFC/AdminFCSector
 	}
 

@@ -256,17 +256,17 @@ func (app *Application) Run() {
 	if batchSize <= 0 {
 		batchSize = 1000
 	}
-	app.StartScheduledJobsPollerWorker(1*time.Second, batchSize)
+	app.StartScheduledJobsPollerWorker(3*time.Second, batchSize)
 
 	app.StartTenantSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
 	app.StartDashboardSummaryWorker(time.Duration(config.GlobalConfiguration.TenantSummaryWorkerInterval) * time.Second)
 
-	// Outbox worker should run frequently, e.g. every 1 second
-	app.StartOutboxRelayWorker(1 * time.Second)
+	// Outbox worker: runs every 5 seconds — balances delivery latency vs CPU cost.
+	app.StartOutboxRelayWorker(5 * time.Second)
 
-	// Metrics Relay worker should also run frequently, e.g. every 2 seconds
-	app.StartMetricsRelayWorker(2 * time.Second)
+	// Metrics Relay worker: runs every 5 seconds — relays gauge updates to master.
+	app.StartMetricsRelayWorker(5 * time.Second)
 
 	// Start TSDB Metrics Workers
 	resolution := config.GlobalConfiguration.MetricsBucketResolution
