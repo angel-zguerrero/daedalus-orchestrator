@@ -404,6 +404,10 @@ func (bo *JobWorkerBO) runClaimWorkStopper(ctx context.Context, workerID string,
 
 								if len(res.Results) > 0 {
 									for _, result := range res.Results {
+										if bo.Config.MetricsCollector != nil {
+											bo.Config.MetricsCollector.UpdateGauges(tenant.Code, queue.Code, queue.VNamespace, result.Pending, result.InProcess)
+											bo.Config.MetricsCollector.RecordDelivery(tenant.Code, queue.Code, queue.VNamespace, 1)
+										}
 										messageChan <- ClaimedMessage{
 											Message:    result.Message,
 											Lease:      result.Lease,

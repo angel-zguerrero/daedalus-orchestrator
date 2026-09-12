@@ -21,10 +21,11 @@ func init() {
 // SaveMetricsBucketsCommand persists a batch of MetricsBuckets to the KV store.
 // It is executed as a Raft FSM write command so the data is replicated.
 type SaveMetricsBucketsCommand struct {
-	Buckets []models.MetricsBucket
-	CF      string // Column family (for tenant shard CFs)
-	CFS     string // Column family sector
-	IsRelay bool   // If true, this is executed by the relay worker on the Master Node and should not create an OutboxEvent
+	Buckets       []models.MetricsBucket
+	CF            string // Column family (for tenant shard CFs)
+	CFS           string // Column family sector
+	IsRelay       bool   // If true, this is executed by the relay worker on the Master Node and should not create an OutboxEvent
+	OutboxEventID string // Unique ID for the OutboxEvent; must be provided by the caller (app layer). Empty means no event is created.
 }
 
 func (cmd *SaveMetricsBucketsCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -46,7 +47,9 @@ func (cmd *SaveMetricsBucketsCommand) Execute(uow *db.UnitOfWork, now time.Time)
 	// Create an OutboxEvent for relaying these metrics to the Master Node.
 	// We serialize the buckets into the Payload field.
 	// Only do this if it's not a relay command, to avoid infinite loops on the Master Node!
-	if !cmd.IsRelay {
+	// The OutboxEventID MUST be provided by the caller (app layer) — the command
+	// layer must never generate random values to keep FSM execution deterministic.
+	if !cmd.IsRelay && cmd.OutboxEventID != "" {
 		payload, err := json.Marshal(cmd.Buckets)
 		if err == nil {
 			idFactory := &db.DeterministicIDGeneratorFactory{}
@@ -57,9 +60,9 @@ func (cmd *SaveMetricsBucketsCommand) Execute(uow *db.UnitOfWork, now time.Time)
 					tenantCode = cmd.Buckets[0].TenantCode
 				}
 				outboxEvent := models.OutboxEvent{
-					ID:        idFactory.GenerateID(),
+					ID:        cmd.OutboxEventID, // ID provided by app layer, not generated here
 					EventType: models.EventTypeMetricsRelay,
-					TenantID:  tenantCode, // Useful for tracing, though payload contains all
+					TenantID:  tenantCode,
 					Payload:   payload,
 					CreatedAt: now,
 				}

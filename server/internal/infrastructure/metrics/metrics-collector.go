@@ -79,12 +79,36 @@ type MetricsCollector struct {
 
 // persistentGauge stores the exact known DB state of a queue
 type persistentGauge struct {
-	tenantCode string
-	queueCode  string
-	vnamespace string
-	pending    uint64
-	inProcess  uint64
+	tenantCode   string
+	queueCode    string
+	vnamespace   string
+	pending      atomic.Uint64
+	inProcess    atomic.Uint64
+	maxPending   atomic.Uint64
+	maxInProcess atomic.Uint64
+	idleFlushes  atomic.Int32
 }
+
+func (g *persistentGauge) getAndResetMax() (uint64, uint64) {
+	currP := g.pending.Load()
+	currIP := g.inProcess.Load()
+
+	maxP := g.maxPending.Swap(currP)
+	maxIP := g.maxInProcess.Swap(currIP)
+
+	if maxP < currP {
+		maxP = currP
+	}
+	if maxIP < currIP {
+		maxIP = currIP
+	}
+
+	return maxP, maxIP
+}
+
+// maxIdleFlushes is the number of consecutive idle flushes before a gauge
+// entry is removed. At the default 5-second resolution this is ~60 seconds.
+const maxIdleFlushes = 12
 
 // bucketEntry associates dimensional metadata with its atomic counters.
 type bucketEntry struct {
@@ -193,10 +217,25 @@ func (mc *MetricsCollector) RecordLatency(tenantCode, queueCode, vnamespace stri
 func (mc *MetricsCollector) UpdateGauges(tenantCode, queueCode, vnamespace string, pending, inProcess uint64) {
 	key := fmt.Sprintf("%s:%s:%s", tenantCode, queueCode, vnamespace)
 
+	// Fast path: RLock to check if gauge already exists
+	mc.mu.RLock()
+	gauge, ok := mc.persistentGauges[key]
+	mc.mu.RUnlock()
+
+	if ok {
+		gauge.pending.Store(pending)
+		gauge.inProcess.Store(inProcess)
+		updateMax(&gauge.maxPending, pending)
+		updateMax(&gauge.maxInProcess, inProcess)
+		gauge.idleFlushes.Store(0)
+		return
+	}
+
+	// Slow path: WLock to insert new gauge entry
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
-	gauge, ok := mc.persistentGauges[key]
+	gauge, ok = mc.persistentGauges[key]
 	if !ok {
 		gauge = &persistentGauge{
 			tenantCode: tenantCode,
@@ -205,11 +244,11 @@ func (mc *MetricsCollector) UpdateGauges(tenantCode, queueCode, vnamespace strin
 		}
 		mc.persistentGauges[key] = gauge
 	}
-	gauge.pending = pending
-	gauge.inProcess = inProcess
-
-	// If pending and inProcess are 0, it means the queue has no backlog.
-	// But we keep it in persistentGauges until next FlushCompleted so it can flush one last 0-bucket.
+	gauge.pending.Store(pending)
+	gauge.inProcess.Store(inProcess)
+	updateMax(&gauge.maxPending, pending)
+	updateMax(&gauge.maxInProcess, inProcess)
+	gauge.idleFlushes.Store(0)
 }
 
 // SnapshotGauges is kept for backward compatibility if needed, but it's replaced by UpdateGauges.
@@ -245,11 +284,10 @@ func (mc *MetricsCollector) FlushCompleted() []FlushedBucket {
 				Failed:       entry.data.Failed.Load(),
 			}
 
-			// Add the gauges
+			// Add the peak gauges reached during this window
 			gKey := fmt.Sprintf("%s:%s:%s", entry.tenantCode, entry.queueCode, entry.vnamespace)
 			if gauge, ok := mc.persistentGauges[gKey]; ok {
-				fb.Pending = gauge.pending
-				fb.InProcess = gauge.inProcess
+				fb.Pending, fb.InProcess = gauge.getAndResetMax()
 			}
 
 			fb.LatencySumMs = entry.data.LatencySumMs.Load()
@@ -262,24 +300,38 @@ func (mc *MetricsCollector) FlushCompleted() []FlushedBucket {
 		}
 	}
 
-	// Process queues with known backlogs
+	// Process queues with known backlogs: emit a synthetic gauge-only bucket
+	// for any queue not already covered by a throughput bucket, so the TSDB
+	// always has a gauge reading even in quiet periods.
 	for key, gauge := range mc.persistentGauges {
 		bKey := bucketKey(gauge.tenantCode, gauge.queueCode, gauge.vnamespace, cutoff-mc.resolution)
-		// Only create an artificial bucket if throughput didn't already create one
+		// Only create an artificial bucket if throughput didn't already create one.
+		maxP, maxIP := gauge.getAndResetMax()
 		if _, exists := flushedKeys[bKey]; !exists {
 			result = append(result, FlushedBucket{
 				TenantCode: gauge.tenantCode,
 				QueueCode:  gauge.queueCode,
 				VNamespace: gauge.vnamespace,
 				Timestamp:  cutoff - mc.resolution,
-				Pending:    gauge.pending,
-				InProcess:  gauge.inProcess,
+				Pending:    maxP,
+				InProcess:  maxIP,
 			})
 		}
 
-		// If a queue falls completely flat, remove it from memory tracking
-		if gauge.pending == 0 && gauge.inProcess == 0 {
-			delete(mc.persistentGauges, key)
+		// Age-based eviction: track how many consecutive flushes have seen
+		// this queue completely idle (both gauges == 0). After maxIdleFlushes
+		// consecutive idle cycles the entry is evicted to prevent unbounded
+		// memory growth for queues that have gone permanently quiet.
+		p := gauge.pending.Load()
+		ip := gauge.inProcess.Load()
+		if p == 0 && ip == 0 {
+			idle := gauge.idleFlushes.Add(1)
+			if idle >= maxIdleFlushes {
+				delete(mc.persistentGauges, key)
+			}
+		} else {
+			// Queue is still active — reset the idle counter.
+			gauge.idleFlushes.Store(0)
 		}
 	}
 
