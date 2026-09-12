@@ -10,14 +10,15 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 func init() {
 	gob.Register(ProcessDueScheduledJobsCommand{})
 	gob.Register(ProcessDueScheduledJobsResult{})
 	gob.Register(DispatchedMsgDetail{})
+	gob.Register(models.ScheduledJobTracker{})
+	gob.Register([]models.ScheduledJobTracker{})
+
 }
 
 type DispatchedMsgDetail struct {
@@ -59,6 +60,12 @@ func (cmd *ProcessDueScheduledJobsCommand) Execute(uow *db.UnitOfWork, now time.
 		return *commandResult
 	}
 
+	trackerRepo, err := db.NewScheduledJobTrackerRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err != nil {
+		commandResult.Error = err.Error()
+		return *commandResult
+	}
+
 	queueRepo, err := db.NewQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -94,8 +101,9 @@ func (cmd *ProcessDueScheduledJobsCommand) Execute(uow *db.UnitOfWork, now time.
 			continue
 		}
 
-		// Dispatch task message
-		messagesToEnqueue, err := cmd.resolveTargetMessages(uow, idFactory, job, now)
+		// Dispatch task message with deterministic execution ID
+		executionID := fmt.Sprintf("exec_%s_%d", job.ID, oldNextRunAt.Unix())
+		messagesToEnqueue, trackersToCreate, err := cmd.resolveTargetMessages(uow, idFactory, job, executionID, now)
 		if err != nil || len(messagesToEnqueue) == 0 {
 			// Revert state back to idle so dispatch can be retried on next poll
 			job.State = models.ScheduledJobIdle
@@ -123,6 +131,17 @@ func (cmd *ProcessDueScheduledJobsCommand) Execute(uow *db.UnitOfWork, now time.
 
 			result.Errors = append(result.Errors, fmt.Sprintf("failed to enqueue message for job %s: %s", job.ID, enqueueResult.Error))
 			continue
+		}
+
+		if len(trackersToCreate) > 0 {
+			_, err = trackerRepo.BulkCreateTrackers(trackersToCreate, now)
+			if err != nil {
+				job.State = models.ScheduledJobIdle
+				_, _ = scheduledJobRepo.UpdateScheduledJobStateAndRunAt(job, &oldNextRunAt, now)
+
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to create job trackers for job %s: %s", job.ID, err.Error()))
+				continue
+			}
 		}
 
 		if resData, ok := enqueueResult.Result.(queue_command.EnqueueResult); ok {
@@ -169,12 +188,13 @@ func (cmd *ProcessDueScheduledJobsCommand) resolveTargetMessages(
 	uow *db.UnitOfWork,
 	idFactory db.IDGeneratorFactory,
 	job *models.ScheduledJob,
+	executionID string,
 	now time.Time,
-) ([]models.QueueMessage, error) {
-	msgID := uuid.New().String()
+) ([]models.QueueMessage, []*models.ScheduledJobTracker, error) {
+	msgID := fmt.Sprintf("msg_%s_%d", job.ID, job.NextRunAt.Unix())
 
 	baseMessage := models.QueueMessage{
-		ID:             uuid.New().String(),
+		ID:             fmt.Sprintf("msg_%s_%d", job.ID, job.NextRunAt.Unix()),
 		MessageID:      msgID,
 		Content:        []byte(job.Content),
 		ContentType:    job.ContentType,
@@ -184,13 +204,23 @@ func (cmd *ProcessDueScheduledJobsCommand) resolveTargetMessages(
 		Priority:       job.Priority,
 		VNamespace:     job.VNamespace,
 		ScheduledJobID: job.ID,
+		ExecutionID:    executionID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 
 	if job.TargetType == string(models.ScheduledJobTargetQueue) {
 		baseMessage.QueueID = job.TargetID
-		return []models.QueueMessage{baseMessage}, nil
+		baseMessage.ID = fmt.Sprintf("msg_%s_%d_%s", job.ID, job.NextRunAt.Unix(), job.TargetID)
+
+		tracker := &models.ScheduledJobTracker{
+			ID:             fmt.Sprintf("trk_%s_%s", executionID, job.TargetID),
+			ScheduledJobID: job.ID,
+			ExecutionID:    executionID,
+			QueueID:        job.TargetID,
+			Status:         models.ScheduledJobTrackerPending,
+		}
+		return []models.QueueMessage{baseMessage}, []*models.ScheduledJobTracker{tracker}, nil
 	}
 
 	if job.TargetType == string(models.ScheduledJobTargetExchange) {
@@ -212,26 +242,36 @@ func (cmd *ProcessDueScheduledJobsCommand) resolveTargetMessages(
 
 		res := resolveCmd.Execute(uow, now)
 		if res.Error != "" {
-			return nil, fmt.Errorf("exchange queue resolution error: %s", res.Error)
+			return nil, nil, fmt.Errorf("exchange queue resolution error: %s", res.Error)
 		}
 
 		fetchRes, ok := res.Result.(binding_command.ResolveAndFetchQueuesResult)
 		if !ok || len(fetchRes.Queues) == 0 {
-			return nil, nil
+			return nil, nil, nil
 		}
 
 		messages := make([]models.QueueMessage, 0, len(fetchRes.Queues))
+		trackers := make([]*models.ScheduledJobTracker, 0, len(fetchRes.Queues))
 		for _, q := range fetchRes.Queues {
 			if q.State == models.QueueActive {
 				m := baseMessage
-				m.ID = uuid.New().String()
+				m.ID = fmt.Sprintf("msg_%s_%d_%s", job.ID, job.NextRunAt.Unix(), q.ID)
 				m.QueueID = q.ID
 				messages = append(messages, m)
+
+				t := &models.ScheduledJobTracker{
+					ID:             fmt.Sprintf("trk_%s_%s", executionID, q.ID),
+					ScheduledJobID: job.ID,
+					ExecutionID:    executionID,
+					QueueID:        q.ID,
+					Status:         models.ScheduledJobTrackerPending,
+				}
+				trackers = append(trackers, t)
 			}
 		}
 
-		return messages, nil
+		return messages, trackers, nil
 	}
 
-	return nil, fmt.Errorf("unknown target type: %s", job.TargetType)
+	return nil, nil, fmt.Errorf("unknown target type: %s", job.TargetType)
 }

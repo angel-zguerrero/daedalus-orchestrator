@@ -151,7 +151,13 @@ func (cmd *BulkAckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 		if message.ScheduledJobID != "" {
 			scheduledJobRepo, errJobRepo := db.NewScheduledJobRepository(uow, idFactory, cmd.CF, cmd.CFS)
 			if errJobRepo == nil {
-				_ = scheduledJobRepo.HandleCompletion(message.ScheduledJobID, now)
+				_ = scheduledJobRepo.UpdateTrackerAndHandleCompletion(
+					message.ScheduledJobID,
+					message.ExecutionID,
+					message.QueueID,
+					models.ScheduledJobTrackerCompleted,
+					now,
+				)
 			}
 		}
 

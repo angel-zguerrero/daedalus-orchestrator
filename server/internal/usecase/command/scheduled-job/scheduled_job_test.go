@@ -1,6 +1,7 @@
 package scheduled_job_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/utils"
+	bindingCommand "deadalus-orch/server/internal/usecase/command/binding"
 	queueCommand "deadalus-orch/server/internal/usecase/command/queue"
 	scheduledJobCommand "deadalus-orch/server/internal/usecase/command/scheduled-job"
 	"deadalus-orch/shared/models"
@@ -489,3 +491,285 @@ func TestScheduledJob_LifecycleCompletionOneOffAndRecurring(t *testing.T) {
 		assert.True(t, exists, "NEW companion index key MUST be created for next run")
 	})
 }
+
+func TestScheduledJob_ExchangeFanOutScenario(t *testing.T) {
+	store := newTestPebbleStore(t)
+	now := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	idFactory := &db.DeterministicIDGeneratorFactory{}
+
+	// 0. Create default VNamespace
+	uowVNS := db.NewUnitOfWork(store, nil)
+	vnsRepo, err := db.NewVNamespaceRepository(uowVNS, idFactory, TestFC, TestCFS)
+	require.NoError(t, err)
+	_, err = vnsRepo.CreateVNamespace(&models.VNamespace{
+		ID:   "vns-default-id",
+		Name: "default",
+	}, now)
+	require.NoError(t, err)
+	require.NoError(t, uowVNS.Commit())
+
+	// 1. Create Exchange
+	uowEx := db.NewUnitOfWork(store, nil)
+	exRepo, err := db.NewExchangeRepository(uowEx, idFactory, TestFC, TestCFS)
+	require.NoError(t, err)
+
+	exchange := &models.Exchange{
+		ID:         "exchange-fanout-1",
+		Code:       "events-exchange",
+		Name:       "Events Exchange",
+		Type:       models.Fanout,
+		VNamespace: "default",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	exID, err := exRepo.CreateExchange(exchange, now)
+	require.NoError(t, err)
+	exchange.ID = exID
+	require.NoError(t, uowEx.Commit())
+
+	// 2. Create 2 Queues: Queue A & Queue B
+	setupQueue := func(id, code, name string) *models.Queue {
+		uow := db.NewUnitOfWork(store, nil)
+		qRepo, _ := db.NewQueueRepository(uow, idFactory, TestFC, TestCFS)
+		q := &models.Queue{
+			ID:                        id,
+			Code:                      code,
+			Name:                      name,
+			VNamespace:                "default",
+			State:                     models.QueueActive,
+			Type:                      models.StandardQueue,
+			DefaultQueueMessageTTL:    3600,
+			AllowDuplicated:           true,
+			MaxAttempts:               3,
+			MessagesCount:             0,
+			DesiredPriorityThresholds: map[int]int{0: 0, 1: 100},
+			PriorityThresholds:        map[int]int{0: 0, 1: 100},
+			CreatedAt:                 now,
+			UpdatedAt:                 now,
+		}
+		qID, _ := qRepo.CreateQueue(q, now)
+		q.ID = qID
+		_ = uow.Commit()
+		return q
+	}
+
+	queueA := setupQueue("queue-fanout-a", "queue-a", "Queue A")
+	queueB := setupQueue("queue-fanout-b", "queue-b", "Queue B")
+
+	// 3. Bind Queue A and Queue B to Exchange
+	bindQueue := func(bindingID, bindingCode, queueCode string) {
+		uow := db.NewUnitOfWork(store, nil)
+		cmd := &bindingCommand.AssertBindingCommand{
+			NewBindingID: bindingID,
+			Code:         bindingCode,
+			QueueCode:    queueCode,
+			ExchangeCode: exchange.Code,
+			VNamespace:   "default",
+			BindingType:  models.BindingTypeClassic,
+			CF:           TestFC,
+			CFS:          TestCFS,
+		}
+		res := cmd.Execute(uow, now)
+		require.Empty(t, res.Error)
+		require.NoError(t, uow.Commit())
+	}
+
+	bindQueue("binding-a", "BIND_A", queueA.Code)
+	bindQueue("binding-b", "BIND_B", queueB.Code)
+
+	t.Run("OneOff_FanOut_RequiresAllQueuesAckBeforeDeletion", func(t *testing.T) {
+		// Create OneOff scheduled job targeting the fan-out exchange
+		uowCreate := db.NewUnitOfWork(store, nil)
+		jobRepo, _ := db.NewScheduledJobRepository(uowCreate, idFactory, TestFC, TestCFS)
+
+		oneOffJob := &models.ScheduledJob{
+			ID:         "oneoff-fanout-job-1",
+			TenantID:   TestCFS,
+			TargetType: "exchange",
+			TargetID:   exchange.ID,
+			TargetCode: exchange.Code,
+			VNamespace: "default",
+			Content:    "FanOut Event Payload",
+			Type:       models.ScheduledJobOneOff,
+			RunAfter:   "1m",
+			NextRunAt:  now,
+			State:      models.ScheduledJobIdle,
+		}
+		_, err := jobRepo.CreateScheduledJob(oneOffJob, now)
+		require.NoError(t, err)
+		require.NoError(t, uowCreate.Commit())
+
+		// Dispatch via poller
+		uowPoller := db.NewUnitOfWork(store, nil)
+		poller := &scheduledJobCommand.ProcessDueScheduledJobsCommand{BatchSize: 100, CF: TestFC, CFS: TestCFS}
+		resPoller := poller.Execute(uowPoller, now)
+		require.Empty(t, resPoller.Error)
+		require.NoError(t, uowPoller.Commit())
+
+		pRes := resPoller.Result.(*scheduledJobCommand.ProcessDueScheduledJobsResult)
+		assert.Equal(t, 1, pRes.ProcessedJobs)
+		assert.Equal(t, 2, pRes.DispatchedMsgs, "Should dispatch messages to both Queue A and Queue B")
+
+		// Verify ScheduledJob state transitioned to delivered
+		uowCheck := db.NewUnitOfWork(store, nil)
+		jobRepoCheck, _ := db.NewScheduledJobRepository(uowCheck, idFactory, TestFC, TestCFS)
+		jobCheck, err := jobRepoCheck.GetScheduledJobByID("oneoff-fanout-job-1", now)
+		require.NoError(t, err)
+		require.NotNil(t, jobCheck)
+		assert.Equal(t, models.ScheduledJobDelivered, jobCheck.State)
+
+		// Verify 2 trackers exist in DB
+		expectedExecutionID := fmt.Sprintf("exec_%s_%d", oneOffJob.ID, oneOffJob.NextRunAt.Unix())
+		trackerRepo, _ := db.NewScheduledJobTrackerRepository(uowCheck, idFactory, TestFC, TestCFS)
+		trackers, err := trackerRepo.GetTrackersByExecution(expectedExecutionID, now)
+		require.NoError(t, err)
+		assert.Len(t, trackers, 2)
+
+		// Worker A dequeues from Queue A and ACKs message
+		uowDeqA := db.NewUnitOfWork(store, nil)
+		deqCmdA := &queueCommand.DequeueCommand{
+			QueueID:       queueA.ID,
+			JobWorkerID:   "worker-a",
+			LeaseDuration: 30 * time.Second,
+			CF:            TestFC,
+			CFS:           TestCFS,
+		}
+		deqResA := deqCmdA.Execute(uowDeqA, now)
+		require.Empty(t, deqResA.Error)
+		require.NoError(t, uowDeqA.Commit())
+
+		claimedMsgA := deqResA.Result.(queueCommand.DequeueResult)
+		require.NotNil(t, claimedMsgA.Lease)
+		assert.Equal(t, "oneoff-fanout-job-1", claimedMsgA.Message.ScheduledJobID)
+
+		ackTime1 := now.Add(1 * time.Second)
+		uowAckA := db.NewUnitOfWork(store, nil)
+		ackCmdA := &queueCommand.AckMessageCommand{
+			LeaseID: claimedMsgA.Lease.ID,
+			CF:      TestFC,
+			CFS:     TestCFS,
+		}
+		ackResA := ackCmdA.Execute(uowAckA, ackTime1)
+		require.Empty(t, ackResA.Error)
+		require.NoError(t, uowAckA.Commit())
+
+		// Job must STILL exist because Queue B has not ACKed yet!
+		uowMidCheck := db.NewUnitOfWork(store, nil)
+		jobRepoMid, _ := db.NewScheduledJobRepository(uowMidCheck, idFactory, TestFC, TestCFS)
+		jobMid, err := jobRepoMid.GetScheduledJobByID("oneoff-fanout-job-1", ackTime1)
+		require.NoError(t, err)
+		require.NotNil(t, jobMid, "Job must NOT be deleted while Queue B is still pending ACK")
+		assert.Equal(t, models.ScheduledJobDelivered, jobMid.State)
+
+		// Worker B dequeues from Queue B and ACKs message
+		uowDeqB := db.NewUnitOfWork(store, nil)
+		deqCmdB := &queueCommand.DequeueCommand{
+			QueueID:       queueB.ID,
+			JobWorkerID:   "worker-b",
+			LeaseDuration: 30 * time.Second,
+			CF:            TestFC,
+			CFS:           TestCFS,
+		}
+		deqResB := deqCmdB.Execute(uowDeqB, ackTime1)
+		require.Empty(t, deqResB.Error)
+		require.NoError(t, uowDeqB.Commit())
+
+		claimedMsgB := deqResB.Result.(queueCommand.DequeueResult)
+		require.NotNil(t, claimedMsgB.Lease)
+
+		ackTime2 := ackTime1.Add(1 * time.Second)
+		uowAckB := db.NewUnitOfWork(store, nil)
+		ackCmdB := &queueCommand.AckMessageCommand{
+			LeaseID: claimedMsgB.Lease.ID,
+			CF:      TestFC,
+			CFS:     TestCFS,
+		}
+		ackResB := ackCmdB.Execute(uowAckB, ackTime2)
+		require.Empty(t, ackResB.Error)
+		require.NoError(t, uowAckB.Commit())
+
+		// Now that ALL queues ACKed, OneOff job MUST be completely DELETED
+		uowFinal := db.NewUnitOfWork(store, nil)
+		jobRepoFinal, _ := db.NewScheduledJobRepository(uowFinal, idFactory, TestFC, TestCFS)
+		jobFinal, err := jobRepoFinal.GetScheduledJobByID("oneoff-fanout-job-1", ackTime2)
+		require.NoError(t, err)
+		assert.Nil(t, jobFinal, "OneOff fan-out job MUST be deleted after ALL target queues have ACKed")
+
+		// Trackers should also be cleaned up
+		trackerRepoFinal, _ := db.NewScheduledJobTrackerRepository(uowFinal, idFactory, TestFC, TestCFS)
+		trackersFinal, err := trackerRepoFinal.GetTrackersByExecution(expectedExecutionID, ackTime2)
+		require.NoError(t, err)
+		assert.Empty(t, trackersFinal, "Trackers MUST be cleaned up after completion")
+	})
+
+	t.Run("Recurring_FanOut_ResetsToIdleOnlyAfterAllQueuesAck", func(t *testing.T) {
+		uowCreate := db.NewUnitOfWork(store, nil)
+		jobRepo, _ := db.NewScheduledJobRepository(uowCreate, idFactory, TestFC, TestCFS)
+
+		recurringJob := &models.ScheduledJob{
+			ID:         "recurring-fanout-job-1",
+			TenantID:   TestCFS,
+			TargetType: "exchange",
+			TargetID:   exchange.ID,
+			TargetCode: exchange.Code,
+			VNamespace: "default",
+			Content:    "Recurring FanOut Event Payload",
+			Type:       models.ScheduledJobRecurring,
+			Every:      "5m",
+			NextRunAt:  now,
+			State:      models.ScheduledJobIdle,
+		}
+		_, err := jobRepo.CreateScheduledJob(recurringJob, now)
+		require.NoError(t, err)
+		require.NoError(t, uowCreate.Commit())
+
+		// Dispatch via poller
+		uowPoller := db.NewUnitOfWork(store, nil)
+		poller := &scheduledJobCommand.ProcessDueScheduledJobsCommand{BatchSize: 100, CF: TestFC, CFS: TestCFS}
+		resPoller := poller.Execute(uowPoller, now)
+		require.Empty(t, resPoller.Error)
+		require.NoError(t, uowPoller.Commit())
+
+		// ACK Queue A
+		uowDeqA := db.NewUnitOfWork(store, nil)
+		deqCmdA := &queueCommand.DequeueCommand{QueueID: queueA.ID, JobWorkerID: "w-a", LeaseDuration: 30 * time.Second, CF: TestFC, CFS: TestCFS}
+		deqResA := deqCmdA.Execute(uowDeqA, now)
+		claimedMsgA := deqResA.Result.(queueCommand.DequeueResult)
+		_ = uowDeqA.Commit()
+
+		ackTime1 := now.Add(1 * time.Second)
+		uowAckA := db.NewUnitOfWork(store, nil)
+		ackCmdA := &queueCommand.AckMessageCommand{LeaseID: claimedMsgA.Lease.ID, CF: TestFC, CFS: TestCFS}
+		_ = ackCmdA.Execute(uowAckA, ackTime1)
+		_ = uowAckA.Commit()
+
+		// Verify state is still delivered (not reset to idle yet)
+		uowMidCheck := db.NewUnitOfWork(store, nil)
+		jobRepoMid, _ := db.NewScheduledJobRepository(uowMidCheck, idFactory, TestFC, TestCFS)
+		jobMid, _ := jobRepoMid.GetScheduledJobByID("recurring-fanout-job-1", ackTime1)
+		assert.Equal(t, models.ScheduledJobDelivered, jobMid.State)
+
+		// ACK Queue B
+		uowDeqB := db.NewUnitOfWork(store, nil)
+		deqCmdB := &queueCommand.DequeueCommand{QueueID: queueB.ID, JobWorkerID: "w-b", LeaseDuration: 30 * time.Second, CF: TestFC, CFS: TestCFS}
+		deqResB := deqCmdB.Execute(uowDeqB, ackTime1)
+		claimedMsgB := deqResB.Result.(queueCommand.DequeueResult)
+		_ = uowDeqB.Commit()
+
+		ackTime2 := ackTime1.Add(1 * time.Second)
+		uowAckB := db.NewUnitOfWork(store, nil)
+		ackCmdB := &queueCommand.AckMessageCommand{LeaseID: claimedMsgB.Lease.ID, CF: TestFC, CFS: TestCFS}
+		_ = ackCmdB.Execute(uowAckB, ackTime2)
+		_ = uowAckB.Commit()
+
+		// Verify state reset to idle and NextRunAt recalculated
+		uowFinal := db.NewUnitOfWork(store, nil)
+		jobRepoFinal, _ := db.NewScheduledJobRepository(uowFinal, idFactory, TestFC, TestCFS)
+		jobFinal, err := jobRepoFinal.GetScheduledJobByID("recurring-fanout-job-1", ackTime2)
+		require.NoError(t, err)
+		require.NotNil(t, jobFinal)
+		assert.Equal(t, models.ScheduledJobIdle, jobFinal.State, "Recurring fan-out job MUST return to idle after ALL queues ACK")
+		assert.Equal(t, ackTime2.Add(5*time.Minute), jobFinal.NextRunAt)
+	})
+}
+
