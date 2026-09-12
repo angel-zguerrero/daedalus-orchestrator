@@ -50,6 +50,10 @@
               <svg cIcon name="cil-clock" class="me-2"></svg>
               Scheduled Jobs
             </button>
+            <button cTab itemKey="configs-secrets">
+              <svg cIcon name="cil-shield-alt" class="me-2"></svg>
+              Configs & Secrets
+            </button>
           </c-tabs-list>
           
           <c-tabs-content>
@@ -260,6 +264,13 @@
             <c-tab-panel itemKey="scheduled-jobs" class="p-3">
               <ng-container *ngIf="activeTab === 'scheduled-jobs'">
                 <app-scheduled-jobs [tenantCode]="tenantCode"></app-scheduled-jobs>
+              </ng-container>
+            </c-tab-panel>
+
+            <!-- Configs & Secrets Tab -->
+            <c-tab-panel itemKey="configs-secrets" class="p-3">
+              <ng-container *ngIf="activeTab === 'configs-secrets'">
+                <app-configs-secrets scope="tenant" [tenantCode]="tenantCode"></app-configs-secrets>
               </ng-container>
             </c-tab-panel>
           </c-tabs-content>

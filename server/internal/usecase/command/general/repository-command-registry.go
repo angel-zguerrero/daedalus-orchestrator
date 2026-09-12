@@ -4,6 +4,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	binding_command "deadalus-orch/server/internal/usecase/command/binding"
+	env_config_command "deadalus-orch/server/internal/usecase/command/env-config"
 	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	header_command "deadalus-orch/server/internal/usecase/command/header"
 	jobworker_command "deadalus-orch/server/internal/usecase/command/job-worker"
@@ -191,6 +192,17 @@ func init() {
 	RegisterRepoCommand("DeleteScheduledJobCommand", func() commands.Command { return &scheduled_job_command.DeleteScheduledJobCommand{} })
 	RegisterRepoCommand("ProcessDueScheduledJobsCommand", func() commands.Command { return &scheduled_job_command.ProcessDueScheduledJobsCommand{} })
 	RegisterRepoCommand("HandleScheduledJobCompletionCommand", func() commands.Command { return &scheduled_job_command.HandleScheduledJobCompletionCommand{} })
+
+	// Env Config commands
+	RegisterRepoCommand("CreateEnvGroupCommand", func() commands.Command { return &env_config_command.CreateEnvGroupCommand{} })
+	RegisterRepoCommand("UpdateEnvGroupCommand", func() commands.Command { return &env_config_command.UpdateEnvGroupCommand{} })
+	RegisterRepoCommand("DeleteEnvGroupCommand", func() commands.Command { return &env_config_command.DeleteEnvGroupCommand{} })
+	RegisterRepoCommand("GetEnvGroupCommand", func() commands.Command { return &env_config_command.GetEnvGroupCommand{} })
+	RegisterRepoCommand("ListEnvGroupsCommand", func() commands.Command { return &env_config_command.ListEnvGroupsCommand{} })
+	RegisterRepoCommand("SaveEnvVarCommand", func() commands.Command { return &env_config_command.SaveEnvVarCommand{} })
+	RegisterRepoCommand("DeleteEnvVarCommand", func() commands.Command { return &env_config_command.DeleteEnvVarCommand{} })
+	RegisterRepoCommand("GetEnvVarsCommand", func() commands.Command { return &env_config_command.GetEnvVarsCommand{} })
+	RegisterRepoCommand("BulkSaveEnvVarsCommand", func() commands.Command { return &env_config_command.BulkSaveEnvVarsCommand{} })
 
 	// General commands
 	RegisterRepoCommand("CreateColumnFamilyCommand", func() commands.Command { return &CreateColumnFamilyCommand{} })

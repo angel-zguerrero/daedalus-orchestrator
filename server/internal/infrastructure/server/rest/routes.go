@@ -5,6 +5,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
 	"deadalus-orch/server/internal/infrastructure/server/rest/cluster"
 	"deadalus-orch/server/internal/infrastructure/server/rest/dashboard"
+	"deadalus-orch/server/internal/infrastructure/server/rest/envconfig"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
@@ -34,6 +35,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	dashboardController := dashboard.NewDashboardController(s.Config)
 	userController := user.NewUserController(s.Config)
 	scheduledJobController := scheduledjob.NewScheduledJobController(s.Config)
+	envConfigController := envconfig.NewEnvConfigController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -89,7 +91,32 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.GET("/:code/scheduled-jobs", scheduledJobController.GetScheduledJobsHandler)
 				tenantsGroup.GET("/:code/scheduled-job/:id", scheduledJobController.GetScheduledJobHandler)
 				tenantsGroup.DELETE("/:code/scheduled-job/:id", scheduledJobController.DeleteScheduledJobHandler)
+
+				tenantsGroup.POST("/:code/env-groups", envConfigController.CreateTenantGroupHandler)
+				tenantsGroup.GET("/:code/env-groups", envConfigController.ListTenantGroupsHandler)
+				tenantsGroup.GET("/:code/env-groups/:groupId", envConfigController.GetTenantGroupHandler)
+				tenantsGroup.PUT("/:code/env-groups/:groupId", envConfigController.UpdateTenantGroupHandler)
+				tenantsGroup.DELETE("/:code/env-groups/:groupId", envConfigController.DeleteTenantGroupHandler)
+				tenantsGroup.GET("/:code/env-groups/:groupId/vars", envConfigController.GetTenantVarsHandler)
+				tenantsGroup.POST("/:code/env-groups/:groupId/vars", envConfigController.SaveTenantVarHandler)
+				tenantsGroup.DELETE("/:code/env-groups/:groupId/vars/:varId", envConfigController.DeleteTenantVarHandler)
+				tenantsGroup.PUT("/:code/env-groups/:groupId/vars/bulk", envConfigController.BulkSaveTenantVarsHandler)
 			}
+		}
+
+		envGroupsGroup := restAPIGroup.Group("/env-groups")
+		envGroupsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		envGroupsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
+		{
+			envGroupsGroup.POST("", envConfigController.CreateGlobalGroupHandler)
+			envGroupsGroup.GET("", envConfigController.ListGlobalGroupsHandler)
+			envGroupsGroup.GET("/:groupId", envConfigController.GetGlobalGroupHandler)
+			envGroupsGroup.PUT("/:groupId", envConfigController.UpdateGlobalGroupHandler)
+			envGroupsGroup.DELETE("/:groupId", envConfigController.DeleteGlobalGroupHandler)
+			envGroupsGroup.GET("/:groupId/vars", envConfigController.GetGlobalVarsHandler)
+			envGroupsGroup.POST("/:groupId/vars", envConfigController.SaveGlobalVarHandler)
+			envGroupsGroup.DELETE("/:groupId/vars/:varId", envConfigController.DeleteGlobalVarHandler)
+			envGroupsGroup.PUT("/:groupId/vars/bulk", envConfigController.BulkSaveGlobalVarsHandler)
 		}
 
 		usersGroup := restAPIGroup.Group("/users")
@@ -128,6 +155,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		}
 
 	}
+
 	metricsAPIGroup := engine.Group("/metrics")
 	metricsAPIGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 	metricsAPIGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))

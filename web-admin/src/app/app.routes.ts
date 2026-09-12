@@ -27,6 +27,10 @@ export const routes: Routes = [
         loadChildren: () => import('./views/tenants/routes').then((m) => m.routes)
       },
       {
+        path: 'configs-secrets',
+        loadChildren: () => import('./views/configs-secrets/routes').then((m) => m.routes)
+      },
+      {
         path: 'cluster',
         loadChildren: () => import('./views/cluster/routes').then((m) => m.routes)
       },
