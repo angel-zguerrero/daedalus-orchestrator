@@ -60,3 +60,5 @@ Thumbs.db
 .github/instructions/nx.instructions.md
 scripts/examples/*.csv
 
+# Lockfiles
+package-lock.json
