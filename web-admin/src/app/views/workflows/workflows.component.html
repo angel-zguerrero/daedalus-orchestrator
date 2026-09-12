@@ -1,0 +1,318 @@
+<c-card class="mb-4">
+  <c-card-header>
+    Workflows {{ scope === 'tenant' ? '(' + tenantCode + ')' : '(Global)' }}
+  </c-card-header>
+  <c-card-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="success" *ngIf="successMsg" dismissible>{{ successMsg }}</c-alert>
+
+    <!-- Search and Actions Row -->
+    <c-row class="mb-3">
+      <c-col [md]="3">
+        <div class="input-group">
+          <input 
+            type="text" 
+            cFormControl 
+            placeholder="Search by name or code" 
+            [(ngModel)]="searchQuery" 
+            (keydown.enter)="searchWorkflows()"/>
+          <button 
+            cButton 
+            type="button" 
+            color="secondary" 
+            variant="outline" 
+            (click)="searchWorkflows()">
+            <svg cIcon name="cil-search"></svg>
+          </button>
+        </div>
+      </c-col>
+      <c-col [md]="9" class="d-flex justify-content-end">
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create Workflow
+        </button>
+      </c-col>
+    </c-row>
+
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loading">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading workflows...</p>
+    </div>
+
+    <!-- Workflows Table -->
+    <div class="table-responsive" *ngIf="!loading">
+      <table cTable class="mt-4" [hover]="true">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Code</th>
+            <th>Version</th>
+            <th>Payload Format</th>
+            <th>Max Duration</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let wf of filteredWorkflows" class="align-middle">
+            <td class="text-truncate" style="max-width: 180px;" title="{{ wf.name }}">
+              <strong>{{ wf.name }}</strong>
+            </td>
+            <td class="text-truncate" style="max-width: 150px;" title="{{ wf.code }}">
+              <code>{{ wf.code }}</code>
+            </td>
+            <td>v{{ wf.version }}</td>
+            <td>
+              <c-badge [color]="wf.payloadFormat === 'json' ? 'info' : 'warning'" shape="rounded-pill">
+                {{ wf.payloadFormat | uppercase }}
+              </c-badge>
+            </td>
+            <td>{{ wf.maxDurationSeconds }}s</td>
+            <td>
+              <c-badge [color]="wf.isActive ? 'success' : 'secondary'" shape="rounded-pill">
+                {{ wf.isActive ? 'Active' : 'Inactive' }}
+              </c-badge>
+            </td>
+            <td>
+              <div class="btn-group" role="group">
+                <button 
+                  cButton 
+                  color="info" 
+                  size="sm" 
+                  (click)="openDetailModal(wf)" 
+                  title="View Details">
+                  <svg cIcon name="cil-info"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="warning" 
+                  size="sm" 
+                  (click)="openEditModal(wf)" 
+                  title="Edit">
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button 
+                  cButton 
+                  color="danger" 
+                  size="sm" 
+                  (click)="confirmDelete(wf)" 
+                  title="Delete">
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="filteredWorkflows.length === 0">
+            <td colspan="7" class="text-center py-4">
+              <div class="text-muted">
+                <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                <h6>No workflows found</h6>
+                <p class="mb-0">Create your first workflow definition to get started.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex justify-content-end mt-3" *ngIf="filteredWorkflows.length > 0">
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="cursors.length === 1" 
+        (click)="previousPage()">
+        <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+        Previous
+      </button>
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="!nextCursor" 
+        (click)="nextPage()" 
+        class="ms-2">
+        Next
+        <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create / Edit Workflow Modal -->
+<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="showModal = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon [name]="isEditing ? 'cil-pencil' : 'cil-plus'" class="me-2"></svg>
+      {{ isEditing ? 'Edit Workflow' : 'Create Workflow' }}
+    </h5>
+    <button (click)="showModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <form [formGroup]="workflowForm" (ngSubmit)="saveWorkflow()">
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="6">
+          <label cLabel for="wfName">Name *</label>
+          <input cFormControl id="wfName" formControlName="name" placeholder="Enter workflow name" />
+          <small class="form-text text-muted">Display name for the workflow definition</small>
+        </c-col>
+        <c-col [md]="6">
+          <label cLabel for="wfCode">Code</label>
+          <input cFormControl id="wfCode" formControlName="code" placeholder="Enter unique workflow code" />
+          <small class="form-text text-muted">Generated from name if left empty</small>
+        </c-col>
+      </c-row>
+
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <label cLabel for="wfDesc">Description</label>
+          <textarea cFormControl id="wfDesc" formControlName="description" rows="2" placeholder="Enter description"></textarea>
+        </c-col>
+      </c-row>
+
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="4">
+          <label cLabel for="wfVersion">Version *</label>
+          <input cFormControl type="number" id="wfVersion" formControlName="version" min="1" />
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="wfFormat">Payload Format *</label>
+          <select cSelect id="wfFormat" formControlName="payloadFormat">
+            <option value="json">JSON</option>
+            <option value="yaml">YAML</option>
+          </select>
+        </c-col>
+        <c-col [md]="4">
+          <label cLabel for="wfDuration">Max Duration (seconds)</label>
+          <input cFormControl type="number" id="wfDuration" formControlName="maxDurationSeconds" min="0" />
+        </c-col>
+      </c-row>
+
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <label cLabel for="wfPayload">Payload Definition</label>
+          <textarea cFormControl id="wfPayload" formControlName="payload" rows="6" class="font-monospace"></textarea>
+          <small class="form-text text-muted">Workflow execution schema / steps in JSON or YAML</small>
+        </c-col>
+      </c-row>
+
+      <div class="mb-3 form-check">
+        <input class="form-check-input" type="checkbox" id="wfIsActive" formControlName="isActive" />
+        <label class="form-check-label" for="wfIsActive">Active</label>
+      </div>
+    </form>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="showModal = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="primary" (click)="saveWorkflow()" [disabled]="!workflowForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      {{ isEditing ? 'Save Changes' : 'Create Workflow' }}
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Delete Workflow Modal -->
+<c-modal id="deleteModal" [visible]="showDeleteModal" (visibleChange)="showDeleteModal = $event">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-trash" class="me-2"></svg>
+      Delete Workflow
+    </h5>
+    <button (click)="showDeleteModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center">
+      <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
+      <h6>Are you sure you want to delete this workflow?</h6>
+      <p class="text-muted mb-0">
+        <strong>{{ workflowToDelete?.name }}</strong> (<code>{{ workflowToDelete?.code }}</code>)
+        <br>This action cannot be undone.
+      </p>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="showDeleteModal = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="danger" (click)="deleteWorkflow()">
+      <svg cIcon name="cil-trash" class="me-1"></svg>
+      Delete Workflow
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Workflow Details Modal -->
+<c-modal id="detailsModal" [visible]="showDetailModal" (visibleChange)="showDetailModal = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-info" class="me-2"></svg>
+      Workflow Details
+    </h5>
+    <button (click)="showDetailModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedWorkflow">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">ID</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.id }}</div>
+          <div class="form-text">Unique system identifier</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Name</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.name }}</div>
+          <div class="form-text">Display name for the workflow</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedWorkflow.code }}</code>
+          </div>
+          <div class="form-text">Unique workflow code</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Status</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="selectedWorkflow.isActive ? 'success' : 'secondary'" shape="rounded-pill">
+              {{ selectedWorkflow.isActive ? 'Active' : 'Inactive' }}
+            </c-badge>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Version</label>
+          <div class="p-2 bg-dark rounded">v{{ selectedWorkflow.version }}</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Payload Format</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.payloadFormat | uppercase }}</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Max Duration</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.maxDurationSeconds }} seconds</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Scope</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.scope | titlecase }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="mb-3" *ngIf="selectedWorkflow.description">
+      <label class="form-label fw-bold">Description</label>
+      <div class="p-2 bg-dark rounded">{{ selectedWorkflow.description }}</div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-bold">Payload Content</label>
+      <pre class="p-3 bg-dark rounded text-light font-monospace border-0" style="max-height: 250px; overflow-y: auto;">{{ payloadDisplayText }}</pre>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="showDetailModal = false" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>

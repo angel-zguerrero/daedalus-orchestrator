@@ -14,6 +14,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
 	"deadalus-orch/server/internal/infrastructure/server/rest/user"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
+	"deadalus-orch/server/internal/infrastructure/server/rest/workflowdefinition"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"time"
 
@@ -36,6 +37,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	userController := user.NewUserController(s.Config)
 	scheduledJobController := scheduledjob.NewScheduledJobController(s.Config)
 	envConfigController := envconfig.NewEnvConfigController(s.Config)
+	workflowDefinitionController := workflowdefinition.NewWorkflowDefinitionController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -101,7 +103,24 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.POST("/:code/env-groups/:groupId/vars", envConfigController.SaveTenantVarHandler)
 				tenantsGroup.DELETE("/:code/env-groups/:groupId/vars/:varId", envConfigController.DeleteTenantVarHandler)
 				tenantsGroup.PUT("/:code/env-groups/:groupId/vars/bulk", envConfigController.BulkSaveTenantVarsHandler)
+
+				tenantsGroup.POST("/:code/workflows", workflowDefinitionController.CreateTenantWorkflowHandler)
+				tenantsGroup.GET("/:code/workflows", workflowDefinitionController.ListTenantWorkflowsHandler)
+				tenantsGroup.GET("/:code/workflows/:id", workflowDefinitionController.GetTenantWorkflowHandler)
+				tenantsGroup.PUT("/:code/workflows/:id", workflowDefinitionController.UpdateTenantWorkflowHandler)
+				tenantsGroup.DELETE("/:code/workflows/:id", workflowDefinitionController.DeleteTenantWorkflowHandler)
 			}
+		}
+
+		workflowsGroup := restAPIGroup.Group("/workflows")
+		workflowsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		workflowsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
+		{
+			workflowsGroup.POST("", workflowDefinitionController.CreateGlobalWorkflowHandler)
+			workflowsGroup.GET("", workflowDefinitionController.ListGlobalWorkflowsHandler)
+			workflowsGroup.GET("/:id", workflowDefinitionController.GetGlobalWorkflowHandler)
+			workflowsGroup.PUT("/:id", workflowDefinitionController.UpdateGlobalWorkflowHandler)
+			workflowsGroup.DELETE("/:id", workflowDefinitionController.DeleteGlobalWorkflowHandler)
 		}
 
 		envGroupsGroup := restAPIGroup.Group("/env-groups")
