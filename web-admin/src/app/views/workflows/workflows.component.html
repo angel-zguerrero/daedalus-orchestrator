@@ -35,8 +35,8 @@
           <input type="text" matInput [formControl]="vnamespaceFilterCtrl" [matAutocomplete]="autoFilter"
             (ngModelChange)="onVNamespaceFilterChange($event)">
           <mat-autocomplete #autoFilter="matAutocomplete">
-            <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
-              {{vns.Name}}
+            <mat-option *ngFor="let vns of filteredFilterVNamespaces | async" [value]="vns.Name || vns">
+              {{vns.Name || vns}}
             </mat-option>
           </mat-autocomplete>
         </mat-form-field>
@@ -189,8 +189,8 @@
             <mat-label>Virtual Namespace *</mat-label>
             <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="auto">
             <mat-autocomplete #auto="matAutocomplete">
-              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
-                {{vns.Name}}
+              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name || vns">
+                {{vns.Name || vns}}
               </mat-option>
             </mat-autocomplete>
           </mat-form-field>

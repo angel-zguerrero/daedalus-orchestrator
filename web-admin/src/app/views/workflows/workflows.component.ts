@@ -188,7 +188,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     return this.vNamespacesService.getVNamespaces(this.tenantCode, '', 20, value).pipe(
       map(response => {
         this.loadingVNamespaces = false;
-        return response.data || [];
+        return response.data || response.result?.Entities || response.entities || [];
       })
     );
   }
