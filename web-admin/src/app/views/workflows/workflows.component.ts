@@ -1,6 +1,11 @@
 import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { CommonModule, AsyncPipe } from '@angular/common';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { Observable, of } from 'rxjs';
+import { map, switchMap, startWith, debounceTime } from 'rxjs/operators';
 import {
   TableModule,
   UtilitiesModule,
@@ -13,11 +18,17 @@ import {
   SpinnerComponent,
   BadgeComponent,
   NavModule,
-  TabsModule
+  TabsModule,
+  AccordionComponent,
+  AccordionItemComponent,
+  TemplateIdDirective,
+  AccordionButtonDirective
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { WorkflowsService, WorkflowDefinition } from './services/workflows.service';
+import { VNamespacesService } from '../tenants/tenant-management/services/vnamespaces.service';
 import { ErrorUtil } from '../../shared/utils/error.util';
+import { QueueDetailComponent } from '../tenants/tenant-management/queues/queue-detail/queue-detail.component';
 
 @Component({
   selector: 'app-workflows',
@@ -26,6 +37,7 @@ import { ErrorUtil } from '../../shared/utils/error.util';
   standalone: true,
   imports: [
     CommonModule,
+    AsyncPipe,
     FormsModule,
     ReactiveFormsModule,
     TableModule,
@@ -40,7 +52,15 @@ import { ErrorUtil } from '../../shared/utils/error.util';
     BadgeComponent,
     NavModule,
     TabsModule,
-    IconDirective
+    AccordionComponent,
+    AccordionItemComponent,
+    TemplateIdDirective,
+    AccordionButtonDirective,
+    IconDirective,
+    MatFormFieldModule,
+    MatInputModule,
+    MatAutocompleteModule,
+    QueueDetailComponent
   ]
 })
 export class WorkflowsComponent implements OnInit, OnChanges {
@@ -78,13 +98,24 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   showDeleteModal: boolean = false;
   workflowToDelete: WorkflowDefinition | null = null;
 
+  // VNamespace properties
+  vnamespaceCtrl = new FormControl('default');
+  filteredVNamespaces!: Observable<any[]>;
+  loadingVNamespaces: boolean = false;
+
+  vnamespaceFilterCtrl = new FormControl('');
+  filteredFilterVNamespaces!: Observable<any[]>;
+  selectedVNamespaceFilter: string = '';
+
   constructor(
     private fb: FormBuilder,
-    private workflowsService: WorkflowsService
+    private workflowsService: WorkflowsService,
+    private vNamespacesService: VNamespacesService
   ) {
     this.workflowForm = this.fb.group({
       name: ['', Validators.required],
       code: ['', [Validators.pattern('^[a-z0-9-]*$')]],
+      vnamespace: this.vnamespaceCtrl,
       description: [''],
       version: [1, [Validators.required, Validators.min(1)]],
       payloadFormat: ['json', Validators.required],
@@ -92,6 +123,18 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       maxDurationSeconds: [3600, [Validators.required, Validators.min(0)]],
       isActive: [true]
     });
+
+    this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      switchMap(value => this._filterVNamespaces(value || ''))
+    );
+
+    this.filteredFilterVNamespaces = this.vnamespaceFilterCtrl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      switchMap(value => this._filterVNamespaces(value || ''))
+    );
   }
 
   ngOnInit(): void {
@@ -137,14 +180,34 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     };
   }
 
+  private _filterVNamespaces(value: string): Observable<any[]> {
+    if (!this.tenantCode) {
+      return of([]);
+    }
+    this.loadingVNamespaces = true;
+    return this.vNamespacesService.getVNamespaces(this.tenantCode, '', 20, value).pipe(
+      map(response => {
+        this.loadingVNamespaces = false;
+        return response.data || [];
+      })
+    );
+  }
+
+  onVNamespaceFilterChange(value: string): void {
+    this.selectedVNamespaceFilter = value;
+    this.cursor = '';
+    this.cursors = [''];
+    this.loadWorkflows();
+  }
+
   loadWorkflows(): void {
     this.loading = true;
     this.showAlert = false;
     this.errorMessage = '';
 
     const req$ = this.scope === 'global'
-      ? this.workflowsService.getGlobalWorkflows(this.pageSize, this.cursor)
-      : this.workflowsService.getTenantWorkflows(this.tenantCode, this.pageSize, this.cursor);
+      ? this.workflowsService.getGlobalWorkflows(this.pageSize, this.cursor, this.selectedVNamespaceFilter)
+      : this.workflowsService.getTenantWorkflows(this.tenantCode, this.pageSize, this.cursor, this.selectedVNamespaceFilter);
 
     req$.subscribe({
       next: (res) => {
@@ -207,6 +270,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.isEditing = false;
     this.editingWorkflowId = '';
     this.workflowForm.reset({
+      vnamespace: 'default',
       version: 1,
       payloadFormat: 'json',
       payload: '{\n  "steps": []\n}',
@@ -224,6 +288,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.workflowForm.patchValue({
       code: wf.code,
       name: wf.name,
+      vnamespace: wf.vnamespace || 'default',
       description: wf.description,
       version: wf.version,
       payloadFormat: wf.payloadFormat,
@@ -235,10 +300,34 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.showModal = true;
   }
 
+  // Workflow Queues
+  workflowQueues: any[] = [];
+  loadingWorkflowQueues: boolean = false;
+
   openDetailModal(wf: WorkflowDefinition): void {
     this.selectedWorkflow = wf;
     this.payloadDisplayText = this.decodePayload(wf.payload);
     this.showDetailModal = true;
+    this.loadWorkflowQueues(wf);
+  }
+
+  loadWorkflowQueues(wf: WorkflowDefinition): void {
+    if (!wf.id) return;
+    this.loadingWorkflowQueues = true;
+    const queues$ = this.scope === 'global'
+      ? this.workflowsService.getGlobalWorkflowQueues(wf.id)
+      : this.workflowsService.getTenantWorkflowQueues(this.tenantCode, wf.id);
+
+    queues$.subscribe({
+      next: (res) => {
+        this.workflowQueues = res.queues || [];
+        this.loadingWorkflowQueues = false;
+      },
+      error: () => {
+        this.workflowQueues = [];
+        this.loadingWorkflowQueues = false;
+      }
+    });
   }
 
   saveWorkflow(): void {
@@ -248,6 +337,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     const payload: Partial<WorkflowDefinition> = {
       code: val.code ? val.code.trim() : '',
       name: val.name ? val.name.trim() : '',
+      vnamespace: val.vnamespace ? val.vnamespace.trim() : 'default',
       description: val.description,
       version: Number(val.version),
       payloadFormat: val.payloadFormat,

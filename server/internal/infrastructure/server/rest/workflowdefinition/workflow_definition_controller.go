@@ -44,6 +44,7 @@ type updateWorkflowRequest struct {
 	PayloadFormat      models.WorkflowPayloadFormat `json:"payloadFormat"`
 	MaxDurationSeconds int32                        `json:"maxDurationSeconds"`
 	IsActive           *bool                        `json:"isActive"`
+	VNamespace         string                       `json:"vnamespace"`
 }
 
 // --- GLOBAL HANDLERS ---
@@ -86,11 +87,13 @@ func (ctrl *WorkflowDefinitionController) CreateGlobalWorkflowHandler(c *gin.Con
 func (ctrl *WorkflowDefinitionController) ListGlobalWorkflowsHandler(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 	cursor := c.Query("cursor")
+	vnamespace := c.Query("vnamespace")
 
 	res, err := ctrl.WorkflowDefinitionBO.ListWorkflows(
 		c.Request.Context(),
 		models.WorkflowScopeGlobal,
 		"",
+		vnamespace,
 		pageSize,
 		cursor,
 		"", "", nil,
@@ -147,6 +150,7 @@ func (ctrl *WorkflowDefinitionController) UpdateGlobalWorkflowHandler(c *gin.Con
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
 		isActive,
+		req.VNamespace,
 		"", "", nil,
 	)
 	if err != nil {
@@ -216,11 +220,13 @@ func (ctrl *WorkflowDefinitionController) ListTenantWorkflowsHandler(c *gin.Cont
 	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 	cursor := c.Query("cursor")
+	vnamespace := c.Query("vnamespace")
 
 	res, err := ctrl.WorkflowDefinitionBO.ListWorkflows(
 		c.Request.Context(),
 		models.WorkflowScopeTenant,
 		tenant.ID,
+		vnamespace,
 		pageSize,
 		cursor,
 		cf, cfs, tenantNode,
@@ -280,6 +286,7 @@ func (ctrl *WorkflowDefinitionController) UpdateTenantWorkflowHandler(c *gin.Con
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
 		isActive,
+		req.VNamespace,
 		cf, cfs, tenantNode,
 	)
 	if err != nil {
@@ -306,4 +313,35 @@ func (ctrl *WorkflowDefinitionController) DeleteTenantWorkflowHandler(c *gin.Con
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Workflow definition deleted successfully"})
+}
+
+func (ctrl *WorkflowDefinitionController) GetGlobalWorkflowQueuesHandler(c *gin.Context) {
+	id := c.Param("id")
+	queues, err := ctrl.WorkflowDefinitionBO.GetWorkflowQueues(
+		c.Request.Context(),
+		models.WorkflowScopeGlobal,
+		id,
+		"", "", nil,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"queues": queues})
+}
+
+func (ctrl *WorkflowDefinitionController) GetTenantWorkflowQueuesHandler(c *gin.Context) {
+	_, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+	id := c.Param("id")
+	queues, err := ctrl.WorkflowDefinitionBO.GetWorkflowQueues(
+		c.Request.Context(),
+		models.WorkflowScopeTenant,
+		id,
+		cf, cfs, tenantNode,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"queues": queues})
 }

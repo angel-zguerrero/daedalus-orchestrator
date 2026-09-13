@@ -5,7 +5,9 @@ import "time"
 type QueueType string
 
 const (
-	StandardQueue QueueType = "standard"
+	StandardQueue          QueueType = "standard"
+	WorkflowExecutionQueue QueueType = "workflow_execution"
+	WorkflowActivityQueue  QueueType = "workflow_activity"
 )
 
 type QueueSupervisionState string
@@ -61,6 +63,8 @@ type Queue struct {
 
 	DeadLetterExchangeId                  string
 	DeadLetterExchangeRoutingKeyOrPattern string
+
+	WorkflowDefinitionID string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

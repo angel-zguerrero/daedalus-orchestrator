@@ -29,8 +29,12 @@ export class WorkflowsService {
   constructor(private http: HttpClient) {}
 
   // --- GLOBAL API ---
-  getGlobalWorkflows(pageSize: number = 50, cursor: string = ''): Observable<any> {
-    return this.http.get(`${this.globalUrl}?pageSize=${pageSize}&cursor=${cursor}`);
+  getGlobalWorkflows(pageSize: number = 50, cursor: string = '', vnamespace: string = ''): Observable<any> {
+    let params = `pageSize=${pageSize}&cursor=${cursor}`;
+    if (vnamespace) {
+      params += `&vnamespace=${encodeURIComponent(vnamespace)}`;
+    }
+    return this.http.get(`${this.globalUrl}?${params}`);
   }
 
   getGlobalWorkflow(id: string): Observable<WorkflowDefinition> {
@@ -49,9 +53,17 @@ export class WorkflowsService {
     return this.http.delete(`${this.globalUrl}/${id}`);
   }
 
+  getGlobalWorkflowQueues(id: string): Observable<any> {
+    return this.http.get(`${this.globalUrl}/${id}/queues`);
+  }
+
   // --- TENANT API ---
-  getTenantWorkflows(tenantCode: string, pageSize: number = 50, cursor: string = ''): Observable<any> {
-    return this.http.get(`${this.tenantUrl}/${tenantCode}/workflows?pageSize=${pageSize}&cursor=${cursor}`);
+  getTenantWorkflows(tenantCode: string, pageSize: number = 50, cursor: string = '', vnamespace: string = ''): Observable<any> {
+    let params = `pageSize=${pageSize}&cursor=${cursor}`;
+    if (vnamespace) {
+      params += `&vnamespace=${encodeURIComponent(vnamespace)}`;
+    }
+    return this.http.get(`${this.tenantUrl}/${tenantCode}/workflows?${params}`);
   }
 
   getTenantWorkflow(tenantCode: string, id: string): Observable<WorkflowDefinition> {
@@ -68,5 +80,9 @@ export class WorkflowsService {
 
   deleteTenantWorkflow(tenantCode: string, id: string): Observable<any> {
     return this.http.delete(`${this.tenantUrl}/${tenantCode}/workflows/${id}`);
+  }
+
+  getTenantWorkflowQueues(tenantCode: string, id: string): Observable<any> {
+    return this.http.get(`${this.tenantUrl}/${tenantCode}/workflows/${id}/queues`);
   }
 }

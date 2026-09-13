@@ -1,6 +1,9 @@
 <c-card class="mb-4">
-  <c-card-header>
-    Workflows {{ scope === 'tenant' ? '(' + tenantCode + ')' : '(Global)' }}
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-task" class="me-2"></svg>
+      Workflows Management {{ scope === 'tenant' ? '(' + tenantCode + ')' : '(Global)' }}
+    </h5>
   </c-card-header>
   <c-card-body>
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
@@ -26,7 +29,19 @@
           </button>
         </div>
       </c-col>
-      <c-col [md]="9" class="d-flex justify-content-end">
+      <c-col [md]="3">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by VNamespace</mat-label>
+          <input type="text" matInput [formControl]="vnamespaceFilterCtrl" [matAutocomplete]="autoFilter"
+            (ngModelChange)="onVNamespaceFilterChange($event)">
+          <mat-autocomplete #autoFilter="matAutocomplete">
+            <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+              {{vns.Name}}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+      <c-col [md]="6" class="d-flex justify-content-end align-items-end">
         <button cButton color="primary" (click)="openCreateModal()">
           <svg cIcon name="cil-plus" class="me-1"></svg>
           Create Workflow
@@ -47,6 +62,7 @@
           <tr>
             <th>Name</th>
             <th>Code</th>
+            <th style="min-width: 120px;">VNamespace</th>
             <th>Version</th>
             <th>Payload Format</th>
             <th>Max Duration</th>
@@ -61,6 +77,9 @@
             </td>
             <td class="text-truncate" style="max-width: 150px;" title="{{ wf.code }}">
               <code>{{ wf.code }}</code>
+            </td>
+            <td class="text-truncate" style="max-width: 120px;" title="{{ wf.vnamespace || '-' }}">
+              {{ wf.vnamespace || '-' }}
             </td>
             <td>v{{ wf.version }}</td>
             <td>
@@ -104,7 +123,7 @@
             </td>
           </tr>
           <tr *ngIf="filteredWorkflows.length === 0">
-            <td colspan="7" class="text-center py-4">
+            <td colspan="8" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No workflows found</h6>
@@ -161,6 +180,21 @@
           <label cLabel for="wfCode">Code</label>
           <input cFormControl id="wfCode" formControlName="code" placeholder="Enter unique workflow code" />
           <small class="form-text text-muted">Generated from name if left empty</small>
+        </c-col>
+      </c-row>
+
+      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
+        <c-col [md]="12">
+          <mat-form-field class="w-100">
+            <mat-label>Virtual Namespace *</mat-label>
+            <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="auto">
+            <mat-autocomplete #auto="matAutocomplete">
+              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name">
+                {{vns.Name}}
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+          <div class="form-text">Required: Select or enter a virtual namespace for this workflow</div>
         </c-col>
       </c-row>
 
@@ -274,6 +308,13 @@
           <div class="form-text">Unique workflow code</div>
         </div>
         <div class="mb-3">
+          <label class="form-label fw-bold">VNamespace</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedWorkflow.vnamespace || 'default' }}</code>
+          </div>
+          <div class="form-text">Virtual namespace</div>
+        </div>
+        <div class="mb-3">
           <label class="form-label fw-bold">Status</label>
           <div class="p-2 bg-dark rounded">
             <c-badge [color]="selectedWorkflow.isActive ? 'success' : 'secondary'" shape="rounded-pill">
@@ -308,6 +349,47 @@
     <div class="mb-3">
       <label class="form-label fw-bold">Payload Content</label>
       <pre class="p-3 bg-dark rounded text-light font-monospace border-0" style="max-height: 250px; overflow-y: auto;">{{ payloadDisplayText }}</pre>
+    </div>
+
+    <!-- Associated Workflow Queues Accordion -->
+    <h6 class="mt-4 mb-3 border-bottom pb-2">
+      <svg cIcon name="cil-transfer" class="me-2"></svg>
+      Isolated Workflow Queues
+    </h6>
+
+    <div *ngIf="loadingWorkflowQueues" class="text-center py-2">
+      <c-spinner size="sm"></c-spinner>
+      <span class="ms-2 text-muted">Loading workflow queues...</span>
+    </div>
+
+    <c-accordion [alwaysOpen]="false" class="shadow-sm rounded mb-3" *ngIf="!loadingWorkflowQueues && workflowQueues.length > 0">
+      <c-accordion-item *ngFor="let q of workflowQueues; let i = index" #item="cAccordionItem" [visible]="false">
+        <ng-template cTemplateId="accordionHeaderTemplate">
+          <button (click)="item.toggleItem()" [collapsed]="!item.visible" cAccordionButton class="d-flex align-items-center justify-content-between w-100 pe-3">
+            <span>
+              <strong class="me-2">{{ q.Name || q.name }}</strong>
+              <code class="me-2">{{ q.Code || q.code }}</code>
+            </span>
+            <span class="d-flex gap-2 align-items-center me-3">
+              <c-badge [color]="(q.Type || q.type) === 'workflow_execution' ? 'primary' : 'info'" shape="rounded-pill">
+                {{ (q.Type || q.type) === 'workflow_execution' ? 'Workflow Execution' : 'Workflow Activity' }}
+              </c-badge>
+              <c-badge [color]="(q.State || q.state) === 'active' ? 'success' : 'secondary'" shape="rounded-pill">
+                {{ q.State || q.state || 'active' }}
+              </c-badge>
+            </span>
+          </button>
+        </ng-template>
+        <ng-template cTemplateId="accordionBodyTemplate">
+          <div class="accordion-body p-3">
+            <app-queue-detail [queue]="q" [tenantCode]="tenantCode" [isWorkflowQueue]="true"></app-queue-detail>
+          </div>
+        </ng-template>
+      </c-accordion-item>
+    </c-accordion>
+
+    <div *ngIf="!loadingWorkflowQueues && workflowQueues.length === 0" class="text-muted small py-2">
+      No isolated workflow queues found for this definition.
     </div>
   </c-modal-body>
   <c-modal-footer>

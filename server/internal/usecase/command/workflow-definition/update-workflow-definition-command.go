@@ -54,6 +54,9 @@ func (cmd *UpdateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 	}
 	existing.MaxDurationSeconds = cmd.WorkflowDefinition.MaxDurationSeconds
 	existing.IsActive = cmd.WorkflowDefinition.IsActive
+	if cmd.WorkflowDefinition.VNamespace != "" {
+		existing.VNamespace = cmd.WorkflowDefinition.VNamespace
+	}
 
 	ok, err := repo.UpdateWorkflowDefinition(existing, now)
 	if err != nil || !ok {

@@ -1,0 +1,463 @@
+<div *ngIf="queue">
+  <!-- Read-Only Banner for Workflow Queues -->
+  <c-alert color="info" class="d-flex align-items-center mb-3 py-2 small" *ngIf="isWorkflowQueue">
+    <svg cIcon name="cil-lock-locked" class="me-2 flex-shrink-0" style="width: 18px; height: 18px;"></svg>
+    <div>
+      <strong>Isolated Queue (Read-Only):</strong> Managed automatically by the workflow execution engine. Manual editing and deletion are disabled.
+    </div>
+  </c-alert>
+
+  <!-- TSDB Metrics Section -->
+  <div class="row mt-2 mb-2">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0">
+          <svg cIcon name="cil-chart-line" class="me-2"></svg>
+          Real-time Metrics
+        </h6>
+        <select class="form-select form-select-sm w-auto bg-dark text-white border-secondary" [(ngModel)]="selectedTimeRange" (change)="onTimeRangeChange()">
+          <option [value]="60">Last 1 min</option>
+          <option [value]="300">Last 5 min</option>
+          <option [value]="600">Last 10 min</option>
+          <option [value]="1800">Last 30 min</option>
+          <option [value]="2700">Last 45 min</option>
+          <option [value]="3600">Last 1 hour</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="row">
+    <!-- Queue Throughput Metrics Section -->
+    <div class="col-xl-6 mb-4">
+      <c-card color="dark" class="border-0 h-100">
+        <c-card-header class="d-flex justify-content-between align-items-center bg-dark border-bottom-0">
+          <h6 class="mb-0">
+            <svg cIcon name="cil-chart-line" class="me-2"></svg>
+            Queue Throughput
+          </h6>
+        </c-card-header>
+        <c-card-body>
+          <div *ngIf="metricsLoading" class="text-center py-4">
+            <c-spinner></c-spinner>
+            <div class="mt-2 text-muted">Loading metrics...</div>
+          </div>
+          
+          <div *ngIf="!metricsLoading && metricsData.labels.length > 0">
+            <!-- KPIs Horizontal Row -->
+            <div class="d-flex justify-content-around mb-3 pb-3 border-bottom border-secondary">
+              <div class="text-center">
+                <h6 class="text-muted mb-1">Published</h6>
+                <h4 class="text-primary mb-0">{{ currentRates?.publish | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+              </div>
+              <div class="text-center">
+                <h6 class="text-muted mb-1">Delivered</h6>
+                <h4 class="text-success mb-0">{{ currentRates?.deliver | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+              </div>
+              <div class="text-center">
+                <h6 class="text-muted mb-1">Acked</h6>
+                <h4 class="text-warning mb-0">{{ currentRates?.ack | number:'1.0-2' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msg/s</small></h4>
+              </div>
+            </div>
+            
+            <!-- Chart -->
+            <div style="height: 250px;">
+              <c-chart [data]="metricsData" [options]="metricsOptions" type="line" height="250"></c-chart>
+            </div>
+          </div>
+          
+          <div *ngIf="!metricsLoading && metricsData.labels.length === 0" class="text-center py-4 text-muted">
+            No metrics data available for the selected time range.
+          </div>
+        </c-card-body>
+      </c-card>
+    </div>
+
+    <!-- Queue Gauge Metrics Section -->
+    <div class="col-xl-6 mb-4">
+      <c-card color="dark" class="border-0 h-100">
+        <c-card-header class="d-flex justify-content-between align-items-center bg-dark border-bottom-0">
+          <h6 class="mb-0">
+            <svg cIcon name="cil-chart-pie" class="me-2"></svg>
+            Queue Backlog
+          </h6>
+        </c-card-header>
+        <c-card-body>
+          <div *ngIf="metricsLoading" class="text-center py-4">
+            <c-spinner></c-spinner>
+            <div class="mt-2 text-muted">Loading metrics...</div>
+          </div>
+          
+          <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length > 0">
+            <!-- KPIs Horizontal Row -->
+            <div class="d-flex justify-content-around mb-3 pb-3 border-bottom border-secondary">
+              <div class="text-center">
+                <h6 class="text-muted mb-1" style="color: rgba(255, 99, 132, 1) !important;">Pending</h6>
+                <h4 class="mb-0" style="color: rgba(255, 99, 132, 1) !important;">{{ currentGauges?.pending | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
+              </div>
+              <div class="text-center">
+                <h6 class="text-muted mb-1 d-flex align-items-center justify-content-center" style="color: rgba(54, 162, 235, 1) !important;">
+                  In Process
+                  <span cTooltip="Messages currently being processed by workers. Often 0 if messages are processed very quickly." cTooltipPlacement="top">
+                    <svg cIcon name="cil-info" size="sm" class="ms-1 text-muted"></svg>
+                  </span>
+                </h6>
+                <h4 class="mb-0" style="color: rgba(54, 162, 235, 1) !important;">{{ currentGauges?.inProcess | number:'1.0-0' }} <small class="text-muted fw-normal" style="font-size: 0.6em;">msgs</small></h4>
+              </div>
+            </div>
+
+            <!-- Chart -->
+            <div style="height: 250px;">
+              <c-chart [data]="gaugeMetricsData" [options]="metricsOptions" type="line" height="250"></c-chart>
+            </div>
+          </div>
+
+          <div *ngIf="!metricsLoading && gaugeMetricsData.labels.length === 0" class="text-center py-4 text-muted">
+            No metrics data available for the selected time range.
+          </div>
+        </c-card-body>
+      </c-card>
+    </div>
+  </div>
+
+  <!-- Expiration Alert -->
+  <c-alert *ngIf="getExpirationInfo(queue).isExpired" color="danger" class="mb-3">
+    <svg cIcon name="cil-warning" class="me-2"></svg>
+    <strong>Queue Expired!</strong> This queue expired {{ getExpirationInfo(queue).text.replace('Expired on ', 'on ') }}. No new messages can be sent to this queue.
+  </c-alert>
+
+  <c-alert *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).isNearExpiry" color="warning" class="mb-3">
+    <svg cIcon name="cil-clock" class="me-2"></svg>
+    <strong>Queue Expiring Soon!</strong> This queue will expire {{ getExpirationInfo(queue).text.replace('Expires on ', 'on ') }}. Only {{ getExpirationInfo(queue).progressPercentage.toFixed(1) }}% time remaining.
+  </c-alert>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="mb-3">
+        <label class="form-label fw-bold">ID</label>
+        <div class="p-2 bg-dark rounded font-monospace">{{ queue?.ID || queue?.id || 'N/A' }}</div>
+        <div class="form-text">Unique system identifier</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Name</label>
+        <div class="p-2 bg-dark rounded">{{ queue?.Name || queue?.name || 'N/A' }}</div>
+        <div class="form-text">Display name for the queue</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Code</label>
+        <div class="p-2 bg-dark rounded font-monospace">
+          <code>{{ queue?.Code || queue?.code || 'N/A' }}</code>
+        </div>
+        <div class="form-text">Unique business identifier (immutable)</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Type</label>
+        <div class="p-2 bg-dark rounded">
+          <c-badge [color]="getQueueTypeColor(queue?.Type || queue?.type)" shape="rounded-pill">
+            {{ (queue?.Type || queue?.type) === 'workflow_execution' ? 'Workflow Execution' : ((queue?.Type || queue?.type) === 'workflow_activity' ? 'Workflow Activity' : (queue?.Type || queue?.type || 'N/A')) }}
+          </c-badge>
+        </div>
+        <div class="form-text">Queue type determines message processing behavior</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">State</label>
+        <div class="p-2 bg-dark rounded">
+          <c-badge [color]="getQueueStateColor(queue?.State || queue?.state)" shape="rounded-pill">
+            {{ getQueueStateLabel(queue?.State || queue?.state) }}
+          </c-badge>
+        </div>
+        <div class="form-text">Current queue processing state</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Virtual Namespace</label>
+        <div class="p-2 bg-dark rounded">{{ queue?.VNamespace || queue?.vNamespace || queue?.vnamespace || '-' }}</div>
+        <div class="form-text">Virtual namespace for logical grouping</div>
+      </div>
+      <div class="mb-3" *ngIf="queue?.WorkflowDefinitionID || queue?.workflowDefinitionID">
+        <label class="form-label fw-bold">Workflow Definition ID</label>
+        <div class="p-2 bg-dark rounded font-monospace">{{ queue?.WorkflowDefinitionID || queue?.workflowDefinitionID }}</div>
+        <div class="form-text">Associated workflow definition</div>
+      </div>
+      <div class="mb-3">
+        <hr>
+        <h6 class="mb-3">
+          <svg cIcon name="cil-user" class="me-2"></svg>
+          Supervisor Information
+        </h6>
+        <div class="mb-2">
+          <label class="form-label fw-bold">Supervisor ID</label>
+          <div class="p-2 bg-dark rounded">{{ queue?.NodeSchedulerSupervisorId || queue?.nodeSchedulerSupervisorId || '-' }}</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-bold">Supervisor Code</label>
+          <div class="p-2 bg-dark rounded font-monospace">
+            <code>{{ queue?.NodeSchedulerSupervisorCode || queue?.nodeSchedulerSupervisorCode || '-' }}</code>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-bold">Supervisor Name</label>
+          <div class="p-2 bg-dark rounded">{{ queue?.NodeSchedulerSupervisorName || queue?.nodeSchedulerSupervisorName || '-' }}</div>
+        </div>
+        <div class="form-text">Information about the NodeScheduler supervising this queue</div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="mb-3">
+        <label class="form-label fw-bold">Created At</label>
+        <div class="p-2 bg-dark rounded">{{ (queue?.CreatedAt || queue?.createdAt) | date:'full' }}</div>
+        <div class="form-text">Queue creation timestamp</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Updated At</label>
+        <div class="p-2 bg-dark rounded">{{ (queue?.UpdatedAt || queue?.updatedAt) | date:'full' }}</div>
+        <div class="form-text">Last modification timestamp</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Default Message TTL (seconds)</label>
+        <div class="p-2 bg-dark rounded">
+          {{ queue?.DefaultQueueMessageTTL || queue?.defaultQueueMessageTTL || 0 }}s
+        </div>
+        <div class="form-text">Default time to live for messages in seconds</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Default Message Delay Time (seconds)</label>
+        <div class="p-2 bg-dark rounded">
+          {{ queue?.DefaultQueueMessageDelayTime || queue?.defaultQueueMessageDelayTime || 0 }}s
+        </div>
+        <div class="form-text">Default delay time for messages in seconds</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Queue Expires (seconds)</label>
+        <div class="p-2 bg-dark rounded">
+          {{ queue?.QueueExpires || queue?.queueExpires || 0 }}s
+        </div>
+        <div class="form-text">Queue expiration time in seconds</div>
+      </div>
+      <div class="mb-3" *ngIf="getExpirationInfo(queue).show">
+        <label class="form-label fw-bold">Expiration Status</label>
+        <div class="p-2 bg-dark rounded">
+          <div class="d-flex align-items-center mb-2">
+            <c-badge [color]="getExpirationInfo(queue).isExpired ? 'danger' : getExpirationInfo(queue).isNearExpiry ? 'warning' : 'success'" shape="rounded-pill">
+              {{ getExpirationInfo(queue).text }}
+            </c-badge>
+          </div>
+          <div *ngIf="!getExpirationInfo(queue).isExpired && getExpirationInfo(queue).progressPercentage >= 0">
+            <c-progress height="12" class="mb-2">
+              <c-progress-bar [value]="getExpirationInfo(queue).progressPercentage" [color]="getExpirationInfo(queue).isNearExpiry ? 'warning' : 'success'"></c-progress-bar>
+            </c-progress>
+            <small class="text-muted">{{ getExpirationInfo(queue).progressPercentage.toFixed(1) }}% time remaining</small>
+          </div>
+        </div>
+        <div class="form-text">Queue expiration status and progress</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Max Attempts</label>
+        <div class="p-2 bg-dark rounded">{{ queue?.MaxAttempts || queue?.maxAttempts || 1 }}</div>
+        <div class="form-text">Maximum number of processing attempts</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Current Messages Count</label>
+        <div class="p-2 bg-dark rounded">
+          <span class="text-info fw-bold">{{ queue?.MessagesCount || queue?.messagesCount || 0 }}</span> messages
+        </div>
+        <div class="form-text">Current number of messages in the queue</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Max Queue Size</label>
+        <div class="p-2 bg-dark rounded">
+          <span *ngIf="(queue?.MaxQueueSize || queue?.maxQueueSize) > 0; else unlimited">
+            {{ queue.MaxQueueSize || queue.maxQueueSize }} messages maximum
+            <div class="mt-2">
+              <small class="text-muted d-block">Current: {{ queue?.MessagesCount || queue?.messagesCount || 0 }} / {{ queue.MaxQueueSize || queue.maxQueueSize }}</small>
+              <c-progress height="8" class="mt-1">
+                <c-progress-bar [value]="((queue?.MessagesCount || queue?.messagesCount || 0) / (queue.MaxQueueSize || queue.maxQueueSize)) * 100" [color]="((queue?.MessagesCount || queue?.messagesCount || 0) / (queue.MaxQueueSize || queue.maxQueueSize)) > 0.8 ? 'danger' : ((queue?.MessagesCount || queue?.messagesCount || 0) / (queue.MaxQueueSize || queue.maxQueueSize)) > 0.6 ? 'warning' : 'success'"></c-progress-bar>
+              </c-progress>
+              <small class="text-muted">{{ (((queue?.MessagesCount || queue?.messagesCount || 0) / (queue.MaxQueueSize || queue.maxQueueSize)) * 100).toFixed(1) }}% full</small>
+            </div>
+          </span>
+          <ng-template #unlimited>
+            <span class="text-muted">Unlimited</span>
+            <small class="text-muted d-block">Current: {{ queue?.MessagesCount || queue?.messagesCount || 0 }} messages</small>
+          </ng-template>
+        </div>
+        <div class="form-text">Maximum number of messages allowed in the queue</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Max Delivering Messages</label>
+        <div class="p-2 bg-dark rounded">
+          <span *ngIf="(queue?.MaxDeliveringMessages || queue?.maxDeliveringMessages) > 0; else unlimitedDelivering">
+            {{ queue.MaxDeliveringMessages || queue.maxDeliveringMessages }} messages maximum in delivering state
+            <div class="mt-2">
+              <small class="text-muted d-block">Current: {{ queue?.CurrentDeliveringMessages || queue?.currentDeliveringMessages || 0 }} / {{ queue.MaxDeliveringMessages || queue.maxDeliveringMessages }}</small>
+              <c-progress height="8" class="mt-1">
+                <c-progress-bar [value]="((queue?.CurrentDeliveringMessages || queue?.currentDeliveringMessages || 0) / (queue.MaxDeliveringMessages || queue.maxDeliveringMessages)) * 100" [color]="((queue?.CurrentDeliveringMessages || queue?.currentDeliveringMessages || 0) / (queue.MaxDeliveringMessages || queue.maxDeliveringMessages)) > 0.8 ? 'danger' : ((queue?.CurrentDeliveringMessages || queue?.currentDeliveringMessages || 0) / (queue.MaxDeliveringMessages || queue.maxDeliveringMessages)) > 0.6 ? 'warning' : 'success'"></c-progress-bar>
+              </c-progress>
+              <small class="text-muted">{{ (((queue?.CurrentDeliveringMessages || queue?.currentDeliveringMessages || 0) / (queue.MaxDeliveringMessages || queue.maxDeliveringMessages)) * 100).toFixed(1) }}% delivering</small>
+            </div>
+          </span>
+          <ng-template #unlimitedDelivering>
+            <span class="text-muted">Unlimited</span>
+            <small class="text-muted d-block">Current delivering: {{ queue?.CurrentDeliveringMessages || queue?.currentDeliveringMessages || 0 }} messages</small>
+          </ng-template>
+        </div>
+        <div class="form-text">Maximum number of messages that can be in delivering state simultaneously</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">Allow Duplicated</label>
+        <div class="p-2 bg-dark rounded">
+          <c-badge [color]="(queue?.AllowDuplicated || queue?.allowDuplicated) ? 'success' : 'danger'" shape="rounded-pill">
+            {{ (queue?.AllowDuplicated || queue?.allowDuplicated) ? 'Yes' : 'No' }}
+          </c-badge>
+        </div>
+        <div class="form-text">Whether duplicate messages are allowed in the queue</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Priority Type Section - Full Width -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="mb-3">
+        <label class="form-label fw-bold">Priority Type</label>
+        <div class="p-2 bg-dark rounded">
+          <c-badge [color]="getPriorityTypeColor(getCalculatedPriorityType(queue))" shape="rounded-pill">
+            {{ getPriorityTypeLabel(getCalculatedPriorityType(queue)) }}
+          </c-badge>
+          <span class="ms-2 text-muted">
+            (Max Priority Supported: {{getCalculatedMaxPriorityLevels(queue)}})
+          </span>
+        </div>
+        <div class="form-text">Priority management type and maximum priority level</div>
+      </div>
+
+      <!-- Fair Priority Thresholds -->
+      <div class="mb-3" *ngIf="getCalculatedPriorityType(queue) === 'fair' && (queue?.DesiredPriorityThresholds || queue?.desiredPriorityThresholds)">
+        <label class="form-label fw-bold">Desired Priority Thresholds</label>
+        <div class="p-3 bg-dark rounded">
+          <div class="row g-3">
+            <div class="col-6 col-md-4 col-lg-3" *ngFor="let threshold of getPriorityThresholdsArray(queue?.DesiredPriorityThresholds || queue?.desiredPriorityThresholds); let i = index">
+              <div class="card bg-warning bg-opacity-75 border-0 h-100">
+                <div class="card-body text-center p-4">
+                  <div class="text-dark fw-bold mb-3">Priority {{i + 1}}</div>
+                  <div class="h4 mb-3 text-dark">
+                    {{ threshold === 0 ? 'All' : threshold }}
+                  </div>
+                  <div class="small text-dark opacity-75">
+                    {{ threshold === 0 ? 'Process all tasks' : 'tasks limit' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 p-2 bg-warning bg-opacity-10 border border-warning rounded">
+            <small class="text-warning">
+              <svg cIcon name="cil-settings" class="me-1"></svg>
+              <strong>Desired Configuration:</strong>
+              These are the values you want to apply. The system will transition to these values when appropriate.
+            </small>
+          </div>
+        </div>
+        <div class="form-text mt-2">
+          Desired values for task processing thresholds per priority level
+        </div>
+      </div>
+
+      <!-- Current Priority Thresholds -->
+      <div class="mb-3" *ngIf="getCalculatedPriorityType(queue) === 'fair' && (queue?.PriorityThresholds || queue?.priorityThresholds)">
+        <label class="form-label fw-bold">Current Priority Thresholds</label>
+        <div class="p-3 bg-dark rounded">
+          <div class="row g-3">
+            <div class="col-6 col-md-4 col-lg-3" *ngFor="let threshold of getPriorityThresholdsArray(queue?.PriorityThresholds || queue?.priorityThresholds); let i = index">
+              <div class="card bg-primary bg-opacity-75 border-0 h-100">
+                <div class="card-body text-center p-4">
+                  <div class="text-white fw-bold mb-3">Priority {{i + 1}}</div>
+                  <div class="h4 mb-3 text-white">
+                    {{ threshold === 0 ? 'All' : threshold }}
+                  </div>
+                  <div class="small text-white-50">
+                    {{ threshold === 0 ? 'Process all tasks' : 'tasks limit' }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 p-2 bg-info bg-opacity-10 border border-info rounded">
+            <small class="text-info">
+              <svg cIcon name="cil-info" class="me-1"></svg>
+              <strong>Current Active Configuration:</strong>
+              These are the values currently being used by the system for task processing.
+            </small>
+          </div>
+        </div>
+        <div class="form-text mt-2">
+          Currently active task processing thresholds per priority level
+        </div>
+      </div>
+
+      <!-- Dead Letter Exchange Section -->
+      <div class="mb-3">
+        <label class="form-label fw-bold">
+          <svg cIcon name="cil-warning" class="me-2"></svg>
+          Dead Letter Exchange
+        </label>
+        <div class="form-text mb-2">Configuration for handling failed message processing</div>
+
+        <div *ngIf="queue?.DeadLetterExchangeId || queue?.deadLetterExchangeId; else noDeadLetterExchange" class="border rounded p-3">
+          <div class="row">
+            <div class="col-md-8">
+              <strong>Exchange ID:</strong>
+              <div class="p-2 bg-dark rounded mt-1 font-monospace">{{ queue?.DeadLetterExchangeId || queue?.deadLetterExchangeId }}</div>
+            </div>
+            <div class="col-md-4" *ngIf="queue?.DeadLetterExchangeRoutingKeyOrPattern || queue?.deadLetterExchangeRoutingKeyOrPattern">
+              <strong>Routing Key/Pattern:</strong>
+              <div class="p-2 bg-dark rounded mt-1 font-monospace">{{ queue?.DeadLetterExchangeRoutingKeyOrPattern || queue?.deadLetterExchangeRoutingKeyOrPattern }}</div>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noDeadLetterExchange>
+          <div class="p-3 text-muted border rounded bg-light">
+            <svg cIcon name="cil-info" class="me-1"></svg>
+            No Dead Letter Exchange configured
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- Headers Section -->
+      <div class="mb-3">
+        <label class="form-label fw-bold">
+          <svg cIcon name="cil-tags" class="me-2"></svg>
+          Queue Headers
+        </label>
+        <div class="form-text mb-2">Headers associated with this queue for routing and metadata</div>
+
+        <div *ngIf="(queue?.Headers || queue?.headers) && getHeadersArray(queue?.Headers || queue?.headers).length > 0; else noQueueHeaders" class="border rounded p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Queue Headers ({{ getHeadersArray(queue?.Headers || queue?.headers).length }})</h6>
+          </div>
+
+          <div class="row">
+            <div *ngFor="let header of getHeadersArray(queue?.Headers || queue?.headers)" class="col-md-6 mb-2">
+              <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded">
+                <div class="d-flex flex-column flex-grow-1">
+                  <code class="text-info mb-1">{{ header.key }}</code>
+                  <code class="text-light">{{ header.value }}</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noQueueHeaders>
+          <div class="border rounded p-3 text-center text-muted">
+            <svg cIcon name="cil-tags" size="2xl" class="mb-2 opacity-50"></svg>
+            <div>No headers configured for this queue</div>
+            <small class="mt-1 d-block">Custom headers can be configured when creating or editing the queue</small>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+</div>

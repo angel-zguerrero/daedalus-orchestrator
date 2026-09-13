@@ -3,6 +3,7 @@ package business_logic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -85,6 +86,39 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 	}
 
 	workflowID := uuid.New().String()
+	randToken := uuid.New().String()[:8]
+
+	execQueueID := strings.ReplaceAll(uuid.New().String(), "-", "")
+	actQueueID := strings.ReplaceAll(uuid.New().String(), "-", "")
+
+	execQueueCode := fmt.Sprintf("wf-exec-%s-%s", code, randToken)
+	execQueueName := fmt.Sprintf("%s Execution Queue (%s)", name, randToken)
+	actQueueCode := fmt.Sprintf("wf-act-%s-%s", code, randToken)
+	actQueueName := fmt.Sprintf("%s Activity Queue (%s)", name, randToken)
+
+	execQueue := models.Queue{
+		ID:                   execQueueID,
+		Code:                 execQueueCode,
+		Name:                 execQueueName,
+		Type:                 models.WorkflowExecutionQueue,
+		WorkflowDefinitionID: workflowID,
+		VNamespace:           vnamespace,
+		State:                models.QueueActive,
+		AllowDuplicated:      true,
+		MaxAttempts:          1,
+	}
+
+	actQueue := models.Queue{
+		ID:                   actQueueID,
+		Code:                 actQueueCode,
+		Name:                 actQueueName,
+		Type:                 models.WorkflowActivityQueue,
+		WorkflowDefinitionID: workflowID,
+		VNamespace:           vnamespace,
+		State:                models.QueueActive,
+		AllowDuplicated:      true,
+		MaxAttempts:          1,
+	}
 
 	wf := models.WorkflowDefinition{
 		ID:                 workflowID,
@@ -105,6 +139,8 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 
 	cmd := &workflow_definition_command.CreateWorkflowDefinitionCommand{
 		WorkflowDefinition: wf,
+		ExecQueue:          execQueue,
+		ActQueue:           actQueue,
 		CF:                 targetCF,
 		CFS:                targetCFS,
 	}
@@ -136,6 +172,7 @@ func (bo *WorkflowDefinitionBO) UpdateWorkflow(
 	payloadFormat models.WorkflowPayloadFormat,
 	maxDurationSeconds int32,
 	isActive bool,
+	vnamespace string,
 	cf, cfs string,
 	tenantNode *dragonboat.RaftNode,
 ) (models.WorkflowDefinition, error) {
@@ -157,6 +194,7 @@ func (bo *WorkflowDefinitionBO) UpdateWorkflow(
 		PayloadFormat:      payloadFormat,
 		MaxDurationSeconds: maxDurationSeconds,
 		IsActive:           isActive,
+		VNamespace:         vnamespace,
 	}
 
 	cmd := &workflow_definition_command.UpdateWorkflowDefinitionCommand{
@@ -259,6 +297,7 @@ func (bo *WorkflowDefinitionBO) ListWorkflows(
 	ctx context.Context,
 	scope models.WorkflowScope,
 	tenantID string,
+	vnamespace string,
 	pageSize int,
 	cursor string,
 	cf, cfs string,
@@ -274,12 +313,13 @@ func (bo *WorkflowDefinitionBO) ListWorkflows(
 	}
 
 	cmd := &workflow_definition_command.ListWorkflowDefinitionsCommand{
-		Scope:    string(scope),
-		TenantID: tenantID,
-		PageSize: pageSize,
-		Cursor:   cursor,
-		CF:       targetCF,
-		CFS:      targetCFS,
+		Scope:      string(scope),
+		TenantID:   tenantID,
+		VNamespace: vnamespace,
+		PageSize:   pageSize,
+		Cursor:     cursor,
+		CF:         targetCF,
+		CFS:        targetCFS,
 	}
 
 	timeout := config.GlobalConfiguration.ApiRaftTimeout
@@ -295,4 +335,41 @@ func (bo *WorkflowDefinitionBO) ListWorkflows(
 		return nil, err
 	}
 	return &res, nil
+}
+
+func (bo *WorkflowDefinitionBO) GetWorkflowQueues(
+	ctx context.Context,
+	scope models.WorkflowScope,
+	workflowID string,
+	cf, cfs string,
+	tenantNode *dragonboat.RaftNode,
+) ([]models.Queue, error) {
+	node, targetCF, targetCFS, err := bo.resolveRaftNode(scope, tenantNode)
+	if err != nil {
+		return nil, err
+	}
+	if scope == models.WorkflowScopeTenant {
+		targetCF = cf
+		targetCFS = cfs
+	}
+
+	cmd := &workflow_definition_command.GetWorkflowQueuesCommand{
+		WorkflowID: workflowID,
+		CF:         targetCF,
+		CFS:        targetCFS,
+	}
+
+	timeout := config.GlobalConfiguration.ApiRaftTimeout
+	queues, err := dragonboat.ExecuteRepositoryQuery[[]models.Queue](
+		node,
+		ctx,
+		cmd,
+		timeout,
+		bo.Config.Logger,
+		"get workflow queues",
+	)
+	if err != nil {
+		return nil, err
+	}
+	return queues, nil
 }

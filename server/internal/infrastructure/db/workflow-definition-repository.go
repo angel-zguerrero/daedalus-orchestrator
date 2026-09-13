@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	models "deadalus-orch/shared/models"
@@ -58,19 +59,27 @@ func (r *WorkflowDefinitionRepository) GetWorkflowDefinitionByCode(code string, 
 	return &res.Entities[0], nil
 }
 
-func (r *WorkflowDefinitionRepository) ListWorkflowDefinitions(scope string, tenantID string, pageSize int, cursor string, now time.Time) (*FindResult[models.WorkflowDefinition], error) {
-	var query string
+func (r *WorkflowDefinitionRepository) ListWorkflowDefinitions(scope string, tenantID string, vnamespace string, pageSize int, cursor string, now time.Time) (*FindResult[models.WorkflowDefinition], error) {
+	var conditions []string
+
 	if scope != "" {
-		query = fmt.Sprintf("Scope = %s", scope)
+		conditions = append(conditions, fmt.Sprintf("Scope = %s", scope))
 		if scope == string(models.WorkflowScopeTenant) && tenantID != "" {
-			query += fmt.Sprintf(" & TenantID = %s", tenantID)
+			conditions = append(conditions, fmt.Sprintf("TenantID = %s", tenantID))
 		}
 	} else if tenantID != "" {
-		query = fmt.Sprintf("TenantID = %s", tenantID)
+		conditions = append(conditions, fmt.Sprintf("TenantID = %s", tenantID))
 	}
 
-	if query == "" {
+	if vnamespace != "" {
+		conditions = append(conditions, fmt.Sprintf("VNamespace = %s", vnamespace))
+	}
+
+	var query string
+	if len(conditions) == 0 {
 		query = "ID != 0"
+	} else {
+		query = strings.Join(conditions, " & ")
 	}
 
 	if pageSize <= 0 {

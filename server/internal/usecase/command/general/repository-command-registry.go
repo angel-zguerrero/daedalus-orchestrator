@@ -211,6 +211,7 @@ func init() {
 	RegisterRepoCommand("DeleteWorkflowDefinitionCommand", func() commands.Command { return &workflow_definition_command.DeleteWorkflowDefinitionCommand{} })
 	RegisterRepoCommand("GetWorkflowDefinitionCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowDefinitionCommand{} })
 	RegisterRepoCommand("ListWorkflowDefinitionsCommand", func() commands.Command { return &workflow_definition_command.ListWorkflowDefinitionsCommand{} })
+	RegisterRepoCommand("GetWorkflowQueuesCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowQueuesCommand{} })
 
 	// General commands
 	RegisterRepoCommand("CreateColumnFamilyCommand", func() commands.Command { return &CreateColumnFamilyCommand{} })

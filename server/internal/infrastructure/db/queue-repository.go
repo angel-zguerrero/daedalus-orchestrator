@@ -24,9 +24,13 @@ func NewQueueRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs str
 }
 
 func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (string, error) {
+	if input.Type == "" {
+		input.Type = models.StandardQueue
+	}
+
 	// Validate QueueType
 	if !isValidQueueType(input.Type) {
-		return "", fmt.Errorf("invalid queue type: %s. Valid types are: standard", input.Type)
+		return "", fmt.Errorf("invalid queue type: %s. Valid types are: standard, workflow_execution, workflow_activity", input.Type)
 	}
 
 	// Validate DefaultQueueMessageTTL must be >= 0
@@ -65,9 +69,13 @@ func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (strin
 }
 
 func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool, error) {
+	if input.Type == "" {
+		input.Type = models.StandardQueue
+	}
+
 	// Validate QueueType
 	if !isValidQueueType(input.Type) {
-		return false, fmt.Errorf("invalid queue type: %s. Valid types are: standard", input.Type)
+		return false, fmt.Errorf("invalid queue type: %s. Valid types are: standard, workflow_execution, workflow_activity", input.Type)
 	}
 
 	// Validate DefaultQueueMessageTTL must be >= 0
@@ -115,6 +123,15 @@ func (r *QueueRepository) GetQueueById(id string, now time.Time) (*models.Queue,
 	return r.FindByField("ID", id, now)
 }
 
+func (r *QueueRepository) GetQueuesByWorkflowDefinitionID(workflowID string, now time.Time) ([]models.Queue, error) {
+	query := "WorkflowDefinitionID = " + workflowID
+	result, err := r.Find(query, 100, "", now)
+	if err != nil {
+		return nil, err
+	}
+	return result.Entities, nil
+}
+
 func (r *QueueRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
 	return r.paginate(q, "", pageSize, cursor, vNamespace, now)
 }
@@ -154,7 +171,23 @@ func (r *QueueRepository) paginate(q string, supervisionState models.QueueSuperv
 		}
 	}
 
-	return r.Find(query, pageSize, cursor, now)
+	result, err := r.Find(query, pageSize, cursor, now)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter out non-standard workflow queues from standard list
+	if result != nil && len(result.Entities) > 0 {
+		var filtered []models.Queue
+		for _, entity := range result.Entities {
+			if entity.Type == "" || entity.Type == models.StandardQueue {
+				filtered = append(filtered, entity)
+			}
+		}
+		result.Entities = filtered
+	}
+
+	return result, nil
 }
 
 func (r *QueueRepository) DeleteQueueById(id string, now time.Time) (bool, error) {
@@ -194,6 +227,11 @@ func containsString(arr []string, val string) bool {
 }
 
 func matchClaimWorkFilter(q *models.Queue, f models.ClaimWorkFilter) bool {
+	// Exclude non-standard queues (workflow execution and activity queues) from standard workers
+	if q.Type != "" && q.Type != models.StandardQueue {
+		return false
+	}
+
 	if q.MessagesCount <= 0 {
 		return false
 	}
@@ -254,7 +292,7 @@ func matchClaimWorkFilter(q *models.Queue, f models.ClaimWorkFilter) bool {
 // isValidQueueType validates if the queue type is one of the allowed types
 func isValidQueueType(queueType models.QueueType) bool {
 	switch queueType {
-	case models.StandardQueue:
+	case models.StandardQueue, models.WorkflowExecutionQueue, models.WorkflowActivityQueue:
 		return true
 	default:
 		return false

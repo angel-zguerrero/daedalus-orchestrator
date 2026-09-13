@@ -53,12 +53,13 @@ func (cmd *GetWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time.Ti
 }
 
 type ListWorkflowDefinitionsCommand struct {
-	Scope    string
-	TenantID string
-	PageSize int
-	Cursor   string
-	CF       string
-	CFS      string
+	Scope      string
+	TenantID   string
+	VNamespace string
+	PageSize   int
+	Cursor     string
+	CF         string
+	CFS        string
 }
 
 func (cmd *ListWorkflowDefinitionsCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -71,7 +72,7 @@ func (cmd *ListWorkflowDefinitionsCommand) Execute(uow *db.UnitOfWork, now time.
 		return *commandResult
 	}
 
-	res, err := repo.ListWorkflowDefinitions(cmd.Scope, cmd.TenantID, cmd.PageSize, cmd.Cursor, now)
+	res, err := repo.ListWorkflowDefinitions(cmd.Scope, cmd.TenantID, cmd.VNamespace, cmd.PageSize, cmd.Cursor, now)
 	if err != nil {
 		commandResult.Error = fmt.Sprintf("failed to list workflow definitions: %v", err)
 		return *commandResult

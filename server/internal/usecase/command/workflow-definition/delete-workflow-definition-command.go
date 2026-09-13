@@ -7,6 +7,7 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/usecase/command"
+	"deadalus-orch/server/internal/usecase/command/queue"
 )
 
 func init() {
@@ -32,6 +33,24 @@ func (cmd *DeleteWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult
+	}
+
+	// Cascading deletion: find and delete all queues associated with this WorkflowID
+	queueRepo, errQRepo := db.NewQueueRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if errQRepo == nil {
+		queues, errQ := queueRepo.GetQueuesByWorkflowDefinitionID(cmd.WorkflowID, now)
+		if errQ == nil {
+			for _, q := range queues {
+				delQueueCmd := &queue.DeleteQueueCommand{
+					Code:            q.Code,
+					VNamespace:      q.VNamespace,
+					CF:              cmd.CF,
+					CFS:             cmd.CFS,
+					InternalCascade: true,
+				}
+				_ = delQueueCmd.Execute(uow, now)
+			}
+		}
 	}
 
 	ok, err := repo.DeleteWorkflowDefinition(cmd.WorkflowID, now)

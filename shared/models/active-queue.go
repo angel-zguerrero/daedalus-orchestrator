@@ -7,6 +7,7 @@ type ActiveQueue struct {
 	ID         string `orm:"primary-key"`
 	Code       string
 	VNamespace string
+	Type       QueueType
 }
 
 func (ActiveQueue) TableName() string {

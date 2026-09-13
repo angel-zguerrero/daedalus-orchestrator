@@ -29,6 +29,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { Observable, of } from 'rxjs';
 import { startWith, map, debounceTime, switchMap } from 'rxjs/operators';
 import { ErrorUtil } from '../../../../shared/utils/error.util';
+import { QueueDetailComponent } from './queue-detail/queue-detail.component';
 
 interface Queue {
   ID: string;
@@ -95,11 +96,14 @@ interface Exchange {
     AsyncPipe,
     ProgressModule,
     TooltipModule,
-    ChartjsModule
+    ChartjsModule,
+    QueueDetailComponent
   ]
 })
 export class QueuesComponent implements OnInit {
   @Input() tenantCode: string = '';
+  @Input() readOnly: boolean = false;
+  @Input() allowDelete: boolean = true;
 
   queues: Queue[] = [];
   exchanges: Exchange[] = [];
@@ -336,7 +340,12 @@ export class QueuesComponent implements OnInit {
 
     this.queuesService.getQueues(this.tenantCode, cursor, this.pageSize, this.searchQuery, this.selectedVNamespaceFilter, true).subscribe({
       next: (response) => {
-        this.queues = response.result.Entities || [];
+        const rawQueues: Queue[] = response.result.Entities || [];
+        if (!this.readOnly) {
+          this.queues = rawQueues.filter(q => !q.Type || q.Type === 'standard');
+        } else {
+          this.queues = rawQueues;
+        }
         this.cursor = response.result.Cursor;
         this.loading = false;
       },
@@ -346,6 +355,10 @@ export class QueuesComponent implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  isStandardQueue(queue: Queue): boolean {
+    return !queue?.Type || queue.Type === 'standard';
   }
 
   searchQueues(): void {
