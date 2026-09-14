@@ -302,7 +302,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.editingWorkflowId = '';
     this.showAdvancedSettings = false;
     this.workflowForm.reset({
-      vnamespace: 'default',
+      vnamespace: this.scope === 'global' ? '' : 'default',
       version: 1,
       payloadFormat: 'bpmn',
       payload: DEFAULT_BPMN_XML,
@@ -328,7 +328,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.workflowForm.patchValue({
       code: wf.code,
       name: wf.name,
-      vnamespace: wf.vnamespace || 'default',
+      vnamespace: this.scope === 'global' ? '' : (wf.vnamespace || 'default'),
       description: wf.description,
       version: wf.version,
       payloadFormat: 'bpmn',
@@ -386,7 +386,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   }
 
   async saveWorkflowAndClose(): Promise<void> {
-    await this.saveWorkflow();
+    await this.saveWorkflow(true);
   }
 
   // Workflow Queues
@@ -419,7 +419,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     });
   }
 
-  async saveWorkflow(): Promise<void> {
+  async saveWorkflow(closeAfterSave: boolean = true): Promise<void> {
     if (this.workflowForm.invalid) return;
 
     if (this.bpmnDesigner) {
@@ -433,7 +433,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     const payload: Partial<WorkflowDefinition> = {
       code: val.code ? val.code.trim() : '',
       name: val.name ? val.name.trim() : '',
-      vnamespace: val.vnamespace ? val.vnamespace.trim() : 'default',
+      vnamespace: this.scope === 'global' ? '' : (val.vnamespace ? val.vnamespace.trim() : 'default'),
       description: val.description,
       version: Number(val.version),
       payloadFormat: 'bpmn',
@@ -452,7 +452,9 @@ export class WorkflowsComponent implements OnInit, OnChanges {
         next: () => {
           this.hasUnsavedChanges = false;
           this.showUnsavedConfirmModal = false;
-          this.showModal = false;
+          if (closeAfterSave) {
+            this.showModal = false;
+          }
           this.successMsg = 'Workflow definition updated successfully.';
           this.loadWorkflows();
           setTimeout(() => this.successMsg = '', 3000);
@@ -468,10 +470,18 @@ export class WorkflowsComponent implements OnInit, OnChanges {
         : this.workflowsService.createTenantWorkflow(this.tenantCode, payload);
 
       create$.subscribe({
-        next: () => {
+        next: (res: any) => {
           this.hasUnsavedChanges = false;
           this.showUnsavedConfirmModal = false;
-          this.showModal = false;
+          const createdEntity = res?.Entity || res?.entity || res;
+          if (createdEntity && createdEntity.id) {
+            this.isEditing = true;
+            this.editingWorkflowId = createdEntity.id;
+            this.workflowForm.get('code')?.disable();
+          }
+          if (closeAfterSave) {
+            this.showModal = false;
+          }
           this.successMsg = 'Workflow definition created successfully.';
           this.loadWorkflows();
           setTimeout(() => this.successMsg = '', 3000);

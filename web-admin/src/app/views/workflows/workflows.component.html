@@ -11,7 +11,7 @@
 
     <!-- Search and Actions Row -->
     <c-row class="mb-3">
-      <c-col [md]="3">
+      <c-col [md]="scope === 'global' ? 6 : 3">
         <div class="input-group">
           <input 
             type="text" 
@@ -29,7 +29,7 @@
           </button>
         </div>
       </c-col>
-      <c-col [md]="3">
+      <c-col [md]="3" *ngIf="scope !== 'global'">
         <mat-form-field class="w-100">
           <mat-label>Filter by VNamespace</mat-label>
           <input type="text" matInput [formControl]="vnamespaceFilterCtrl" [matAutocomplete]="autoFilter"
@@ -62,7 +62,7 @@
           <tr>
             <th>Name</th>
             <th>Code</th>
-            <th style="min-width: 120px;">VNamespace</th>
+            <th *ngIf="scope !== 'global'" style="min-width: 120px;">VNamespace</th>
             <th>Version</th>
             <th>Payload Format</th>
             <th>Max Duration</th>
@@ -78,7 +78,7 @@
             <td class="text-truncate" style="max-width: 150px;" title="{{ wf.code }}">
               <code>{{ wf.code }}</code>
             </td>
-            <td class="text-truncate" style="max-width: 120px;" title="{{ wf.vnamespace || '-' }}">
+            <td *ngIf="scope !== 'global'" class="text-truncate" style="max-width: 120px;" title="{{ wf.vnamespace || '-' }}">
               {{ wf.vnamespace || '-' }}
             </td>
             <td>v{{ wf.version }}</td>
@@ -123,7 +123,7 @@
             </td>
           </tr>
           <tr *ngIf="filteredWorkflows.length === 0">
-            <td colspan="8" class="text-center py-4">
+            <td [attr.colspan]="scope === 'global' ? 7 : 8" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No workflows found</h6>
@@ -194,7 +194,7 @@
 
           <div class="d-flex align-items-center gap-3">
             <!-- VNamespace Compact Picker -->
-            <div class="vnamespace-compact-picker d-flex align-items-center gap-1">
+            <div class="vnamespace-compact-picker d-flex align-items-center gap-1" *ngIf="scope !== 'global'">
               <span class="text-muted small">VNamespace:</span>
               <mat-form-field appearance="outline" class="compact-mat-field">
                 <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="autoHeader" placeholder="Namespace">
@@ -238,12 +238,34 @@
           Cancel
         </button>
 
-        <button cButton color="primary" size="sm" type="button" (click)="saveWorkflow()" [disabled]="!workflowForm.valid">
-          <svg cIcon name="cil-check" class="me-1"></svg>
-          {{ isEditing ? 'Save Changes' : 'Create Workflow' }}
+        <!-- Save (Solo guardar, sin cerrar) -->
+        <button 
+          cButton 
+          color="success" 
+          variant="outline" 
+          size="sm" 
+          type="button" 
+          (click)="saveWorkflow(false)" 
+          [disabled]="!workflowForm.valid"
+          title="Save changes and keep editing">
+          <svg cIcon name="cil-save" class="me-1"></svg>
+          Save
         </button>
 
-        <button (click)="requestCloseModal()" cButtonClose class="btn-close-white ms-2"></button>
+        <!-- Save & Close (Guardar y cerrar) -->
+        <button 
+          cButton 
+          color="primary" 
+          size="sm" 
+          type="button" 
+          (click)="saveWorkflow(true)" 
+          [disabled]="!workflowForm.valid"
+          title="Save changes and close editor">
+          <svg cIcon name="cil-check" class="me-1"></svg>
+          Save & Close
+        </button>
+
+        <button (click)="requestCloseModal()" cButtonClose class="btn-close-white ms-1"></button>
       </div>
 
     </div>
@@ -381,7 +403,7 @@
           </div>
           <div class="form-text">Unique workflow code</div>
         </div>
-        <div class="mb-3">
+        <div class="mb-3" *ngIf="scope !== 'global'">
           <label class="form-label fw-bold">VNamespace</label>
           <div class="p-2 bg-dark rounded">
             <code>{{ selectedWorkflow.vnamespace || 'default' }}</code>
