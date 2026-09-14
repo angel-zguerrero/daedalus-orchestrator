@@ -31,10 +31,24 @@
           "web-admin/src/assets"
         ],
         "styles": [
-          "web-admin/src/scss/styles.scss"
+          "web-admin/src/scss/styles.scss",
+          "node_modules/bpmn-js/dist/assets/diagram-js.css",
+          "node_modules/bpmn-js/dist/assets/bpmn-js.css",
+          "node_modules/bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css",
+          "node_modules/@bpmn-io/properties-panel/dist/assets/properties-panel.css",
+          "node_modules/@bpmn-io/element-template-chooser/dist/element-template-chooser.css"
         ],
         "scripts": [],
-        "allowedCommonJsDependencies": [],
+        "allowedCommonJsDependencies": [
+          "bpmn-js",
+          "bpmn-js-properties-panel",
+          "bpmn-js-element-templates",
+          "@bpmn-io/properties-panel",
+          "@bpmn-io/element-template-chooser",
+          "camunda-bpmn-moddle",
+          "diagram-js",
+          "min-dash"
+        ],
         "stylePreprocessorOptions": {
           "sass": {
             "silenceDeprecations": []
@@ -51,8 +65,8 @@
             },
             {
               "type": "anyComponentStyle",
-              "maximumWarning": "2kb",
-              "maximumError": "4kb"
+              "maximumWarning": "200kb",
+              "maximumError": "300kb"
             }
           ],
           "outputHashing": "all"

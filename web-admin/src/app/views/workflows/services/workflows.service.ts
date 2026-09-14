@@ -10,7 +10,7 @@ export interface WorkflowDefinition {
   description?: string;
   version: number;
   payload?: string;
-  payloadFormat: 'json' | 'yaml';
+  payloadFormat: 'json' | 'yaml' | 'bpmn';
   maxDurationSeconds: number;
   isActive: boolean;
   scope: 'global' | 'tenant';

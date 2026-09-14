@@ -47,6 +47,17 @@ type updateWorkflowRequest struct {
 	VNamespace         string                       `json:"vnamespace"`
 }
 
+func parsePayloadBytes(raw json.RawMessage) []byte {
+	if len(raw) == 0 {
+		return nil
+	}
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		return []byte(str)
+	}
+	return []byte(raw)
+}
+
 // --- GLOBAL HANDLERS ---
 
 func (ctrl *WorkflowDefinitionController) CreateGlobalWorkflowHandler(c *gin.Context) {
@@ -69,7 +80,7 @@ func (ctrl *WorkflowDefinitionController) CreateGlobalWorkflowHandler(c *gin.Con
 		req.Name,
 		req.Description,
 		req.Version,
-		[]byte(req.Payload),
+		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
 		isActive,
@@ -146,7 +157,7 @@ func (ctrl *WorkflowDefinitionController) UpdateGlobalWorkflowHandler(c *gin.Con
 		req.Name,
 		req.Description,
 		req.Version,
-		[]byte(req.Payload),
+		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
 		isActive,
@@ -201,7 +212,7 @@ func (ctrl *WorkflowDefinitionController) CreateTenantWorkflowHandler(c *gin.Con
 		req.Name,
 		req.Description,
 		req.Version,
-		[]byte(req.Payload),
+		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
 		isActive,
@@ -282,7 +293,7 @@ func (ctrl *WorkflowDefinitionController) UpdateTenantWorkflowHandler(c *gin.Con
 		req.Name,
 		req.Description,
 		req.Version,
-		[]byte(req.Payload),
+		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
 		isActive,

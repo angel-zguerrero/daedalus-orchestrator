@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, OnInit, Input, OnChanges, SimpleChanges, ViewChild } from '@angular/core';
 import { CommonModule, AsyncPipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
@@ -29,6 +29,7 @@ import { WorkflowsService, WorkflowDefinition } from './services/workflows.servi
 import { VNamespacesService } from '../tenants/tenant-management/services/vnamespaces.service';
 import { ErrorUtil } from '../../shared/utils/error.util';
 import { QueueDetailComponent } from '../tenants/tenant-management/queues/queue-detail/queue-detail.component';
+import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../shared/components/bpmn-designer/bpmn-designer.component';
 
 @Component({
   selector: 'app-workflows',
@@ -60,7 +61,8 @@ import { QueueDetailComponent } from '../tenants/tenant-management/queues/queue-
     MatFormFieldModule,
     MatInputModule,
     MatAutocompleteModule,
-    QueueDetailComponent
+    QueueDetailComponent,
+    BpmnDesignerComponent
   ]
 })
 export class WorkflowsComponent implements OnInit, OnChanges {
@@ -88,6 +90,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   workflowForm: FormGroup;
   isEditing: boolean = false;
   editingWorkflowId: string = '';
+  @ViewChild('bpmnDesigner') bpmnDesigner?: BpmnDesignerComponent;
 
   // Detail / Payload Modal
   showDetailModal: boolean = false;
@@ -151,14 +154,29 @@ export class WorkflowsComponent implements OnInit, OnChanges {
 
   private decodePayload(payloadRaw: any): string {
     if (!payloadRaw) return '';
+    let decoded = '';
     if (typeof payloadRaw === 'string') {
       try {
-        return atob(payloadRaw);
+        decoded = atob(payloadRaw);
       } catch {
-        return payloadRaw;
+        decoded = payloadRaw;
+      }
+    } else {
+      decoded = JSON.stringify(payloadRaw, null, 2);
+    }
+
+    decoded = decoded.trim();
+    if (decoded.startsWith('"') && decoded.endsWith('"')) {
+      try {
+        const unescaped = JSON.parse(decoded);
+        if (typeof unescaped === 'string') {
+          decoded = unescaped.trim();
+        }
+      } catch {
+        // ignore parse error
       }
     }
-    return JSON.stringify(payloadRaw, null, 2);
+    return decoded;
   }
 
   private normalizeWorkflow(w: any): WorkflowDefinition {
@@ -170,7 +188,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       description: w.description || w.Description || '',
       version: w.version || w.Version || 1,
       payload: w.payload || w.Payload || '',
-      payloadFormat: (w.payloadFormat || w.PayloadFormat || 'json').toLowerCase() as 'json' | 'yaml',
+      payloadFormat: (w.payloadFormat || w.PayloadFormat || 'json').toLowerCase() as 'json' | 'yaml' | 'bpmn',
       maxDurationSeconds: w.maxDurationSeconds || w.MaxDurationSeconds || 0,
       isActive: w.isActive !== undefined ? w.isActive : (w.IsActive !== undefined ? w.IsActive : true),
       scope: (w.scope || w.Scope || this.scope).toLowerCase() as 'global' | 'tenant',
@@ -272,8 +290,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.workflowForm.reset({
       vnamespace: 'default',
       version: 1,
-      payloadFormat: 'json',
-      payload: '{\n  "steps": []\n}',
+      payloadFormat: 'bpmn',
+      payload: DEFAULT_BPMN_XML,
       maxDurationSeconds: 3600,
       isActive: true
     });
@@ -285,19 +303,24 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.isEditing = true;
     this.editingWorkflowId = wf.id || '';
     const decodedPayload = this.decodePayload(wf.payload);
+
     this.workflowForm.patchValue({
       code: wf.code,
       name: wf.name,
       vnamespace: wf.vnamespace || 'default',
       description: wf.description,
       version: wf.version,
-      payloadFormat: wf.payloadFormat,
-      payload: decodedPayload,
+      payloadFormat: 'bpmn',
+      payload: decodedPayload || DEFAULT_BPMN_XML,
       maxDurationSeconds: wf.maxDurationSeconds,
       isActive: wf.isActive
     });
     this.workflowForm.get('code')?.disable();
     this.showModal = true;
+  }
+
+  onBpmnXmlChange(xml: string): void {
+    this.workflowForm.patchValue({ payload: xml }, { emitEvent: false });
   }
 
   // Workflow Queues
@@ -330,8 +353,15 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     });
   }
 
-  saveWorkflow(): void {
+  async saveWorkflow(): Promise<void> {
     if (this.workflowForm.invalid) return;
+
+    if (this.bpmnDesigner) {
+      const xml = await this.bpmnDesigner.getXml();
+      if (xml) {
+        this.workflowForm.patchValue({ payload: xml }, { emitEvent: false });
+      }
+    }
 
     const val = this.workflowForm.getRawValue();
     const payload: Partial<WorkflowDefinition> = {
@@ -340,7 +370,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       vnamespace: val.vnamespace ? val.vnamespace.trim() : 'default',
       description: val.description,
       version: Number(val.version),
-      payloadFormat: val.payloadFormat,
+      payloadFormat: 'bpmn',
       payload: val.payload,
       maxDurationSeconds: Number(val.maxDurationSeconds),
       isActive: Boolean(val.isActive),

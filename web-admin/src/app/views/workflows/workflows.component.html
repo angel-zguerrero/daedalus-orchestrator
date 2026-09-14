@@ -159,7 +159,7 @@
 </c-card>
 
 <!-- Create / Edit Workflow Modal -->
-<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="showModal = $event" size="lg">
+<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="showModal = $event" size="xl">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon [name]="isEditing ? 'cil-pencil' : 'cil-plus'" class="me-2"></svg>
@@ -206,18 +206,11 @@
       </c-row>
 
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="4">
+        <c-col [md]="6">
           <label cLabel for="wfVersion">Version *</label>
           <input cFormControl type="number" id="wfVersion" formControlName="version" min="1" />
         </c-col>
-        <c-col [md]="4">
-          <label cLabel for="wfFormat">Payload Format *</label>
-          <select cSelect id="wfFormat" formControlName="payloadFormat">
-            <option value="json">JSON</option>
-            <option value="yaml">YAML</option>
-          </select>
-        </c-col>
-        <c-col [md]="4">
+        <c-col [md]="6">
           <label cLabel for="wfDuration">Max Duration (seconds)</label>
           <input cFormControl type="number" id="wfDuration" formControlName="maxDurationSeconds" min="0" />
         </c-col>
@@ -225,9 +218,12 @@
 
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
-          <label cLabel for="wfPayload">Payload Definition</label>
-          <textarea cFormControl id="wfPayload" formControlName="payload" rows="6" class="font-monospace"></textarea>
-          <small class="form-text text-muted">Workflow execution schema / steps in JSON or YAML</small>
+          <label cLabel for="wfPayload" class="fw-bold mb-2">Visual BPMN 2.0 Diagram</label>
+          <app-bpmn-designer
+            #bpmnDesigner
+            [payload]="workflowForm.get('payload')?.value"
+            (xmlChange)="onBpmnXmlChange($event)">
+          </app-bpmn-designer>
         </c-col>
       </c-row>
 
@@ -279,7 +275,7 @@
 </c-modal>
 
 <!-- Workflow Details Modal -->
-<c-modal id="detailsModal" [visible]="showDetailModal" (visibleChange)="showDetailModal = $event" size="lg">
+<c-modal id="detailsModal" [visible]="showDetailModal" (visibleChange)="showDetailModal = $event" size="xl">
   <c-modal-header>
     <h5 cModalTitle>
       <svg cIcon name="cil-info" class="me-2"></svg>
@@ -348,7 +344,12 @@
     </div>
     <div class="mb-3">
       <label class="form-label fw-bold">Payload Content</label>
-      <pre class="p-3 bg-dark rounded text-light font-monospace border-0" style="max-height: 250px; overflow-y: auto;">{{ payloadDisplayText }}</pre>
+      <div *ngIf="selectedWorkflow.payloadFormat === 'bpmn' || payloadDisplayText.trim().startsWith('<?xml')">
+        <app-bpmn-designer [payload]="payloadDisplayText" [readonly]="true"></app-bpmn-designer>
+      </div>
+      <div *ngIf="selectedWorkflow.payloadFormat !== 'bpmn' && !payloadDisplayText.trim().startsWith('<?xml')">
+        <pre class="p-3 bg-dark rounded text-light font-monospace border-0" style="max-height: 250px; overflow-y: auto;">{{ payloadDisplayText }}</pre>
+      </div>
     </div>
 
     <!-- Associated Workflow Queues Accordion -->

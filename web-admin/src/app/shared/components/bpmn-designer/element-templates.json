@@ -1,0 +1,604 @@
+[
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "HTTP REST Connector",
+    "id": "io.camunda.connectors.HttpJson.v1",
+    "description": "Execute HTTP GET, POST, PUT, PATCH, DELETE requests to external REST endpoints",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/http-rest/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Authentication Type",
+        "type": "Dropdown",
+        "value": "noAuth",
+        "choices": [
+          { "name": "No Authentication", "value": "noAuth" },
+          { "name": "Basic Authentication", "value": "basic" },
+          { "name": "Bearer Token", "value": "bearer" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "authenticationType"
+        }
+      },
+      {
+        "label": "HTTP Method",
+        "type": "Dropdown",
+        "value": "GET",
+        "choices": [
+          { "name": "GET", "value": "GET" },
+          { "name": "POST", "value": "POST" },
+          { "name": "PUT", "value": "PUT" },
+          { "name": "PATCH", "value": "PATCH" },
+          { "name": "DELETE", "value": "DELETE" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "method"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Target URL Endpoint",
+        "type": "String",
+        "value": "https://api.example.com/v1/resource",
+        "binding": {
+          "type": "camunda:property",
+          "name": "url"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Request Body (JSON)",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"key\": \"value\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "body"
+        }
+      },
+      {
+        "label": "Headers (JSON)",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"Content-Type\": \"application/json\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "headers"
+        }
+      },
+      {
+        "label": "Connection Timeout (ms)",
+        "type": "String",
+        "value": "10000",
+        "binding": {
+          "type": "camunda:property",
+          "name": "connectionTimeout"
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Slack Outbound Connector",
+    "id": "io.camunda.connectors.Slack.v1",
+    "description": "Send notification messages to a Slack channel or direct user via Bot Token",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/slack/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Slack Bot OAuth Token",
+        "type": "String",
+        "value": "xoxb-your-slack-bot-token",
+        "binding": {
+          "type": "camunda:property",
+          "name": "token"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Channel or User ID",
+        "type": "String",
+        "value": "#alerts",
+        "binding": {
+          "type": "camunda:property",
+          "name": "channel"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Message Text",
+        "type": "String",
+        "multiline": true,
+        "value": "Workflow alert: Execution completed successfully for ID ${workflowId}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "message"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "SendGrid Email Connector",
+    "id": "io.camunda.connectors.SendGrid.v1",
+    "description": "Send transactional email messages via SendGrid API",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/sendgrid/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "SendGrid API Key",
+        "type": "String",
+        "value": "SG.your_api_key_here",
+        "binding": {
+          "type": "camunda:property",
+          "name": "apiKey"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Recipient Email (To)",
+        "type": "String",
+        "value": "user@example.com",
+        "binding": {
+          "type": "camunda:property",
+          "name": "to"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Subject Line",
+        "type": "String",
+        "value": "Important Notification from Daedalus Platform",
+        "binding": {
+          "type": "camunda:property",
+          "name": "subject"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Email Body (HTML/Text)",
+        "type": "String",
+        "multiline": true,
+        "value": "<h1>Workflow Status Update</h1><p>Your process executed successfully.</p>",
+        "binding": {
+          "type": "camunda:property",
+          "name": "content"
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Apache Kafka Producer Connector",
+    "id": "io.camunda.connectors.Kafka.v1",
+    "description": "Publish events or messages directly to an Apache Kafka topic",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/kafka/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Bootstrap Servers",
+        "type": "String",
+        "value": "localhost:9092",
+        "binding": {
+          "type": "camunda:property",
+          "name": "bootstrapServers"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Kafka Topic Name",
+        "type": "String",
+        "value": "daedalus.events.workflow",
+        "binding": {
+          "type": "camunda:property",
+          "name": "topic"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Message Key",
+        "type": "String",
+        "value": "event-12345",
+        "binding": {
+          "type": "camunda:property",
+          "name": "key"
+        }
+      },
+      {
+        "label": "Value Payload (JSON)",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"eventType\": \"WORKFLOW_EXECUTED\",\n  \"timestamp\": 1700000000\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "value"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "AWS SQS Publisher Connector",
+    "id": "io.camunda.connectors.AwsSqs.v1",
+    "description": "Publish messages to Amazon Simple Queue Service (AWS SQS)",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-sqs/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "AWS Region",
+        "type": "String",
+        "value": "us-east-1",
+        "binding": {
+          "type": "camunda:property",
+          "name": "region"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Queue URL",
+        "type": "String",
+        "value": "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
+        "binding": {
+          "type": "camunda:property",
+          "name": "queueUrl"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Message Body",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"task\": \"process_data\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "messageBody"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "AWS SNS Publisher Connector",
+    "id": "io.camunda.connectors.AwsSns.v1",
+    "description": "Publish messages to Amazon Simple Notification Service (AWS SNS)",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-sns/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "AWS Region",
+        "type": "String",
+        "value": "us-east-1",
+        "binding": {
+          "type": "camunda:property",
+          "name": "region"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Topic ARN",
+        "type": "String",
+        "value": "arn:aws:sns:us-east-1:123456789012:my-topic",
+        "binding": {
+          "type": "camunda:property",
+          "name": "topicArn"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Message",
+        "type": "String",
+        "multiline": true,
+        "value": "Notification alert payload",
+        "binding": {
+          "type": "camunda:property",
+          "name": "message"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "OpenAI GPT Connector",
+    "id": "io.camunda.connectors.OpenAI.v1",
+    "description": "Interact with OpenAI GPT models for text completions and chat response generation",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/openai/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "OpenAI API Key",
+        "type": "String",
+        "value": "sk-your-openai-api-key",
+        "binding": {
+          "type": "camunda:property",
+          "name": "apiKey"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Model Name",
+        "type": "Dropdown",
+        "value": "gpt-4o",
+        "choices": [
+          { "name": "gpt-4o", "value": "gpt-4o" },
+          { "name": "gpt-4o-mini", "value": "gpt-4o-mini" },
+          { "name": "gpt-4-turbo", "value": "gpt-4-turbo" },
+          { "name": "gpt-3.5-turbo", "value": "gpt-3.5-turbo" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "model"
+        }
+      },
+      {
+        "label": "System Prompt",
+        "type": "String",
+        "multiline": true,
+        "value": "You are a helpful assistant analyzing process metrics.",
+        "binding": {
+          "type": "camunda:property",
+          "name": "systemPrompt"
+        }
+      },
+      {
+        "label": "User Input Prompt",
+        "type": "String",
+        "multiline": true,
+        "value": "Summarize the following workflow logs: ${logSummary}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "userPrompt"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "RabbitMQ Publisher Connector",
+    "id": "io.camunda.connectors.RabbitMQ.v1",
+    "description": "Publish messages to RabbitMQ exchange and routing key",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/rabbitmq/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "AMQP Connection URI",
+        "type": "String",
+        "value": "amqp://guest:guest@localhost:5672/",
+        "binding": {
+          "type": "camunda:property",
+          "name": "uri"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Exchange Name",
+        "type": "String",
+        "value": "daedalus.direct",
+        "binding": {
+          "type": "camunda:property",
+          "name": "exchange"
+        }
+      },
+      {
+        "label": "Routing Key",
+        "type": "String",
+        "value": "tasks.process",
+        "binding": {
+          "type": "camunda:property",
+          "name": "routingKey"
+        }
+      },
+      {
+        "label": "Message Body (JSON)",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"action\": \"reindex\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "payload"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "PostgreSQL / MySQL Query Connector",
+    "id": "io.camunda.connectors.Sql.v1",
+    "description": "Execute relational SQL query (SELECT, INSERT, UPDATE, DELETE) against PostgreSQL/MySQL",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/sql/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Database Type",
+        "type": "Dropdown",
+        "value": "postgresql",
+        "choices": [
+          { "name": "PostgreSQL", "value": "postgresql" },
+          { "name": "MySQL", "value": "mysql" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "dbType"
+        }
+      },
+      {
+        "label": "Connection String",
+        "type": "String",
+        "value": "postgresql://user:password@localhost:5432/daedalus",
+        "binding": {
+          "type": "camunda:property",
+          "name": "connectionString"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "SQL Query Statement",
+        "type": "String",
+        "multiline": true,
+        "value": "SELECT * FROM workflow_executions WHERE status = 'COMPLETED';",
+        "binding": {
+          "type": "camunda:property",
+          "name": "sql"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Log Message Activity",
+    "id": "com.daedalus.tasks.log",
+    "description": "Logs a custom message to the audit pipeline",
+    "category": {
+      "id": "tasks",
+      "name": "Built-in Tasks"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Log Level",
+        "type": "Dropdown",
+        "value": "INFO",
+        "choices": [
+          { "name": "DEBUG", "value": "DEBUG" },
+          { "name": "INFO", "value": "INFO" },
+          { "name": "WARN", "value": "WARN" },
+          { "name": "ERROR", "value": "ERROR" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "logLevel"
+        }
+      },
+      {
+        "label": "Message Template",
+        "type": "String",
+        "multiline": true,
+        "value": "Processing workflow execution step ${executionId}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "message"
+        }
+      }
+    ]
+  }
+]
