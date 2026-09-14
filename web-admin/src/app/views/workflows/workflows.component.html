@@ -159,7 +159,7 @@
 </c-card>
 
 <!-- Create / Edit Workflow Modal (Google Docs / Document Studio Workspace Style) -->
-<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="showModal = $event" size="xl" class="doc-studio-modal">
+<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="onModalVisibleChange($event)" size="xl" class="doc-studio-modal">
   <div class="doc-studio-container" [formGroup]="workflowForm">
     
     <!-- Magnetic / Sticky Top Header Bar (Google Docs style) -->
@@ -234,7 +234,7 @@
           <span class="d-none d-md-inline">Settings</span>
         </button>
 
-        <button (click)="showModal = false" cButton color="secondary" size="sm" type="button">
+        <button (click)="requestCloseModal()" cButton color="secondary" size="sm" type="button">
           Cancel
         </button>
 
@@ -243,7 +243,7 @@
           {{ isEditing ? 'Save Changes' : 'Create Workflow' }}
         </button>
 
-        <button (click)="showModal = false" cButtonClose class="btn-close-white ms-2"></button>
+        <button (click)="requestCloseModal()" cButtonClose class="btn-close-white ms-2"></button>
       </div>
 
     </div>
@@ -282,6 +282,44 @@
       </app-bpmn-designer>
     </div>
   </div>
+</c-modal>
+
+<!-- Unsaved Changes Confirmation Modal (Word / Google Docs style) -->
+<c-modal id="unsavedModal" [visible]="showUnsavedConfirmModal" (visibleChange)="showUnsavedConfirmModal = $event">
+  <c-modal-header class="bg-dark text-light border-secondary">
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-warning" class="text-warning"></svg>
+      Unsaved Changes
+    </h5>
+    <button (click)="cancelCloseUnsavedModal()" cButtonClose class="btn-close-white"></button>
+  </c-modal-header>
+  <c-modal-body class="bg-dark text-light">
+    <div class="d-flex align-items-start gap-3 py-2">
+      <div class="rounded-circle p-2 bg-warning-subtle text-warning d-flex align-items-center justify-content-center">
+        <svg cIcon name="cil-warning" size="2xl"></svg>
+      </div>
+      <div>
+        <h6 class="fw-bold mb-1">
+          Do you want to save changes to "{{ workflowForm.get('name')?.value || 'this workflow' }}"?
+        </h6>
+        <p class="text-muted small mb-0">
+          Your diagram modifications will be lost if you close without saving.
+        </p>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary d-flex justify-content-end gap-2">
+    <button (click)="cancelCloseUnsavedModal()" cButton color="secondary" variant="outline">
+      Cancel
+    </button>
+    <button (click)="confirmDiscardAndClose()" cButton color="danger">
+      Don't Save
+    </button>
+    <button (click)="saveWorkflowAndClose()" cButton color="primary" [disabled]="!workflowForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Save Changes
+    </button>
+  </c-modal-footer>
 </c-modal>
 
 <!-- Delete Workflow Modal -->

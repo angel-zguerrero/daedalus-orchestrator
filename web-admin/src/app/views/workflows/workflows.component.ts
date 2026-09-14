@@ -88,6 +88,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   // Create / Edit Modal
   showModal: boolean = false;
   showAdvancedSettings: boolean = false;
+  showUnsavedConfirmModal: boolean = false;
+  hasUnsavedChanges: boolean = false;
   workflowForm: FormGroup;
   isEditing: boolean = false;
   editingWorkflowId: string = '';
@@ -130,6 +132,12 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       payload: ['{}'],
       maxDurationSeconds: [3600, [Validators.required, Validators.min(0)]],
       isActive: [true]
+    });
+
+    this.workflowForm.valueChanges.subscribe(() => {
+      if (this.showModal) {
+        this.hasUnsavedChanges = true;
+      }
     });
 
     this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
@@ -302,6 +310,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       isActive: true
     });
     this.workflowForm.get('code')?.enable();
+    this.hasUnsavedChanges = false;
     this.showModal = true;
     setTimeout(() => {
       if (this.bpmnDesigner) {
@@ -328,6 +337,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       isActive: wf.isActive
     });
     this.workflowForm.get('code')?.disable();
+    this.hasUnsavedChanges = false;
     this.showModal = true;
     setTimeout(() => {
       if (this.bpmnDesigner) {
@@ -338,6 +348,45 @@ export class WorkflowsComponent implements OnInit, OnChanges {
 
   onBpmnXmlChange(xml: string): void {
     this.workflowForm.patchValue({ payload: xml }, { emitEvent: false });
+    if (this.showModal) {
+      this.hasUnsavedChanges = true;
+    }
+  }
+
+  requestCloseModal(): void {
+    if (this.hasUnsavedChanges) {
+      this.showUnsavedConfirmModal = true;
+    } else {
+      this.showModal = false;
+      this.hasUnsavedChanges = false;
+    }
+  }
+
+  onModalVisibleChange(visible: boolean): void {
+    if (!visible) {
+      if (this.hasUnsavedChanges) {
+        setTimeout(() => {
+          this.showModal = true;
+          this.showUnsavedConfirmModal = true;
+        }, 10);
+      } else {
+        this.showModal = false;
+      }
+    }
+  }
+
+  cancelCloseUnsavedModal(): void {
+    this.showUnsavedConfirmModal = false;
+  }
+
+  confirmDiscardAndClose(): void {
+    this.hasUnsavedChanges = false;
+    this.showUnsavedConfirmModal = false;
+    this.showModal = false;
+  }
+
+  async saveWorkflowAndClose(): Promise<void> {
+    await this.saveWorkflow();
   }
 
   // Workflow Queues
@@ -401,6 +450,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
 
       update$.subscribe({
         next: () => {
+          this.hasUnsavedChanges = false;
+          this.showUnsavedConfirmModal = false;
           this.showModal = false;
           this.successMsg = 'Workflow definition updated successfully.';
           this.loadWorkflows();
@@ -418,6 +469,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
 
       create$.subscribe({
         next: () => {
+          this.hasUnsavedChanges = false;
+          this.showUnsavedConfirmModal = false;
           this.showModal = false;
           this.successMsg = 'Workflow definition created successfully.';
           this.loadWorkflows();
