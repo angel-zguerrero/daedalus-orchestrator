@@ -46,14 +46,12 @@ export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
-import { IconDirective } from '@coreui/icons-angular';
-
 @Component({
   selector: 'app-bpmn-designer',
   templateUrl: './bpmn-designer.component.html',
   styleUrls: ['./bpmn-designer.component.scss'],
   standalone: true,
-  imports: [CommonModule, IconDirective],
+  imports: [CommonModule],
   encapsulation: ViewEncapsulation.None
 })
 export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestroy {
@@ -244,6 +242,52 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       } catch (err) {
         console.error('Zoom reset failed:', err);
       }
+    }
+  }
+
+  public undo(): void {
+    if (this.bpmnModeler && !this.readonly) {
+      try {
+        const commandStack = this.bpmnModeler.get('commandStack');
+        if (commandStack && commandStack.canUndo()) {
+          commandStack.undo();
+        }
+      } catch (err) {
+        console.error('Undo action failed:', err);
+      }
+    }
+  }
+
+  public redo(): void {
+    if (this.bpmnModeler && !this.readonly) {
+      try {
+        const commandStack = this.bpmnModeler.get('commandStack');
+        if (commandStack && commandStack.canRedo()) {
+          commandStack.redo();
+        }
+      } catch (err) {
+        console.error('Redo action failed:', err);
+      }
+    }
+  }
+
+  public canUndo(): boolean {
+    if (!this.bpmnModeler || this.readonly) return false;
+    try {
+      const commandStack = this.bpmnModeler.get('commandStack');
+      return commandStack ? commandStack.canUndo() : false;
+    } catch {
+      return false;
+    }
+  }
+
+  public canRedo(): boolean {
+    if (!this.bpmnModeler || this.readonly) return false;
+    try {
+      const commandStack = this.bpmnModeler.get('commandStack');
+      return commandStack ? commandStack.canRedo() : false;
+    } catch {
+      return false;
     }
   }
 }
