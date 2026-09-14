@@ -3,6 +3,11 @@ declare module 'bpmn-js/lib/Modeler' {
   export default BpmnModeler;
 }
 
+declare module 'bpmn-js/lib/NavigatedViewer' {
+  const BpmnNavigatedViewer: any;
+  export default BpmnNavigatedViewer;
+}
+
 declare module 'bpmn-js-properties-panel' {
   export const BpmnPropertiesPanelModule: any;
   export const BpmnPropertiesProviderModule: any;

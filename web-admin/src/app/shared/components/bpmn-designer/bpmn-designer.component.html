@@ -15,7 +15,7 @@
   </small>
 </div>
 
-<div class="bpmn-designer-container">
+<div class="bpmn-designer-container" [class.is-readonly]="readonly">
   <div #canvasRef class="bpmn-canvas"></div>
-  <div #propertiesRef class="bpmn-properties-panel"></div>
+  <div #propertiesRef class="bpmn-properties-panel" [style.display]="readonly ? 'none' : 'block'"></div>
 </div>

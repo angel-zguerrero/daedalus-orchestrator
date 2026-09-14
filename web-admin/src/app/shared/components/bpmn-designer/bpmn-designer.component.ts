@@ -14,6 +14,7 @@ import {
 import { CommonModule } from '@angular/common';
 
 import BpmnModeler from 'bpmn-js/lib/Modeler';
+import BpmnNavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
 import {
   BpmnPropertiesPanelModule,
   BpmnPropertiesProviderModule
@@ -69,7 +70,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['payload'] && this.isInitialized && !changes['payload'].firstChange) {
+    if (changes['readonly'] && this.isInitialized && !changes['readonly'].firstChange) {
+      this.reinitModeler();
+    } else if (changes['payload'] && this.isInitialized && !changes['payload'].firstChange) {
       this.importXml(this.payload || DEFAULT_BPMN_XML);
     }
   }
@@ -80,45 +83,79 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     }
   }
 
-  private initModeler(): void {
-    this.bpmnModeler = new BpmnModeler({
-      container: this.canvasRef.nativeElement,
-      propertiesPanel: {
-        parent: this.propertiesRef.nativeElement
-      },
-      additionalModules: [
-        BpmnPropertiesPanelModule,
-        BpmnPropertiesProviderModule,
-        ElementTemplatesCoreModule,
-        ElementTemplatesPropertiesProviderModule,
-        ElementTemplateChooserModule
-      ],
-      moddleExtensions: {
-        camunda: camundaModdleDescriptor
-      },
-      elementTemplates: elementTemplatesData
-    });
+  public reinitModeler(): void {
+    if (this.bpmnModeler) {
+      try {
+        this.bpmnModeler.destroy();
+      } catch (e) {
+        // ignore destroy error
+      }
+      this.bpmnModeler = null;
+    }
+    this.isInitialized = false;
+    setTimeout(() => {
+      this.initModeler();
+    }, 50);
+  }
 
-    try {
-      const elementTemplates = this.bpmnModeler.get('elementTemplates');
-      if (elementTemplates && elementTemplates.set) {
-        elementTemplates.set(elementTemplatesData);
+  private initModeler(): void {
+    if (!this.canvasRef || !this.canvasRef.nativeElement) {
+      console.warn('Canvas element reference is not ready yet');
+      return;
+    }
+
+    if (this.readonly) {
+      this.bpmnModeler = new BpmnNavigatedViewer({
+        container: this.canvasRef.nativeElement
+      });
+    } else {
+      const propertiesParent = this.propertiesRef?.nativeElement;
+      const modelerConfig: any = {
+        container: this.canvasRef.nativeElement,
+        additionalModules: [
+          BpmnPropertiesPanelModule,
+          BpmnPropertiesProviderModule,
+          ElementTemplatesCoreModule,
+          ElementTemplatesPropertiesProviderModule,
+          ElementTemplateChooserModule
+        ],
+        moddleExtensions: {
+          camunda: camundaModdleDescriptor
+        },
+        elementTemplates: elementTemplatesData
+      };
+
+      if (propertiesParent) {
+        modelerConfig.propertiesPanel = {
+          parent: propertiesParent
+        };
       }
-      const loader = this.bpmnModeler.get('elementTemplatesLoader');
-      if (loader && loader.setTemplates) {
-        loader.setTemplates(elementTemplatesData);
+
+      this.bpmnModeler = new BpmnModeler(modelerConfig);
+
+      try {
+        const elementTemplates = this.bpmnModeler.get('elementTemplates');
+        if (elementTemplates && elementTemplates.set) {
+          elementTemplates.set(elementTemplatesData);
+        }
+        const loader = this.bpmnModeler.get('elementTemplatesLoader');
+        if (loader && loader.setTemplates) {
+          loader.setTemplates(elementTemplatesData);
+        }
+      } catch (e) {
+        console.warn('Element templates loader notice:', e);
       }
-    } catch (e) {
-      console.warn('Element templates loader notice:', e);
     }
 
     this.isInitialized = true;
 
-    // Listen for diagram changes to emit xmlChange
-    const eventBus = this.bpmnModeler.get('eventBus');
-    eventBus.on('commandStack.changed', () => {
-      this.emitCurrentXml();
-    });
+    // Listen for diagram changes to emit xmlChange if not readonly
+    if (!this.readonly) {
+      const eventBus = this.bpmnModeler.get('eventBus');
+      eventBus.on('commandStack.changed', () => {
+        this.emitCurrentXml();
+      });
+    }
 
     const initialXml = this.payload && this.payload.trim().startsWith('<?xml')
       ? this.payload
@@ -127,19 +164,24 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     this.importXml(initialXml);
   }
 
+  public refresh(): void {
+    if (!this.bpmnModeler) return;
+    try {
+      const canvas = this.bpmnModeler.get('canvas');
+      canvas.resized();
+      canvas.zoom('fit-viewport');
+    } catch {
+      // ignore resize error
+    }
+  }
+
   public async importXml(xml: string): Promise<void> {
     if (!this.bpmnModeler) return;
     try {
       const xmlToLoad = xml && xml.trim().startsWith('<?xml') ? xml : DEFAULT_BPMN_XML;
       await this.bpmnModeler.importXML(xmlToLoad);
       setTimeout(() => {
-        try {
-          const canvas = this.bpmnModeler.get('canvas');
-          canvas.resized();
-          canvas.zoom('fit-viewport');
-        } catch {
-          // ignore canvas resize error if destroyed
-        }
+        this.refresh();
       }, 100);
     } catch (err) {
       console.error('Failed to import BPMN XML diagram:', err);

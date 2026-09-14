@@ -31,41 +31,192 @@
     overflow-y: auto;
     color: #e0e0e0;
   }
+
+  &.is-readonly {
+    .bpmn-properties-panel {
+      display: none !important;
+    }
+
+    .bpmn-canvas {
+      width: 100% !important;
+      flex: 1 1 100% !important;
+    }
+  }
 }
 
-/* Custom styling for dark mode properties panel */
+/* Comprehensive Dark-Mode Styling & Contrast Overrides for Properties Panel */
 .bio-properties-panel {
-  background-color: #212631 !important;
-  color: #e0e0e0 !important;
+  --bio-surface: #212631 !important;
+  --bio-surface-overlay: #212631 !important;
+  --bio-surface-subtle: #2a303d !important;
+  --bio-surface-medium: #2a303d !important;
+  --bio-surface-strong: #181b22 !important;
+  --bio-text: #f8fafc !important;
+  --bio-text-subtle: #cbd5e1 !important;
+  --bio-text-subtlest: #94a3b8 !important;
+  --group-background-color: #212631 !important;
+  --header-background-color: #2a303d !important;
 
-  .bio-properties-panel-header {
+  background-color: #212631 !important;
+  color: #f8fafc !important;
+
+  *,
+  div,
+  span,
+  label,
+  p,
+  section,
+  .bio-properties-panel-group,
+  .bio-properties-panel-group-entries,
+  .bio-properties-panel-entry,
+  .bio-properties-panel-field-wrapper,
+  .bio-properties-panel-placeholder {
+    background-color: #212631 !important;
+    color: #f8fafc !important;
+  }
+
+  .bio-properties-panel-header,
+  .bio-properties-panel-group-header {
     background-color: #2a303d !important;
     color: #ffffff !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-  }
 
-  .bio-properties-panel-group-header {
-    color: #a5a5a5 !important;
-  }
-
-  .bio-properties-panel-input,
-  .bio-properties-panel-select,
-  .bio-properties-panel-textarea {
-    background-color: #181b22 !important;
-    color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-  }
-
-  .bio-properties-panel-entry {
-    color: #e0e0e0 !important;
+    * {
+      background-color: #2a303d !important;
+      color: #ffffff !important;
+    }
   }
 
   .bio-properties-panel-label {
-    color: #c2c7d0 !important;
+    color: #e2e8f0 !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+  }
+
+  .bio-properties-panel-description,
+  .bio-properties-panel-description * {
+    background-color: transparent !important;
+    color: #94a3b8 !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* Text inputs, dropdown selects, and textareas */
+  .bio-properties-panel-input,
+  .bio-properties-panel-select,
+  .bio-properties-panel-textarea,
+  input,
+  select,
+  textarea {
+    background-color: #181b22 !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 4px !important;
+
+    option {
+      background-color: #181b22 !important;
+      color: #ffffff !important;
+    }
+  }
+
+  /* Values under Template section (Name, Description) */
+  .bio-properties-panel-string-value,
+  .bio-properties-panel-text-value,
+  .bio-properties-panel-value {
+    color: #38bdf8 !important;
+    font-weight: 500 !important;
   }
 }
 
-/* High-contrast styling for diagram-js popup menus & element template chooser */
+/* Context Pad Action Icons (Popup tools next to selected element on canvas) */
+.djs-context-pad {
+  .entry {
+    background-color: #1e293b !important;
+    border: 1px solid #475569 !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
+    border-radius: 6px !important;
+
+    svg {
+      fill: #f8fafc !important;
+      stroke: #f8fafc !important;
+
+      path, rect, circle, polygon, line {
+        fill: #f8fafc !important;
+        stroke: #f8fafc !important;
+      }
+    }
+
+    [class^="bpmn-icon-"],
+    [class*=" bpmn-icon-"] {
+      color: #f8fafc !important;
+    }
+
+    &:hover {
+      background-color: #2563eb !important;
+
+      svg {
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
+
+        path, rect, circle, polygon, line {
+          fill: #ffffff !important;
+          stroke: #ffffff !important;
+        }
+      }
+
+      [class^="bpmn-icon-"],
+      [class*=" bpmn-icon-"] {
+        color: #ffffff !important;
+      }
+    }
+  }
+}
+
+/* High-contrast Palette Styling */
+.djs-palette {
+  background-color: #1e293b !important;
+  border: 1px solid #475569 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 6px !important;
+
+  .entry {
+    color: #f8fafc !important;
+
+    svg {
+      fill: #f8fafc !important;
+      stroke: #f8fafc !important;
+
+      path, rect, circle, polygon, line {
+        fill: #f8fafc !important;
+        stroke: #f8fafc !important;
+      }
+    }
+
+    [class^="bpmn-icon-"],
+    [class*=" bpmn-icon-"] {
+      color: #f8fafc !important;
+    }
+
+    &:hover {
+      color: #60a5fa !important;
+
+      svg {
+        fill: #60a5fa !important;
+        stroke: #60a5fa !important;
+
+        path, rect, circle, polygon, line {
+          fill: #60a5fa !important;
+          stroke: #60a5fa !important;
+        }
+      }
+
+      [class^="bpmn-icon-"],
+      [class*=" bpmn-icon-"] {
+        color: #60a5fa !important;
+      }
+    }
+  }
+}
+
+/* High-contrast Styling for Diagram-JS Popup Menus & Element Template Chooser */
 .djs-popup {
   background-color: #ffffff !important;
   color: #0f172a !important;
@@ -116,7 +267,6 @@
       border-color: #2563eb !important;
     }
 
-    /* Target all possible title / label element classes in bpmn-js / element-template-chooser */
     .title,
     .label,
     .name,
@@ -132,7 +282,6 @@
       opacity: 1 !important;
     }
 
-    /* Target description element classes */
     .description,
     .djs-popup-description,
     .entry-description,
@@ -152,11 +301,16 @@
   z-index: 1090 !important;
 }
 
-/* Palette styling */
-.djs-palette {
-  background-color: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.15) !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
-  border-radius: 6px !important;
-}
+/* BPMN Visual Element Styling on Canvas */
+.djs-element {
+  .djs-visual {
+    rect, circle, polygon, path {
+      stroke-width: 2px;
+    }
 
+    text {
+      fill: #0f172a !important;
+      font-weight: 600 !important;
+    }
+  }
+}

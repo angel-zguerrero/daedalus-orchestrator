@@ -297,6 +297,11 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     });
     this.workflowForm.get('code')?.enable();
     this.showModal = true;
+    setTimeout(() => {
+      if (this.bpmnDesigner) {
+        this.bpmnDesigner.refresh();
+      }
+    }, 150);
   }
 
   openEditModal(wf: WorkflowDefinition): void {
@@ -317,6 +322,11 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     });
     this.workflowForm.get('code')?.disable();
     this.showModal = true;
+    setTimeout(() => {
+      if (this.bpmnDesigner) {
+        this.bpmnDesigner.refresh();
+      }
+    }, 150);
   }
 
   onBpmnXmlChange(xml: string): void {
