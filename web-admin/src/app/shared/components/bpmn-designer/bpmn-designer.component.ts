@@ -64,6 +64,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
   private bpmnModeler!: any;
   private isInitialized = false;
+  private lastEmittedXml: string = '';
 
   ngAfterViewInit(): void {
     this.initModeler();
@@ -73,7 +74,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     if (changes['readonly'] && this.isInitialized && !changes['readonly'].firstChange) {
       this.reinitModeler();
     } else if (changes['payload'] && this.isInitialized && !changes['payload'].firstChange) {
-      this.importXml(this.payload || DEFAULT_BPMN_XML);
+      const newPayload = (this.payload || '').trim();
+      if (newPayload !== this.lastEmittedXml.trim()) {
+        this.importXml(newPayload || DEFAULT_BPMN_XML);
+      }
     }
   }
 
@@ -179,6 +183,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     if (!this.bpmnModeler) return;
     try {
       const xmlToLoad = xml && xml.trim().startsWith('<?xml') ? xml : DEFAULT_BPMN_XML;
+      this.lastEmittedXml = xmlToLoad.trim();
       await this.bpmnModeler.importXML(xmlToLoad);
       setTimeout(() => {
         this.refresh();
@@ -201,6 +206,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
   private async emitCurrentXml(): Promise<void> {
     const xml = await this.getXml();
+    this.lastEmittedXml = (xml || '').trim();
     this.xmlChange.emit(xml);
   }
 
