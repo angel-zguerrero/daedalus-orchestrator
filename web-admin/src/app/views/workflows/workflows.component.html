@@ -158,90 +158,130 @@
   </c-card-body>
 </c-card>
 
-<!-- Create / Edit Workflow Modal -->
-<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="showModal = $event" size="xl">
-  <c-modal-header>
-    <h5 cModalTitle>
-      <svg cIcon [name]="isEditing ? 'cil-pencil' : 'cil-plus'" class="me-2"></svg>
-      {{ isEditing ? 'Edit Workflow' : 'Create Workflow' }}
-    </h5>
-    <button (click)="showModal = false" cButtonClose></button>
-  </c-modal-header>
-  <c-modal-body>
-    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
-    <form [formGroup]="workflowForm" (ngSubmit)="saveWorkflow()">
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="6">
-          <label cLabel for="wfName">Name *</label>
-          <input cFormControl id="wfName" formControlName="name" placeholder="Enter workflow name" />
-          <small class="form-text text-muted">Display name for the workflow definition</small>
-        </c-col>
-        <c-col [md]="6">
-          <label cLabel for="wfCode">Code</label>
-          <input cFormControl id="wfCode" formControlName="code" placeholder="Enter unique workflow code" />
-          <small class="form-text text-muted">Generated from name if left empty</small>
-        </c-col>
-      </c-row>
+<!-- Create / Edit Workflow Modal (Google Docs / Document Studio Workspace Style) -->
+<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="showModal = $event" size="xl" class="doc-studio-modal">
+  <div class="doc-studio-container" [formGroup]="workflowForm">
+    
+    <!-- Magnetic / Sticky Top Header Bar (Google Docs style) -->
+    <div class="doc-studio-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+      
+      <!-- Left: Icon + Document Title + Code + Namespace -->
+      <div class="d-flex align-items-center gap-3 flex-grow-1 me-3">
+        <div class="doc-icon-badge d-flex align-items-center justify-content-center rounded p-2 text-info bg-dark border border-secondary">
+          <svg cIcon name="cil-description" size="lg"></svg>
+        </div>
+        
+        <div class="doc-title-container flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <!-- Document Title Input (Google Docs style) -->
+            <input 
+              type="text" 
+              formControlName="name" 
+              class="doc-title-input fw-bold text-white bg-transparent border-0 fs-5 px-2 py-1" 
+              placeholder="Untitled Workflow..." 
+              title="Workflow Name"/>
 
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="12">
-          <mat-form-field class="w-100">
-            <mat-label>Virtual Namespace *</mat-label>
-            <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="auto">
-            <mat-autocomplete #auto="matAutocomplete">
-              <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name || vns">
-                {{vns.Name || vns}}
-              </mat-option>
-            </mat-autocomplete>
-          </mat-form-field>
-          <div class="form-text">Required: Select or enter a virtual namespace for this workflow</div>
-        </c-col>
-      </c-row>
+            <!-- Code Badge -->
+            <span class="badge bg-dark text-info border border-secondary font-monospace px-2 py-1" title="Workflow Code">
+              {{ workflowForm.get('code')?.value || 'auto-code' }}
+            </span>
 
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="12">
-          <label cLabel for="wfDesc">Description</label>
-          <textarea cFormControl id="wfDesc" formControlName="description" rows="2" placeholder="Enter description"></textarea>
-        </c-col>
-      </c-row>
+            <!-- Version Tag -->
+            <span class="badge bg-secondary text-light px-2 py-1">
+              v{{ workflowForm.get('version')?.value || 1 }}
+            </span>
+          </div>
 
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="6">
-          <label cLabel for="wfVersion">Version *</label>
-          <input cFormControl type="number" id="wfVersion" formControlName="version" min="1" />
-        </c-col>
-        <c-col [md]="6">
-          <label cLabel for="wfDuration">Max Duration (seconds)</label>
-          <input cFormControl type="number" id="wfDuration" formControlName="maxDurationSeconds" min="0" />
-        </c-col>
-      </c-row>
+          <div class="d-flex align-items-center gap-3">
+            <!-- VNamespace Compact Picker -->
+            <div class="vnamespace-compact-picker d-flex align-items-center gap-1">
+              <span class="text-muted small">VNamespace:</span>
+              <mat-form-field appearance="outline" class="compact-mat-field">
+                <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="autoHeader" placeholder="Namespace">
+                <mat-autocomplete #autoHeader="matAutocomplete">
+                  <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name || vns">
+                    {{vns.Name || vns}}
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+            </div>
 
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="12">
-          <label cLabel for="wfPayload" class="fw-bold mb-2">Visual BPMN 2.0 Diagram</label>
-          <app-bpmn-designer
-            #bpmnDesigner
-            [payload]="workflowForm.get('payload')?.value"
-            (xmlChange)="onBpmnXmlChange($event)">
-          </app-bpmn-designer>
-        </c-col>
-      </c-row>
-
-      <div class="mb-3 form-check">
-        <input class="form-check-input" type="checkbox" id="wfIsActive" formControlName="isActive" />
-        <label class="form-check-label" for="wfIsActive">Active</label>
+            <!-- Active Status Toggle -->
+            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1 small ms-2">
+              <input class="form-check-input mt-0" type="checkbox" id="headerActiveSwitch" formControlName="isActive">
+              <label class="form-check-label text-muted cursor-pointer" for="headerActiveSwitch">
+                <span class="badge" [ngClass]="workflowForm.get('isActive')?.value ? 'bg-success' : 'bg-secondary'">
+                  {{ workflowForm.get('isActive')?.value ? 'Active' : 'Inactive' }}
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
-    </form>
-  </c-modal-body>
-  <c-modal-footer>
-    <button (click)="showModal = false" cButton color="secondary">
-      Cancel
-    </button>
-    <button cButton color="primary" (click)="saveWorkflow()" [disabled]="!workflowForm.valid">
-      <svg cIcon name="cil-check" class="me-1"></svg>
-      {{ isEditing ? 'Save Changes' : 'Create Workflow' }}
-    </button>
-  </c-modal-footer>
+
+      <!-- Right: Action Buttons & Advanced Settings Toggle -->
+      <div class="d-flex align-items-center gap-2">
+        <button 
+          cButton 
+          color="dark" 
+          variant="outline" 
+          size="sm" 
+          type="button"
+          class="d-flex align-items-center gap-1 text-light border-secondary"
+          (click)="toggleAdvancedSettings()"
+          title="Workflow Description & Extra Settings">
+          <svg cIcon name="cil-options" size="sm"></svg>
+          <span class="d-none d-md-inline">Settings</span>
+        </button>
+
+        <button (click)="showModal = false" cButton color="secondary" size="sm" type="button">
+          Cancel
+        </button>
+
+        <button cButton color="primary" size="sm" type="button" (click)="saveWorkflow()" [disabled]="!workflowForm.valid">
+          <svg cIcon name="cil-check" class="me-1"></svg>
+          {{ isEditing ? 'Save Changes' : 'Create Workflow' }}
+        </button>
+
+        <button (click)="showModal = false" cButtonClose class="btn-close-white ms-2"></button>
+      </div>
+
+    </div>
+
+    <!-- Advanced Settings Dropdown / Panel -->
+    <div class="doc-settings-panel p-3 bg-dark border-bottom" *ngIf="showAdvancedSettings">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Workflow Code</label>
+          <input cFormControl size="sm" formControlName="code" placeholder="Enter custom code" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Version</label>
+          <input cFormControl size="sm" type="number" formControlName="version" min="1" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Max Duration (seconds)</label>
+          <input cFormControl size="sm" type="number" formControlName="maxDurationSeconds" min="0" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small text-muted">Description</label>
+          <textarea cFormControl size="sm" formControlName="description" rows="2" placeholder="Brief description of the workflow logic..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert error message if any -->
+    <c-alert color="danger" *ngIf="showAlert" class="m-2" [innerHTML]="errorMessage"></c-alert>
+
+    <!-- Main Workspace Area (BPMN Designer as Main Focus) -->
+    <div class="doc-studio-body p-0 flex-grow-1 position-relative">
+      <app-bpmn-designer
+        #bpmnDesigner
+        [payload]="workflowForm.get('payload')?.value"
+        (xmlChange)="onBpmnXmlChange($event)">
+      </app-bpmn-designer>
+    </div>
+  </div>
 </c-modal>
 
 <!-- Delete Workflow Modal -->

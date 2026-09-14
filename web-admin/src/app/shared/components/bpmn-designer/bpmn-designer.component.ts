@@ -46,12 +46,14 @@ export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
+import { IconDirective } from '@coreui/icons-angular';
+
 @Component({
   selector: 'app-bpmn-designer',
   templateUrl: './bpmn-designer.component.html',
   styleUrls: ['./bpmn-designer.component.scss'],
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconDirective],
   encapsulation: ViewEncapsulation.None
 })
 export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestroy {

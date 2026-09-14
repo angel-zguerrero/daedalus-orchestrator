@@ -4,16 +4,26 @@
 @import '@bpmn-io/properties-panel/dist/assets/properties-panel.css';
 @import '@bpmn-io/element-template-chooser/dist/element-template-chooser.css';
 
+:host {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+}
+
 .bpmn-designer-container {
   display: flex;
   flex-direction: row;
   width: 100%;
-  height: 620px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  height: 100%;
+  min-height: 500px;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   position: relative;
   background-color: #ffffff;
+  flex: 1;
 
   .bpmn-canvas {
     flex: 1;
@@ -24,12 +34,54 @@
   }
 
   .bpmn-properties-panel {
-    width: 350px;
+    width: 380px;
     height: 100%;
     border-left: 1px solid rgba(0, 0, 0, 0.1);
     background-color: #212631;
     overflow-y: auto;
     color: #e0e0e0;
+  }
+
+  .bpmn-zoom-overlay {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 4px 6px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+
+    .zoom-btn {
+      background: transparent;
+      border: none;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.15s ease-in-out;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #38bdf8;
+      }
+
+      &.text-btn {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+    }
   }
 
   &.is-readonly {

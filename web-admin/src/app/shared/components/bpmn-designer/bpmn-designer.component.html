@@ -1,21 +1,17 @@
-<div class="d-flex justify-content-between align-items-center mb-2" *ngIf="!readonly">
-  <div class="btn-group btn-group-sm" role="group">
-    <button type="button" class="btn btn-outline-secondary px-2 d-flex align-items-center gap-1" (click)="zoomIn()" title="Zoom In">
-      <span class="fw-bold fs-6">+</span> Zoom In
-    </button>
-    <button type="button" class="btn btn-outline-secondary px-2 d-flex align-items-center gap-1" (click)="zoomOut()" title="Zoom Out">
-      <span class="fw-bold fs-6">-</span> Zoom Out
-    </button>
-    <button type="button" class="btn btn-outline-secondary px-2" (click)="zoomReset()" title="Reset Zoom">
-      Fit View
-    </button>
-  </div>
-  <small class="text-muted">
-    Drag and drop BPMN nodes or select elements to configure properties & templates
-  </small>
-</div>
-
 <div class="bpmn-designer-container" [class.is-readonly]="readonly">
   <div #canvasRef class="bpmn-canvas"></div>
   <div #propertiesRef class="bpmn-properties-panel" [style.display]="readonly ? 'none' : 'block'"></div>
+
+  <!-- Floating Canvas Zoom Controls -->
+  <div class="bpmn-zoom-overlay" *ngIf="!readonly">
+    <button type="button" class="zoom-btn" (click)="zoomIn()" title="Zoom In">
+      <svg cIcon name="cil-plus" size="sm"></svg>
+    </button>
+    <button type="button" class="zoom-btn" (click)="zoomOut()" title="Zoom Out">
+      <svg cIcon name="cil-minus" size="sm"></svg>
+    </button>
+    <button type="button" class="zoom-btn text-btn" (click)="zoomReset()" title="Fit View">
+      Fit
+    </button>
+  </div>
 </div>

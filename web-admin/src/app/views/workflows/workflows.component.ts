@@ -87,10 +87,15 @@ export class WorkflowsComponent implements OnInit, OnChanges {
 
   // Create / Edit Modal
   showModal: boolean = false;
+  showAdvancedSettings: boolean = false;
   workflowForm: FormGroup;
   isEditing: boolean = false;
   editingWorkflowId: string = '';
   @ViewChild('bpmnDesigner') bpmnDesigner?: BpmnDesignerComponent;
+
+  toggleAdvancedSettings(): void {
+    this.showAdvancedSettings = !this.showAdvancedSettings;
+  }
 
   // Detail / Payload Modal
   showDetailModal: boolean = false;
@@ -287,6 +292,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   openCreateModal(): void {
     this.isEditing = false;
     this.editingWorkflowId = '';
+    this.showAdvancedSettings = false;
     this.workflowForm.reset({
       vnamespace: 'default',
       version: 1,
@@ -307,6 +313,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   openEditModal(wf: WorkflowDefinition): void {
     this.isEditing = true;
     this.editingWorkflowId = wf.id || '';
+    this.showAdvancedSettings = false;
     const decodedPayload = this.decodePayload(wf.payload);
 
     this.workflowForm.patchValue({

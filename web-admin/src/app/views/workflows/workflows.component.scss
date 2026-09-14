@@ -194,3 +194,124 @@ pre {
     filter: invert(0.8) sepia(1) saturate(5) hue-rotate(190deg);
   }
 }
+
+/* Document Studio Workspace Modal Styles */
+::ng-deep {
+  .doc-studio-modal {
+    .modal-dialog {
+      max-width: 96vw !important;
+      width: 96vw !important;
+      margin: 2vh auto !important;
+      height: 94vh !important;
+    }
+
+    .modal-content {
+      height: 100% !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 12px !important;
+      background-color: #0f172a !important;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+      overflow: hidden !important;
+      padding: 0 !important;
+    }
+
+    .modal-body {
+      padding: 0 !important;
+    }
+  }
+
+  .compact-mat-field {
+    width: 160px !important;
+    height: 28px !important;
+
+    .mat-mdc-text-field-wrapper {
+      height: 28px !important;
+      background-color: #1e293b !important;
+      border-color: #334155 !important;
+      padding: 0 6px !important;
+    }
+
+    .mat-mdc-form-field-infix {
+      padding: 2px 4px !important;
+      height: 24px !important;
+    }
+
+    .mat-mdc-input-element {
+      font-size: 0.75rem !important;
+    }
+  }
+}
+
+.doc-studio-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: #0f172a;
+}
+
+.doc-studio-header {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid #334155 !important;
+  z-index: 10;
+  min-height: 64px;
+}
+
+.doc-title-input {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f8fafc !important;
+  background: transparent;
+  border: 1px solid transparent !important;
+  border-radius: 6px;
+  max-width: 380px;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+  }
+
+  &:focus {
+    background: #1e293b !important;
+    border-color: #38bdf8 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
+  }
+}
+
+.doc-settings-panel {
+  background-color: #1e293b !important;
+  border-bottom: 1px solid #334155 !important;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.doc-studio-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 64px);
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  background-color: #0f172a;
+
+  app-bpmn-designer {
+    display: flex;
+    flex: 1;
+    height: 100%;
+    width: 100%;
+  }
+}
