@@ -92,6 +92,58 @@
   },
   {
     "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "GraphQL Connector",
+    "id": "io.camunda.connectors.GraphQL.v1",
+    "description": "Execute GraphQL queries or mutations against a GraphQL endpoint",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/graphql/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "GraphQL Endpoint URL",
+        "type": "String",
+        "value": "https://api.example.com/graphql",
+        "binding": {
+          "type": "camunda:property",
+          "name": "url"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Query Statement",
+        "type": "String",
+        "multiline": true,
+        "value": "query GetUser($id: ID!) {\n  user(id: $id) {\n    id\n    name\n    email\n  }\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "query"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Variables (JSON)",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"id\": \"123\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "variables"
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
     "name": "Slack Outbound Connector",
     "id": "io.camunda.connectors.Slack.v1",
     "description": "Send notification messages to a Slack channel or direct user via Bot Token",
@@ -137,6 +189,57 @@
         "binding": {
           "type": "camunda:property",
           "name": "message"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Microsoft Teams Connector",
+    "id": "io.camunda.connectors.MsTeams.v1",
+    "description": "Publish messages to a Microsoft Teams channel via Webhook URL or Bot",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/ms-teams/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Teams Webhook URL",
+        "type": "String",
+        "value": "https://outlook.office.com/webhook/your-webhook-url",
+        "binding": {
+          "type": "camunda:property",
+          "name": "webhookUrl"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Message Title",
+        "type": "String",
+        "value": "Workflow Notification Alert",
+        "binding": {
+          "type": "camunda:property",
+          "name": "title"
+        }
+      },
+      {
+        "label": "Message Content (Markdown)",
+        "type": "String",
+        "multiline": true,
+        "value": "**Status:** Success\n\nProcess completed task execution.",
+        "binding": {
+          "type": "camunda:property",
+          "name": "content"
         },
         "constraints": {
           "notEmpty": true
@@ -209,6 +312,84 @@
   },
   {
     "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Twilio SMS Connector",
+    "id": "io.camunda.connectors.Twilio.v1",
+    "description": "Send SMS mobile messages via Twilio API",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/twilio/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Account SID",
+        "type": "String",
+        "value": "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "binding": {
+          "type": "camunda:property",
+          "name": "accountSid"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Auth Token",
+        "type": "String",
+        "value": "your_auth_token",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authToken"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "From Phone Number",
+        "type": "String",
+        "value": "+1234567890",
+        "binding": {
+          "type": "camunda:property",
+          "name": "from"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "To Phone Number",
+        "type": "String",
+        "value": "+10987654321",
+        "binding": {
+          "type": "camunda:property",
+          "name": "to"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "SMS Message Body",
+        "type": "String",
+        "multiline": true,
+        "value": "Alert: Your workflow process execution step has completed.",
+        "binding": {
+          "type": "camunda:property",
+          "name": "body"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
     "name": "Apache Kafka Producer Connector",
     "id": "io.camunda.connectors.Kafka.v1",
     "description": "Publish events or messages directly to an Apache Kafka topic",
@@ -266,6 +447,182 @@
         },
         "constraints": {
           "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "RabbitMQ Publisher Connector",
+    "id": "io.camunda.connectors.RabbitMQ.v1",
+    "description": "Publish messages to RabbitMQ exchange and routing key",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/rabbitmq/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "AMQP Connection URI",
+        "type": "String",
+        "value": "amqp://guest:guest@localhost:5672/",
+        "binding": {
+          "type": "camunda:property",
+          "name": "uri"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Exchange Name",
+        "type": "String",
+        "value": "daedalus.direct",
+        "binding": {
+          "type": "camunda:property",
+          "name": "exchange"
+        }
+      },
+      {
+        "label": "Routing Key",
+        "type": "String",
+        "value": "tasks.process",
+        "binding": {
+          "type": "camunda:property",
+          "name": "routingKey"
+        }
+      },
+      {
+        "label": "Message Body (JSON)",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"action\": \"reindex\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "payload"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "MQTT Producer Connector",
+    "id": "io.camunda.connectors.MQTT.v1",
+    "description": "Publish IoT telemetry messages to an MQTT Broker topic",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/mqtt/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Broker Server URI",
+        "type": "String",
+        "value": "tcp://broker.hivemq.com:1883",
+        "binding": {
+          "type": "camunda:property",
+          "name": "brokerUrl"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Topic",
+        "type": "String",
+        "value": "sensors/temperature/room1",
+        "binding": {
+          "type": "camunda:property",
+          "name": "topic"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "QoS Level",
+        "type": "Dropdown",
+        "value": "1",
+        "choices": [
+          { "name": "0 - At most once", "value": "0" },
+          { "name": "1 - At least once", "value": "1" },
+          { "name": "2 - Exactly once", "value": "2" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "qos"
+        }
+      },
+      {
+        "label": "Message Payload",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"temp\": 24.5,\n  \"unit\": \"C\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "payload"
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "AWS Lambda Connector",
+    "id": "io.camunda.connectors.AwsLambda.v1",
+    "description": "Invoke serverless AWS Lambda functions with payload parameters",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-lambda/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "AWS Region",
+        "type": "String",
+        "value": "us-east-1",
+        "binding": {
+          "type": "camunda:property",
+          "name": "region"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Function Name / ARN",
+        "type": "String",
+        "value": "my-lambda-function",
+        "binding": {
+          "type": "camunda:property",
+          "name": "functionName"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Payload (JSON)",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"userId\": \"12345\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "payload"
         }
       }
     ]
@@ -380,6 +737,171 @@
   },
   {
     "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "AWS S3 Storage Connector",
+    "id": "io.camunda.connectors.AwsS3.v1",
+    "description": "Read, upload, or delete objects stored in Amazon S3 buckets",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-s3/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "AWS Region",
+        "type": "String",
+        "value": "us-east-1",
+        "binding": {
+          "type": "camunda:property",
+          "name": "region"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Operation",
+        "type": "Dropdown",
+        "value": "GetObject",
+        "choices": [
+          { "name": "Get Object", "value": "GetObject" },
+          { "name": "Put Object", "value": "PutObject" },
+          { "name": "Delete Object", "value": "DeleteObject" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "operation"
+        }
+      },
+      {
+        "label": "Bucket Name",
+        "type": "String",
+        "value": "my-company-s3-bucket",
+        "binding": {
+          "type": "camunda:property",
+          "name": "bucket"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Object Key",
+        "type": "String",
+        "value": "documents/report-2026.pdf",
+        "binding": {
+          "type": "camunda:property",
+          "name": "key"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Google Drive Connector",
+    "id": "io.camunda.connectors.GoogleDrive.v1",
+    "description": "Upload and manage files inside Google Drive folders",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/google-drive/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Google OAuth Access Token",
+        "type": "String",
+        "value": "ya29.a0AfH6SM...",
+        "binding": {
+          "type": "camunda:property",
+          "name": "token"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Folder ID",
+        "type": "String",
+        "value": "1A2b3C4d5E6f7G8h9I0j",
+        "binding": {
+          "type": "camunda:property",
+          "name": "folderId"
+        }
+      },
+      {
+        "label": "File Name",
+        "type": "String",
+        "value": "audit-log.txt",
+        "binding": {
+          "type": "camunda:property",
+          "name": "fileName"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Google Sheets Connector",
+    "id": "io.camunda.connectors.GoogleSheets.v1",
+    "description": "Read, append, or update rows in a Google Sheets spreadsheet",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/google-sheets/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Spreadsheet ID",
+        "type": "String",
+        "value": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+        "binding": {
+          "type": "camunda:property",
+          "name": "spreadsheetId"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Worksheet Name",
+        "type": "String",
+        "value": "Sheet1",
+        "binding": {
+          "type": "camunda:property",
+          "name": "worksheetName"
+        }
+      },
+      {
+        "label": "Row Data (JSON Array)",
+        "type": "String",
+        "multiline": true,
+        "value": "[\"2026-09-14\", \"COMPLETED\", \"User123\"]",
+        "binding": {
+          "type": "camunda:property",
+          "name": "rowData"
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
     "name": "OpenAI GPT Connector",
     "id": "io.camunda.connectors.OpenAI.v1",
     "description": "Interact with OpenAI GPT models for text completions and chat response generation",
@@ -447,10 +969,10 @@
   },
   {
     "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "RabbitMQ Publisher Connector",
-    "id": "io.camunda.connectors.RabbitMQ.v1",
-    "description": "Publish messages to RabbitMQ exchange and routing key",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/rabbitmq/",
+    "name": "MongoDB Database Connector",
+    "id": "io.camunda.connectors.MongoDB.v1",
+    "description": "Execute CRUD operations (insert, find, update, delete) on MongoDB collections",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/mongodb/",
     "category": {
       "id": "connectors",
       "name": "Camunda Connectors"
@@ -461,46 +983,49 @@
     ],
     "properties": [
       {
-        "label": "AMQP Connection URI",
+        "label": "MongoDB Connection String",
         "type": "String",
-        "value": "amqp://guest:guest@localhost:5672/",
+        "value": "mongodb://localhost:27017/daedalus",
         "binding": {
           "type": "camunda:property",
-          "name": "uri"
+          "name": "connectionString"
         },
         "constraints": {
           "notEmpty": true
         }
       },
       {
-        "label": "Exchange Name",
+        "label": "Database Name",
         "type": "String",
-        "value": "daedalus.direct",
+        "value": "daedalus_db",
         "binding": {
           "type": "camunda:property",
-          "name": "exchange"
+          "name": "database"
+        },
+        "constraints": {
+          "notEmpty": true
         }
       },
       {
-        "label": "Routing Key",
+        "label": "Collection Name",
         "type": "String",
-        "value": "tasks.process",
+        "value": "executions",
         "binding": {
           "type": "camunda:property",
-          "name": "routingKey"
+          "name": "collection"
+        },
+        "constraints": {
+          "notEmpty": true
         }
       },
       {
-        "label": "Message Body (JSON)",
+        "label": "Operation Payload (JSON)",
         "type": "String",
         "multiline": true,
-        "value": "{\n  \"action\": \"reindex\"\n}",
+        "value": "{\n  \"filter\": { \"status\": \"ACTIVE\" }\n}",
         "binding": {
           "type": "camunda:property",
           "name": "payload"
-        },
-        "constraints": {
-          "notEmpty": true
         }
       }
     ]
@@ -556,6 +1081,81 @@
         },
         "constraints": {
           "notEmpty": true
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Redis Cache Connector",
+    "id": "io.camunda.connectors.Redis.v1",
+    "description": "Execute Redis commands (GET, SET, DEL, PUBLISH) against in-memory store",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/redis/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "properties": [
+      {
+        "label": "Redis Host",
+        "type": "String",
+        "value": "localhost",
+        "binding": {
+          "type": "camunda:property",
+          "name": "host"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Redis Port",
+        "type": "String",
+        "value": "6379",
+        "binding": {
+          "type": "camunda:property",
+          "name": "port"
+        }
+      },
+      {
+        "label": "Command",
+        "type": "Dropdown",
+        "value": "GET",
+        "choices": [
+          { "name": "GET", "value": "GET" },
+          { "name": "SET", "value": "SET" },
+          { "name": "DEL", "value": "DEL" },
+          { "name": "PUBLISH", "value": "PUBLISH" }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "command"
+        }
+      },
+      {
+        "label": "Key",
+        "type": "String",
+        "value": "session:user:100",
+        "binding": {
+          "type": "camunda:property",
+          "name": "key"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Value",
+        "type": "String",
+        "multiline": true,
+        "value": "{\n  \"status\": \"active\"\n}",
+        "binding": {
+          "type": "camunda:property",
+          "name": "value"
         }
       }
     ]
