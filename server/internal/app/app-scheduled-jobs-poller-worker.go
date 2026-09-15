@@ -63,6 +63,10 @@ func (app *Application) StartScheduledJobsPollerWorker(interval time.Duration, b
 }
 
 func (app *Application) processAllTenantsScheduledJobs(batchSize int) {
+	// 1. Process MasterNode global scheduled jobs
+	app.processTenantScheduledJobs(app.MasterNode, nil, db.AdminFC, db.AdminFCSector, batchSize)
+
+	// 2. Process TenantNodes scheduled jobs
 	cursor := ""
 	pageSize := 50
 
@@ -133,6 +137,11 @@ func (app *Application) processTenantScheduledJobs(
 	cf, cfs string,
 	batchSize int,
 ) {
+	tenantCode := "master"
+	if tenant != nil {
+		tenantCode = tenant.Code
+	}
+
 	cmd := general_command.FSM_Command{
 		Now:  utils.GetNowInInt(),
 		Type: general_command.REPOSITORY_COMMAND,
@@ -149,9 +158,9 @@ func (app *Application) processTenantScheduledJobs(
 	resultChan, err := node.Write(ctx, cmd)
 	if err != nil {
 		log.Err(err).
-			Str("tenant", tenant.Code).
+			Str("tenant", tenantCode).
 			Str("node", strconv.FormatUint(node.ShardID, 10)).
-			Msg("❌ Failed to start scheduled jobs processing on tenant node")
+			Msg("❌ Failed to start scheduled jobs processing on node")
 		return
 	}
 
@@ -159,16 +168,16 @@ func (app *Application) processTenantScheduledJobs(
 	case writeResult := <-resultChan:
 		if writeResult.Error != nil {
 			log.Err(writeResult.Error).
-				Str("tenant", tenant.Code).
+				Str("tenant", tenantCode).
 				Str("node", strconv.FormatUint(node.ShardID, 10)).
-				Msg("❌ Failed to process scheduled jobs on tenant node")
+				Msg("❌ Failed to process scheduled jobs on node")
 			return
 		}
 
 		res, err := command.DecodeCommandResult[*scheduled_job_command.ProcessDueScheduledJobsResult](writeResult.Result.Data)
 		if err != nil {
 			log.Err(err).
-				Str("tenant", tenant.Code).
+				Str("tenant", tenantCode).
 				Str("node", strconv.FormatUint(node.ShardID, 10)).
 				Msg("❌ Failed to decode scheduled jobs command result")
 			return
@@ -176,26 +185,26 @@ func (app *Application) processTenantScheduledJobs(
 
 		if res != nil && res.ProcessedJobs > 0 {
 			log.Info().
-				Str("tenant", tenant.Code).
+				Str("tenant", tenantCode).
 				Str("node", strconv.FormatUint(node.ShardID, 10)).
 				Int("processedJobs", res.ProcessedJobs).
 				Int("dispatchedMsgs", res.DispatchedMsgs).
-				Msg("✅ Processed due scheduled jobs on tenant node")
+				Msg("✅ Processed due scheduled jobs on node")
 
 			if app.MetricsCollector != nil {
 				for _, gauge := range res.Gauges {
-					app.MetricsCollector.UpdateGauges(tenant.Code, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
+					app.MetricsCollector.UpdateGauges(tenantCode, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
 				}
 				for _, detail := range res.DispatchedDetails {
-					app.MetricsCollector.RecordPublish(tenant.Code, detail.QueueCode, detail.VNamespace, detail.Count)
+					app.MetricsCollector.RecordPublish(tenantCode, detail.QueueCode, detail.VNamespace, detail.Count)
 				}
 			}
 		}
 
 	case <-ctx.Done():
 		log.Warn().
-			Str("tenant", tenant.Code).
+			Str("tenant", tenantCode).
 			Str("node", strconv.FormatUint(node.ShardID, 10)).
-			Msg("⏱️ Scheduled jobs processing timed out on tenant node")
+			Msg("⏱️ Scheduled jobs processing timed out on node")
 	}
 }

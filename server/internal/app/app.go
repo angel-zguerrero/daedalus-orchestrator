@@ -79,6 +79,8 @@ type Application struct {
 	MetricsAggregationWorkerStopper *syncutil.Stopper
 	MetricsDownsampleWorkerStopper *syncutil.Stopper
 	MemoryScavengerStopper         *syncutil.Stopper
+	WorkflowExecutionStopper       *syncutil.Stopper
+	WorkflowActivityStopper        *syncutil.Stopper
 
 	MetricsCollector *metrics.MetricsCollector
 
@@ -286,6 +288,14 @@ func (app *Application) Run() {
 
 	app.StartMemoryScavengerWorker(1 * time.Minute)
 
+	if dragonboat.ContainsRole(roles, dragonboat.RoleWorkflowExecutionWorker) {
+		app.StartWorkflowExecutionWorker(2*time.Second, 100)
+	}
+
+	if dragonboat.ContainsRole(roles, dragonboat.RoleWorkflowActivityWorker) {
+		app.StartWorkflowActivityWorker(2*time.Second, 100)
+	}
+
 	if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
 		app.StartRestAPI()
 	}
@@ -461,7 +471,13 @@ func (app *Application) Stop() {
 		if app.MemoryScavengerStopper != nil {
 			app.MemoryScavengerStopper.Stop()
 		}
-		log.Info().Msg("✅ OutboxRelayWorkerStopper, Metrics Workers and MemoryScavenger stopped.")
+		if app.WorkflowExecutionStopper != nil {
+			app.WorkflowExecutionStopper.Stop()
+		}
+		if app.WorkflowActivityStopper != nil {
+			app.WorkflowActivityStopper.Stop()
+		}
+		log.Info().Msg("✅ OutboxRelayWorkerStopper, Metrics Workers, MemoryScavenger and Workflow Workers stopped.")
 	}()
 
 	// Stop Job Worker Heartbeat Monitor
@@ -515,6 +531,8 @@ func NewApplication() *Application {
 		MetricsRelayWorkerStopper:     syncutil.NewStopper(),
 		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
 		MemoryScavengerStopper:        syncutil.NewStopper(),
+		WorkflowExecutionStopper:      syncutil.NewStopper(),
+		WorkflowActivityStopper:       syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary: make(map[string]*dragonboat.RaftNode),

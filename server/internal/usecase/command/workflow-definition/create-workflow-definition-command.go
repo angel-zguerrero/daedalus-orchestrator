@@ -73,7 +73,13 @@ func (cmd *CreateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 	execQueue.VNamespace = vns
 	execQueue.State = models.QueueActive
 	execQueue.AllowDuplicated = true
-	execQueue.MaxAttempts = 1
+	execQueue.MaxAttempts = 1000
+	if execQueue.DesiredPriorityThresholds == nil {
+		execQueue.DesiredPriorityThresholds = map[int]int{0: 0}
+	}
+	if execQueue.PriorityThresholds == nil {
+		execQueue.PriorityThresholds = map[int]int{0: 0}
+	}
 
 	if actQueue.ID == "" {
 		actQueue.ID = idFactory.GenerateID()
@@ -89,7 +95,13 @@ func (cmd *CreateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 	actQueue.VNamespace = vns
 	actQueue.State = models.QueueActive
 	actQueue.AllowDuplicated = true
-	actQueue.MaxAttempts = 1
+	actQueue.MaxAttempts = 1000
+	if actQueue.DesiredPriorityThresholds == nil {
+		actQueue.DesiredPriorityThresholds = map[int]int{0: 0}
+	}
+	if actQueue.PriorityThresholds == nil {
+		actQueue.PriorityThresholds = map[int]int{0: 0}
+	}
 
 	assertCmd := &queue.AssertQueueCommand{
 		Queues: []models.Queue{execQueue, actQueue},

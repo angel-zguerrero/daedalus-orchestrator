@@ -23,6 +23,8 @@ type PaginateQueuesCommand struct {
 	CF               string
 	CFS              string
 	SupervisionState models.QueueSupervisionState
+	QueueType        models.QueueType
+	IncludeAllTypes  bool
 }
 
 func (cmd *PaginateQueuesCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -38,6 +40,12 @@ func (cmd *PaginateQueuesCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 	var findResult *db.FindResult[models.Queue]
 	if cmd.SupervisionState != "" {
 		findResult, err = queueRepo.PaginateBySupervisionState(cmd.Query, cmd.SupervisionState, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
+		if err != nil {
+			commandResult.Error = err.Error()
+			return *commandResult
+		}
+	} else if cmd.QueueType != "" || cmd.IncludeAllTypes {
+		findResult, err = queueRepo.PaginateByType(cmd.Query, cmd.QueueType, cmd.IncludeAllTypes, cmd.PageSize, cmd.Cursor, cmd.VNamespace, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

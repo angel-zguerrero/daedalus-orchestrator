@@ -97,27 +97,31 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 	actQueueName := fmt.Sprintf("%s Activity Queue (%s)", name, randToken)
 
 	execQueue := models.Queue{
-		ID:                   execQueueID,
-		Code:                 execQueueCode,
-		Name:                 execQueueName,
-		Type:                 models.WorkflowExecutionQueue,
-		WorkflowDefinitionID: workflowID,
-		VNamespace:           vnamespace,
-		State:                models.QueueActive,
-		AllowDuplicated:      true,
-		MaxAttempts:          1,
+		ID:                        execQueueID,
+		Code:                      execQueueCode,
+		Name:                      execQueueName,
+		Type:                      models.WorkflowExecutionQueue,
+		WorkflowDefinitionID:      workflowID,
+		VNamespace:                vnamespace,
+		State:                     models.QueueActive,
+		AllowDuplicated:           true,
+		MaxAttempts:               1000,
+		DesiredPriorityThresholds: map[int]int{0: 0},
+		PriorityThresholds:        map[int]int{0: 0},
 	}
 
 	actQueue := models.Queue{
-		ID:                   actQueueID,
-		Code:                 actQueueCode,
-		Name:                 actQueueName,
-		Type:                 models.WorkflowActivityQueue,
-		WorkflowDefinitionID: workflowID,
-		VNamespace:           vnamespace,
-		State:                models.QueueActive,
-		AllowDuplicated:      true,
-		MaxAttempts:          1,
+		ID:                        actQueueID,
+		Code:                      actQueueCode,
+		Name:                      actQueueName,
+		Type:                      models.WorkflowActivityQueue,
+		WorkflowDefinitionID:      workflowID,
+		VNamespace:                vnamespace,
+		State:                     models.QueueActive,
+		AllowDuplicated:           true,
+		MaxAttempts:               1000,
+		DesiredPriorityThresholds: map[int]int{0: 0},
+		PriorityThresholds:        map[int]int{0: 0},
 	}
 
 	wf := models.WorkflowDefinition{

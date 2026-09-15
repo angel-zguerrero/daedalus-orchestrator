@@ -227,6 +227,12 @@ var PublishBufferFlushIntervalMsFlag = flag.Int(constants.PublishBufferFlushInte
 // PublishBufferMaxSizeFlag defines the --publish-buffer-max-size command-line flag.
 var PublishBufferMaxSizeFlag = flag.Int(constants.PublishBufferMaxSizeFlagName, 0, "Maximum number of messages to buffer before forcing a flush. Default: 200. Overrides config file and environment variable.")
 
+// CamundaConnectorRunnerURLFlag defines the --camunda-connector-runner-url command-line flag.
+var CamundaConnectorRunnerURLFlag = flag.String(constants.CamundaConnectorRunnerURLFlagName, "", "URL for external Camunda connector runner. Overrides config file and environment variable.")
+
+// AutoCompleteMockActivitiesFlag defines the --auto-complete-mock-activities command-line flag.
+var AutoCompleteMockActivitiesFlag = flag.Bool(constants.AutoCompleteMockActivitiesFlagName, false, "Enable auto completion of mock activities when no external runner is available. Overrides config file and environment variable.")
+
 // LoadDefaultConfiguration loads the application configuration from various sources
 // and populates the GlobalConfiguration variable.
 // The loading order of precedence is:
@@ -482,6 +488,17 @@ func LoadDefaultConfiguration() error {
 		}
 	}
 
+	if envVal := os.Getenv(constants.EnvVarCamundaConnectorRunnerURL); envVal != "" {
+		config.CamundaConnectorRunnerURL = envVal
+	}
+
+	if envVal := os.Getenv(constants.EnvVarAutoCompleteMockActivities); envVal != "" {
+		autoComp, err := strconv.ParseBool(envVal)
+		if err == nil {
+			config.AutoCompleteMockActivities = autoComp
+		}
+	}
+
 	// Flags override environment variables and config file
 	if *RoleFlag != "" {
 		config.Roles = *RoleFlag
@@ -573,6 +590,14 @@ func LoadDefaultConfiguration() error {
 		config.MessageLeaseDuration = time.Duration(*MessageLeaseDurationFlag) * time.Second
 	}
 
+	if *CamundaConnectorRunnerURLFlag != "" {
+		config.CamundaConnectorRunnerURL = *CamundaConnectorRunnerURLFlag
+	}
+
+	if *AutoCompleteMockActivitiesFlag {
+		config.AutoCompleteMockActivities = *AutoCompleteMockActivitiesFlag
+	}
+
 	config.Demo = true
 	if ProductionFlag != nil && *ProductionFlag {
 		config.Demo = false
@@ -588,6 +613,9 @@ func LoadDefaultConfiguration() error {
 	}
 
 	// Apply defaults if values are not set by any source
+	if config.CamundaConnectorRunnerURL == "" {
+		config.CamundaConnectorRunnerURL = "http://localhost:8086"
+	}
 	if config.MasterDBEngine == "" {
 		config.MasterDBEngine = "pebble"
 	}
@@ -959,6 +987,16 @@ func mapToConfig(data map[string]string) (*ConfigFromMap, error) {
 				return nil, fmt.Errorf("error parsing %s: %w", k, err)
 			}
 			cfg.publish_buffer_max_size = p
+
+		case constants.ConfigCamundaConnectorRunnerURLKey:
+			cfg.camunda_connector_runner_url = v
+
+		case constants.ConfigAutoCompleteMockActivitiesKey:
+			autoComp, err := strconv.ParseBool(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %s: %w", k, err)
+			}
+			cfg.auto_complete_mock_activities = autoComp
 		}
 	}
 

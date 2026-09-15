@@ -15,6 +15,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/user"
 	"deadalus-orch/server/internal/infrastructure/server/rest/vnamespace"
 	"deadalus-orch/server/internal/infrastructure/server/rest/workflowdefinition"
+	"deadalus-orch/server/internal/infrastructure/server/rest/workflowexecution"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
 	"time"
 
@@ -38,6 +39,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	scheduledJobController := scheduledjob.NewScheduledJobController(s.Config)
 	envConfigController := envconfig.NewEnvConfigController(s.Config)
 	workflowDefinitionController := workflowdefinition.NewWorkflowDefinitionController(s.Config)
+	workflowExecutionController := workflowexecution.NewWorkflowExecutionController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -110,6 +112,10 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.PUT("/:code/workflows/:id", workflowDefinitionController.UpdateTenantWorkflowHandler)
 				tenantsGroup.DELETE("/:code/workflows/:id", workflowDefinitionController.DeleteTenantWorkflowHandler)
 				tenantsGroup.GET("/:code/workflows/:id/queues", workflowDefinitionController.GetTenantWorkflowQueuesHandler)
+
+				tenantsGroup.POST("/:code/workflow-executions", workflowExecutionController.StartTenantExecutionHandler)
+				tenantsGroup.GET("/:code/workflow-executions", workflowExecutionController.ListTenantExecutionsHandler)
+				tenantsGroup.GET("/:code/workflow-executions/:id", workflowExecutionController.GetTenantExecutionHandler)
 			}
 		}
 
@@ -123,6 +129,11 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			workflowsGroup.PUT("/:id", workflowDefinitionController.UpdateGlobalWorkflowHandler)
 			workflowsGroup.DELETE("/:id", workflowDefinitionController.DeleteGlobalWorkflowHandler)
 			workflowsGroup.GET("/:id/queues", workflowDefinitionController.GetGlobalWorkflowQueuesHandler)
+
+			workflowsGroup.POST("/executions", workflowExecutionController.StartGlobalExecutionHandler)
+			workflowsGroup.GET("/executions", workflowExecutionController.ListGlobalExecutionsHandler)
+			workflowsGroup.GET("/executions/:id", workflowExecutionController.GetGlobalExecutionHandler)
+			workflowsGroup.POST("/executions/jobs/:jobId/complete", workflowExecutionController.CompleteGlobalJobHandler)
 		}
 
 		envGroupsGroup := restAPIGroup.Group("/env-groups")

@@ -25,7 +25,7 @@ import {
   AccordionButtonDirective
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
-import { WorkflowsService, WorkflowDefinition } from './services/workflows.service';
+import { WorkflowsService, WorkflowDefinition, WorkflowExecution, WorkflowExecutionDetail } from './services/workflows.service';
 import { VNamespacesService } from '../tenants/tenant-management/services/vnamespaces.service';
 import { ErrorUtil } from '../../shared/utils/error.util';
 import { QueueDetailComponent } from '../tenants/tenant-management/queues/queue-detail/queue-detail.component';
@@ -107,6 +107,30 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   // Delete Confirm Modal
   showDeleteModal: boolean = false;
   workflowToDelete: WorkflowDefinition | null = null;
+
+  // Execute Workflow Modal
+  showExecuteModal: boolean = false;
+  executingWorkflow: WorkflowDefinition | null = null;
+  executeInputJson: string = '{\n  "approved": true\n}';
+  executionKey: string = '';
+  executing: boolean = false;
+  executionResult: any = null;
+  executeErrorMessage: string = '';
+
+  // Executions List Modal
+  showExecutionsModal: boolean = false;
+  executionsWorkflow: WorkflowDefinition | null = null;
+  executionsList: WorkflowExecution[] = [];
+  loadingExecutions: boolean = false;
+  executionsErrorMessage: string = '';
+  executionStatusFilter: string = '';
+
+  // Execution Detail Modal
+  showExecutionDetailModal: boolean = false;
+  selectedExecutionDetail: WorkflowExecutionDetail | null = null;
+  loadingExecutionDetail: boolean = false;
+  executionDetailError: string = '';
+  activeDetailTab: 'overview' | 'payloads' | 'activities' | 'tokens' = 'overview';
 
   // VNamespace properties
   vnamespaceCtrl = new FormControl('default');
@@ -519,5 +543,234 @@ export class WorkflowsComponent implements OnInit, OnChanges {
         this.showAlert = true;
       }
     });
+  }
+
+  // --- EXECUTE WORKFLOW HANDLERS ---
+  openExecuteModal(wf: WorkflowDefinition): void {
+    this.executingWorkflow = wf;
+    this.executeInputJson = '{\n  "approved": true\n}';
+    this.executionKey = '';
+    this.executionResult = null;
+    this.executeErrorMessage = '';
+    this.showExecuteModal = true;
+  }
+
+  openExecuteModalFromForm(): void {
+    if (this.selectedWorkflow) {
+      this.openExecuteModal(this.selectedWorkflow);
+    } else if (this.isEditing && this.editingWorkflowId) {
+      const currentWf: WorkflowDefinition = {
+        id: this.editingWorkflowId,
+        code: this.workflowForm.get('code')?.value,
+        name: this.workflowForm.get('name')?.value,
+        vnamespace: this.workflowForm.get('vnamespace')?.value,
+        version: this.workflowForm.get('version')?.value || 1,
+        payloadFormat: 'json',
+        maxDurationSeconds: 3600,
+        isActive: true,
+        scope: this.scope
+      };
+      this.openExecuteModal(currentWf);
+    }
+  }
+
+  confirmExecuteWorkflow(): void {
+    if (!this.executingWorkflow || !this.executingWorkflow.id) return;
+
+    let inputObj = {};
+    if (this.executeInputJson && this.executeInputJson.trim()) {
+      try {
+        inputObj = JSON.parse(this.executeInputJson);
+      } catch (e: any) {
+        this.executeErrorMessage = 'Invalid JSON input payload: ' + e.message;
+        return;
+      }
+    }
+
+    this.executing = true;
+    this.executeErrorMessage = '';
+    this.executionResult = null;
+
+    const vns = this.executingWorkflow.vnamespace || 'default';
+    const exec$ = this.scope === 'global'
+      ? this.workflowsService.executeGlobalWorkflow(this.executingWorkflow.id, inputObj, this.executionKey, vns)
+      : this.workflowsService.executeTenantWorkflow(this.tenantCode, this.executingWorkflow.id, inputObj, this.executionKey, vns);
+
+    exec$.subscribe({
+      next: (res: any) => {
+        this.executing = false;
+        this.executionResult = res?.Result || res?.result || res;
+        this.successMsg = `Workflow execution started successfully! Execution ID: ${this.executionResult?.id || ''}`;
+        setTimeout(() => this.successMsg = '', 6000);
+      },
+      error: (err) => {
+        this.executing = false;
+        this.executeErrorMessage = ErrorUtil.formatErrorMessage(err);
+      }
+    });
+  }
+
+  closeExecuteModal(): void {
+    this.showExecuteModal = false;
+    this.executingWorkflow = null;
+    this.executionResult = null;
+  }
+
+  // --- EXECUTIONS LIST HANDLERS ---
+  openExecutionsModal(wf: WorkflowDefinition): void {
+    this.executionsWorkflow = wf;
+    this.executionStatusFilter = '';
+    this.showExecutionsModal = true;
+    this.loadExecutions();
+  }
+
+  loadExecutions(): void {
+    if (!this.executionsWorkflow || !this.executionsWorkflow.id) return;
+    this.loadingExecutions = true;
+    this.executionsErrorMessage = '';
+
+    const vns = this.executionsWorkflow.vnamespace || '';
+    const req$ = this.scope === 'global'
+      ? this.workflowsService.getGlobalExecutions(this.executionsWorkflow.id, this.executionStatusFilter, 50, '', vns)
+      : this.workflowsService.getTenantExecutions(this.tenantCode, this.executionsWorkflow.id, this.executionStatusFilter, 50, '', vns);
+
+    req$.subscribe({
+      next: (res: any) => {
+        const raw = res.Entities || res.entities || [];
+        this.executionsList = raw.map((e: any) => ({
+          id: e.id || e.ID || '',
+          workflowDefinitionId: e.workflowDefinitionId || e.WorkflowDefinitionID || '',
+          workflowDefinitionVersion: e.workflowDefinitionVersion || e.WorkflowDefinitionVersion || 1,
+          vnamespace: e.vnamespace || e.VNamespace || '',
+          executionKey: e.executionKey || e.ExecutionKey || '',
+          status: (e.status || e.Status || 'pending').toLowerCase(),
+          input: e.input || e.Input || null,
+          output: e.output || e.Output || null,
+          stateData: e.stateData || e.StateData || null,
+          error: e.error || e.Error || '',
+          startedAt: e.startedAt || e.StartedAt || null,
+          completedAt: e.completedAt || e.CompletedAt || null,
+          createdAt: e.createdAt || e.CreatedAt || '',
+          updatedAt: e.updatedAt || e.UpdatedAt || ''
+        }));
+        this.loadingExecutions = false;
+      },
+      error: (err) => {
+        this.executionsErrorMessage = ErrorUtil.formatErrorMessage(err);
+        this.loadingExecutions = false;
+      }
+    });
+  }
+
+  closeExecutionsModal(): void {
+    this.showExecutionsModal = false;
+    this.executionsWorkflow = null;
+    this.executionsList = [];
+  }
+
+  // --- EXECUTION DETAIL HANDLERS ---
+  openExecutionDetail(executionId: string): void {
+    this.showExecutionDetailModal = true;
+    this.loadingExecutionDetail = true;
+    this.executionDetailError = '';
+    this.selectedExecutionDetail = null;
+    this.activeDetailTab = 'overview';
+
+    const req$ = this.scope === 'global'
+      ? this.workflowsService.getGlobalExecutionDetail(executionId)
+      : this.workflowsService.getTenantExecutionDetail(this.tenantCode, executionId);
+
+    req$.subscribe({
+      next: (res: any) => {
+        const detailObj = res?.Result || res?.result || res;
+        const rawExec = detailObj?.execution || detailObj?.Execution || detailObj;
+        const rawTokens = detailObj?.tokens || detailObj?.Tokens || [];
+        const rawJobs = detailObj?.jobs || detailObj?.Jobs || [];
+
+        this.selectedExecutionDetail = {
+          execution: {
+            id: rawExec.id || rawExec.ID || '',
+            workflowDefinitionId: rawExec.workflowDefinitionId || rawExec.WorkflowDefinitionID || '',
+            workflowDefinitionVersion: rawExec.workflowDefinitionVersion || rawExec.WorkflowDefinitionVersion || 1,
+            vnamespace: rawExec.vnamespace || rawExec.VNamespace || '',
+            executionKey: rawExec.executionKey || rawExec.ExecutionKey || '',
+            status: (rawExec.status || rawExec.Status || 'pending').toLowerCase(),
+            input: rawExec.input || rawExec.Input || null,
+            output: rawExec.output || rawExec.Output || null,
+            stateData: rawExec.stateData || rawExec.StateData || null,
+            error: rawExec.error || rawExec.Error || '',
+            startedAt: rawExec.startedAt || rawExec.StartedAt || null,
+            completedAt: rawExec.completedAt || rawExec.CompletedAt || null,
+            createdAt: rawExec.createdAt || rawExec.CreatedAt || '',
+            updatedAt: rawExec.updatedAt || rawExec.UpdatedAt || ''
+          },
+          tokens: rawTokens.map((t: any) => ({
+            id: t.id || t.ID || '',
+            workflowExecutionId: t.workflowExecutionId || t.WorkflowExecutionID || '',
+            workflowDefinitionId: t.workflowDefinitionId || t.WorkflowDefinitionID || '',
+            vnamespace: t.vnamespace || t.VNamespace || '',
+            currentNodeId: t.currentNodeId || t.CurrentNodeID || '',
+            status: (t.status || t.Status || 'active').toLowerCase(),
+            parentTokenId: t.parentTokenId || t.ParentTokenID || '',
+            createdAt: t.createdAt || t.CreatedAt || '',
+            updatedAt: t.updatedAt || t.UpdatedAt || ''
+          })),
+          jobs: rawJobs.map((j: any) => ({
+            id: j.id || j.ID || '',
+            workflowExecutionId: j.workflowExecutionId || j.WorkflowExecutionID || '',
+            executionTokenId: j.executionTokenId || j.ExecutionTokenID || '',
+            workflowDefinitionId: j.workflowDefinitionId || j.WorkflowDefinitionID || '',
+            vnamespace: j.vnamespace || j.VNamespace || '',
+            activityId: j.activityId || j.ActivityID || '',
+            activityName: j.activityName || j.ActivityName || '',
+            activityType: j.activityType || j.ActivityType || '',
+            status: (j.status || j.Status || 'pending').toLowerCase(),
+            input: j.input || j.Input || null,
+            output: j.output || j.Output || null,
+            error: j.error || j.Error || '',
+            assignedWorkerId: j.assignedWorkerId || j.AssignedWorkerID || '',
+            retries: j.retries || j.Retries || 0,
+            maxRetries: j.maxRetries || j.MaxRetries || 3,
+            timeoutSeconds: j.timeoutSeconds || j.TimeoutSeconds || 300,
+            createdAt: j.createdAt || j.CreatedAt || '',
+            updatedAt: j.updatedAt || j.UpdatedAt || ''
+          }))
+        };
+        this.loadingExecutionDetail = false;
+      },
+      error: (err) => {
+        this.executionDetailError = ErrorUtil.formatErrorMessage(err);
+        this.loadingExecutionDetail = false;
+      }
+    });
+  }
+
+  closeExecutionDetailModal(): void {
+    this.showExecutionDetailModal = false;
+    this.selectedExecutionDetail = null;
+  }
+
+  getExecutionStatusBadgeColor(status: string): string {
+    switch (status?.toLowerCase()) {
+      case 'completed': return 'success';
+      case 'running': return 'info';
+      case 'pending': return 'primary';
+      case 'failed': return 'danger';
+      case 'terminated': return 'danger';
+      case 'cancelled': return 'warning';
+      default: return 'secondary';
+    }
+  }
+
+  formatJson(data: any): string {
+    if (!data) return '{}';
+    if (typeof data === 'string') {
+      try {
+        return JSON.stringify(JSON.parse(data), null, 2);
+      } catch {
+        return data;
+      }
+    }
+    return JSON.stringify(data, null, 2);
   }
 }

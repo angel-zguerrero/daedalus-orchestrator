@@ -133,14 +133,18 @@ func (r *QueueRepository) GetQueuesByWorkflowDefinitionID(workflowID string, now
 }
 
 func (r *QueueRepository) Paginate(q string, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
-	return r.paginate(q, "", pageSize, cursor, vNamespace, now)
+	return r.paginate(q, "", "", false, pageSize, cursor, vNamespace, now)
+}
+
+func (r *QueueRepository) PaginateByType(q string, queueType models.QueueType, includeAllTypes bool, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
+	return r.paginate(q, "", queueType, includeAllTypes, pageSize, cursor, vNamespace, now)
 }
 
 func (r *QueueRepository) PaginateBySupervisionState(q string, supervisionState models.QueueSupervisionState, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
-	return r.paginate(q, supervisionState, pageSize, cursor, vNamespace, now)
+	return r.paginate(q, supervisionState, "", false, pageSize, cursor, vNamespace, now)
 }
 
-func (r *QueueRepository) paginate(q string, supervisionState models.QueueSupervisionState, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
+func (r *QueueRepository) paginate(q string, supervisionState models.QueueSupervisionState, queueType models.QueueType, includeAllTypes bool, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
 	var query string
 
 	if q == "" && vNamespace == "" && supervisionState == "" {
@@ -176,12 +180,21 @@ func (r *QueueRepository) paginate(q string, supervisionState models.QueueSuperv
 		return nil, err
 	}
 
-	// Filter out non-standard workflow queues from standard list
+	// Filter queues by type
 	if result != nil && len(result.Entities) > 0 {
 		var filtered []models.Queue
 		for _, entity := range result.Entities {
-			if entity.Type == "" || entity.Type == models.StandardQueue {
+			if includeAllTypes {
 				filtered = append(filtered, entity)
+			} else if queueType != "" {
+				if entity.Type == queueType {
+					filtered = append(filtered, entity)
+				}
+			} else {
+				// Default: filter out non-standard workflow queues from standard list
+				if entity.Type == "" || entity.Type == models.StandardQueue {
+					filtered = append(filtered, entity)
+				}
 			}
 		}
 		result.Entities = filtered
