@@ -13,9 +13,9 @@ const (
 
 type ExecutionToken struct {
 	ID                   string                 `orm:"primary-key" json:"id"`
-	WorkflowExecutionID string                 `orm:"unique-compound:0" json:"workflowExecutionId"`
+	WorkflowExecutionID string                 `json:"workflowExecutionId"`
 	WorkflowDefinitionID string                 `json:"workflowDefinitionId"`
-	VNamespace           string                 `orm:"unique-compound:0" json:"vnamespace"`
+	VNamespace           string                 `json:"vnamespace"`
 	CurrentNodeID        string                 `json:"currentNodeId"`
 	Status               ExecutionTokenStatus   `json:"status"`
 	ScopeVariables       map[string]interface{} `json:"scopeVariables,omitempty"`

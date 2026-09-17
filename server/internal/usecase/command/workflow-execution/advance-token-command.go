@@ -157,7 +157,48 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			tokenRepo.UpdateExecutionToken(token, now)
 
 		case bpmn.ElementParallelGateway:
+			incoming := bpmnModel.GetIncomingFlows(currentNode.ID)
 			outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
+
+			if len(incoming) > 1 {
+				// Parallel Join / Merge
+				token.Status = models.ExecutionTokenStatusCompleted
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				allTokens, _ := tokenRepo.GetTokensByExecutionID(execution.ID, now)
+				arrivedCount := 0
+				for _, t := range allTokens {
+					if t.CurrentNodeID == currentNode.ID {
+						arrivedCount++
+					}
+				}
+
+				if arrivedCount < len(incoming) {
+					// Still waiting for remaining parallel branches to arrive at the join gateway
+					goto SaveExecutionState
+				}
+
+				// All incoming parallel branches have arrived! Create 1 merged token for outgoing branch
+				if len(outgoing) > 0 {
+					mergedTokenID := strings.ReplaceAll(uuid.New().String(), "-", "")
+					mergedToken := &models.ExecutionToken{
+						ID:                   mergedTokenID,
+						WorkflowExecutionID: execution.ID,
+						WorkflowDefinitionID: def.ID,
+						VNamespace:           execution.VNamespace,
+						CurrentNodeID:        outgoing[0].TargetRef,
+						Status:               models.ExecutionTokenStatusActive,
+						ParentTokenID:        token.ID,
+						CreatedAt:            now,
+						UpdatedAt:            now,
+					}
+					tokenRepo.CreateExecutionToken(mergedToken, now)
+					token = mergedToken
+					continue
+				}
+				goto CheckExecutionCompletion
+			}
+
 			if len(outgoing) > 1 {
 				// Parallel Split
 				token.Status = models.ExecutionTokenStatusCompleted
