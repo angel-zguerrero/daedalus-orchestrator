@@ -267,6 +267,20 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			if actType == "" {
 				actType = string(currentNode.Type)
 			}
+			jobInputPayload := make(map[string]interface{})
+			if execution.StateData != nil {
+				for k, v := range execution.StateData {
+					jobInputPayload[k] = v
+				}
+			}
+			if currentNode.Properties != nil {
+				for k, v := range currentNode.Properties {
+					if k != "modelerTemplate" && k != "taskType" {
+						jobInputPayload[k] = v
+					}
+				}
+			}
+
 			job := &models.WorkflowJob{
 				ID:                   jobID,
 				WorkflowExecutionID: execution.ID,
@@ -277,7 +291,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				ActivityName:         currentNode.Name,
 				ActivityType:         actType,
 				Status:               models.WorkflowJobStatusPending,
-				Input:                execution.StateData,
+				Input:                jobInputPayload,
 				Retries:              0,
 				MaxRetries:           3,
 				TimeoutSeconds:       300,
@@ -315,7 +329,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					"activityId":   currentNode.ID,
 					"activityName": currentNode.Name,
 					"activityType": actType,
-					"input":        execution.StateData,
+					"input":        jobInputPayload,
 				})
 				enqueueCmd := &queue.EnqueueCommand{
 					Messages: []models.QueueMessage{

@@ -14,11 +14,26 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "authentication", "label": "Authentication" },
-      { "id": "request", "label": "HTTP Request" },
-      { "id": "headers", "label": "Headers & Query Parameters" },
-      { "id": "responseMapping", "label": "Response & Mapping" },
-      { "id": "errorHandling", "label": "Error Handling & Retry" }
+      {
+        "id": "authentication",
+        "label": "Authentication"
+      },
+      {
+        "id": "request",
+        "label": "HTTP Request"
+      },
+      {
+        "id": "headers",
+        "label": "Headers & Query Parameters"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response & Mapping"
+      },
+      {
+        "id": "errorHandling",
+        "label": "Error Handling & Retry"
+      }
     ],
     "properties": [
       {
@@ -27,60 +42,99 @@
         "value": "noAuth",
         "group": "authentication",
         "choices": [
-          { "name": "None", "value": "noAuth" },
-          { "name": "Basic Auth", "value": "basic" },
-          { "name": "Bearer Token", "value": "bearer" },
-          { "name": "OAuth 2.0 Client Credentials", "value": "oauth-client-credentials" }
+          {
+            "name": "None",
+            "value": "noAuth"
+          },
+          {
+            "name": "Basic Auth",
+            "value": "basic"
+          },
+          {
+            "name": "Bearer Token",
+            "value": "bearer"
+          },
+          {
+            "name": "OAuth 2.0 Client Credentials",
+            "value": "oauth-client-credentials"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "authentication.type" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.type"
+        }
       },
       {
         "label": "Basic Auth Username",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.username" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.username"
+        }
       },
       {
         "label": "Basic Auth Password",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.password" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.password"
+        }
       },
       {
         "label": "Bearer Token",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.token" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.token"
+        }
       },
       {
         "label": "OAuth 2.0 Token Endpoint",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.oauthTokenEndpoint" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.oauthTokenEndpoint"
+        }
       },
       {
         "label": "OAuth 2.0 Client ID",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.clientId" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.clientId"
+        }
       },
       {
         "label": "OAuth 2.0 Client Secret",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.clientSecret" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.clientSecret"
+        }
       },
       {
         "label": "OAuth 2.0 Audience",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.audience" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.audience"
+        }
       },
       {
         "label": "OAuth 2.0 Scope",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.scope" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.scope"
+        }
       },
       {
         "label": "HTTP Method",
@@ -88,66 +142,113 @@
         "value": "GET",
         "group": "request",
         "choices": [
-          { "name": "GET", "value": "GET" },
-          { "name": "POST", "value": "POST" },
-          { "name": "PUT", "value": "PUT" },
-          { "name": "PATCH", "value": "PATCH" },
-          { "name": "DELETE", "value": "DELETE" },
-          { "name": "HEAD", "value": "HEAD" }
+          {
+            "name": "GET",
+            "value": "GET"
+          },
+          {
+            "name": "POST",
+            "value": "POST"
+          },
+          {
+            "name": "PUT",
+            "value": "PUT"
+          },
+          {
+            "name": "PATCH",
+            "value": "PATCH"
+          },
+          {
+            "name": "DELETE",
+            "value": "DELETE"
+          },
+          {
+            "name": "HEAD",
+            "value": "HEAD"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "method" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "method"
+        }
       },
       {
         "label": "Target URL",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "url" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "url"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Connection Timeout (seconds)",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "connectionTimeout" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "connectionTimeout"
+        }
       },
       {
         "label": "HTTP Headers (JSON / key-value format)",
         "type": "String",
         "multiline": true,
         "group": "headers",
-        "binding": { "type": "camunda:property", "name": "headers" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "headers"
+        }
       },
       {
         "label": "Query Parameters (JSON / key-value format)",
         "type": "String",
         "multiline": true,
         "group": "headers",
-        "binding": { "type": "camunda:property", "name": "queryParameters" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "queryParameters"
+        }
       },
       {
         "label": "Request Body / Payload (JSON or Raw Text)",
         "type": "String",
         "multiline": true,
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "body" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "body"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       },
       {
         "label": "Response Result Expression (FEEL / JSONPath)",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultExpression" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultExpression"
+        }
       },
       {
         "label": "Error Catch Expression",
         "type": "String",
         "group": "errorHandling",
-        "binding": { "type": "camunda:property", "name": "errorExpression" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "errorExpression"
+        }
       }
     ]
   },
@@ -166,10 +267,22 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "authentication", "label": "Authentication" },
-      { "id": "request", "label": "GraphQL Request" },
-      { "id": "headers", "label": "Headers" },
-      { "id": "responseMapping", "label": "Response & Mapping" }
+      {
+        "id": "authentication",
+        "label": "Authentication"
+      },
+      {
+        "id": "request",
+        "label": "GraphQL Request"
+      },
+      {
+        "id": "headers",
+        "label": "Headers"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response & Mapping"
+      }
     ],
     "properties": [
       {
@@ -178,65 +291,108 @@
         "value": "noAuth",
         "group": "authentication",
         "choices": [
-          { "name": "None", "value": "noAuth" },
-          { "name": "Basic Auth", "value": "basic" },
-          { "name": "Bearer Token", "value": "bearer" },
-          { "name": "OAuth 2.0", "value": "oauth-client-credentials" }
+          {
+            "name": "None",
+            "value": "noAuth"
+          },
+          {
+            "name": "Basic Auth",
+            "value": "basic"
+          },
+          {
+            "name": "Bearer Token",
+            "value": "bearer"
+          },
+          {
+            "name": "OAuth 2.0",
+            "value": "oauth-client-credentials"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "authentication.type" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.type"
+        }
       },
       {
         "label": "Bearer Token",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.token" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.token"
+        }
       },
       {
         "label": "GraphQL Endpoint URL",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "url" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "url"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "GraphQL Query / Mutation",
         "type": "String",
         "multiline": true,
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "query" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "query"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Query Variables (JSON object)",
         "type": "String",
         "multiline": true,
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "variables" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "variables"
+        }
       },
       {
         "label": "Connection Timeout (seconds)",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "connectionTimeout" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "connectionTimeout"
+        }
       },
       {
         "label": "Custom Headers (JSON)",
         "type": "String",
         "multiline": true,
         "group": "headers",
-        "binding": { "type": "camunda:property", "name": "headers" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "headers"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       },
       {
         "label": "Response Expression",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultExpression" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultExpression"
+        }
       }
     ]
   },
@@ -255,9 +411,18 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "authentication", "label": "Authentication & Connection" },
-      { "id": "request", "label": "Slack Message Details" },
-      { "id": "responseMapping", "label": "Response Mapping" }
+      {
+        "id": "authentication",
+        "label": "Authentication & Connection"
+      },
+      {
+        "id": "request",
+        "label": "Slack Message Details"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response Mapping"
+      }
     ],
     "properties": [
       {
@@ -266,22 +431,37 @@
         "value": "token",
         "group": "authentication",
         "choices": [
-          { "name": "Bot Token (xoxb-...)", "value": "token" },
-          { "name": "Incoming Webhook URL", "value": "webhook" }
+          {
+            "name": "Bot Token (xoxb-...)",
+            "value": "token"
+          },
+          {
+            "name": "Incoming Webhook URL",
+            "value": "webhook"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "authentication.method" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.method"
+        }
       },
       {
         "label": "Slack OAuth Bot Token (xoxb-...)",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.token" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.token"
+        }
       },
       {
         "label": "Incoming Webhook URL",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authentication.webhookUrl" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.webhookUrl"
+        }
       },
       {
         "label": "Action",
@@ -289,50 +469,83 @@
         "value": "chat.postMessage",
         "group": "request",
         "choices": [
-          { "name": "Post Message (chat.postMessage)", "value": "chat.postMessage" },
-          { "name": "Update Message (chat.update)", "value": "chat.update" },
-          { "name": "Create Channel (channels.create)", "value": "channels.create" },
-          { "name": "Lookup User by Email (users.lookupByEmail)", "value": "users.lookupByEmail" }
+          {
+            "name": "Post Message (chat.postMessage)",
+            "value": "chat.postMessage"
+          },
+          {
+            "name": "Update Message (chat.update)",
+            "value": "chat.update"
+          },
+          {
+            "name": "Create Channel (channels.create)",
+            "value": "channels.create"
+          },
+          {
+            "name": "Lookup User by Email (users.lookupByEmail)",
+            "value": "users.lookupByEmail"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "action" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "action"
+        }
       },
       {
         "label": "Target Channel Name / ID or User ID",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "channel" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "channel"
+        }
       },
       {
         "label": "Message Text",
         "type": "String",
         "multiline": true,
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "text" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "text"
+        }
       },
       {
         "label": "Slack Block Kit JSON Payload",
         "type": "String",
         "multiline": true,
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "blocks" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "blocks"
+        }
       },
       {
         "label": "Thread Timestamp (for replies)",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "threadTs" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "threadTs"
+        }
       },
       {
         "label": "User Email (for Lookup User action)",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "userEmail" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "userEmail"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       }
     ]
   },
@@ -351,17 +564,31 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "authentication", "label": "Connection & Auth" },
-      { "id": "request", "label": "Message Content" },
-      { "id": "responseMapping", "label": "Response Mapping" }
+      {
+        "id": "authentication",
+        "label": "Connection & Auth"
+      },
+      {
+        "id": "request",
+        "label": "Message Content"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response Mapping"
+      }
     ],
     "properties": [
       {
         "label": "Teams Incoming Webhook URL / Endpoint",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "webhookUrl" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "webhookUrl"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Action Type",
@@ -369,36 +596,57 @@
         "value": "postMessage",
         "group": "request",
         "choices": [
-          { "name": "Post Standard Message", "value": "postMessage" },
-          { "name": "Post Adaptive Card", "value": "postCard" }
+          {
+            "name": "Post Standard Message",
+            "value": "postMessage"
+          },
+          {
+            "name": "Post Adaptive Card",
+            "value": "postCard"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "action" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "action"
+        }
       },
       {
         "label": "Message Title",
         "type": "String",
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "title" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "title"
+        }
       },
       {
         "label": "Message Text Content",
         "type": "String",
         "multiline": true,
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "text" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "text"
+        }
       },
       {
         "label": "Adaptive Card JSON Payload",
         "type": "String",
         "multiline": true,
         "group": "request",
-        "binding": { "type": "camunda:property", "name": "cardJson" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "cardJson"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       }
     ]
   },
@@ -417,64 +665,111 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "authentication", "label": "API Key & Auth" },
-      { "id": "sender", "label": "Sender Information" },
-      { "id": "recipient", "label": "Recipient Information" },
-      { "id": "content", "label": "Email Content & Templates" },
-      { "id": "responseMapping", "label": "Response Mapping" }
+      {
+        "id": "authentication",
+        "label": "API Key & Auth"
+      },
+      {
+        "id": "sender",
+        "label": "Sender Information"
+      },
+      {
+        "id": "recipient",
+        "label": "Recipient Information"
+      },
+      {
+        "id": "content",
+        "label": "Email Content & Templates"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response Mapping"
+      }
     ],
     "properties": [
       {
         "label": "SendGrid API Key (Bearer Token)",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "apiKey" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "apiKey"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "From Sender Email",
         "type": "String",
         "group": "sender",
-        "binding": { "type": "camunda:property", "name": "fromEmail" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "fromEmail"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "From Sender Name",
         "type": "String",
         "group": "sender",
-        "binding": { "type": "camunda:property", "name": "fromName" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "fromName"
+        }
       },
       {
         "label": "Recipient To Email",
         "type": "String",
         "group": "recipient",
-        "binding": { "type": "camunda:property", "name": "toEmail" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "toEmail"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Recipient To Name",
         "type": "String",
         "group": "recipient",
-        "binding": { "type": "camunda:property", "name": "toName" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "toName"
+        }
       },
       {
         "label": "CC Email Addresses (comma separated)",
         "type": "String",
         "group": "recipient",
-        "binding": { "type": "camunda:property", "name": "ccEmails" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "ccEmails"
+        }
       },
       {
         "label": "BCC Email Addresses (comma separated)",
         "type": "String",
         "group": "recipient",
-        "binding": { "type": "camunda:property", "name": "bccEmails" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "bccEmails"
+        }
       },
       {
         "label": "Email Subject",
         "type": "String",
         "group": "content",
-        "binding": { "type": "camunda:property", "name": "subject" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "subject"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Content Type",
@@ -482,37 +777,61 @@
         "value": "text/plain",
         "group": "content",
         "choices": [
-          { "name": "Plain Text (text/plain)", "value": "text/plain" },
-          { "name": "HTML (text/html)", "value": "text/html" },
-          { "name": "Dynamic Template", "value": "template" }
+          {
+            "name": "Plain Text (text/plain)",
+            "value": "text/plain"
+          },
+          {
+            "name": "HTML (text/html)",
+            "value": "text/html"
+          },
+          {
+            "name": "Dynamic Template",
+            "value": "template"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "contentType" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "contentType"
+        }
       },
       {
         "label": "Email Body (Text or HTML)",
         "type": "String",
         "multiline": true,
         "group": "content",
-        "binding": { "type": "camunda:property", "name": "contentValue" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "contentValue"
+        }
       },
       {
         "label": "Dynamic Template ID (d-xxx)",
         "type": "String",
         "group": "content",
-        "binding": { "type": "camunda:property", "name": "templateId" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "templateId"
+        }
       },
       {
         "label": "Dynamic Template Data (JSON)",
         "type": "String",
         "multiline": true,
         "group": "content",
-        "binding": { "type": "camunda:property", "name": "templateData" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "templateData"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       }
     ]
   },
@@ -531,787 +850,98 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "authentication", "label": "Twilio Credentials" },
-      { "id": "message", "label": "SMS / WhatsApp Message" },
-      { "id": "responseMapping", "label": "Response Mapping" }
+      {
+        "id": "authentication",
+        "label": "Twilio Credentials"
+      },
+      {
+        "id": "message",
+        "label": "SMS / WhatsApp Message"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response Mapping"
+      }
     ],
     "properties": [
       {
         "label": "Account SID",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "accountSid" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "accountSid"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Auth Token",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "authToken" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "authToken"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "From Phone Number / Messaging Service SID",
         "type": "String",
         "group": "message",
-        "binding": { "type": "camunda:property", "name": "from" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "from"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "To Phone Number (E.164 format, e.g. +1234567890)",
         "type": "String",
         "group": "message",
-        "binding": { "type": "camunda:property", "name": "to" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "to"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Message Body / Text",
         "type": "String",
         "multiline": true,
         "group": "message",
-        "binding": { "type": "camunda:property", "name": "body" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "body"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Media URL (for MMS / WhatsApp attachments)",
         "type": "String",
         "group": "message",
-        "binding": { "type": "camunda:property", "name": "mediaUrl" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "mediaUrl"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "Apache Kafka Producer Connector",
-    "id": "io.camunda.connectors.Kafka.v1",
-    "description": "Publish events and messages to Apache Kafka topics with SASL/SSL authentication and custom headers",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/kafka/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "Kafka Connection & Security" },
-      { "id": "message", "label": "Topic & Payload" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "Bootstrap Servers (host:port, comma separated)",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "bootstrapServers" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Security Protocol",
-        "type": "Dropdown",
-        "value": "PLAINTEXT",
-        "group": "authentication",
-        "choices": [
-          { "name": "PLAINTEXT", "value": "PLAINTEXT" },
-          { "name": "SASL_PLAINTEXT", "value": "SASL_PLAINTEXT" },
-          { "name": "SASL_SSL", "value": "SASL_SSL" },
-          { "name": "SSL", "value": "SSL" }
-        ],
-        "binding": { "type": "camunda:property", "name": "securityProtocol" }
-      },
-      {
-        "label": "SASL Mechanism",
-        "type": "Dropdown",
-        "value": "PLAIN",
-        "group": "authentication",
-        "choices": [
-          { "name": "PLAIN", "value": "PLAIN" },
-          { "name": "SCRAM-SHA-256", "value": "SCRAM-SHA-256" },
-          { "name": "SCRAM-SHA-512", "value": "SCRAM-SHA-512" }
-        ],
-        "binding": { "type": "camunda:property", "name": "saslMechanism" }
-      },
-      {
-        "label": "SASL Username",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "username" }
-      },
-      {
-        "label": "SASL Password / Secret",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "password" }
-      },
-      {
-        "label": "Topic Name",
-        "type": "String",
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "topic" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Message Key",
-        "type": "String",
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "key" }
-      },
-      {
-        "label": "Message Value / Payload (JSON or String)",
-        "type": "String",
-        "multiline": true,
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "value" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Kafka Record Headers (JSON format)",
-        "type": "String",
-        "multiline": true,
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "headers" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "RabbitMQ Outbound Connector",
-    "id": "io.camunda.connectors.RabbitMQ.v1",
-    "description": "Publish messages to RabbitMQ exchanges and queues via AMQP protocol",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/rabbitmq/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "AMQP Connection" },
-      { "id": "routing", "label": "Exchange & Routing" },
-      { "id": "message", "label": "Message Payload & Headers" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "AMQP URI / Connection String (amqp://user:pass@host:5672)",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "uri" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Exchange Name",
-        "type": "String",
-        "group": "routing",
-        "binding": { "type": "camunda:property", "name": "exchange" }
-      },
-      {
-        "label": "Routing Key",
-        "type": "String",
-        "group": "routing",
-        "binding": { "type": "camunda:property", "name": "routingKey" }
-      },
-      {
-        "label": "Message Payload",
-        "type": "String",
-        "multiline": true,
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "payload" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Message Properties / Headers (JSON format)",
-        "type": "String",
-        "multiline": true,
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "properties" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "MQTT Outbound Connector",
-    "id": "io.camunda.connectors.MQTT.v1",
-    "description": "Publish messages to MQTT brokers for IoT and edge messaging",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/mqtt/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "connection", "label": "MQTT Broker Connection" },
-      { "id": "publish", "label": "Publish Options & Payload" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "MQTT Server Host / URL (e.g. tcp://localhost:1883)",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "serverUrl" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Client ID",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "clientId" }
-      },
-      {
-        "label": "Username",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "username" }
-      },
-      {
-        "label": "Password",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "password" }
-      },
-      {
-        "label": "Topic Name",
-        "type": "String",
-        "group": "publish",
-        "binding": { "type": "camunda:property", "name": "topic" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Quality of Service (QoS)",
-        "type": "Dropdown",
-        "value": "0",
-        "group": "publish",
-        "choices": [
-          { "name": "0 - At most once", "value": "0" },
-          { "name": "1 - At least once", "value": "1" },
-          { "name": "2 - Exactly once", "value": "2" }
-        ],
-        "binding": { "type": "camunda:property", "name": "qos" }
-      },
-      {
-        "label": "Retain Message",
-        "type": "Dropdown",
-        "value": "false",
-        "group": "publish",
-        "choices": [
-          { "name": "False", "value": "false" },
-          { "name": "True", "value": "true" }
-        ],
-        "binding": { "type": "camunda:property", "name": "retained" }
-      },
-      {
-        "label": "Payload / Message Body",
-        "type": "String",
-        "multiline": true,
-        "group": "publish",
-        "binding": { "type": "camunda:property", "name": "payload" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "AWS Lambda Connector",
-    "id": "io.camunda.connectors.AWSLambda.v1",
-    "description": "Invoke AWS Lambda serverless functions synchronously or asynchronously",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-lambda/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "AWS Authentication" },
-      { "id": "function", "label": "Lambda Function Details" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "AWS Region",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "awsRegion" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "AWS Access Key ID",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "accessKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "AWS Secret Access Key",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "secretKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Function Name or ARN",
-        "type": "String",
-        "group": "function",
-        "binding": { "type": "camunda:property", "name": "functionName" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Invocation Type",
-        "type": "Dropdown",
-        "value": "RequestResponse",
-        "group": "function",
-        "choices": [
-          { "name": "Synchronous (RequestResponse)", "value": "RequestResponse" },
-          { "name": "Asynchronous (Event)", "value": "Event" },
-          { "name": "Validation Only (DryRun)", "value": "DryRun" }
-        ],
-        "binding": { "type": "camunda:property", "name": "invocationType" }
-      },
-      {
-        "label": "Function Payload (JSON)",
-        "type": "String",
-        "multiline": true,
-        "group": "function",
-        "binding": { "type": "camunda:property", "name": "payload" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "AWS SQS Connector",
-    "id": "io.camunda.connectors.AWSSQS.v1",
-    "description": "Send messages to Amazon Simple Queue Service (SQS) standard and FIFO colas",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-sqs/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "AWS Credentials" },
-      { "id": "queue", "label": "SQS Queue Details" },
-      { "id": "message", "label": "Message Payload & Attributes" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "AWS Region",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "awsRegion" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Access Key ID",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "accessKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Secret Access Key",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "secretKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Queue URL",
-        "type": "String",
-        "group": "queue",
-        "binding": { "type": "camunda:property", "name": "queueUrl" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Message Body / Content",
-        "type": "String",
-        "multiline": true,
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "messageBody" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Message Group ID (Required for FIFO Queues)",
-        "type": "String",
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "messageGroupId" }
-      },
-      {
-        "label": "Message Deduplication ID (for FIFO Queues)",
-        "type": "String",
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "messageDeduplicationId" }
-      },
-      {
-        "label": "Message Attributes (JSON)",
-        "type": "String",
-        "multiline": true,
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "messageAttributes" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "AWS SNS Connector",
-    "id": "io.camunda.connectors.AWSSNS.v1",
-    "description": "Publish notifications to Amazon Simple Notification Service (SNS) topics",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-sns/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "AWS Credentials" },
-      { "id": "topic", "label": "SNS Topic & Subject" },
-      { "id": "message", "label": "Message Content" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "AWS Region",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "awsRegion" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Access Key ID",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "accessKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Secret Access Key",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "secretKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Topic ARN",
-        "type": "String",
-        "group": "topic",
-        "binding": { "type": "camunda:property", "name": "topicArn" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Subject / Title",
-        "type": "String",
-        "group": "topic",
-        "binding": { "type": "camunda:property", "name": "subject" }
-      },
-      {
-        "label": "Message Content",
-        "type": "String",
-        "multiline": true,
-        "group": "message",
-        "binding": { "type": "camunda:property", "name": "message" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Message Structure",
-        "type": "Dropdown",
-        "value": "text",
-        "group": "message",
-        "choices": [
-          { "name": "Plain Text / Default", "value": "text" },
-          { "name": "JSON (Protocol specific)", "value": "json" }
-        ],
-        "binding": { "type": "camunda:property", "name": "messageStructure" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "AWS S3 Connector",
-    "id": "io.camunda.connectors.AWSS3.v1",
-    "description": "Upload, retrieve, list, or delete objects in Amazon S3 buckets",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/aws-s3/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "AWS Auth" },
-      { "id": "bucket", "label": "Bucket & Operation" },
-      { "id": "object", "label": "Object Content & Metadata" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "AWS Region",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "awsRegion" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Access Key ID",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "accessKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Secret Access Key",
-        "type": "String",
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "secretKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Action / Operation",
-        "type": "Dropdown",
-        "value": "putObject",
-        "group": "bucket",
-        "choices": [
-          { "name": "Upload File (putObject)", "value": "putObject" },
-          { "name": "Get File Content (getObject)", "value": "getObject" },
-          { "name": "Delete Object (deleteObject)", "value": "deleteObject" },
-          { "name": "List Objects (listObjects)", "value": "listObjects" }
-        ],
-        "binding": { "type": "camunda:property", "name": "action" }
-      },
-      {
-        "label": "S3 Bucket Name",
-        "type": "String",
-        "group": "bucket",
-        "binding": { "type": "camunda:property", "name": "bucketName" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Object Key / Path",
-        "type": "String",
-        "group": "object",
-        "binding": { "type": "camunda:property", "name": "objectKey" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "File Content / Body (for putObject)",
-        "type": "String",
-        "multiline": true,
-        "group": "object",
-        "binding": { "type": "camunda:property", "name": "content" }
-      },
-      {
-        "label": "Content Type (e.g. application/json, text/plain)",
-        "type": "String",
-        "group": "object",
-        "binding": { "type": "camunda:property", "name": "contentType" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "Google Drive Connector",
-    "id": "io.camunda.connectors.GoogleDrive.v1",
-    "description": "Create, upload, search, and manage files or folders in Google Drive",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/google-drive/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "Google Auth Credentials" },
-      { "id": "request", "label": "Drive Action & File Data" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "Google Service Account Key JSON / Access Token",
-        "type": "String",
-        "multiline": true,
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "auth" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Action",
-        "type": "Dropdown",
-        "value": "uploadFile",
-        "group": "request",
-        "choices": [
-          { "name": "Upload File", "value": "uploadFile" },
-          { "name": "Create Folder", "value": "createFolder" },
-          { "name": "Delete File / Folder", "value": "deleteFile" },
-          { "name": "Share File", "value": "shareFile" }
-        ],
-        "binding": { "type": "camunda:property", "name": "action" }
-      },
-      {
-        "label": "Parent Folder ID",
-        "type": "String",
-        "group": "request",
-        "binding": { "type": "camunda:property", "name": "folderId" }
-      },
-      {
-        "label": "File / Folder Name",
-        "type": "String",
-        "group": "request",
-        "binding": { "type": "camunda:property", "name": "fileName" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "File Content / Text",
-        "type": "String",
-        "multiline": true,
-        "group": "request",
-        "binding": { "type": "camunda:property", "name": "content" }
-      },
-      {
-        "label": "MIME Type (e.g. text/plain, application/pdf)",
-        "type": "String",
-        "group": "request",
-        "binding": { "type": "camunda:property", "name": "mimeType" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "Google Sheets Connector",
-    "id": "io.camunda.connectors.GoogleSheets.v1",
-    "description": "Read, append, and update spreadsheet rows or cells in Google Sheets",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/google-sheets/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "authentication", "label": "Google Credentials" },
-      { "id": "spreadsheet", "label": "Spreadsheet & Row Operations" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "Service Account JSON / Access Token",
-        "type": "String",
-        "multiline": true,
-        "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "auth" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Spreadsheet ID",
-        "type": "String",
-        "group": "spreadsheet",
-        "binding": { "type": "camunda:property", "name": "spreadsheetId" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Operation",
-        "type": "Dropdown",
-        "value": "appendRow",
-        "group": "spreadsheet",
-        "choices": [
-          { "name": "Append Row(s)", "value": "appendRow" },
-          { "name": "Update Cell Range", "value": "updateRange" },
-          { "name": "Get Row Data", "value": "getRows" },
-          { "name": "Create Spreadsheet", "value": "createSpreadsheet" }
-        ],
-        "binding": { "type": "camunda:property", "name": "operation" }
-      },
-      {
-        "label": "Sheet Name / Range (e.g. Sheet1!A1:D10)",
-        "type": "String",
-        "group": "spreadsheet",
-        "binding": { "type": "camunda:property", "name": "range" }
-      },
-      {
-        "label": "Row Data / Values (JSON Array format: [[\"col1\", \"col2\"]])",
-        "type": "String",
-        "multiline": true,
-        "group": "spreadsheet",
-        "binding": { "type": "camunda:property", "name": "values" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       }
     ]
   },
@@ -1330,18 +960,35 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "authentication", "label": "OpenAI API Auth" },
-      { "id": "modelConfig", "label": "Model & Parameters" },
-      { "id": "prompt", "label": "Prompts & Context" },
-      { "id": "responseMapping", "label": "Response Mapping" }
+      {
+        "id": "authentication",
+        "label": "OpenAI API Auth"
+      },
+      {
+        "id": "modelConfig",
+        "label": "Model & Parameters"
+      },
+      {
+        "id": "prompt",
+        "label": "Prompts & Context"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response Mapping"
+      }
     ],
     "properties": [
       {
         "label": "OpenAI API Secret Key (sk-...)",
         "type": "String",
         "group": "authentication",
-        "binding": { "type": "camunda:property", "name": "apiKey" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "apiKey"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Model",
@@ -1349,191 +996,77 @@
         "value": "gpt-4o",
         "group": "modelConfig",
         "choices": [
-          { "name": "gpt-4o (Recommended)", "value": "gpt-4o" },
-          { "name": "gpt-4-turbo", "value": "gpt-4-turbo" },
-          { "name": "gpt-3.5-turbo", "value": "gpt-3.5-turbo" },
-          { "name": "dall-e-3 (Image Gen)", "value": "dall-e-3" }
+          {
+            "name": "gpt-4o (Recommended)",
+            "value": "gpt-4o"
+          },
+          {
+            "name": "gpt-4-turbo",
+            "value": "gpt-4-turbo"
+          },
+          {
+            "name": "gpt-3.5-turbo",
+            "value": "gpt-3.5-turbo"
+          },
+          {
+            "name": "dall-e-3 (Image Gen)",
+            "value": "dall-e-3"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "model" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "model"
+        }
       },
       {
         "label": "Temperature (0.0 = Deterministic, 1.0 = Creative)",
         "type": "String",
         "group": "modelConfig",
-        "binding": { "type": "camunda:property", "name": "temperature" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "temperature"
+        }
       },
       {
         "label": "Max Completion Tokens",
         "type": "String",
         "group": "modelConfig",
-        "binding": { "type": "camunda:property", "name": "maxTokens" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "maxTokens"
+        }
       },
       {
         "label": "System Prompt / Persona",
         "type": "String",
         "multiline": true,
         "group": "prompt",
-        "binding": { "type": "camunda:property", "name": "systemPrompt" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "systemPrompt"
+        }
       },
       {
         "label": "User Prompt / Message",
         "type": "String",
         "multiline": true,
         "group": "prompt",
-        "binding": { "type": "camunda:property", "name": "userPrompt" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "userPrompt"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "MongoDB Connector",
-    "id": "io.camunda.connectors.MongoDB.v1",
-    "description": "Execute insert, find, update, delete, or aggregation queries against MongoDB databases",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/mongodb/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "connection", "label": "Database Connection" },
-      { "id": "operation", "label": "Operation & Documents" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "MongoDB Connection String (mongodb://... or mongodb+srv://...)",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "connectionString" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Database Name",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "database" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Collection Name",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "collection" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Operation",
-        "type": "Dropdown",
-        "value": "insertOne",
-        "group": "operation",
-        "choices": [
-          { "name": "Insert One Document (insertOne)", "value": "insertOne" },
-          { "name": "Find Documents (find)", "value": "find" },
-          { "name": "Update One Document (updateOne)", "value": "updateOne" },
-          { "name": "Delete One Document (deleteOne)", "value": "deleteOne" },
-          { "name": "Aggregate Pipeline (aggregate)", "value": "aggregate" }
-        ],
-        "binding": { "type": "camunda:property", "name": "operation" }
-      },
-      {
-        "label": "Filter / Query (JSON format)",
-        "type": "String",
-        "multiline": true,
-        "group": "operation",
-        "binding": { "type": "camunda:property", "name": "filter" }
-      },
-      {
-        "label": "Document / Update Payload (JSON format)",
-        "type": "String",
-        "multiline": true,
-        "group": "operation",
-        "binding": { "type": "camunda:property", "name": "document" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
-      }
-    ]
-  },
-  {
-    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
-    "name": "SQL Database Connector",
-    "id": "io.camunda.connectors.SQL.v1",
-    "description": "Execute relational SQL statements (SELECT, INSERT, UPDATE, DELETE) against PostgreSQL, MySQL, SQL Server, or SQLite",
-    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/sql/",
-    "category": {
-      "id": "connectors",
-      "name": "Camunda Connectors"
-    },
-    "appliesTo": [
-      "bpmn:Task",
-      "bpmn:ServiceTask"
-    ],
-    "groups": [
-      { "id": "connection", "label": "Database Connection" },
-      { "id": "query", "label": "SQL Statement & Parameters" },
-      { "id": "responseMapping", "label": "Response Mapping" }
-    ],
-    "properties": [
-      {
-        "label": "Database Dialect / Driver",
-        "type": "Dropdown",
-        "value": "postgres",
-        "group": "connection",
-        "choices": [
-          { "name": "PostgreSQL", "value": "postgres" },
-          { "name": "MySQL / MariaDB", "value": "mysql" },
-          { "name": "Microsoft SQL Server", "value": "sqlserver" },
-          { "name": "SQLite", "value": "sqlite" }
-        ],
-        "binding": { "type": "camunda:property", "name": "dialect" }
-      },
-      {
-        "label": "Connection DSN / Connection String",
-        "type": "String",
-        "group": "connection",
-        "binding": { "type": "camunda:property", "name": "connectionString" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "SQL Query / Command",
-        "type": "String",
-        "multiline": true,
-        "group": "query",
-        "binding": { "type": "camunda:property", "name": "query" },
-        "constraints": { "notEmpty": true }
-      },
-      {
-        "label": "Positional Parameters (JSON Array format: [val1, val2])",
-        "type": "String",
-        "multiline": true,
-        "group": "query",
-        "binding": { "type": "camunda:property", "name": "parameters" }
-      },
-      {
-        "label": "Query Timeout (seconds)",
-        "type": "String",
-        "group": "query",
-        "binding": { "type": "camunda:property", "name": "timeout" }
-      },
-      {
-        "label": "Response Result Variable Name",
-        "type": "String",
-        "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       }
     ]
   },
@@ -1552,23 +1085,40 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "connection", "label": "Redis Server Connection" },
-      { "id": "operation", "label": "Command & Arguments" },
-      { "id": "responseMapping", "label": "Response Mapping" }
+      {
+        "id": "connection",
+        "label": "Redis Server Connection"
+      },
+      {
+        "id": "operation",
+        "label": "Command & Arguments"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response Mapping"
+      }
     ],
     "properties": [
       {
         "label": "Redis Host / Connection String (redis://host:6379)",
         "type": "String",
         "group": "connection",
-        "binding": { "type": "camunda:property", "name": "connectionString" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "connectionString"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Password / Auth Token",
         "type": "String",
         "group": "connection",
-        "binding": { "type": "camunda:property", "name": "password" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "password"
+        }
       },
       {
         "label": "Command",
@@ -1576,40 +1126,75 @@
         "value": "GET",
         "group": "operation",
         "choices": [
-          { "name": "GET", "value": "GET" },
-          { "name": "SET", "value": "SET" },
-          { "name": "DEL", "value": "DEL" },
-          { "name": "EXPIRE", "value": "EXPIRE" },
-          { "name": "PUBLISH", "value": "PUBLISH" },
-          { "name": "HSET", "value": "HSET" }
+          {
+            "name": "GET",
+            "value": "GET"
+          },
+          {
+            "name": "SET",
+            "value": "SET"
+          },
+          {
+            "name": "DEL",
+            "value": "DEL"
+          },
+          {
+            "name": "EXPIRE",
+            "value": "EXPIRE"
+          },
+          {
+            "name": "PUBLISH",
+            "value": "PUBLISH"
+          },
+          {
+            "name": "HSET",
+            "value": "HSET"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "command" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "command"
+        }
       },
       {
         "label": "Key Name",
         "type": "String",
         "group": "operation",
-        "binding": { "type": "camunda:property", "name": "key" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "key"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Value / Payload (for SET, HSET, PUBLISH)",
         "type": "String",
         "multiline": true,
         "group": "operation",
-        "binding": { "type": "camunda:property", "name": "value" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "value"
+        }
       },
       {
         "label": "Expiration Time in Seconds (for SET / EXPIRE)",
         "type": "String",
         "group": "operation",
-        "binding": { "type": "camunda:property", "name": "ttl" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "ttl"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       }
     ]
   },
@@ -1628,8 +1213,14 @@
       "bpmn:ServiceTask"
     ],
     "groups": [
-      { "id": "configuration", "label": "Log Message & Severity" },
-      { "id": "responseMapping", "label": "Output Mapping" }
+      {
+        "id": "configuration",
+        "label": "Log Message & Severity"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Output Mapping"
+      }
     ],
     "properties": [
       {
@@ -1638,33 +1229,59 @@
         "value": "INFO",
         "group": "configuration",
         "choices": [
-          { "name": "INFO", "value": "INFO" },
-          { "name": "WARN", "value": "WARN" },
-          { "name": "ERROR", "value": "ERROR" },
-          { "name": "DEBUG", "value": "DEBUG" }
+          {
+            "name": "INFO",
+            "value": "INFO"
+          },
+          {
+            "name": "WARN",
+            "value": "WARN"
+          },
+          {
+            "name": "ERROR",
+            "value": "ERROR"
+          },
+          {
+            "name": "DEBUG",
+            "value": "DEBUG"
+          }
         ],
-        "binding": { "type": "camunda:property", "name": "level" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "level"
+        }
       },
       {
         "label": "Log Message Text",
         "type": "String",
         "multiline": true,
         "group": "configuration",
-        "binding": { "type": "camunda:property", "name": "message" },
-        "constraints": { "notEmpty": true }
+        "binding": {
+          "type": "camunda:property",
+          "name": "message"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
       },
       {
         "label": "Additional Context / Metadata (JSON format)",
         "type": "String",
         "multiline": true,
         "group": "configuration",
-        "binding": { "type": "camunda:property", "name": "context" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "context"
+        }
       },
       {
         "label": "Response Result Variable Name",
         "type": "String",
         "group": "responseMapping",
-        "binding": { "type": "camunda:property", "name": "resultVariable" }
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
       }
     ]
   }

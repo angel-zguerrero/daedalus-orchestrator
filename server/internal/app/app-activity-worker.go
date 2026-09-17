@@ -14,7 +14,7 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
-	"deadalus-orch/server/internal/infrastructure/zeebe"
+	"deadalus-orch/server/internal/pkg/activity"
 	"deadalus-orch/server/internal/pkg/config"
 	"deadalus-orch/server/internal/usecase/command"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
@@ -252,11 +252,13 @@ func (app *Application) processActivityQueuesForNode(
 		if err := json.Unmarshal(deqRes.Message.Content, &jobMsg); err == nil && jobMsg.JobID != "" {
 			var outputData map[string]interface{}
 			var completedSuccessfully bool
+			var lastExecErr error
 
-			if runnerURL != "" {
-				execCtx, cancelExec := context.WithTimeout(context.Background(), 30*time.Second)
-				zeebeClient := zeebe.NewZeebeClient(runnerURL)
-				out, err := zeebeClient.ExecuteConnectorJob(execCtx, jobMsg.JobID, jobMsg.ActivityName, jobMsg.ActivityType, jobMsg.Input)
+			execCtx, cancelExec := context.WithTimeout(context.Background(), 30*time.Second)
+			nativeExec, foundNative := activity.GetRegistry().Get(jobMsg.ActivityType)
+
+			if foundNative {
+				out, err := nativeExec.Execute(execCtx, jobMsg.Input)
 				cancelExec()
 
 				if err == nil {
@@ -265,109 +267,138 @@ func (app *Application) processActivityQueuesForNode(
 					log.Info().
 						Str("jobID", jobMsg.JobID).
 						Str("activityType", jobMsg.ActivityType).
-						Msg("🚀 Successfully executed job via Camunda Zeebe Gateway & Connectors bundle")
+						Msg("🚀 Successfully executed activity natively in Daedalus WORKER_ACTIVITIES")
 				} else {
+					lastExecErr = err
 					log.Warn().
 						Err(err).
 						Str("jobID", jobMsg.JobID).
 						Str("activityType", jobMsg.ActivityType).
-						Msg("⚠️ External Camunda connector execution via Zeebe failed")
+						Msg("⚠️ Native activity execution failed")
+				}
+			} else if runnerURL != "" {
+				out, err := invokeExternalCamundaRunner(execCtx, runnerURL, jobMsg)
+				cancelExec()
 
-					failCmd := &workflow_execution_command.HandleJobFailureCommand{
-						JobID:    jobMsg.JobID,
-						WorkerID: "WorkflowActivityWorker-1",
-						ErrorMsg: err.Error(),
-						CF:       cf,
-						CFS:      cfs,
+				if err == nil {
+					outputData = out
+					completedSuccessfully = true
+					log.Info().
+						Str("jobID", jobMsg.JobID).
+						Str("activityType", jobMsg.ActivityType).
+						Msg("🚀 Successfully executed job via external activity runner")
+				} else {
+					lastExecErr = err
+					log.Warn().
+						Err(err).
+						Str("jobID", jobMsg.JobID).
+						Str("activityType", jobMsg.ActivityType).
+						Msg("⚠️ External activity runner execution failed")
+				}
+			} else {
+				cancelExec()
+				if autoComplete {
+					outputData = map[string]interface{}{"status": "SUCCESS"}
+					completedSuccessfully = true
+					log.Info().
+						Str("jobID", jobMsg.JobID).
+						Str("activityType", jobMsg.ActivityType).
+						Msg("⚡ Auto-completed activity job in Daedalus WORKER_ACTIVITIES")
+				}
+			}
+
+			if !completedSuccessfully && lastExecErr != nil {
+				failCmd := &workflow_execution_command.HandleJobFailureCommand{
+					JobID:    jobMsg.JobID,
+					WorkerID: "WorkflowActivityWorker-1",
+					ErrorMsg: lastExecErr.Error(),
+					CF:       cf,
+					CFS:      cfs,
+				}
+				failCtx, cancelFail := context.WithTimeout(context.Background(), 10*time.Second)
+				failRes, failErr := dragonboat.ExecuteRepositoryCommand[workflow_execution_command.HandleJobFailureResult](
+					node,
+					failCtx,
+					failCmd,
+					config.GlobalConfiguration.ApiRaftTimeout,
+					log.Logger,
+					"handle activity job failure",
+				)
+				cancelFail()
+
+				if failErr == nil && failRes.RetriesExceeded {
+					log.Error().
+						Str("jobID", jobMsg.JobID).
+						Int32("retries", failRes.CurrentRetries).
+						Int32("maxRetries", failRes.MaxRetries).
+						Msg("❌ Activity job exceeded max retries. Marked job and workflow execution as FAILED.")
+
+					ackCmd := &queue_command.AckMessageCommand{
+						LeaseID: deqRes.Lease.ID,
+						CF:      cf,
+						CFS:     cfs,
 					}
-					failCtx, cancelFail := context.WithTimeout(context.Background(), 10*time.Second)
-					failRes, failErr := dragonboat.ExecuteRepositoryCommand[workflow_execution_command.HandleJobFailureResult](
+					ackCtx, cancelAck := context.WithTimeout(context.Background(), 10*time.Second)
+					_, _ = dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
 						node,
-						failCtx,
-						failCmd,
+						ackCtx,
+						ackCmd,
 						config.GlobalConfiguration.ApiRaftTimeout,
 						log.Logger,
-						"handle activity job failure",
+						"ack failed activity message",
 					)
-					cancelFail()
+					cancelAck()
+				} else if failErr == nil {
+					log.Warn().
+						Str("jobID", jobMsg.JobID).
+						Int32("retries", failRes.CurrentRetries).
+						Int32("maxRetries", failRes.MaxRetries).
+						Msg("⏳ Activity job retry count incremented. Scheduling retry message with 5s delay via ScheduledJob.")
 
-					if failErr == nil && failRes.RetriesExceeded {
-						log.Error().
-							Str("jobID", jobMsg.JobID).
-							Int32("retries", failRes.CurrentRetries).
-							Int32("maxRetries", failRes.MaxRetries).
-							Msg("❌ Activity job exceeded max retries. Marked job and workflow execution as FAILED.")
-
-						// Ack message to remove from queue
-						ackCmd := &queue_command.AckMessageCommand{
-							LeaseID: deqRes.Lease.ID,
-							CF:      cf,
-							CFS:     cfs,
-						}
-						ackCtx, cancelAck := context.WithTimeout(context.Background(), 10*time.Second)
-						_, _ = dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
-							node,
-							ackCtx,
-							ackCmd,
-							config.GlobalConfiguration.ApiRaftTimeout,
-							log.Logger,
-							"ack failed activity message",
-						)
-						cancelAck()
-					} else if failErr == nil {
-						log.Warn().
-							Str("jobID", jobMsg.JobID).
-							Int32("retries", failRes.CurrentRetries).
-							Int32("maxRetries", failRes.MaxRetries).
-							Msg("⏳ Activity job retry count incremented. Scheduling retry message with 5s delay via ScheduledJob.")
-
-						// Ack current lease to free old locked message
-						ackCmd := &queue_command.AckMessageCommand{
-							LeaseID: deqRes.Lease.ID,
-							CF:      cf,
-							CFS:     cfs,
-						}
-						ackCtx, cancelAck := context.WithTimeout(context.Background(), 10*time.Second)
-						_, _ = dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
-							node,
-							ackCtx,
-							ackCmd,
-							config.GlobalConfiguration.ApiRaftTimeout,
-							log.Logger,
-							"ack activity message for retry",
-						)
-						cancelAck()
-
-						// Schedule retry message with 5s delay using native ScheduledJob (no sleep)
-						nextRunAt := time.Now().Add(5 * time.Second)
-						schedCmd := &scheduled_job_command.CreateScheduledJobCommand{
-							ScheduledJob: models.ScheduledJob{
-								TenantID:    cfs,
-								TargetType:  "queue",
-								TargetID:    q.ID,
-								VNamespace:  deqRes.Message.VNamespace,
-								Content:     string(deqRes.Message.Content),
-								ContentType: "application/json",
-								Type:        models.ScheduledJobOneOff,
-								RunAt:       &nextRunAt,
-								NextRunAt:   nextRunAt,
-							},
-							CF:  cf,
-							CFS: cfs,
-						}
-						schedCtx, cancelSched := context.WithTimeout(context.Background(), 10*time.Second)
-						_, _ = dragonboat.ExecuteRepositoryCommand[interface{}](
-							node,
-							schedCtx,
-							schedCmd,
-							config.GlobalConfiguration.ApiRaftTimeout,
-							log.Logger,
-							"schedule activity retry job message",
-						)
-						cancelSched()
-					} else {
-						log.Error().Err(failErr).Str("jobID", jobMsg.JobID).Msg("❌ Failed to execute HandleJobFailureCommand")
+					ackCmd := &queue_command.AckMessageCommand{
+						LeaseID: deqRes.Lease.ID,
+						CF:      cf,
+						CFS:     cfs,
 					}
+					ackCtx, cancelAck := context.WithTimeout(context.Background(), 10*time.Second)
+					_, _ = dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
+						node,
+						ackCtx,
+						ackCmd,
+						config.GlobalConfiguration.ApiRaftTimeout,
+						log.Logger,
+						"ack activity message for retry",
+					)
+					cancelAck()
+
+					nextRunAt := time.Now().Add(5 * time.Second)
+					schedCmd := &scheduled_job_command.CreateScheduledJobCommand{
+						ScheduledJob: models.ScheduledJob{
+							TenantID:    cfs,
+							TargetType:  "queue",
+							TargetID:    q.ID,
+							VNamespace:  deqRes.Message.VNamespace,
+							Content:     string(deqRes.Message.Content),
+							ContentType: "application/json",
+							Type:        models.ScheduledJobOneOff,
+							RunAt:       &nextRunAt,
+							NextRunAt:   nextRunAt,
+						},
+						CF:  cf,
+						CFS: cfs,
+					}
+					schedCtx, cancelSched := context.WithTimeout(context.Background(), 10*time.Second)
+					_, _ = dragonboat.ExecuteRepositoryCommand[interface{}](
+						node,
+						schedCtx,
+						schedCmd,
+						config.GlobalConfiguration.ApiRaftTimeout,
+						log.Logger,
+						"schedule activity retry job message",
+					)
+					cancelSched()
+				} else {
+					log.Error().Err(failErr).Str("jobID", jobMsg.JobID).Msg("❌ Failed to execute HandleJobFailureCommand")
 				}
 			}
 
@@ -407,7 +438,6 @@ func (app *Application) processActivityQueuesForNode(
 						Msg("✅ Successfully completed workflow activity job")
 				}
 
-				// Ack message
 				ackCmd := &queue_command.AckMessageCommand{
 					LeaseID: deqRes.Lease.ID,
 					CF:      cf,
