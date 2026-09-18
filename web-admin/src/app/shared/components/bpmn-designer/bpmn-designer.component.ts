@@ -357,7 +357,15 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'execution listeners',
       'extension properties',
       'executable',
-      'isexecutable'
+      'isexecutable',
+      'start indicator',
+      'initiator',
+      'asynchronous continuation',
+      'asynchronous continuations',
+      'asynchronous',
+      'async',
+      'async before',
+      'async after'
     ];
 
     const UNWANTED_IDS = [
@@ -371,7 +379,15 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'executionlisteners',
       'extensionproperties',
       'isexecutable',
-      'executable'
+      'executable',
+      'startindicator',
+      'initiator',
+      'asynchronouscontinuation',
+      'asynchronouscontinuations',
+      'asynchronous',
+      'async',
+      'asyncbefore',
+      'asyncafter'
     ];
 
     const hideUnsupportedGroups = () => {

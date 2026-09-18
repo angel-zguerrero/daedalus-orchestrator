@@ -67,6 +67,9 @@
     [data-group-id*="jobConfiguration"],
     [data-group-id*="executionListeners"],
     [data-group-id*="extensionProperties"],
+    [data-group-id*="async"],
+    [data-group-id*="asynchronous"],
+    [data-group-id*="initiator"],
     [data-entry-id*="historyTimeToLive"],
     [data-entry-id*="isStartableInTasklist"],
     [data-entry-id*="candidateStarter"],
@@ -75,7 +78,11 @@
     [data-entry-id*="executionListeners"],
     [data-entry-id*="extensionProperties"],
     [data-entry-id*="isExecutable"],
-    [data-entry-id*="executable"] {
+    [data-entry-id*="executable"],
+    [data-entry-id*="initiator"],
+    [data-entry-id*="asyncBefore"],
+    [data-entry-id*="asyncAfter"],
+    [data-entry-id*="async"] {
       display: none !important;
     }
   }
