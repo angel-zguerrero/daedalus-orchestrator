@@ -345,7 +345,68 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       pattern: 'e.g. ^[A-Z]{3}-\\d{3}$ (regex)'
     };
 
+    const UNWANTED_GROUPS = [
+      'history clean up',
+      'history time to live',
+      'task list',
+      'tasklist',
+      'candidate starter',
+      'external task',
+      'job execution',
+      'job configuration',
+      'execution listeners',
+      'extension properties',
+      'executable',
+      'isexecutable'
+    ];
+
+    const UNWANTED_IDS = [
+      'historytimetolive',
+      'historycleanup',
+      'tasklist',
+      'candidatestarter',
+      'externaltask',
+      'jobexecution',
+      'jobconfiguration',
+      'executionlisteners',
+      'extensionproperties',
+      'isexecutable',
+      'executable'
+    ];
+
+    const hideUnsupportedGroups = () => {
+      const groupEls = parent.querySelectorAll('.bio-properties-panel-group, [data-group-id]');
+      groupEls.forEach((groupEl) => {
+        const groupId = (groupEl.getAttribute('data-group-id') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const headerEl = groupEl.querySelector('.bio-properties-panel-group-header-title, .bio-properties-panel-group-title, h3, h4, .group-title, .bio-properties-panel-group-header');
+        const headerText = (headerEl?.textContent || '').toLowerCase().trim();
+
+        const isUnwanted = UNWANTED_IDS.some(id => groupId.includes(id)) ||
+                           UNWANTED_GROUPS.some(name => headerText.includes(name));
+
+        if (isUnwanted) {
+          (groupEl as HTMLElement).style.display = 'none';
+        }
+      });
+
+      const entryEls = parent.querySelectorAll('.bio-properties-panel-entry, [data-entry-id]');
+      entryEls.forEach((entryEl) => {
+        const entryId = (entryEl.getAttribute('data-entry-id') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const labelEl = entryEl.querySelector('label, .bio-properties-panel-label');
+        const labelText = (labelEl?.textContent || '').toLowerCase().trim();
+
+        const isUnwantedEntry = UNWANTED_IDS.some(id => entryId.includes(id)) ||
+                                UNWANTED_GROUPS.some(name => labelText.includes(name));
+
+        if (isUnwantedEntry) {
+          (entryEl as HTMLElement).style.display = 'none';
+        }
+      });
+    };
+
     const enhanceConstraintEntries = () => {
+      hideUnsupportedGroups();
+
       const nameEntries = parent.querySelectorAll('[data-entry-id*="-constraint-"][data-entry-id$="-name"]');
       nameEntries.forEach((entryEl) => {
         const input = entryEl.querySelector('input') as HTMLInputElement;

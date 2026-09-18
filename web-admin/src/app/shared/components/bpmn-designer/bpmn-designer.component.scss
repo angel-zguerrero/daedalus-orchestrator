@@ -54,6 +54,30 @@
     background-color: #212631;
     overflow-y: auto;
     color: #e0e0e0;
+
+    /* Hide Unsupported Groups & Entries */
+    [data-group-id*="historyTimeToLive"],
+    [data-group-id*="historyCleanUp"],
+    [data-group-id*="history"],
+    [data-group-id*="tasklist"],
+    [data-group-id*="taskList"],
+    [data-group-id*="candidateStarter"],
+    [data-group-id*="externalTask"],
+    [data-group-id*="jobExecution"],
+    [data-group-id*="jobConfiguration"],
+    [data-group-id*="executionListeners"],
+    [data-group-id*="extensionProperties"],
+    [data-entry-id*="historyTimeToLive"],
+    [data-entry-id*="isStartableInTasklist"],
+    [data-entry-id*="candidateStarter"],
+    [data-entry-id*="externalTask"],
+    [data-entry-id*="jobPriority"],
+    [data-entry-id*="executionListeners"],
+    [data-entry-id*="extensionProperties"],
+    [data-entry-id*="isExecutable"],
+    [data-entry-id*="executable"] {
+      display: none !important;
+    }
   }
 
   .bpmn-zoom-overlay {
