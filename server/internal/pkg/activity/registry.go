@@ -62,15 +62,9 @@ func (r *Registry) RegisterDefaults() {
 	redisExec := &RedisExecutor{}
 	logExec := &LogExecutor{}
 
-	// HTTP-based services (HTTP REST, GraphQL, Slack, MS Teams, SendGrid, Twilio, OpenAI)
+	// HTTP-based services (HTTP REST)
 	r.executors["io.camunda.connectors.httpjson.v1"] = httpExec
 	r.executors["io.camunda:http-json:1"] = httpExec
-	r.executors["io.camunda.connectors.graphql.v1"] = httpExec
-	r.executors["io.camunda.connectors.slack.v1"] = httpExec
-	r.executors["io.camunda.connectors.msteams.v1"] = httpExec
-	r.executors["io.camunda.connectors.sendgrid.v1"] = httpExec
-	r.executors["io.camunda.connectors.twilio.v1"] = httpExec
-	r.executors["io.camunda.connectors.openai.v1"] = httpExec
 	r.executors["http-json"] = httpExec
 	r.executors["http"] = httpExec
 	r.executors["rest"] = httpExec

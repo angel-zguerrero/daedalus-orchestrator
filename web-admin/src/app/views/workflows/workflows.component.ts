@@ -30,6 +30,7 @@ import { VNamespacesService } from '../tenants/tenant-management/services/vnames
 import { ErrorUtil } from '../../shared/utils/error.util';
 import { QueueDetailComponent } from '../tenants/tenant-management/queues/queue-detail/queue-detail.component';
 import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../shared/components/bpmn-designer/bpmn-designer.component';
+import { BpmnFormParserUtil, GeneratedFormField } from '../../shared/utils/bpmn-form-parser.util';
 
 @Component({
   selector: 'app-workflows',
@@ -116,6 +117,11 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   executing: boolean = false;
   executionResult: any = null;
   executeErrorMessage: string = '';
+  startFormFields: GeneratedFormField[] = [];
+  formValues: { [key: string]: any } = {};
+  formErrors: { [key: string]: string } = {};
+  hasStartForm: boolean = false;
+  executionInputMode: 'form' | 'json' = 'form';
 
   // Executions List Modal
   showExecutionsModal: boolean = false;
@@ -546,19 +552,57 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   }
 
   // --- EXECUTE WORKFLOW HANDLERS ---
-  openExecuteModal(wf: WorkflowDefinition): void {
+  async openExecuteModal(wf: WorkflowDefinition): Promise<void> {
     this.executingWorkflow = wf;
-    this.executeInputJson = '{\n  "approved": true\n}';
     this.executionKey = '';
     this.executionResult = null;
     this.executeErrorMessage = '';
+
+    // Extract BPMN XML payload from definition or active editor
+    let xmlPayload = '';
+    if (this.isEditing && this.bpmnDesigner) {
+      xmlPayload = await this.bpmnDesigner.getXml();
+    } else if (wf && wf.payload) {
+      xmlPayload = this.decodePayload(wf.payload);
+    } else if (this.workflowForm && this.workflowForm.get('payload')?.value) {
+      xmlPayload = this.decodePayload(this.workflowForm.get('payload')?.value);
+    }
+
+    // Extract Generated Task Form fields from StartEvent
+    this.startFormFields = BpmnFormParserUtil.extractStartFormFields(xmlPayload);
+    this.formValues = {};
+    this.formErrors = {};
+
+    if (this.startFormFields.length > 0) {
+      this.hasStartForm = true;
+      this.executionInputMode = 'form';
+      // Populate default values
+      for (const field of this.startFormFields) {
+        if (field.type === 'boolean') {
+          this.formValues[field.id] = field.defaultValue === 'true';
+        } else if (field.type === 'long' || field.type === 'integer') {
+          this.formValues[field.id] = field.defaultValue ? Number(field.defaultValue) : 0;
+        } else if (field.type === 'enum' && field.values && field.values.length > 0) {
+          this.formValues[field.id] = field.defaultValue || field.values[0].id;
+        } else {
+          this.formValues[field.id] = field.defaultValue || '';
+        }
+      }
+      this.executeInputJson = JSON.stringify(this.formValues, null, 2);
+    } else {
+      this.hasStartForm = false;
+      this.executionInputMode = 'json';
+      this.executeInputJson = '{\n  "approved": true\n}';
+    }
+
     this.showExecuteModal = true;
   }
 
-  openExecuteModalFromForm(): void {
+  async openExecuteModalFromForm(): Promise<void> {
     if (this.selectedWorkflow) {
-      this.openExecuteModal(this.selectedWorkflow);
+      await this.openExecuteModal(this.selectedWorkflow);
     } else if (this.isEditing && this.editingWorkflowId) {
+      const activeXml = this.bpmnDesigner ? await this.bpmnDesigner.getXml() : this.workflowForm.get('payload')?.value;
       const currentWf: WorkflowDefinition = {
         id: this.editingWorkflowId,
         code: this.workflowForm.get('code')?.value,
@@ -566,19 +610,124 @@ export class WorkflowsComponent implements OnInit, OnChanges {
         vnamespace: this.workflowForm.get('vnamespace')?.value,
         version: this.workflowForm.get('version')?.value || 1,
         payloadFormat: 'json',
+        payload: activeXml,
         maxDurationSeconds: 3600,
         isActive: true,
         scope: this.scope
       };
-      this.openExecuteModal(currentWf);
+      await this.openExecuteModal(currentWf);
     }
+  }
+
+  validateField(field: GeneratedFormField): string {
+    const val = this.formValues[field.id];
+    const valStr = val !== undefined && val !== null ? String(val).trim() : '';
+    const normType = (field.type || 'string').toLowerCase();
+
+    // Required check
+    if (field.required) {
+      if (normType === 'boolean') {
+        if (val !== true && val !== 'true' && val !== 1) {
+          return `El campo '${field.label || field.id}' es obligatorio.`;
+        }
+      } else if (!valStr) {
+        return `El campo '${field.label || field.id}' es obligatorio.`;
+      }
+    }
+
+    if (!valStr) return ''; // If not required and empty, skip range/length checks
+
+    // String length & pattern checks
+    if (normType === 'string' || normType === 'text' || normType === 'longtext' || normType === '') {
+      const minL = field.minlength !== undefined ? Number(field.minlength) : (field.min !== undefined ? Number(field.min) : undefined);
+      const maxL = field.maxlength !== undefined ? Number(field.maxlength) : (field.max !== undefined ? Number(field.max) : undefined);
+
+      if (minL !== undefined && !isNaN(minL) && valStr.length < minL) {
+        return `El campo '${field.label || field.id}' debe tener al menos ${minL} caracteres (longitud actual: ${valStr.length}).`;
+      }
+      if (maxL !== undefined && !isNaN(maxL) && valStr.length > maxL) {
+        return `El campo '${field.label || field.id}' debe tener máximo ${maxL} caracteres (longitud actual: ${valStr.length}).`;
+      }
+      if (field.pattern) {
+        try {
+          const reg = new RegExp(field.pattern);
+          if (!reg.test(valStr)) {
+            return `El valor del campo '${field.label || field.id}' no cumple el patrón requerido (${field.pattern}).`;
+          }
+        } catch {
+          // ignore invalid pattern regex
+        }
+      }
+    }
+
+    // Number min/max checks
+    if (normType === 'long' || normType === 'integer' || normType === 'number' || normType === 'float' || normType === 'double') {
+      const numVal = Number(val);
+      if (isNaN(numVal)) {
+        return `El campo '${field.label || field.id}' debe ser un número válido.`;
+      }
+      const minN = field.min !== undefined ? Number(field.min) : (field.minlength !== undefined ? Number(field.minlength) : undefined);
+      const maxN = field.max !== undefined ? Number(field.max) : (field.maxlength !== undefined ? Number(field.maxlength) : undefined);
+
+      if (minN !== undefined && !isNaN(minN) && numVal < minN) {
+        return `El campo '${field.label || field.id}' debe ser mayor o igual a ${minN}.`;
+      }
+      if (maxN !== undefined && !isNaN(maxN) && numVal > maxN) {
+        return `El campo '${field.label || field.id}' debe ser menor o igual a ${maxN}.`;
+      }
+    }
+
+    return '';
+  }
+
+  onFormFieldChange(field: GeneratedFormField): void {
+    const err = this.validateField(field);
+    const newErrors = { ...this.formErrors };
+    if (err) {
+      newErrors[field.id] = err;
+    } else {
+      delete newErrors[field.id];
+    }
+    this.formErrors = newErrors;
+  }
+
+  validateAllFormFields(): boolean {
+    const newErrors: { [key: string]: string } = {};
+    let isValid = true;
+    for (const field of this.startFormFields) {
+      const err = this.validateField(field);
+      if (err) {
+        newErrors[field.id] = err;
+        isValid = false;
+      }
+    }
+    this.formErrors = newErrors;
+    return isValid;
   }
 
   confirmExecuteWorkflow(): void {
     if (!this.executingWorkflow || !this.executingWorkflow.id) return;
 
-    let inputObj = {};
-    if (this.executeInputJson && this.executeInputJson.trim()) {
+    let inputObj: any = {};
+    if (this.hasStartForm && this.executionInputMode === 'form') {
+      if (!this.validateAllFormFields()) {
+        this.executeErrorMessage = 'Por favor corrija los errores del formulario antes de continuar.';
+        return;
+      }
+
+      inputObj = {};
+      for (const field of this.startFormFields) {
+        const val = this.formValues[field.id];
+        if (field.type === 'boolean') {
+          inputObj[field.id] = Boolean(val);
+        } else if (field.type === 'long' || field.type === 'integer') {
+          inputObj[field.id] = val !== '' && val !== null && !isNaN(Number(val)) ? Number(val) : 0;
+        } else {
+          inputObj[field.id] = val !== undefined && val !== null ? val : '';
+        }
+      }
+      this.executeInputJson = JSON.stringify(inputObj, null, 2);
+    } else if (this.executeInputJson && this.executeInputJson.trim()) {
       try {
         inputObj = JSON.parse(this.executeInputJson);
       } catch (e: any) {
@@ -614,6 +763,10 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.showExecuteModal = false;
     this.executingWorkflow = null;
     this.executionResult = null;
+    this.startFormFields = [];
+    this.formValues = {};
+    this.formErrors = {};
+    this.hasStartForm = false;
   }
 
   // --- EXECUTIONS LIST HANDLERS ---

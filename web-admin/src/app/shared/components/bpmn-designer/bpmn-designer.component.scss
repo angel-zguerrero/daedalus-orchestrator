@@ -194,6 +194,14 @@
     color: #38bdf8 !important;
     font-weight: 500 !important;
   }
+
+  /* Filter Form Type options to focus on Generated Task Forms */
+  .bio-properties-panel-entry[data-entry-id="formType"] select option[value="formRef"],
+  .bio-properties-panel-entry[data-entry-id="formType"] select option[value="formKey"],
+  select[name="formType"] option[value="formRef"],
+  select[name="formType"] option[value="formKey"] {
+    display: none !important;
+  }
 }
 
 /* Context Pad Action Icons (Popup tools next to selected element on canvas) */

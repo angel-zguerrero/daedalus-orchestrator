@@ -22,13 +22,33 @@ const (
 	ElementSequenceFlow     ElementType = "sequenceFlow"
 )
 
+type FormFieldConstraint struct {
+	Name   string `json:"name"`
+	Config string `json:"config"`
+}
+
+type FormFieldValue struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type FormField struct {
+	ID           string                `json:"id"`
+	Label        string                `json:"label"`
+	Type         string                `json:"type"`
+	DefaultValue string                `json:"defaultValue"`
+	Values       []FormFieldValue      `json:"values,omitempty"`
+	Constraints  []FormFieldConstraint `json:"constraints,omitempty"`
+}
+
 type BPMNNode struct {
-	ID           string                 `json:"id"`
-	Name         string                 `json:"name"`
-	Type         ElementType            `json:"type"`
-	Incoming     []string               `json:"incoming"`
-	Outgoing     []string               `json:"outgoing"`
-	Properties   map[string]string      `json:"properties,omitempty"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Type       ElementType       `json:"type"`
+	Incoming   []string          `json:"incoming"`
+	Outgoing   []string          `json:"outgoing"`
+	Properties map[string]string `json:"properties,omitempty"`
+	FormFields []*FormField      `json:"formFields,omitempty"`
 }
 
 type SequenceFlow struct {
@@ -91,6 +111,7 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 	}
 
 	var currentNode *BPMNNode
+	var currentFormField *FormField
 	var currentFlow *SequenceFlow
 	var currentElement string
 	var inConditionExpression bool
@@ -157,6 +178,48 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 						currentNode.Properties[pName] = pValue
 					}
 				}
+			case "formField":
+				if currentNode != nil {
+					fID := getAttr(t.Attr, "id")
+					fLabel := getAttr(t.Attr, "label")
+					fType := getAttr(t.Attr, "type")
+					fDef := getAttr(t.Attr, "defaultValue")
+					if fID != "" {
+						field := &FormField{
+							ID:           fID,
+							Label:        fLabel,
+							Type:         fType,
+							DefaultValue: fDef,
+						}
+						currentNode.FormFields = append(currentNode.FormFields, field)
+						currentFormField = field
+					}
+				}
+			case "value":
+				if currentFormField != nil {
+					vID := getAttr(t.Attr, "id")
+					vName := getAttr(t.Attr, "name")
+					if vID != "" {
+						currentFormField.Values = append(currentFormField.Values, FormFieldValue{
+							ID:   vID,
+							Name: vName,
+						})
+					}
+				}
+			case "constraint":
+				if currentFormField != nil {
+					cName := getAttr(t.Attr, "name")
+					cConfig := getAttr(t.Attr, "config")
+					if cConfig == "" {
+						cConfig = getAttr(t.Attr, "value")
+					}
+					if cName != "" {
+						currentFormField.Constraints = append(currentFormField.Constraints, FormFieldConstraint{
+							Name:   cName,
+							Config: cConfig,
+						})
+					}
+				}
 
 			case ElementSequenceFlow:
 				id := getAttr(t.Attr, "id")
@@ -204,6 +267,9 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 			switch ElementType(local) {
 			case ElementStartEvent, ElementEndEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				currentNode = nil
+				currentFormField = nil
+			case "formField":
+				currentFormField = nil
 			case ElementSequenceFlow:
 				currentFlow = nil
 			}

@@ -556,8 +556,111 @@
       <small class="text-muted d-block mt-1">An optional unique key to track this execution in external systems.</small>
     </div>
 
+    <!-- Mode Switcher (if Start Form exists) -->
+    <div *ngIf="hasStartForm" class="mb-3 d-flex align-items-center justify-content-between p-2 bg-dark rounded border border-secondary">
+      <span class="badge bg-info text-dark font-weight-bold d-flex align-items-center gap-1">
+        <svg cIcon name="cil-list-rich" class="me-1"></svg> Formulario Generado (Start Event)
+      </span>
+      <div class="btn-group btn-group-sm">
+        <button cButton [color]="executionInputMode === 'form' ? 'info' : 'outline-secondary'" (click)="executionInputMode = 'form'">
+          Formulario Visual
+        </button>
+        <button cButton [color]="executionInputMode === 'json' ? 'info' : 'outline-secondary'" (click)="executionInputMode = 'json'">
+          JSON Crudo
+        </button>
+      </div>
+    </div>
+
+    <!-- DYNAMIC FORM INPUTS -->
+    <div *ngIf="hasStartForm && executionInputMode === 'form'" class="p-3 bg-dark text-light rounded border border-secondary mb-3">
+      <h6 class="text-info mb-3">Campos de Entrada del Workflow</h6>
+      <div *ngFor="let field of startFormFields" class="mb-3 p-2 bg-dark rounded border" [class.border-danger]="formErrors[field.id]" [class.border-secondary]="!formErrors[field.id]">
+        <label class="form-label small text-light d-flex align-items-center justify-content-between mb-1">
+          <span class="d-flex align-items-center gap-1">
+            <strong>{{ field.label || field.id }}</strong>
+            <span class="text-muted font-monospace me-1">({{ field.id }})</span>
+            <span *ngIf="field.type" class="badge bg-secondary text-light font-monospace">{{ field.type }}</span>
+          </span>
+          <div class="d-flex align-items-center gap-1 flex-wrap">
+            <span *ngIf="field.required" class="badge bg-danger">Obligatorio</span>
+            <span *ngIf="field.readonly" class="badge bg-warning text-dark">Sólo Lectura</span>
+            <span *ngIf="(field.minlength !== undefined || field.min !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Mín Caracteres: {{ field.minlength !== undefined ? field.minlength : field.min }}</span>
+            <span *ngIf="(field.maxlength !== undefined || field.max !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Máx Caracteres: {{ field.maxlength !== undefined ? field.maxlength : field.max }}</span>
+            <span *ngIf="(field.min !== undefined || field.minlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Mín: {{ field.min !== undefined ? field.min : field.minlength }}</span>
+            <span *ngIf="(field.max !== undefined || field.maxlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Máx: {{ field.max !== undefined ? field.max : field.maxlength }}</span>
+            <span *ngIf="field.pattern" class="badge bg-dark border border-info text-info" [title]="'Patrón Regex: ' + field.pattern">Regex</span>
+          </div>
+        </label>
+
+        <!-- String Input -->
+        <input *ngIf="field.type === 'string' || field.type === 'text' || field.type === 'longtext' || !field.type"
+               type="text"
+               cFormControl
+               [(ngModel)]="formValues[field.id]"
+               (input)="onFormFieldChange(field)"
+               (ngModelChange)="onFormFieldChange(field)"
+               [placeholder]="field.label || field.id"
+               [readonly]="!!field.readonly"
+               [attr.minlength]="field.minlength !== undefined ? field.minlength : field.min"
+               [attr.maxlength]="field.maxlength !== undefined ? field.maxlength : field.max"
+               [class.is-invalid]="formErrors[field.id]" />
+
+        <!-- Long/Integer Input -->
+        <input *ngIf="field.type === 'long' || field.type === 'integer' || field.type === 'number' || field.type === 'float' || field.type === 'double'"
+               type="number"
+               cFormControl
+               [(ngModel)]="formValues[field.id]"
+               (input)="onFormFieldChange(field)"
+               (ngModelChange)="onFormFieldChange(field)"
+               [placeholder]="field.label || field.id"
+               [readonly]="!!field.readonly"
+               [attr.min]="field.min !== undefined ? field.min : field.minlength"
+               [attr.max]="field.max !== undefined ? field.max : field.maxlength"
+               [class.is-invalid]="formErrors[field.id]" />
+
+        <!-- Date Input -->
+        <input *ngIf="field.type === 'date'"
+               type="date"
+               cFormControl
+               [(ngModel)]="formValues[field.id]"
+               (input)="onFormFieldChange(field)"
+               (ngModelChange)="onFormFieldChange(field)"
+               [readonly]="!!field.readonly"
+               [class.is-invalid]="formErrors[field.id]" />
+
+        <!-- Boolean Switch -->
+        <div *ngIf="field.type === 'boolean'" class="form-check form-switch mt-1">
+          <input class="form-check-input"
+                 type="checkbox"
+                 [id]="'form_switch_' + field.id"
+                 [(ngModel)]="formValues[field.id]"
+                 (ngModelChange)="onFormFieldChange(field)"
+                 [disabled]="!!field.readonly" />
+          <label class="form-check-label text-muted" [for]="'form_switch_' + field.id">
+            {{ formValues[field.id] ? 'Sí (True)' : 'No (False)' }}
+          </label>
+        </div>
+
+        <!-- Enum Select -->
+        <select *ngIf="field.type === 'enum'"
+                cSelect
+                [(ngModel)]="formValues[field.id]"
+                (change)="onFormFieldChange(field)"
+                (ngModelChange)="onFormFieldChange(field)"
+                [disabled]="!!field.readonly"
+                [class.is-invalid]="formErrors[field.id]">
+          <option *ngFor="let opt of field.values" [value]="opt.id">{{ opt.name || opt.id }}</option>
+        </select>
+
+        <!-- Live Validation Error Message -->
+        <div *ngIf="formErrors[field.id]" class="text-danger small mt-1 font-weight-bold d-flex align-items-center gap-1">
+          <svg cIcon name="cil-warning" class="me-1"></svg> {{ formErrors[field.id] }}
+        </div>
+      </div>
+    </div>
+
     <!-- Input Payload JSON -->
-    <div class="mb-3">
+    <div class="mb-3" *ngIf="!hasStartForm || executionInputMode === 'json'">
       <label class="form-label font-weight-bold">Input Payload (JSON format)</label>
       <textarea cFormControl rows="6" [(ngModel)]="executeInputJson" class="font-monospace bg-dark text-light border-secondary" placeholder='{ "param": "value" }'></textarea>
       <small class="text-muted d-block mt-1">Variables provided here will populate the execution's initial state context.</small>

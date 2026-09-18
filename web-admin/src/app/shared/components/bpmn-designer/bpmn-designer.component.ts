@@ -65,6 +65,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   private bpmnModeler!: any;
   private isInitialized = false;
   private lastEmittedXml: string = '';
+  private constraintObserver?: MutationObserver;
 
   ngAfterViewInit(): void {
     this.initModeler();
@@ -82,6 +83,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   }
 
   ngOnDestroy(): void {
+    if (this.constraintObserver) {
+      this.constraintObserver.disconnect();
+      this.constraintObserver = undefined;
+    }
     if (this.bpmnModeler) {
       this.bpmnModeler.destroy();
     }
@@ -149,6 +154,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       } catch (e) {
         console.warn('Element templates loader notice:', e);
       }
+
+      this.setupPropertiesPanelConstraintEnhancer();
     }
 
     this.isInitialized = true;
@@ -289,5 +296,118 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     } catch {
       return false;
     }
+  }
+
+  private setupPropertiesPanelConstraintEnhancer(): void {
+    const parent = this.propertiesRef?.nativeElement;
+    if (!parent) return;
+
+    if (this.constraintObserver) {
+      this.constraintObserver.disconnect();
+      this.constraintObserver = undefined;
+    }
+
+    const SUPPORTED_CONSTRAINTS = [
+      { value: 'required', label: 'required (Obligatorio)' },
+      { value: 'minlength', label: 'minlength (Longitud Mínima)' },
+      { value: 'maxlength', label: 'maxlength (Longitud Máxima)' },
+      { value: 'min', label: 'min (Valor Mínimo)' },
+      { value: 'max', label: 'max (Valor Máximo)' },
+      { value: 'pattern', label: 'pattern (Regex / Expresión Regular)' },
+      { value: 'readonly', label: 'readonly (Sólo Lectura)' }
+    ];
+
+    const CONFIG_PLACEHOLDERS: { [key: string]: string } = {
+      required: 'true',
+      readonly: 'true',
+      minlength: 'Ej. 5 (mínimo de caracteres)',
+      maxlength: 'Ej. 50 (máximo de caracteres)',
+      min: 'Ej. 100 (valor numérico mínimo)',
+      max: 'Ej. 5000 (valor numérico máximo)',
+      pattern: 'Ej. ^[A-Z]{3}-\\d{3}$ (regex)'
+    };
+
+    const enhanceConstraintEntries = () => {
+      const nameEntries = parent.querySelectorAll('[data-entry-id*="-constraint-"][data-entry-id$="-name"]');
+      nameEntries.forEach((entryEl) => {
+        const input = entryEl.querySelector('input') as HTMLInputElement;
+        if (!input || input.dataset['enhanced']) return;
+
+        input.dataset['enhanced'] = 'true';
+        input.style.display = 'none';
+
+        const select = document.createElement('select');
+        select.className = 'bio-properties-panel-input bio-properties-panel-select';
+        select.style.width = '100%';
+        select.style.backgroundColor = '#181b22';
+        select.style.color = '#ffffff';
+        select.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        select.style.borderRadius = '4px';
+        select.style.padding = '6px 8px';
+        select.style.marginTop = '4px';
+
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = '-- Seleccionar Regla de Validación --';
+        select.appendChild(placeholderOpt);
+
+        let isKnown = false;
+        SUPPORTED_CONSTRAINTS.forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c.value;
+          opt.textContent = c.label;
+          if (input.value && input.value.toLowerCase() === c.value) {
+            opt.selected = true;
+            isKnown = true;
+          }
+          select.appendChild(opt);
+        });
+
+        if (input.value && !isKnown) {
+          const customOpt = document.createElement('option');
+          customOpt.value = input.value;
+          customOpt.textContent = input.value + ' (Custom)';
+          customOpt.selected = true;
+          select.appendChild(customOpt);
+        }
+
+        input.parentNode?.insertBefore(select, input.nextSibling);
+
+        const entryId = entryEl.getAttribute('data-entry-id') || '';
+        const configEntryId = entryId.replace(/-name$/, '-config');
+        const configEntryEl = parent.querySelector(`[data-entry-id="${configEntryId}"]`);
+        const configInput = configEntryEl?.querySelector('input') as HTMLInputElement;
+
+        const updateConfigPlaceholder = (selectedVal: string) => {
+          if (configInput) {
+            configInput.placeholder = CONFIG_PLACEHOLDERS[selectedVal.toLowerCase()] || 'Ej. valor de configuración';
+          }
+        };
+
+        if (input.value) {
+          updateConfigPlaceholder(input.value);
+        }
+
+        select.addEventListener('change', () => {
+          const chosen = select.value;
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+          if (nativeSetter) {
+            nativeSetter.call(input, chosen);
+          } else {
+            input.value = chosen;
+          }
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          updateConfigPlaceholder(chosen);
+        });
+      });
+    };
+
+    this.constraintObserver = new MutationObserver(() => {
+      enhanceConstraintEntries();
+    });
+
+    this.constraintObserver.observe(parent, { childList: true, subtree: true });
+    setTimeout(enhanceConstraintEntries, 100);
   }
 }

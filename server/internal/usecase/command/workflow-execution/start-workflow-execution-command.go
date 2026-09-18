@@ -80,6 +80,14 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		return *commandResult
 	}
 
+	startNode := bpmnModel.GetNode(bpmnModel.StartNodeID)
+	if startNode != nil && len(startNode.FormFields) > 0 {
+		if err := bpmn.ValidateFormInput(startNode.FormFields, cmd.Input); err != nil {
+			commandResult.Error = fmt.Sprintf("invalid start form input: %s", err.Error())
+			return *commandResult
+		}
+	}
+
 	vns := cmd.VNamespace
 	if vns == "" {
 		vns = def.VNamespace
