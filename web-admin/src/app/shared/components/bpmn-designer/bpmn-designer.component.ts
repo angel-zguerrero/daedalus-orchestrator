@@ -161,6 +161,23 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       }
 
       try {
+        const contextPadProvider = this.bpmnModeler.get('contextPadProvider');
+        if (contextPadProvider && contextPadProvider.getContextPadEntries) {
+          const origGetContextPadEntries = contextPadProvider.getContextPadEntries.bind(contextPadProvider);
+          contextPadProvider.getContextPadEntries = function(element: any) {
+            const entries = origGetContextPadEntries(element);
+            const elementType = element && element.type ? element.type.toLowerCase() : '';
+            if (!elementType.includes('gateway')) {
+              delete entries['replace'];
+            }
+            return entries;
+          };
+        }
+      } catch (e) {
+        console.warn('Context pad entries override notice:', e);
+      }
+
+      try {
         const elementTemplates = this.bpmnModeler.get('elementTemplates');
         if (elementTemplates && elementTemplates.set) {
           elementTemplates.set(elementTemplatesData);
