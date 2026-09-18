@@ -254,7 +254,7 @@
           Cancel
         </button>
 
-        <!-- Save (Solo guardar, sin cerrar) -->
+        <!-- Save (Save only, without closing) -->
         <button 
           cButton 
           color="success" 
@@ -268,7 +268,7 @@
           Save
         </button>
 
-        <!-- Save & Close (Guardar y cerrar) -->
+        <!-- Save & Close (Save and close) -->
         <button 
           cButton 
           color="primary" 
@@ -559,21 +559,21 @@
     <!-- Mode Switcher (if Start Form exists) -->
     <div *ngIf="hasStartForm" class="mb-3 d-flex align-items-center justify-content-between p-2 bg-dark rounded border border-secondary">
       <span class="badge bg-info text-dark font-weight-bold d-flex align-items-center gap-1">
-        <svg cIcon name="cil-list-rich" class="me-1"></svg> Formulario Generado (Start Event)
+        <svg cIcon name="cil-list-rich" class="me-1"></svg> Generated Form (Start Event)
       </span>
       <div class="btn-group btn-group-sm">
         <button cButton [color]="executionInputMode === 'form' ? 'info' : 'outline-secondary'" (click)="executionInputMode = 'form'">
-          Formulario Visual
+          Visual Form
         </button>
         <button cButton [color]="executionInputMode === 'json' ? 'info' : 'outline-secondary'" (click)="executionInputMode = 'json'">
-          JSON Crudo
+          Raw JSON
         </button>
       </div>
     </div>
 
     <!-- DYNAMIC FORM INPUTS -->
     <div *ngIf="hasStartForm && executionInputMode === 'form'" class="p-3 bg-dark text-light rounded border border-secondary mb-3">
-      <h6 class="text-info mb-3">Campos de Entrada del Workflow</h6>
+      <h6 class="text-info mb-3">Workflow Input Fields</h6>
       <div *ngFor="let field of startFormFields" class="mb-3 p-2 bg-dark rounded border" [class.border-danger]="formErrors[field.id]" [class.border-secondary]="!formErrors[field.id]">
         <label class="form-label small text-light d-flex align-items-center justify-content-between mb-1">
           <span class="d-flex align-items-center gap-1">
@@ -582,13 +582,13 @@
             <span *ngIf="field.type" class="badge bg-secondary text-light font-monospace">{{ field.type }}</span>
           </span>
           <div class="d-flex align-items-center gap-1 flex-wrap">
-            <span *ngIf="field.required" class="badge bg-danger">Obligatorio</span>
-            <span *ngIf="field.readonly" class="badge bg-warning text-dark">Sólo Lectura</span>
-            <span *ngIf="(field.minlength !== undefined || field.min !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Mín Caracteres: {{ field.minlength !== undefined ? field.minlength : field.min }}</span>
-            <span *ngIf="(field.maxlength !== undefined || field.max !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Máx Caracteres: {{ field.maxlength !== undefined ? field.maxlength : field.max }}</span>
-            <span *ngIf="(field.min !== undefined || field.minlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Mín: {{ field.min !== undefined ? field.min : field.minlength }}</span>
-            <span *ngIf="(field.max !== undefined || field.maxlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Máx: {{ field.max !== undefined ? field.max : field.maxlength }}</span>
-            <span *ngIf="field.pattern" class="badge bg-dark border border-info text-info" [title]="'Patrón Regex: ' + field.pattern">Regex</span>
+            <span *ngIf="field.required" class="badge bg-danger">Required</span>
+            <span *ngIf="field.readonly" class="badge bg-warning text-dark">Read-only</span>
+            <span *ngIf="(field.minlength !== undefined || field.min !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Min Length: {{ field.minlength !== undefined ? field.minlength : field.min }}</span>
+            <span *ngIf="(field.maxlength !== undefined || field.max !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Max Length: {{ field.maxlength !== undefined ? field.maxlength : field.max }}</span>
+            <span *ngIf="(field.min !== undefined || field.minlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Min: {{ field.min !== undefined ? field.min : field.minlength }}</span>
+            <span *ngIf="(field.max !== undefined || field.maxlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Max: {{ field.max !== undefined ? field.max : field.maxlength }}</span>
+            <span *ngIf="field.pattern" class="badge bg-dark border border-info text-info" [title]="'Regex Pattern: ' + field.pattern">Regex</span>
           </div>
         </label>
 
@@ -637,7 +637,7 @@
                  (ngModelChange)="onFormFieldChange(field)"
                  [disabled]="!!field.readonly" />
           <label class="form-check-label text-muted" [for]="'form_switch_' + field.id">
-            {{ formValues[field.id] ? 'Sí (True)' : 'No (False)' }}
+            {{ formValues[field.id] ? 'Yes (True)' : 'No (False)' }}
           </label>
         </div>
 
@@ -764,7 +764,7 @@
             <td class="small">{{ exec.completedAt ? (exec.completedAt | date:'medium') : '-' }}</td>
             <td>
               <button cButton color="info" size="sm" (click)="openExecutionDetail(exec.id)" title="View Full Execution Detail">
-                <svg cIcon name="cil-options" class="me-1"></svg> Detalle
+                <svg cIcon name="cil-options" class="me-1"></svg> Detail
               </button>
             </td>
           </tr>
@@ -831,7 +831,7 @@
       <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
           <button class="nav-link" [class.active]="activeDetailTab === 'overview'" (click)="activeDetailTab = 'overview'">
-            <svg cIcon name="cil-task" class="me-1"></svg> Resumen DB
+            <svg cIcon name="cil-task" class="me-1"></svg> DB Summary
           </button>
         </li>
         <li class="nav-item">
@@ -841,12 +841,12 @@
         </li>
         <li class="nav-item">
           <button class="nav-link" [class.active]="activeDetailTab === 'activities'" (click)="activeDetailTab = 'activities'">
-            <svg cIcon name="cil-list" class="me-1"></svg> Actividades ({{ selectedExecutionDetail.jobs.length }})
+            <svg cIcon name="cil-list" class="me-1"></svg> Activities ({{ selectedExecutionDetail.jobs.length }})
           </button>
         </li>
         <li class="nav-item">
           <button class="nav-link" [class.active]="activeDetailTab === 'tokens'" (click)="activeDetailTab = 'tokens'">
-            <svg cIcon name="cil-cursor" class="me-1"></svg> Tokens BPMN ({{ selectedExecutionDetail.tokens.length }})
+            <svg cIcon name="cil-cursor" class="me-1"></svg> BPMN Tokens ({{ selectedExecutionDetail.tokens.length }})
           </button>
         </li>
       </ul>
@@ -856,16 +856,16 @@
         <div class="row g-3">
           <div class="col-md-6">
             <div class="card h-100 border-secondary">
-              <div class="card-header font-weight-bold bg-dark text-light">Metadatos de Base de Datos</div>
+              <div class="card-header font-weight-bold bg-dark text-light">Database Metadata</div>
               <div class="card-body">
                 <table class="table table-sm table-borderless mb-0">
                   <tbody>
                     <tr><td><strong>Execution ID:</strong></td><td><code>{{ selectedExecutionDetail.execution.id }}</code></td></tr>
                     <tr><td><strong>Definition ID:</strong></td><td><code>{{ selectedExecutionDetail.execution.workflowDefinitionId }}</code></td></tr>
-                    <tr><td><strong>Versión:</strong></td><td>v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }}</td></tr>
+                    <tr><td><strong>Version:</strong></td><td>v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }}</td></tr>
                     <tr><td><strong>VNamespace:</strong></td><td>{{ selectedExecutionDetail.execution.vnamespace || '-' }}</td></tr>
                     <tr><td><strong>Execution Key:</strong></td><td>{{ selectedExecutionDetail.execution.executionKey || '-' }}</td></tr>
-                    <tr><td><strong>Estado Actual:</strong></td><td>
+                    <tr><td><strong>Current Status:</strong></td><td>
                       <c-badge [color]="getExecutionStatusBadgeColor(selectedExecutionDetail.execution.status)" shape="rounded-pill">
                         {{ selectedExecutionDetail.execution.status | uppercase }}
                       </c-badge>
@@ -877,14 +877,14 @@
           </div>
           <div class="col-md-6">
             <div class="card h-100 border-secondary">
-              <div class="card-header font-weight-bold bg-dark text-light">Fechas y Tiempos</div>
+              <div class="card-header font-weight-bold bg-dark text-light">Dates & Timestamps</div>
               <div class="card-body">
                 <table class="table table-sm table-borderless mb-0">
                   <tbody>
-                    <tr><td><strong>Iniciado (StartedAt):</strong></td><td>{{ selectedExecutionDetail.execution.startedAt ? (selectedExecutionDetail.execution.startedAt | date:'medium') : '-' }}</td></tr>
-                    <tr><td><strong>Completado (CompletedAt):</strong></td><td>{{ selectedExecutionDetail.execution.completedAt ? (selectedExecutionDetail.execution.completedAt | date:'medium') : '-' }}</td></tr>
-                    <tr><td><strong>Creado (CreatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.createdAt | date:'medium' }}</td></tr>
-                    <tr><td><strong>Actualizado (UpdatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.updatedAt | date:'medium' }}</td></tr>
+                    <tr><td><strong>Started (StartedAt):</strong></td><td>{{ selectedExecutionDetail.execution.startedAt ? (selectedExecutionDetail.execution.startedAt | date:'medium') : '-' }}</td></tr>
+                    <tr><td><strong>Completed (CompletedAt):</strong></td><td>{{ selectedExecutionDetail.execution.completedAt ? (selectedExecutionDetail.execution.completedAt | date:'medium') : '-' }}</td></tr>
+                    <tr><td><strong>Created (CreatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.createdAt | date:'medium' }}</td></tr>
+                    <tr><td><strong>Updated (UpdatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.updatedAt | date:'medium' }}</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -898,7 +898,7 @@
         <div class="row g-3">
           <div class="col-md-4">
             <div class="card h-100 border-secondary">
-              <div class="card-header font-weight-bold bg-dark text-light">Input Inicial</div>
+              <div class="card-header font-weight-bold bg-dark text-light">Initial Input</div>
               <div class="card-body p-0">
                 <pre class="m-0 p-3 bg-dark text-success font-monospace rounded-bottom" style="max-height: 350px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.input) }}</pre>
               </div>
@@ -906,7 +906,7 @@
           </div>
           <div class="col-md-4">
             <div class="card h-100 border-secondary">
-              <div class="card-header font-weight-bold bg-dark text-light">Resultado (Output)</div>
+              <div class="card-header font-weight-bold bg-dark text-light">Result (Output)</div>
               <div class="card-body p-0">
                 <pre class="m-0 p-3 bg-dark text-info font-monospace rounded-bottom" style="max-height: 350px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.output) }}</pre>
               </div>
@@ -914,7 +914,7 @@
           </div>
           <div class="col-md-4">
             <div class="card h-100 border-secondary">
-              <div class="card-header font-weight-bold bg-dark text-light">Variables de Contexto (StateData)</div>
+              <div class="card-header font-weight-bold bg-dark text-light">Context Variables (StateData)</div>
               <div class="card-body p-0">
                 <pre class="m-0 p-3 bg-dark text-warning font-monospace rounded-bottom" style="max-height: 350px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.stateData) }}</pre>
               </div>
@@ -934,8 +934,8 @@
                 <th>Type</th>
                 <th>Status</th>
                 <th>Worker</th>
-                <th>Reintentos</th>
-                <th>Fechas</th>
+                <th>Retries</th>
+                <th>Timestamps</th>
               </tr>
             </thead>
             <tbody>
@@ -972,10 +972,10 @@
             <thead>
               <tr>
                 <th>Token ID</th>
-                <th>Nodo BPMN Actual</th>
-                <th>Estado Token</th>
+                <th>Current BPMN Node</th>
+                <th>Token Status</th>
                 <th>Parent Token ID</th>
-                <th>Actualizado</th>
+                <th>Updated</th>
               </tr>
             </thead>
             <tbody>
