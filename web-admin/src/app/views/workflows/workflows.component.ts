@@ -628,10 +628,10 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     if (field.required) {
       if (normType === 'boolean') {
         if (val !== true && val !== 'true' && val !== 1) {
-          return `El campo '${field.label || field.id}' es obligatorio.`;
+          return `'${field.label || field.id}' field is required.`;
         }
       } else if (!valStr) {
-        return `El campo '${field.label || field.id}' es obligatorio.`;
+        return `'${field.label || field.id}' field is required.`;
       }
     }
 
@@ -643,16 +643,16 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       const maxL = field.maxlength !== undefined ? Number(field.maxlength) : (field.max !== undefined ? Number(field.max) : undefined);
 
       if (minL !== undefined && !isNaN(minL) && valStr.length < minL) {
-        return `El campo '${field.label || field.id}' debe tener al menos ${minL} caracteres (longitud actual: ${valStr.length}).`;
+        return `'${field.label || field.id}' field must be at least ${minL} characters (current length: ${valStr.length}).`;
       }
       if (maxL !== undefined && !isNaN(maxL) && valStr.length > maxL) {
-        return `El campo '${field.label || field.id}' debe tener máximo ${maxL} caracteres (longitud actual: ${valStr.length}).`;
+        return `'${field.label || field.id}' field must be at most ${maxL} characters (current length: ${valStr.length}).`;
       }
       if (field.pattern) {
         try {
           const reg = new RegExp(field.pattern);
           if (!reg.test(valStr)) {
-            return `El valor del campo '${field.label || field.id}' no cumple el patrón requerido (${field.pattern}).`;
+            return `'${field.label || field.id}' field value does not match required pattern (${field.pattern}).`;
           }
         } catch {
           // ignore invalid pattern regex
@@ -664,16 +664,16 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     if (normType === 'long' || normType === 'integer' || normType === 'number' || normType === 'float' || normType === 'double') {
       const numVal = Number(val);
       if (isNaN(numVal)) {
-        return `El campo '${field.label || field.id}' debe ser un número válido.`;
+        return `'${field.label || field.id}' field must be a valid number.`;
       }
       const minN = field.min !== undefined ? Number(field.min) : (field.minlength !== undefined ? Number(field.minlength) : undefined);
       const maxN = field.max !== undefined ? Number(field.max) : (field.maxlength !== undefined ? Number(field.maxlength) : undefined);
 
       if (minN !== undefined && !isNaN(minN) && numVal < minN) {
-        return `El campo '${field.label || field.id}' debe ser mayor o igual a ${minN}.`;
+        return `'${field.label || field.id}' field must be greater than or equal to ${minN}.`;
       }
       if (maxN !== undefined && !isNaN(maxN) && numVal > maxN) {
-        return `El campo '${field.label || field.id}' debe ser menor o igual a ${maxN}.`;
+        return `'${field.label || field.id}' field must be less than or equal to ${maxN}.`;
       }
     }
 
@@ -711,7 +711,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     let inputObj: any = {};
     if (this.hasStartForm && this.executionInputMode === 'form') {
       if (!this.validateAllFormFields()) {
-        this.executeErrorMessage = 'Por favor corrija los errores del formulario antes de continuar.';
+        this.executeErrorMessage = 'Please fix the form errors before continuing.';
         return;
       }
 

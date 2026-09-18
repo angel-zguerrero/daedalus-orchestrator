@@ -143,6 +143,24 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       this.bpmnModeler = new BpmnModeler(modelerConfig);
 
       try {
+        const paletteProvider = this.bpmnModeler.get('paletteProvider');
+        if (paletteProvider && paletteProvider.getPaletteEntries) {
+          const origGetPaletteEntries = paletteProvider.getPaletteEntries.bind(paletteProvider);
+          paletteProvider.getPaletteEntries = function(element: any) {
+            const entries = origGetPaletteEntries(element);
+            delete entries['create.subprocess-expanded'];
+            delete entries['create.data-object'];
+            delete entries['create.data-store'];
+            delete entries['create.participant-expanded'];
+            delete entries['create.group'];
+            return entries;
+          };
+        }
+      } catch (e) {
+        console.warn('Palette entries override notice:', e);
+      }
+
+      try {
         const elementTemplates = this.bpmnModeler.get('elementTemplates');
         if (elementTemplates && elementTemplates.set) {
           elementTemplates.set(elementTemplatesData);
@@ -308,23 +326,23 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     }
 
     const SUPPORTED_CONSTRAINTS = [
-      { value: 'required', label: 'required (Obligatorio)' },
-      { value: 'minlength', label: 'minlength (Longitud Mínima)' },
-      { value: 'maxlength', label: 'maxlength (Longitud Máxima)' },
-      { value: 'min', label: 'min (Valor Mínimo)' },
-      { value: 'max', label: 'max (Valor Máximo)' },
-      { value: 'pattern', label: 'pattern (Regex / Expresión Regular)' },
-      { value: 'readonly', label: 'readonly (Sólo Lectura)' }
+      { value: 'required', label: 'required (Required)' },
+      { value: 'minlength', label: 'minlength (Minimum Length)' },
+      { value: 'maxlength', label: 'maxlength (Maximum Length)' },
+      { value: 'min', label: 'min (Minimum Value)' },
+      { value: 'max', label: 'max (Maximum Value)' },
+      { value: 'pattern', label: 'pattern (Regex / Regular Expression)' },
+      { value: 'readonly', label: 'readonly (Read Only)' }
     ];
 
     const CONFIG_PLACEHOLDERS: { [key: string]: string } = {
       required: 'true',
       readonly: 'true',
-      minlength: 'Ej. 5 (mínimo de caracteres)',
-      maxlength: 'Ej. 50 (máximo de caracteres)',
-      min: 'Ej. 100 (valor numérico mínimo)',
-      max: 'Ej. 5000 (valor numérico máximo)',
-      pattern: 'Ej. ^[A-Z]{3}-\\d{3}$ (regex)'
+      minlength: 'e.g. 5 (minimum characters)',
+      maxlength: 'e.g. 50 (maximum characters)',
+      min: 'e.g. 100 (minimum numeric value)',
+      max: 'e.g. 5000 (maximum numeric value)',
+      pattern: 'e.g. ^[A-Z]{3}-\\d{3}$ (regex)'
     };
 
     const enhanceConstraintEntries = () => {
@@ -348,7 +366,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
         const placeholderOpt = document.createElement('option');
         placeholderOpt.value = '';
-        placeholderOpt.textContent = '-- Seleccionar Regla de Validación --';
+        placeholderOpt.textContent = '-- Select Validation Rule --';
         select.appendChild(placeholderOpt);
 
         let isKnown = false;
@@ -380,7 +398,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
         const updateConfigPlaceholder = (selectedVal: string) => {
           if (configInput) {
-            configInput.placeholder = CONFIG_PLACEHOLDERS[selectedVal.toLowerCase()] || 'Ej. valor de configuración';
+            configInput.placeholder = CONFIG_PLACEHOLDERS[selectedVal.toLowerCase()] || 'e.g. configuration value';
           }
         };
 

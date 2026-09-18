@@ -25,6 +25,20 @@
   background-color: #ffffff;
   flex: 1;
 
+  .djs-palette {
+    .entry[data-action="create.subprocess-expanded"],
+    .entry[data-action="create.data-object"],
+    .entry[data-action="create.data-store"],
+    .entry[data-action="create.participant-expanded"],
+    .entry[data-action="create.group"] {
+      display: none !important;
+    }
+  }
+
+  .bjs-powered-by {
+    display: none !important;
+  }
+
   .bpmn-canvas {
     flex: 1;
     height: 100%;
@@ -391,4 +405,9 @@
       font-weight: 600 !important;
     }
   }
+}
+
+/* Hide BPMN.IO Watermark Link */
+.bjs-powered-by {
+  display: none !important;
 }
