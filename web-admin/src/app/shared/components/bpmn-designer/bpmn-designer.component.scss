@@ -374,6 +374,19 @@
     font-size: 0.9rem !important;
   }
 
+  .entry[data-id*="complex-gateway"],
+  .entry[data-id*="event-based-gateway"],
+  .entry[data-action*="complex-gateway"],
+  .entry[data-action*="event-based-gateway"],
+  [data-id*="complex-gateway"],
+  [data-id*="event-based-gateway"],
+  [data-action*="complex-gateway"],
+  [data-action*="event-based-gateway"],
+  .replace-with-complex-gateway,
+  .replace-with-event-based-gateway {
+    display: none !important;
+  }
+
   .entry,
   .djs-popup-entry {
     color: #0f172a !important;

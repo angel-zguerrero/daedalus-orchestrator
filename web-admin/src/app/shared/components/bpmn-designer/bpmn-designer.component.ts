@@ -178,6 +178,31 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       }
 
       try {
+        const replaceMenuProvider = this.bpmnModeler.get('replaceMenuProvider');
+        if (replaceMenuProvider && replaceMenuProvider.getEntries) {
+          const origGetEntries = replaceMenuProvider.getEntries.bind(replaceMenuProvider);
+          replaceMenuProvider.getEntries = function(element: any) {
+            const entries = origGetEntries(element);
+            if (Array.isArray(entries)) {
+              return entries.filter((e: any) => {
+                const id = (e.id || e.actionName || '').toLowerCase();
+                const label = (e.label || e.name || '').toLowerCase();
+                return !id.includes('complex') && !id.includes('event-based') &&
+                       !label.includes('complex') && !label.includes('event-based');
+              });
+            } else if (entries && typeof entries === 'object') {
+              delete entries['replace-with-complex-gateway'];
+              delete entries['replace-with-event-based-gateway'];
+              return entries;
+            }
+            return entries;
+          };
+        }
+      } catch (e) {
+        console.warn('Replace menu provider override notice:', e);
+      }
+
+      try {
         const elementTemplates = this.bpmnModeler.get('elementTemplates');
         if (elementTemplates && elementTemplates.set) {
           elementTemplates.set(elementTemplatesData);
