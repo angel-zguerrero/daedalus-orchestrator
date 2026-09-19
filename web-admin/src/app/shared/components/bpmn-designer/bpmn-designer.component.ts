@@ -60,6 +60,7 @@ export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestroy {
   @ViewChild('canvasRef', { static: true }) private canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('propertiesRef', { static: true }) private propertiesRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('fileInputRef') private fileInputRef?: ElementRef<HTMLInputElement>;
 
   @Input() payload: string = '';
   @Input() readonly: boolean = false;
@@ -255,10 +256,21 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     if (!this.bpmnModeler || this.readonly) {
       this.currentLintErrors = [];
       this.hasLintErrors = false;
+      this.updateCanvasOverlays(new Map());
       return { hasErrors: false, errors: [] };
     }
 
     const errors: string[] = [];
+    const elementErrorMap = new Map<string, string[]>();
+
+    const addElementError = (elementId: string, msg: string) => {
+      errors.push(msg);
+      if (elementId) {
+        const existing = elementErrorMap.get(elementId) || [];
+        existing.push(msg);
+        elementErrorMap.set(elementId, existing);
+      }
+    };
 
     const getGatewayTypeName = (typeStr: string): string => {
       const cleanType = (typeStr || '').replace(/^bpmn:/, '');
@@ -309,7 +321,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           if (isConnection) {
             // A sequence flow connection is disconnected ONLY IF missing source or target
             if (!el.source || !el.target) {
-              errors.push(`Sequence Flow ${displayName} is disconnected (missing source or target).`);
+              addElementError(id, `Sequence Flow ${displayName} is disconnected (missing source or target).`);
             }
             return; // Connections are edges, not nodes; skip shape incoming/outgoing checks!
           }
@@ -321,35 +333,44 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           if (type === 'StartEvent') {
             startEventCount++;
             if (outgoing.length === 0) {
-              errors.push(`Start Event ${displayName} has no outgoing connection.`);
+              addElementError(id, `Start Event ${displayName} has no outgoing connection.`);
             }
           } else if (type === 'EndEvent') {
             endEventCount++;
             if (incoming.length === 0) {
-              errors.push(`End Event ${displayName} has no incoming connection.`);
+              addElementError(id, `End Event ${displayName} has no incoming connection.`);
             }
           } else if (type === 'BoundaryEvent') {
             if (outgoing.length === 0) {
-              errors.push(`Boundary Event ${displayName} has no outgoing connection.`);
+              addElementError(id, `Boundary Event ${displayName} has no outgoing connection.`);
             }
           } else {
             // Regular flow nodes (Tasks, Gateways, SubProcesses, etc.)
             if (incoming.length === 0 && outgoing.length === 0) {
-              errors.push(`Element ${displayName} (${type}) is disconnected (has no connections).`);
+              addElementError(id, `Element ${displayName} (${type}) is disconnected (has no connections).`);
             } else if (incoming.length === 0) {
-              errors.push(`Element ${displayName} (${type}) has no incoming connection.`);
+              addElementError(id, `Element ${displayName} (${type}) has no incoming connection.`);
             } else if (outgoing.length === 0) {
-              errors.push(`Element ${displayName} (${type}) has no outgoing connection.`);
+              addElementError(id, `Element ${displayName} (${type}) has no outgoing connection.`);
             }
           }
 
-          // Gateway checks:
-          if (type.includes('Gateway') && outgoing.length > 1) {
-            const divType = type;
+          // 1. Implicit Split Rule (no-implicit-split):
+          // Non-gateway elements (StartEvent, Task, UserTask, etc.) MUST NOT have multiple outgoing sequence flows.
+          if (!type.includes('Gateway') && outgoing.length > 1) {
+            addElementError(
+              id,
+              `Implicit Split Error: ${displayName} (${type}) has multiple outgoing sequence flows without a Gateway. Use an explicit Gateway (e.g. Parallel or Exclusive Gateway) to split execution paths.`
+            );
+          }
+
+          // 2. Gateway & Split Divergence checks:
+          if (outgoing.length > 1) {
+            const divType = type.includes('Gateway') ? type : 'ImplicitParallelSplit';
             const defaultFlowId = el.businessObject?.default?.id;
 
-            // 1. Condition check on outgoing flows (ONLY for conditional divergent gateways: Exclusive, Inclusive, etc. Tasks & Parallel Gateways NEVER require conditions)
-            const isConditionalGateway = divType !== 'ParallelGateway';
+            // Condition check on outgoing flows (ONLY for conditional divergent gateways: Exclusive, Inclusive, etc.)
+            const isConditionalGateway = type.includes('Gateway') && divType !== 'ParallelGateway';
             if (isConditionalGateway) {
               outgoing.forEach((flow: any) => {
                 const cond = (flow.businessObject?.conditionExpression?.body || '').trim();
@@ -358,15 +379,15 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
                   const targetId = flow.target?.id || 'target';
                   const targetRawName = (flow.target?.businessObject?.name || '').trim();
                   const targetDisplayName = targetRawName ? `'${targetRawName}' (${targetId})` : `'${targetId}'`;
-                  errors.push(`Gateway ${displayName} flow to ${targetDisplayName} has no condition and is not marked as default flow.`);
+                  addElementError(id, `Gateway ${displayName} flow to ${targetDisplayName} has no condition and is not marked as default flow.`);
                 }
               });
             }
 
-            // 2. Nesting-aware Gateway Symmetry & Deadlock Check (Simetría de Compuertas Anidadas)
+            // Nesting-aware Gateway Symmetry, Deadlock & Token Multiplication Check
             interface QueueItem {
               node: any;
-              stack: string[];
+              stack: { id: string; type: string; displayName: string }[];
             }
             const queue: QueueItem[] = [];
             const visitedState = new Set<string>();
@@ -375,7 +396,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               if (flow && flow.target) {
                 queue.push({
                   node: flow.target,
-                  stack: [id]
+                  stack: [{ id, type: divType, displayName }]
                 });
               }
             });
@@ -386,7 +407,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               const { node, stack } = item;
               if (!node || !node.id) continue;
 
-              const stateKey = `${node.id}:${stack.join(',')}`;
+              const stackKey = stack.map(s => s.id).join(',');
+              const stateKey = `${node.id}:${stackKey}`;
               if (visitedState.has(stateKey)) {
                 continue;
               }
@@ -401,41 +423,37 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
               if (nodeType.includes('Gateway') && nodeIncomingCount > 1) {
                 if (currentStack.length > 0) {
-                  const topDivId = currentStack[currentStack.length - 1];
-                  const topDivNode = elements.find((e: any) => e.id === topDivId);
+                  const topDiv = currentStack[currentStack.length - 1];
+                  const topDivType = topDiv.type;
+                  const convType = nodeType;
+                  const convId = node.id;
 
-                  if (topDivNode) {
-                    const topDivRawType = topDivNode.type || '';
-                    const topDivType = topDivRawType.replace(/^bpmn:/, '');
-                    const convType = nodeType;
-                    const convId = node.id;
+                  const pairKey = `${topDiv.id}->${convId}`;
+                  if (!reportedGatewayPairs.has(pairKey)) {
+                    const convRawName = (node.businessObject?.name || '').trim();
+                    const convDisplayName = convRawName ? `'${convRawName}' (${convId})` : `'${convId}'`;
 
-                    const pairKey = `${topDivId}->${convId}`;
-                    if (!reportedGatewayPairs.has(pairKey)) {
-                      if (topDivType !== convType) {
-                        reportedGatewayPairs.add(pairKey);
-
-                        const topDivRawName = (topDivNode.businessObject?.name || '').trim();
-                        const topDivDisplayName = topDivRawName ? `'${topDivRawName}' (${topDivId})` : `'${topDivId}'`;
-                        const convRawName = (node.businessObject?.name || '').trim();
-                        const convDisplayName = convRawName ? `'${convRawName}' (${convId})` : `'${convId}'`;
-                        const divTypeName = getGatewayTypeName(topDivType);
-                        const convTypeName = getGatewayTypeName(convType);
-
-                        if (topDivType === 'ExclusiveGateway' && convType === 'ParallelGateway') {
-                          errors.push(
-                            `Deadlock Error: ${divTypeName} ${topDivDisplayName} diverges into ${convTypeName} ${convDisplayName}. A Parallel Gateway waits for all incoming branches, causing a permanent deadlock because an Exclusive Gateway only activates one branch.`
-                          );
-                        } else if (topDivType === 'ExclusiveGateway' && convType === 'InclusiveGateway') {
-                          errors.push(
-                            `Gateway Asymmetry Error: ${divTypeName} ${topDivDisplayName} diverges into ${convTypeName} ${convDisplayName}. Gateways must be symmetric (Exclusive Gateway divergence must converge with an Exclusive Gateway).`
-                          );
-                        } else {
-                          errors.push(
-                            `Gateway Asymmetry Error: ${divTypeName} ${topDivDisplayName} diverges into ${convTypeName} ${convDisplayName}. Gateways must be symmetric (divergence and convergence must use the same gateway type).`
-                          );
-                        }
-                      }
+                    // Token Multiplication Error: Implicit Parallel Split or Parallel Gateway converging into Exclusive Gateway (XOR)
+                    if ((topDivType === 'ImplicitParallelSplit' || topDivType === 'ParallelGateway') && convType === 'ExclusiveGateway') {
+                      reportedGatewayPairs.add(pairKey);
+                      const divName = topDivType === 'ImplicitParallelSplit' ? `Implicit parallel split from ${topDiv.displayName}` : `Parallel Gateway (AND) ${topDiv.displayName}`;
+                      const msg = `Token Multiplication Error: ${divName} converges into Exclusive Gateway (XOR) ${convDisplayName}. An Exclusive Gateway does not synchronize parallel tokens, causing downstream tasks to execute multiple times.`;
+                      addElementError(topDiv.id, msg);
+                      addElementError(convId, msg);
+                    } else if (topDivType === 'ExclusiveGateway' && convType === 'ParallelGateway') {
+                      reportedGatewayPairs.add(pairKey);
+                      const divTypeName = getGatewayTypeName(topDivType);
+                      const convTypeName = getGatewayTypeName(convType);
+                      const msg = `Deadlock Error: ${divTypeName} ${topDiv.displayName} diverges into ${convTypeName} ${convDisplayName}. A Parallel Gateway waits for all incoming branches, causing a permanent deadlock because an Exclusive Gateway only activates one branch.`;
+                      addElementError(topDiv.id, msg);
+                      addElementError(convId, msg);
+                    } else if (topDivType !== 'ImplicitParallelSplit' && topDivType !== convType) {
+                      reportedGatewayPairs.add(pairKey);
+                      const divTypeName = getGatewayTypeName(topDivType);
+                      const convTypeName = getGatewayTypeName(convType);
+                      const msg = `Gateway Asymmetry Error: ${divTypeName} ${topDiv.displayName} diverges into ${convTypeName} ${convDisplayName}. Gateways must be symmetric (divergence and convergence must use the same gateway type).`;
+                      addElementError(topDiv.id, msg);
+                      addElementError(convId, msg);
                     }
                   }
 
@@ -443,8 +461,12 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
                 }
               }
 
-              if (nodeType.includes('Gateway') && nodeOutgoingCount > 1 && node.id !== id) {
-                currentStack.push(node.id);
+              // If node is another divergent element (Gateway or Implicit Split with outgoing > 1), push to stack
+              if (nodeOutgoingCount > 1 && node.id !== id) {
+                const nestedDivType = nodeType.includes('Gateway') ? nodeType : 'ImplicitParallelSplit';
+                const nodeRawName = (node.businessObject?.name || '').trim();
+                const nodeDisplayName = nodeRawName ? `'${nodeRawName}' (${node.id})` : `'${node.id}'`;
+                currentStack.push({ id: node.id, type: nestedDivType, displayName: nodeDisplayName });
               }
 
               (node.outgoing || []).forEach((flow: any) => {
@@ -472,9 +494,54 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
     this.currentLintErrors = errors;
     this.hasLintErrors = errors.length > 0;
+    this.updateCanvasOverlays(elementErrorMap);
     const result = { hasErrors: this.hasLintErrors, errors: this.currentLintErrors };
     this.designErrorsChange.emit(result);
     return result;
+  }
+
+  private updateCanvasOverlays(elementErrorMap: Map<string, string[]>): void {
+    if (!this.bpmnModeler) return;
+    try {
+      const overlays = this.bpmnModeler.get('overlays');
+      const canvas = this.bpmnModeler.get('canvas');
+      const elementRegistry = this.bpmnModeler.get('elementRegistry');
+
+      if (!overlays || !canvas || !elementRegistry) return;
+
+      // 1. Clear previous lint overlays and markers
+      overlays.remove({ type: 'lint-badge-overlay' });
+      elementRegistry.getAll().forEach((el: any) => {
+        if (el && el.id) {
+          canvas.removeMarker(el.id, 'highlight-lint-error');
+        }
+      });
+
+      // 2. Add visual markers & overlays for elements with errors
+      elementErrorMap.forEach((messages, elementId) => {
+        const element = elementRegistry.get(elementId);
+        if (!element) return;
+
+        // Add red glowing border marker
+        canvas.addMarker(elementId, 'highlight-lint-error');
+
+        // Create HTML overlay badge
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'bpmn-lint-badge-overlay';
+        badgeEl.setAttribute('data-tooltip', messages.join('\n\n'));
+        badgeEl.innerHTML = `<span class="badge-icon">!</span><span class="badge-count">${messages.length}</span>`;
+
+        overlays.add(elementId, 'lint-badge-overlay', {
+          position: {
+            top: -10,
+            right: -10
+          },
+          html: badgeEl
+        });
+      });
+    } catch (e) {
+      console.warn('Canvas overlay update notice:', e);
+    }
   }
 
   public refresh(): void {
@@ -598,6 +665,45 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     } catch {
       return false;
     }
+  }
+
+  public triggerFileUpload(): void {
+    if (this.fileInputRef?.nativeElement) {
+      this.fileInputRef.nativeElement.value = '';
+      this.fileInputRef.nativeElement.click();
+    }
+  }
+
+  public async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    try {
+      const content = await file.text();
+      if (content && content.trim()) {
+        await this.importXml(content);
+        await this.emitCurrentXml();
+        this.runLintValidation();
+      }
+    } catch (err) {
+      console.error('Failed to read BPMN XML file:', err);
+    }
+  }
+
+  public async downloadXml(): Promise<void> {
+    const xml = await this.getXml();
+    if (!xml || !xml.trim()) return;
+
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'workflow-diagram.bpmn');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   private setupPropertiesPanelConstraintEnhancer(): void {

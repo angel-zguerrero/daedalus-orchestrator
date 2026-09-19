@@ -275,9 +275,6 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 			if len(incoming) > 1 {
 				// Parallel Join / Merge
-				token.Status = models.ExecutionTokenStatusCompleted
-				tokenRepo.UpdateExecutionToken(token, now)
-
 				allTokens, _ := tokenRepo.GetTokensByExecutionID(execution.ID, now)
 				arrivedCount := 0
 				for _, t := range allTokens {
@@ -294,12 +291,18 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					Msg("⚖️ Parallel Join Gateway status check")
 
 				if arrivedCount < len(incoming) {
+					token.Status = models.ExecutionTokenStatusWaiting
+					tokenRepo.UpdateExecutionToken(token, now)
+
 					log.Info().
 						Str("executionID", execution.ID).
 						Str("gatewayID", currentNode.ID).
 						Msg("⏳ Parallel Join Gateway: Waiting for remaining branches to arrive")
 					goto SaveExecutionState
 				}
+
+				token.Status = models.ExecutionTokenStatusCompleted
+				tokenRepo.UpdateExecutionToken(token, now)
 
 				log.Info().
 					Str("executionID", execution.ID).
@@ -394,7 +397,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 						enqueueCmd.Execute(uow, now)
 					}
 				}
-				goto CheckExecutionCompletion
+				goto SaveExecutionState
 			} else if len(outgoing) == 1 {
 				token.CurrentNodeID = outgoing[0].TargetRef
 				tokenRepo.UpdateExecutionToken(token, now)
@@ -570,7 +573,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 						enqueueCmd.Execute(uow, now)
 					}
 				}
-				goto CheckExecutionCompletion
+				goto SaveExecutionState
 			}
 
 		case bpmn.ElementServiceTask, bpmn.ElementUserTask, bpmn.ElementTask, bpmn.ElementScriptTask:

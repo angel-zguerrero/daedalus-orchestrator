@@ -456,3 +456,80 @@
 .bjs-powered-by {
   display: none !important;
 }
+
+/* Canvas Lint Error Highlights & Animated Badges */
+.highlight-lint-error {
+  .djs-visual > rect,
+  .djs-visual > circle,
+  .djs-visual > polygon,
+  .djs-visual > path {
+    stroke: #ff4d4f !important;
+    stroke-width: 2.5px !important;
+    filter: drop-shadow(0 0 6px rgba(255, 77, 79, 0.6));
+  }
+}
+
+.bpmn-lint-badge-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: linear-gradient(135deg, #ff4d4f, #d9363e);
+  color: #ffffff;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.5);
+  cursor: pointer;
+  position: relative;
+  z-index: 100;
+  animation: pulse-lint-error 2s infinite;
+
+  .badge-icon {
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .badge-count {
+    font-size: 10px;
+  }
+
+  &:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #1f2430;
+    color: #ffffff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    white-space: pre-wrap;
+    width: max-content;
+    max-width: 280px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 77, 79, 0.5);
+    z-index: 1000;
+    pointer-events: none;
+    line-height: 1.4;
+  }
+}
+
+@keyframes pulse-lint-error {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 77, 79, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0);
+  }
+}
