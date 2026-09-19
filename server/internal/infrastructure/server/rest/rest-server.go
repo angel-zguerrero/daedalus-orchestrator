@@ -84,7 +84,7 @@ func NewRestServer(config *common.ServerConfing) *RestServer {
 </head>
 <body>
     <div class="message">
-        <h1>Initializing system</h1>
+        <h1>Initializing system.</h1>
         <p>Please wait while the system initializes.</p>
     </div>
     <script>

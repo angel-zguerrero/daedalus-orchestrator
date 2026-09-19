@@ -42,13 +42,14 @@ type FormField struct {
 }
 
 type BPMNNode struct {
-	ID         string            `json:"id"`
-	Name       string            `json:"name"`
-	Type       ElementType       `json:"type"`
-	Incoming   []string          `json:"incoming"`
-	Outgoing   []string          `json:"outgoing"`
-	Properties map[string]string `json:"properties,omitempty"`
-	FormFields []*FormField      `json:"formFields,omitempty"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Type          ElementType       `json:"type"`
+	DefaultFlowID string            `json:"defaultFlowId,omitempty"`
+	Incoming      []string          `json:"incoming"`
+	Outgoing      []string          `json:"outgoing"`
+	Properties    map[string]string `json:"properties,omitempty"`
+	FormFields    []*FormField      `json:"formFields,omitempty"`
 }
 
 type SequenceFlow struct {
@@ -135,11 +136,13 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 			case ElementStartEvent, ElementEndEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				id := getAttr(t.Attr, "id")
 				name := getAttr(t.Attr, "name")
+				defaultFlow := getAttr(t.Attr, "default")
 				node := &BPMNNode{
-					ID:         id,
-					Name:       name,
-					Type:       ElementType(local),
-					Properties: make(map[string]string),
+					ID:            id,
+					Name:          name,
+					Type:          ElementType(local),
+					DefaultFlowID: defaultFlow,
+					Properties:    make(map[string]string),
 				}
 				model.Nodes[id] = node
 				currentNode = node

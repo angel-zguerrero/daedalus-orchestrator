@@ -14,6 +14,7 @@ import (
 	"deadalus-orch/shared/models"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 func init() {
@@ -137,28 +138,140 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 		case bpmn.ElementExclusiveGateway:
 			outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
+			log.Info().
+				Str("executionID", execution.ID).
+				Str("tokenID", token.ID).
+				Str("gatewayID", currentNode.ID).
+				Str("gatewayName", currentNode.Name).
+				Str("gatewayType", "ExclusiveGateway").
+				Int("outgoingFlowsCount", len(outgoing)).
+				Str("defaultFlowID", currentNode.DefaultFlowID).
+				Msg("🔀 Evaluating Exclusive Gateway")
+
 			var selectedFlow *bpmn.SequenceFlow
-			for _, flow := range outgoing {
-				matched, err := bpmn.EvaluateCondition(flow.Condition, execution.StateData)
+			var defaultFlowCandidate *bpmn.SequenceFlow
+
+			// Validation: In a divergent Exclusive Gateway, any flow that is NOT the default flow MUST have a condition expression
+			if len(outgoing) > 1 {
+				for _, flow := range outgoing {
+					isDefault := currentNode.DefaultFlowID != "" && flow.ID == currentNode.DefaultFlowID
+					condStr := strings.TrimSpace(flow.Condition)
+					if condStr == "" && !isDefault {
+						errMsg := fmt.Sprintf("gateway configuration error for %s (%s): outgoing flow %s has no condition and is not marked as default flow", currentNode.ID, currentNode.Name, flow.ID)
+						log.Error().
+							Str("executionID", execution.ID).
+							Str("gatewayID", currentNode.ID).
+							Str("flowID", flow.ID).
+							Msg("❌ Gateway error: outgoing flow without condition is not marked as default flow")
+
+						token.Status = models.ExecutionTokenStatusCancelled
+						tokenRepo.UpdateExecutionToken(token, now)
+
+						execution.Status = models.WorkflowExecutionStatusFailed
+						execution.Error = errMsg
+						execution.CompletedAt = &now
+						execRepo.UpdateWorkflowExecution(execution, now)
+
+						commandResult.Error = errMsg
+						commandResult.Result = execution
+						return *commandResult
+					}
+				}
+			}
+
+			for idx, flow := range outgoing {
+				if currentNode.DefaultFlowID != "" && flow.ID == currentNode.DefaultFlowID {
+					defaultFlowCandidate = flow
+					continue
+				}
+
+				condStr := strings.TrimSpace(flow.Condition)
+				matched, err := bpmn.EvaluateCondition(condStr, execution.StateData)
+
+				if err != nil {
+					log.Warn().
+						Err(err).
+						Str("executionID", execution.ID).
+						Str("gatewayID", currentNode.ID).
+						Str("flowID", flow.ID).
+						Str("targetRef", flow.TargetRef).
+						Str("condition", condStr).
+						Msg("⚠️ Gateway condition evaluation returned error")
+				} else {
+					log.Info().
+						Str("executionID", execution.ID).
+						Str("gatewayID", currentNode.ID).
+						Str("flowID", flow.ID).
+						Str("targetRef", flow.TargetRef).
+						Str("condition", condStr).
+						Bool("evaluationPassed", matched).
+						Int("flowIndex", idx).
+						Msg("🔍 Evaluated flow condition")
+				}
+
 				if err == nil && matched {
 					selectedFlow = flow
 					break
 				}
 			}
-			if selectedFlow == nil && len(outgoing) > 0 {
-				// Fallback to first outgoing flow if no condition matched
-				selectedFlow = outgoing[0]
+
+			isDefaultTaken := false
+			if selectedFlow == nil && defaultFlowCandidate != nil {
+				selectedFlow = defaultFlowCandidate
+				isDefaultTaken = true
+				log.Info().
+					Str("executionID", execution.ID).
+					Str("gatewayID", currentNode.ID).
+					Str("defaultFlowID", defaultFlowCandidate.ID).
+					Str("targetRef", defaultFlowCandidate.TargetRef).
+					Msg("↩️ No conditions satisfied. Taking designated default flow path")
 			}
+
 			if selectedFlow == nil {
-				commandResult.Error = fmt.Sprintf("no outgoing flow satisfied for gateway %s", currentNode.ID)
+				errMsg := fmt.Sprintf("gateway evaluation failed for %s (%s): no condition satisfied and no default flow defined", currentNode.ID, currentNode.Name)
+				log.Error().
+					Str("executionID", execution.ID).
+					Str("gatewayID", currentNode.ID).
+					Str("gatewayName", currentNode.Name).
+					Msg("❌ Exclusive Gateway evaluation failed: no condition met and no default flow available")
+
+				token.Status = models.ExecutionTokenStatusCancelled
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				execution.Status = models.WorkflowExecutionStatusFailed
+				execution.Error = errMsg
+				execution.CompletedAt = &now
+				execRepo.UpdateWorkflowExecution(execution, now)
+
+				commandResult.Error = errMsg
+				commandResult.Result = execution
 				return *commandResult
 			}
+
+			log.Info().
+				Str("executionID", execution.ID).
+				Str("gatewayID", currentNode.ID).
+				Str("targetNodeID", selectedFlow.TargetRef).
+				Str("flowID", selectedFlow.ID).
+				Bool("isDefaultTaken", isDefaultTaken).
+				Msg("✅ Exclusive Gateway path selected successfully")
+
 			token.CurrentNodeID = selectedFlow.TargetRef
 			tokenRepo.UpdateExecutionToken(token, now)
 
 		case bpmn.ElementParallelGateway:
 			incoming := bpmnModel.GetIncomingFlows(currentNode.ID)
 			outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
+
+			log.Info().
+				Str("executionID", execution.ID).
+				Str("tokenID", token.ID).
+				Str("gatewayID", currentNode.ID).
+				Str("gatewayName", currentNode.Name).
+				Str("gatewayType", "ParallelGateway").
+				Int("incomingCount", len(incoming)).
+				Int("outgoingCount", len(outgoing)).
+				Msg("🔀 Processing Parallel Gateway")
 
 			if len(incoming) > 1 {
 				// Parallel Join / Merge
@@ -173,12 +286,26 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					}
 				}
 
+				log.Info().
+					Str("executionID", execution.ID).
+					Str("gatewayID", currentNode.ID).
+					Int("arrivedTokens", arrivedCount).
+					Int("requiredTokens", len(incoming)).
+					Msg("⚖️ Parallel Join Gateway status check")
+
 				if arrivedCount < len(incoming) {
-					// Still waiting for remaining parallel branches to arrive at the join gateway
+					log.Info().
+						Str("executionID", execution.ID).
+						Str("gatewayID", currentNode.ID).
+						Msg("⏳ Parallel Join Gateway: Waiting for remaining branches to arrive")
 					goto SaveExecutionState
 				}
 
-				// All incoming parallel branches have arrived! Create 1 merged token for outgoing branch
+				log.Info().
+					Str("executionID", execution.ID).
+					Str("gatewayID", currentNode.ID).
+					Msg("✅ All incoming parallel branches arrived! Merging into single token")
+
 				if len(outgoing) > 0 {
 					mergedTokenID := strings.ReplaceAll(uuid.New().String(), "-", "")
 					mergedToken := &models.ExecutionToken{
@@ -201,6 +328,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 			if len(outgoing) > 1 {
 				// Parallel Split
+				log.Info().
+					Str("executionID", execution.ID).
+					Str("gatewayID", currentNode.ID).
+					Int("branchesCreated", len(outgoing)).
+					Msg("🌿 Parallel Split Gateway creating concurrent execution branches")
+
 				token.Status = models.ExecutionTokenStatusCompleted
 				tokenRepo.UpdateExecutionToken(token, now)
 
@@ -219,6 +352,189 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				}
 
 				for _, flow := range outgoing {
+					childTokenID := strings.ReplaceAll(uuid.New().String(), "-", "")
+					childToken := &models.ExecutionToken{
+						ID:                   childTokenID,
+						WorkflowExecutionID: execution.ID,
+						WorkflowDefinitionID: def.ID,
+						VNamespace:           execution.VNamespace,
+						CurrentNodeID:        flow.TargetRef,
+						Status:               models.ExecutionTokenStatusActive,
+						ParentTokenID:        token.ID,
+						CreatedAt:            now,
+						UpdatedAt:            now,
+					}
+					tokenRepo.CreateExecutionToken(childToken, now)
+
+					log.Info().
+						Str("executionID", execution.ID).
+						Str("gatewayID", currentNode.ID).
+						Str("childTokenID", childToken.ID).
+						Str("targetNodeID", flow.TargetRef).
+						Msg("🚀 Spawned parallel branch token")
+
+					if execQ != nil {
+						msgID := strings.ReplaceAll(uuid.New().String(), "-", "")
+						enqueueCmd := &queue.EnqueueCommand{
+							Messages: []models.QueueMessage{
+								{
+									ID:          msgID,
+									MessageID:   msgID,
+									QueueID:     execQ.ID,
+									VNamespace:  execution.VNamespace,
+									Content:     []byte(fmt.Sprintf(`{"executionId":"%s","tokenId":"%s"}`, execution.ID, childToken.ID)),
+									ContentType: "application/json",
+									CreatedAt:   now,
+									UpdatedAt:   now,
+								},
+							},
+							CF:  cmd.CF,
+							CFS: cmd.CFS,
+						}
+						enqueueCmd.Execute(uow, now)
+					}
+				}
+				goto CheckExecutionCompletion
+			} else if len(outgoing) == 1 {
+				token.CurrentNodeID = outgoing[0].TargetRef
+				tokenRepo.UpdateExecutionToken(token, now)
+			} else {
+				token.Status = models.ExecutionTokenStatusCompleted
+				tokenRepo.UpdateExecutionToken(token, now)
+				goto CheckExecutionCompletion
+			}
+
+		case bpmn.ElementInclusiveGateway:
+			outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
+			log.Info().
+				Str("executionID", execution.ID).
+				Str("tokenID", token.ID).
+				Str("gatewayID", currentNode.ID).
+				Str("gatewayName", currentNode.Name).
+				Str("gatewayType", "InclusiveGateway").
+				Int("outgoingFlowsCount", len(outgoing)).
+				Str("defaultFlowID", currentNode.DefaultFlowID).
+				Msg("🔀 Evaluating Inclusive Gateway")
+
+			var selectedFlows []*bpmn.SequenceFlow
+			var defaultFlowCandidate *bpmn.SequenceFlow
+
+			if len(outgoing) > 1 {
+				for _, flow := range outgoing {
+					isDefault := currentNode.DefaultFlowID != "" && flow.ID == currentNode.DefaultFlowID
+					condStr := strings.TrimSpace(flow.Condition)
+					if condStr == "" && !isDefault {
+						errMsg := fmt.Sprintf("gateway configuration error for %s (%s): outgoing flow %s has no condition and is not marked as default flow", currentNode.ID, currentNode.Name, flow.ID)
+						log.Error().
+							Str("executionID", execution.ID).
+							Str("gatewayID", currentNode.ID).
+							Str("flowID", flow.ID).
+							Msg("❌ Gateway error: outgoing flow without condition is not marked as default flow")
+
+						token.Status = models.ExecutionTokenStatusCancelled
+						tokenRepo.UpdateExecutionToken(token, now)
+
+						execution.Status = models.WorkflowExecutionStatusFailed
+						execution.Error = errMsg
+						execution.CompletedAt = &now
+						execRepo.UpdateWorkflowExecution(execution, now)
+
+						commandResult.Error = errMsg
+						commandResult.Result = execution
+						return *commandResult
+					}
+				}
+			}
+
+			for idx, flow := range outgoing {
+				if currentNode.DefaultFlowID != "" && flow.ID == currentNode.DefaultFlowID {
+					defaultFlowCandidate = flow
+					continue
+				}
+
+				condStr := strings.TrimSpace(flow.Condition)
+				matched, err := bpmn.EvaluateCondition(condStr, execution.StateData)
+
+				if err != nil {
+					log.Warn().
+						Err(err).
+						Str("executionID", execution.ID).
+						Str("gatewayID", currentNode.ID).
+						Str("flowID", flow.ID).
+						Str("targetRef", flow.TargetRef).
+						Str("condition", condStr).
+						Msg("⚠️ Inclusive Gateway condition evaluation error")
+				} else {
+					log.Info().
+						Str("executionID", execution.ID).
+						Str("gatewayID", currentNode.ID).
+						Str("flowID", flow.ID).
+						Str("targetRef", flow.TargetRef).
+						Str("condition", condStr).
+						Bool("evaluationPassed", matched).
+						Int("flowIndex", idx).
+						Msg("🔍 Evaluated inclusive flow condition")
+				}
+
+				if err == nil && matched {
+					selectedFlows = append(selectedFlows, flow)
+				}
+			}
+
+			if len(selectedFlows) == 0 && defaultFlowCandidate != nil {
+				selectedFlows = append(selectedFlows, defaultFlowCandidate)
+				log.Info().
+					Str("executionID", execution.ID).
+					Str("gatewayID", currentNode.ID).
+					Str("defaultFlowID", defaultFlowCandidate.ID).
+					Str("targetRef", defaultFlowCandidate.TargetRef).
+					Msg("↩️ Inclusive Gateway: No conditions satisfied. Taking default flow path")
+			}
+
+			if len(selectedFlows) == 0 {
+				errMsg := fmt.Sprintf("inclusive gateway evaluation failed for %s (%s): no condition satisfied and no default flow defined", currentNode.ID, currentNode.Name)
+				log.Error().
+					Str("executionID", execution.ID).
+					Str("gatewayID", currentNode.ID).
+					Str("gatewayName", currentNode.Name).
+					Msg("❌ Inclusive Gateway evaluation failed: no condition met and no default flow available")
+
+				token.Status = models.ExecutionTokenStatusCancelled
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				execution.Status = models.WorkflowExecutionStatusFailed
+				execution.Error = errMsg
+				execution.CompletedAt = &now
+				execRepo.UpdateWorkflowExecution(execution, now)
+
+				commandResult.Error = errMsg
+				commandResult.Result = execution
+				return *commandResult
+			}
+
+			log.Info().
+				Str("executionID", execution.ID).
+				Str("gatewayID", currentNode.ID).
+				Int("selectedBranches", len(selectedFlows)).
+				Msg("✅ Inclusive Gateway paths selected successfully")
+
+			if len(selectedFlows) == 1 {
+				token.CurrentNodeID = selectedFlows[0].TargetRef
+				tokenRepo.UpdateExecutionToken(token, now)
+			} else {
+				token.Status = models.ExecutionTokenStatusCompleted
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				allQs, _ := queueRepo.GetQueuesByWorkflowDefinitionID(def.ID, now)
+				var execQ *models.Queue
+				for i := range allQs {
+					if allQs[i].Type == models.WorkflowExecutionQueue {
+						execQ = &allQs[i]
+						break
+					}
+				}
+
+				for _, flow := range selectedFlows {
 					childTokenID := strings.ReplaceAll(uuid.New().String(), "-", "")
 					childToken := &models.ExecutionToken{
 						ID:                   childTokenID,
@@ -254,13 +570,6 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 						enqueueCmd.Execute(uow, now)
 					}
 				}
-				goto CheckExecutionCompletion
-			} else if len(outgoing) == 1 {
-				token.CurrentNodeID = outgoing[0].TargetRef
-				tokenRepo.UpdateExecutionToken(token, now)
-			} else {
-				token.Status = models.ExecutionTokenStatusCompleted
-				tokenRepo.UpdateExecutionToken(token, now)
 				goto CheckExecutionCompletion
 			}
 

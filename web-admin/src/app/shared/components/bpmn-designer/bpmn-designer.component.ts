@@ -167,7 +167,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           contextPadProvider.getContextPadEntries = function(element: any) {
             const entries = origGetContextPadEntries(element);
             const elementType = element && element.type ? element.type.toLowerCase() : '';
-            if (!elementType.includes('gateway')) {
+            const isGateway = elementType.includes('gateway');
+            const isFlow = elementType.includes('flow') || elementType.includes('sequence') || elementType.includes('association');
+            if (!isGateway && !isFlow) {
               delete entries['replace'];
             }
             return entries;
@@ -407,7 +409,11 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'asynchronous',
       'async',
       'async before',
-      'async after'
+      'async after',
+      'script format',
+      'script body',
+      'script language',
+      'condition script'
     ];
 
     const UNWANTED_IDS = [
@@ -429,7 +435,11 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'asynchronous',
       'async',
       'asyncbefore',
-      'asyncafter'
+      'asyncafter',
+      'scriptformat',
+      'scriptbody',
+      'scriptlanguage',
+      'conditionscript'
     ];
 
     const hideUnsupportedGroups = () => {
@@ -459,6 +469,18 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         if (isUnwantedEntry) {
           (entryEl as HTMLElement).style.display = 'none';
         }
+      });
+
+      const conditionSelects = parent.querySelectorAll('[data-entry-id*="condition"] select, select[name*="condition"], [data-entry-id*="conditionType"] select');
+      conditionSelects.forEach((selectEl) => {
+        const select = selectEl as HTMLSelectElement;
+        Array.from(select.options).forEach((opt) => {
+          const val = (opt.value || '').toLowerCase();
+          const txt = (opt.textContent || '').toLowerCase();
+          if (val === 'script' || txt.includes('script')) {
+            opt.remove();
+          }
+        });
       });
     };
 
