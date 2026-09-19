@@ -15,6 +15,8 @@ export interface WorkflowDefinition {
   isActive: boolean;
   scope: 'global' | 'tenant';
   tenantId?: string;
+  hasDesignErrors?: boolean;
+  designErrorMessages?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

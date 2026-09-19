@@ -47,4 +47,11 @@
       </svg>
     </button>
   </div>
+
+  <app-design-errors-console
+    *ngIf="!readonly && hasLintErrors"
+    [errors]="currentLintErrors"
+    mode="bottom-bar"
+    title="Workflow Design Errors">
+  </app-design-errors-console>
 </div>

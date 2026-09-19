@@ -71,73 +71,88 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let wf of filteredWorkflows" class="align-middle">
-            <td class="text-truncate" style="max-width: 180px;" title="{{ wf.name }}">
-              <strong>{{ wf.name }}</strong>
-            </td>
-            <td class="text-truncate" style="max-width: 150px;" title="{{ wf.code }}">
-              <code>{{ wf.code }}</code>
-            </td>
-            <td *ngIf="scope !== 'global'" class="text-truncate" style="max-width: 120px;" title="{{ wf.vnamespace || '-' }}">
-              {{ wf.vnamespace || '-' }}
-            </td>
-            <td>v{{ wf.version }}</td>
-            <td>
-              <c-badge [color]="wf.payloadFormat === 'json' ? 'info' : 'warning'" shape="rounded-pill">
-                {{ wf.payloadFormat | uppercase }}
-              </c-badge>
-            </td>
-            <td>{{ wf.maxDurationSeconds }}s</td>
-            <td>
-              <c-badge [color]="wf.isActive ? 'success' : 'secondary'" shape="rounded-pill">
-                {{ wf.isActive ? 'Active' : 'Inactive' }}
-              </c-badge>
-            </td>
-            <td>
-              <div class="btn-group" role="group">
-                <button 
-                  cButton 
-                  color="success" 
-                  size="sm" 
-                  (click)="openExecuteModal(wf)" 
-                  title="Run / Execute Workflow">
-                  <svg cIcon name="cil-media-play"></svg>
-                </button>
-                <button 
-                  cButton 
-                  color="primary" 
-                  size="sm" 
-                  (click)="openExecutionsModal(wf)" 
-                  title="View Executions History">
-                  <svg cIcon name="cil-history"></svg>
-                </button>
-                <button 
-                  cButton 
-                  color="info" 
-                  size="sm" 
-                  (click)="openDetailModal(wf)" 
-                  title="View Details">
-                  <svg cIcon name="cil-info"></svg>
-                </button>
-                <button 
-                  cButton 
-                  color="warning" 
-                  size="sm" 
-                  (click)="openEditModal(wf)" 
-                  title="Edit">
-                  <svg cIcon name="cil-pencil"></svg>
-                </button>
-                <button 
-                  cButton 
-                  color="danger" 
-                  size="sm" 
-                  (click)="confirmDelete(wf)" 
-                  title="Delete">
-                  <svg cIcon name="cil-trash"></svg>
-                </button>
-              </div>
-            </td>
-          </tr>
+          <ng-container *ngFor="let wf of filteredWorkflows">
+            <tr class="align-middle" [class.table-danger]="wf.hasDesignErrors">
+              <td class="text-truncate" style="max-width: 180px;" title="{{ wf.name }}">
+                <strong>{{ wf.name }}</strong>
+                <span *ngIf="wf.hasDesignErrors" class="badge bg-danger ms-1" title="Workflow has design errors">Design Error</span>
+              </td>
+              <td class="text-truncate" style="max-width: 150px;" title="{{ wf.code }}">
+                <code>{{ wf.code }}</code>
+              </td>
+              <td *ngIf="scope !== 'global'" class="text-truncate" style="max-width: 120px;" title="{{ wf.vnamespace || '-' }}">
+                {{ wf.vnamespace || '-' }}
+              </td>
+              <td>v{{ wf.version }}</td>
+              <td>
+                <c-badge [color]="wf.payloadFormat === 'json' ? 'info' : 'warning'" shape="rounded-pill">
+                  {{ wf.payloadFormat | uppercase }}
+                </c-badge>
+              </td>
+              <td>{{ wf.maxDurationSeconds }}s</td>
+              <td>
+                <c-badge [color]="wf.isActive ? 'success' : 'secondary'" shape="rounded-pill">
+                  {{ wf.isActive ? 'Active' : 'Inactive' }}
+                </c-badge>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button 
+                    cButton 
+                    [color]="wf.hasDesignErrors ? 'danger' : 'success'" 
+                    size="sm" 
+                    [disabled]="wf.hasDesignErrors"
+                    (click)="openExecuteModal(wf)" 
+                    [title]="wf.hasDesignErrors ? 'Cannot execute workflow with design errors' : 'Run / Execute Workflow'">
+                    <svg cIcon name="cil-media-play"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="primary" 
+                    size="sm" 
+                    (click)="openExecutionsModal(wf)" 
+                    title="View Executions History">
+                    <svg cIcon name="cil-history"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="info" 
+                    size="sm" 
+                    (click)="openDetailModal(wf)" 
+                    title="View Details">
+                    <svg cIcon name="cil-info"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="warning" 
+                    size="sm" 
+                    (click)="openEditModal(wf)" 
+                    title="Edit Workflow">
+                    <svg cIcon name="cil-pencil"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="danger" 
+                    size="sm" 
+                    (click)="confirmDelete(wf)" 
+                    title="Delete Workflow">
+                    <svg cIcon name="cil-trash"></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Expanded full-width error sub-row when workflow has design errors -->
+            <tr *ngIf="wf.hasDesignErrors && wf.designErrorMessages && wf.designErrorMessages.length > 0">
+              <td [attr.colspan]="scope !== 'global' ? 8 : 7" class="p-0 border-0">
+                <app-design-errors-console
+                  [errors]="wf.designErrorMessages"
+                  mode="table-row"
+                  title="Design Errors for {{ wf.name }}">
+                </app-design-errors-console>
+              </td>
+            </tr>
+          </ng-container>
           <tr *ngIf="filteredWorkflows.length === 0">
             <td [attr.colspan]="scope === 'global' ? 7 : 8" class="text-center py-4">
               <div class="text-muted">
@@ -284,12 +299,12 @@
         <!-- Execute Workflow -->
         <button 
           cButton 
-          color="success" 
+          [color]="bpmnDesigner?.hasLintErrors ? 'danger' : 'success'" 
           size="sm" 
           type="button" 
           (click)="openExecuteModalFromForm()" 
-          [disabled]="!isEditing"
-          title="Run / Execute Workflow">
+          [disabled]="!isEditing || bpmnDesigner?.hasLintErrors"
+          [title]="bpmnDesigner?.hasLintErrors ? 'Cannot execute workflow with design errors' : 'Run / Execute Workflow'">
           <svg cIcon name="cil-media-play" class="me-1"></svg>
           Execute
         </button>

@@ -31,6 +31,7 @@ import { ErrorUtil } from '../../shared/utils/error.util';
 import { QueueDetailComponent } from '../tenants/tenant-management/queues/queue-detail/queue-detail.component';
 import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../shared/components/bpmn-designer/bpmn-designer.component';
 import { BpmnFormParserUtil, GeneratedFormField } from '../../shared/utils/bpmn-form-parser.util';
+import { DesignErrorsConsoleComponent } from '../../shared/components/design-errors-console/design-errors-console.component';
 
 @Component({
   selector: 'app-workflows',
@@ -63,7 +64,8 @@ import { BpmnFormParserUtil, GeneratedFormField } from '../../shared/utils/bpmn-
     MatInputModule,
     MatAutocompleteModule,
     QueueDetailComponent,
-    BpmnDesignerComponent
+    BpmnDesignerComponent,
+    DesignErrorsConsoleComponent
   ]
 })
 export class WorkflowsComponent implements OnInit, OnChanges {
@@ -236,6 +238,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       isActive: w.isActive !== undefined ? w.isActive : (w.IsActive !== undefined ? w.IsActive : true),
       scope: (w.scope || w.Scope || this.scope).toLowerCase() as 'global' | 'tenant',
       tenantId: w.tenantId || w.TenantID || '',
+      hasDesignErrors: w.hasDesignErrors !== undefined ? w.hasDesignErrors : (w.HasDesignErrors !== undefined ? w.HasDesignErrors : false),
+      designErrorMessages: w.designErrorMessages || w.DesignErrorMessages || [],
       createdAt: w.createdAt || w.CreatedAt || '',
       updatedAt: w.updatedAt || w.UpdatedAt || ''
     };
@@ -452,11 +456,17 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   async saveWorkflow(closeAfterSave: boolean = true): Promise<void> {
     if (this.workflowForm.invalid) return;
 
+    let hasDesignErrors = false;
+    let designErrorMessages: string[] = [];
+
     if (this.bpmnDesigner) {
       const xml = await this.bpmnDesigner.getXml();
       if (xml) {
         this.workflowForm.patchValue({ payload: xml }, { emitEvent: false });
       }
+      const lintResult = this.bpmnDesigner.runLintValidation();
+      hasDesignErrors = lintResult.hasErrors;
+      designErrorMessages = lintResult.errors;
     }
 
     const val = this.workflowForm.getRawValue();
@@ -470,7 +480,9 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       payload: val.payload,
       maxDurationSeconds: Number(val.maxDurationSeconds),
       isActive: Boolean(val.isActive),
-      scope: this.scope
+      scope: this.scope,
+      hasDesignErrors: hasDesignErrors,
+      designErrorMessages: designErrorMessages
     };
 
     if (this.isEditing) {

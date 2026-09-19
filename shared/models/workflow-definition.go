@@ -29,6 +29,8 @@ type WorkflowDefinition struct {
 	IsActive           bool                  `json:"isActive"`
 	Scope              WorkflowScope         `json:"scope"`
 	TenantID           string                `json:"tenantId"`
+	HasDesignErrors    bool                  `orm:"data-only" json:"hasDesignErrors"`
+	DesignErrorMessages []string             `orm:"data-only" json:"designErrorMessages,omitempty"`
 	CreatedAt          time.Time             `json:"createdAt"`
 	UpdatedAt          time.Time             `json:"updatedAt"`
 }

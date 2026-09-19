@@ -27,6 +27,9 @@ import ElementTemplateChooserModule from '@bpmn-io/element-template-chooser';
 import camundaModdleDescriptor from 'camunda-bpmn-moddle/resources/camunda.json';
 import elementTemplatesData from './element-templates.json';
 
+import lintModule from 'bpmn-js-bpmnlint';
+import { DesignErrorsConsoleComponent } from '../design-errors-console/design-errors-console.component';
+
 export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
@@ -51,7 +54,7 @@ export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
   templateUrl: './bpmn-designer.component.html',
   styleUrls: ['./bpmn-designer.component.scss'],
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DesignErrorsConsoleComponent],
   encapsulation: ViewEncapsulation.None
 })
 export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestroy {
@@ -61,6 +64,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   @Input() payload: string = '';
   @Input() readonly: boolean = false;
   @Output() xmlChange = new EventEmitter<string>();
+  @Output() designErrorsChange = new EventEmitter<{ hasErrors: boolean; errors: string[] }>();
+
+  public currentLintErrors: string[] = [];
+  public hasLintErrors: boolean = false;
 
   private bpmnModeler!: any;
   private isInitialized = false;
@@ -126,7 +133,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           BpmnPropertiesProviderModule,
           ElementTemplatesCoreModule,
           ElementTemplatesPropertiesProviderModule,
-          ElementTemplateChooserModule
+          ElementTemplateChooserModule,
+          lintModule
         ],
         moddleExtensions: {
           camunda: camundaModdleDescriptor
@@ -222,12 +230,18 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
     this.isInitialized = true;
 
-    // Listen for diagram changes to emit xmlChange if not readonly
-    if (!this.readonly) {
+    // Listen for diagram changes to emit xmlChange and run lint validation
+    if (!this.readonly && this.bpmnModeler) {
       const eventBus = this.bpmnModeler.get('eventBus');
-      eventBus.on('commandStack.changed', () => {
-        this.emitCurrentXml();
-      });
+      if (eventBus) {
+        eventBus.on('commandStack.changed', () => {
+          this.emitCurrentXml();
+          this.runLintValidation();
+        });
+        eventBus.on('import.done', () => {
+          setTimeout(() => this.runLintValidation(), 150);
+        });
+      }
     }
 
     const initialXml = this.payload && this.payload.trim().startsWith('<?xml')
@@ -235,6 +249,232 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       : DEFAULT_BPMN_XML;
 
     this.importXml(initialXml);
+  }
+
+  public runLintValidation(): { hasErrors: boolean; errors: string[] } {
+    if (!this.bpmnModeler || this.readonly) {
+      this.currentLintErrors = [];
+      this.hasLintErrors = false;
+      return { hasErrors: false, errors: [] };
+    }
+
+    const errors: string[] = [];
+
+    const getGatewayTypeName = (typeStr: string): string => {
+      const cleanType = (typeStr || '').replace(/^bpmn:/, '');
+      switch (cleanType) {
+        case 'ExclusiveGateway': return 'Exclusive Gateway (XOR)';
+        case 'ParallelGateway': return 'Parallel Gateway (AND)';
+        case 'InclusiveGateway': return 'Inclusive Gateway (OR)';
+        case 'ComplexGateway': return 'Complex Gateway';
+        case 'EventBasedGateway': return 'Event-Based Gateway';
+        default: return cleanType;
+      }
+    };
+
+    try {
+      const elementRegistry = this.bpmnModeler.get('elementRegistry');
+      if (elementRegistry) {
+        const elements = elementRegistry.getAll();
+        let startEventCount = 0;
+        let endEventCount = 0;
+        const reportedGatewayPairs = new Set<string>();
+
+        const IGNORED_TYPES = [
+          'label',
+          'bpmn:Process',
+          'bpmn:Collaboration',
+          'bpmn:Participant',
+          'bpmn:Lane',
+          'bpmn:TextAnnotation',
+          'bpmn:Group',
+          'bpmn:DataStoreReference',
+          'bpmn:DataObjectReference'
+        ];
+
+        elements.forEach((el: any) => {
+          if (!el || !el.type || IGNORED_TYPES.includes(el.type)) {
+            return;
+          }
+
+          const rawType = el.type || '';
+          const type = rawType.replace(/^bpmn:/, '');
+          const id = el.id || '';
+          const rawName = (el.businessObject?.name || '').trim();
+          const displayName = rawName ? `'${rawName}' (${id})` : `'${id}'`;
+
+          // Check if element is a connection / edge (SequenceFlow, Association, MessageFlow, etc.)
+          const isConnection = !!el.waypoints || type === 'SequenceFlow' || type === 'Association' || type === 'MessageFlow';
+
+          if (isConnection) {
+            // A sequence flow connection is disconnected ONLY IF missing source or target
+            if (!el.source || !el.target) {
+              errors.push(`Sequence Flow ${displayName} is disconnected (missing source or target).`);
+            }
+            return; // Connections are edges, not nodes; skip shape incoming/outgoing checks!
+          }
+
+          // Shape / Node checks
+          const incoming = el.incoming || [];
+          const outgoing = el.outgoing || [];
+
+          if (type === 'StartEvent') {
+            startEventCount++;
+            if (outgoing.length === 0) {
+              errors.push(`Start Event ${displayName} has no outgoing connection.`);
+            }
+          } else if (type === 'EndEvent') {
+            endEventCount++;
+            if (incoming.length === 0) {
+              errors.push(`End Event ${displayName} has no incoming connection.`);
+            }
+          } else if (type === 'BoundaryEvent') {
+            if (outgoing.length === 0) {
+              errors.push(`Boundary Event ${displayName} has no outgoing connection.`);
+            }
+          } else {
+            // Regular flow nodes (Tasks, Gateways, SubProcesses, etc.)
+            if (incoming.length === 0 && outgoing.length === 0) {
+              errors.push(`Element ${displayName} (${type}) is disconnected (has no connections).`);
+            } else if (incoming.length === 0) {
+              errors.push(`Element ${displayName} (${type}) has no incoming connection.`);
+            } else if (outgoing.length === 0) {
+              errors.push(`Element ${displayName} (${type}) has no outgoing connection.`);
+            }
+          }
+
+          // Gateway checks:
+          if (type.includes('Gateway') && outgoing.length > 1) {
+            const divType = type;
+            const defaultFlowId = el.businessObject?.default?.id;
+
+            // 1. Condition check on outgoing flows (ONLY for conditional divergent gateways: Exclusive, Inclusive, etc. Tasks & Parallel Gateways NEVER require conditions)
+            const isConditionalGateway = divType !== 'ParallelGateway';
+            if (isConditionalGateway) {
+              outgoing.forEach((flow: any) => {
+                const cond = (flow.businessObject?.conditionExpression?.body || '').trim();
+                const isDefault = defaultFlowId && flow.id === defaultFlowId;
+                if (!cond && !isDefault) {
+                  const targetId = flow.target?.id || 'target';
+                  const targetRawName = (flow.target?.businessObject?.name || '').trim();
+                  const targetDisplayName = targetRawName ? `'${targetRawName}' (${targetId})` : `'${targetId}'`;
+                  errors.push(`Gateway ${displayName} flow to ${targetDisplayName} has no condition and is not marked as default flow.`);
+                }
+              });
+            }
+
+            // 2. Nesting-aware Gateway Symmetry & Deadlock Check (Simetría de Compuertas Anidadas)
+            interface QueueItem {
+              node: any;
+              stack: string[];
+            }
+            const queue: QueueItem[] = [];
+            const visitedState = new Set<string>();
+
+            outgoing.forEach((flow: any) => {
+              if (flow && flow.target) {
+                queue.push({
+                  node: flow.target,
+                  stack: [id]
+                });
+              }
+            });
+
+            while (queue.length > 0) {
+              const item = queue.shift();
+              if (!item) continue;
+              const { node, stack } = item;
+              if (!node || !node.id) continue;
+
+              const stateKey = `${node.id}:${stack.join(',')}`;
+              if (visitedState.has(stateKey)) {
+                continue;
+              }
+              visitedState.add(stateKey);
+
+              const nodeRawType = node.type || '';
+              const nodeType = nodeRawType.replace(/^bpmn:/, '');
+              const nodeIncomingCount = (node.incoming || []).length;
+              const nodeOutgoingCount = (node.outgoing || []).length;
+
+              let currentStack = [...stack];
+
+              if (nodeType.includes('Gateway') && nodeIncomingCount > 1) {
+                if (currentStack.length > 0) {
+                  const topDivId = currentStack[currentStack.length - 1];
+                  const topDivNode = elements.find((e: any) => e.id === topDivId);
+
+                  if (topDivNode) {
+                    const topDivRawType = topDivNode.type || '';
+                    const topDivType = topDivRawType.replace(/^bpmn:/, '');
+                    const convType = nodeType;
+                    const convId = node.id;
+
+                    const pairKey = `${topDivId}->${convId}`;
+                    if (!reportedGatewayPairs.has(pairKey)) {
+                      if (topDivType !== convType) {
+                        reportedGatewayPairs.add(pairKey);
+
+                        const topDivRawName = (topDivNode.businessObject?.name || '').trim();
+                        const topDivDisplayName = topDivRawName ? `'${topDivRawName}' (${topDivId})` : `'${topDivId}'`;
+                        const convRawName = (node.businessObject?.name || '').trim();
+                        const convDisplayName = convRawName ? `'${convRawName}' (${convId})` : `'${convId}'`;
+                        const divTypeName = getGatewayTypeName(topDivType);
+                        const convTypeName = getGatewayTypeName(convType);
+
+                        if (topDivType === 'ExclusiveGateway' && convType === 'ParallelGateway') {
+                          errors.push(
+                            `Deadlock Error: ${divTypeName} ${topDivDisplayName} diverges into ${convTypeName} ${convDisplayName}. A Parallel Gateway waits for all incoming branches, causing a permanent deadlock because an Exclusive Gateway only activates one branch.`
+                          );
+                        } else if (topDivType === 'ExclusiveGateway' && convType === 'InclusiveGateway') {
+                          errors.push(
+                            `Gateway Asymmetry Error: ${divTypeName} ${topDivDisplayName} diverges into ${convTypeName} ${convDisplayName}. Gateways must be symmetric (Exclusive Gateway divergence must converge with an Exclusive Gateway).`
+                          );
+                        } else {
+                          errors.push(
+                            `Gateway Asymmetry Error: ${divTypeName} ${topDivDisplayName} diverges into ${convTypeName} ${convDisplayName}. Gateways must be symmetric (divergence and convergence must use the same gateway type).`
+                          );
+                        }
+                      }
+                    }
+                  }
+
+                  currentStack.pop();
+                }
+              }
+
+              if (nodeType.includes('Gateway') && nodeOutgoingCount > 1 && node.id !== id) {
+                currentStack.push(node.id);
+              }
+
+              (node.outgoing || []).forEach((flow: any) => {
+                if (flow && flow.target) {
+                  queue.push({
+                    node: flow.target,
+                    stack: [...currentStack]
+                  });
+                }
+              });
+            }
+          }
+        });
+
+        if (startEventCount === 0) {
+          errors.push('Process must contain at least one Start Event.');
+        }
+        if (endEventCount === 0) {
+          errors.push('Process must contain at least one End Event.');
+        }
+      }
+    } catch (e) {
+      console.warn('Lint validation notice:', e);
+    }
+
+    this.currentLintErrors = errors;
+    this.hasLintErrors = errors.length > 0;
+    const result = { hasErrors: this.hasLintErrors, errors: this.currentLintErrors };
+    this.designErrorsChange.emit(result);
+    return result;
   }
 
   public refresh(): void {

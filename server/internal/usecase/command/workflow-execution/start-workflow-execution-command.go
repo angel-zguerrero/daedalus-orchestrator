@@ -68,6 +68,15 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		return *commandResult
 	}
 
+	if def.HasDesignErrors {
+		errMsg := "cannot execute workflow definition: workflow has design errors"
+		if len(def.DesignErrorMessages) > 0 {
+			errMsg = fmt.Sprintf("cannot execute workflow definition: workflow has design errors (%s)", strings.Join(def.DesignErrorMessages, "; "))
+		}
+		commandResult.Error = errMsg
+		return *commandResult
+	}
+
 	// 2. Parse BPMN Model
 	bpmnModel, err := bpmn.ParseBPMN(def.Payload)
 	if err != nil {
