@@ -54,6 +54,10 @@ func (bo *WorkflowExecutionBO) StartExecution(
 		targetCFS = cfs
 	}
 
+	if executionKey == "" {
+		executionKey = uuid.New().String()
+	}
+
 	execID := strings.ReplaceAll(uuid.New().String(), "-", "")
 	tokenID := strings.ReplaceAll(uuid.New().String(), "-", "")
 
