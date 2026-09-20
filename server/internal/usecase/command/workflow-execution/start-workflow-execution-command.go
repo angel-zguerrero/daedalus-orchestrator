@@ -122,6 +122,18 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		return *commandResult
 	}
 
+	if cmd.ExecutionKey != "" {
+		activeExec, err := execRepo.GetActiveExecutionByBusinessKey(vns, def.ID, cmd.ExecutionKey, now)
+		if err != nil {
+			commandResult.Error = fmt.Sprintf("failed to validate execution business key: %s", err.Error())
+			return *commandResult
+		}
+		if activeExec != nil {
+			commandResult.Error = fmt.Sprintf("cannot start workflow execution: execution with business key '%s' is already in execution (ID: %s, status: %s)", cmd.ExecutionKey, activeExec.ID, activeExec.Status)
+			return *commandResult
+		}
+	}
+
 	execution := &models.WorkflowExecution{
 		ID:                         execID,
 		WorkflowDefinitionID:       def.ID,

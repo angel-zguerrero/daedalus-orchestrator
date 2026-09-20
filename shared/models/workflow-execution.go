@@ -15,10 +15,10 @@ const (
 
 type WorkflowExecution struct {
 	ID                         string                  `orm:"primary-key" json:"id"`
-	WorkflowDefinitionID       string                  `orm:"unique-compound:0" json:"workflowDefinitionId"`
+	WorkflowDefinitionID       string                  `json:"workflowDefinitionId"`
 	WorkflowDefinitionVersion int32                   `json:"workflowDefinitionVersion"`
-	VNamespace                 string                  `orm:"unique-compound:0" json:"vnamespace"`
-	ExecutionKey               string                  `orm:"unique-compound:0" json:"executionKey"`
+	VNamespace                 string                  `json:"vnamespace"`
+	ExecutionKey               string                  `json:"executionKey"`
 	Status                     WorkflowExecutionStatus `json:"status"`
 	Input                      map[string]interface{}  `json:"input"`
 	Output                     map[string]interface{}  `json:"output"`

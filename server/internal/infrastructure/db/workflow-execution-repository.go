@@ -74,3 +74,31 @@ func (r *WorkflowExecutionRepository) ListWorkflowExecutions(vnamespace string, 
 func (r *WorkflowExecutionRepository) DeleteWorkflowExecution(id string, now time.Time) (bool, error) {
 	return r.Delete(id, now)
 }
+
+func (r *WorkflowExecutionRepository) GetActiveExecutionByBusinessKey(vnamespace string, workflowDefinitionID string, executionKey string, now time.Time) (*models.WorkflowExecution, error) {
+	if executionKey == "" {
+		return nil, nil
+	}
+	var conditions []string
+	if vnamespace != "" {
+		conditions = append(conditions, fmt.Sprintf("VNamespace = %s", vnamespace))
+	}
+	if workflowDefinitionID != "" {
+		conditions = append(conditions, fmt.Sprintf("WorkflowDefinitionID = %s", workflowDefinitionID))
+	}
+	conditions = append(conditions, fmt.Sprintf("ExecutionKey = %s", executionKey))
+
+	query := strings.Join(conditions, " & ")
+	res, err := r.Find(query, 100, "", now)
+	if err != nil || res == nil {
+		return nil, err
+	}
+
+	for i := range res.Entities {
+		exec := &res.Entities[i]
+		if exec.Status == models.WorkflowExecutionStatusRunning || exec.Status == models.WorkflowExecutionStatusPending {
+			return exec, nil
+		}
+	}
+	return nil, nil
+}
