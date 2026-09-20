@@ -634,6 +634,11 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				}
 			}
 
+			// Core Execution Interceptor: Dynamically resolve all ${variableName} expressions in task properties/payload
+			if evaluatedPayload, ok := bpmn.EvaluateObject(jobInputPayload, execution.StateData).(map[string]interface{}); ok {
+				jobInputPayload = evaluatedPayload
+			}
+
 			job := &models.WorkflowJob{
 				ID:                   jobID,
 				WorkflowExecutionID: execution.ID,
