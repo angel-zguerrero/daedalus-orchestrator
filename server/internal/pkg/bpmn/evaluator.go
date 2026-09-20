@@ -7,11 +7,21 @@ import (
 	"github.com/expr-lang/expr"
 )
 
-// EvaluateCondition evaluates a BPMN condition expression against state variables using expr library.
-func EvaluateCondition(condition string, state map[string]interface{}) (bool, error) {
+// EvaluateConditionWithResolver evaluates a BPMN condition expression against state variables and optional resolver.
+func EvaluateConditionWithResolver(condition string, state map[string]interface{}, resolver EnvResolver) (bool, error) {
 	condition = strings.TrimSpace(condition)
 	if condition == "" {
 		return true, nil
+	}
+
+	if resolver != nil && strings.Contains(condition, "${") {
+		evalRes, err := EvaluateStringResolvable(condition, state, resolver)
+		if err != nil {
+			return false, fmt.Errorf("condition expression evaluation error: %w", err)
+		}
+		if evalStr, ok := evalRes.(string); ok {
+			condition = evalStr
+		}
 	}
 
 	// Clean wrapper like ${...}
@@ -47,3 +57,9 @@ func EvaluateCondition(condition string, state map[string]interface{}) (bool, er
 
 	return result, nil
 }
+
+// EvaluateCondition evaluates a BPMN condition expression against state variables using expr library.
+func EvaluateCondition(condition string, state map[string]interface{}) (bool, error) {
+	return EvaluateConditionWithResolver(condition, state, nil)
+}
+

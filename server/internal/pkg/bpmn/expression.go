@@ -7,7 +7,9 @@ import (
 	"strings"
 )
 
-var exprRegex = regexp.MustCompile(`\$\{([^}]+)\}`)
+type EnvResolver interface {
+	ResolveEnvVar(groupType string, scope string, groupRef string, varKey string) (string, error)
+}
 
 // ResolveVariablePath evaluates a dot-notated/indexed path against a state map.
 // Supports nested maps (e.g., "user.address.city") and array indexes (e.g., "items[0].name").
@@ -107,86 +109,158 @@ func parsePathTokens(path string) []pathToken {
 	return tokens
 }
 
-// EvaluateString resolves ${variableName} expressions in a string.
-// If the string is strictly a single expression `${expr}`, it returns the resolved object with its original type.
-// Otherwise, it interpolates all `${expr}` occurrences into a formatted string.
-func EvaluateString(input string, state map[string]interface{}) interface{} {
+var (
+	exprRegex         = regexp.MustCompile(`\$\{([^}]+)\}`)
+	configSecretRegex = regexp.MustCompile(`^(config|secret)\.(global|tenant)\s*\[\s*["']?([^"'\]]+?)["']?\s*\]\s*\[\s*["']?([^"'\]]+?)["']?\s*\]$`)
+)
+
+
+func resolveSingleExpr(exprInner string, state map[string]interface{}, resolver EnvResolver) (interface{}, error) {
+	exprInner = strings.TrimSpace(exprInner)
+	if matches := configSecretRegex.FindStringSubmatch(exprInner); len(matches) == 5 {
+		if resolver == nil {
+			return nil, fmt.Errorf("environment resolver is required to resolve %q", exprInner)
+		}
+		val, err := resolver.ResolveEnvVar(matches[1], matches[2], matches[3], matches[4])
+		if err != nil {
+			return nil, err
+		}
+		return val, nil
+	}
+
+	val := ResolveVariablePath(exprInner, state)
+	if val != nil {
+		return EvaluateObjectResolvable(val, state, resolver)
+	}
+	return "", nil
+}
+
+// EvaluateStringResolvable resolves ${variableName} or ${config...}/${secret...} expressions in a string.
+func EvaluateStringResolvable(input string, state map[string]interface{}, resolver EnvResolver) (interface{}, error) {
 	trimmed := strings.TrimSpace(input)
 
 	// Single standalone expression: preserve native object type
 	if strings.HasPrefix(trimmed, "${") && strings.HasSuffix(trimmed, "}") && strings.Count(trimmed, "${") == 1 {
 		exprInner := trimmed[2 : len(trimmed)-1]
-		val := ResolveVariablePath(exprInner, state)
-		if val != nil {
-			return EvaluateObject(val, state)
-		}
-		return ""
+		return resolveSingleExpr(exprInner, state, resolver)
 	}
 
 	// Mixed text or multiple expressions: interpolate to string
+	var firstErr error
+	var hasError bool
+
 	result := exprRegex.ReplaceAllStringFunc(input, func(match string) string {
+		if hasError {
+			return match
+		}
 		exprInner := match[2 : len(match)-1]
-		val := ResolveVariablePath(exprInner, state)
-		if val == nil {
+		resolved, err := resolveSingleExpr(exprInner, state, resolver)
+		if err != nil {
+			hasError = true
+			firstErr = err
+			return match
+		}
+		if resolved == nil {
 			return ""
 		}
-		return fmt.Sprintf("%v", val)
+		return fmt.Sprintf("%v", resolved)
 	})
 
-	return result
+	if hasError {
+		return nil, firstErr
+	}
+
+	return result, nil
 }
 
-// EvaluateObject recursively traverses data structures (maps, slices, strings) and resolves expressions against state.
-func EvaluateObject(val interface{}, state map[string]interface{}) interface{} {
+// EvaluateObjectResolvable recursively traverses data structures and resolves expressions using state & optional resolver.
+func EvaluateObjectResolvable(val interface{}, state map[string]interface{}, resolver EnvResolver) (interface{}, error) {
 	if val == nil {
-		return nil
+		return nil, nil
 	}
 
 	switch v := val.(type) {
 	case string:
-		return EvaluateString(v, state)
+		return EvaluateStringResolvable(v, state, resolver)
 
 	case map[string]interface{}:
 		evaluatedMap := make(map[string]interface{}, len(v))
 		for k, child := range v {
 			evaluatedKey := k
 			if strings.Contains(k, "${") {
-				if evalKeyStr, ok := EvaluateString(k, state).(string); ok {
-					evaluatedKey = evalKeyStr
+				evalKeyStr, err := EvaluateStringResolvable(k, state, resolver)
+				if err != nil {
+					return nil, err
+				}
+				if str, ok := evalKeyStr.(string); ok {
+					evaluatedKey = str
 				}
 			}
-			evaluatedMap[evaluatedKey] = EvaluateObject(child, state)
+			childRes, err := EvaluateObjectResolvable(child, state, resolver)
+			if err != nil {
+				return nil, err
+			}
+			evaluatedMap[evaluatedKey] = childRes
 		}
-		return evaluatedMap
+		return evaluatedMap, nil
 
 	case map[string]string:
 		evaluatedMap := make(map[string]interface{}, len(v))
 		for k, childStr := range v {
 			evaluatedKey := k
 			if strings.Contains(k, "${") {
-				if evalKeyStr, ok := EvaluateString(k, state).(string); ok {
-					evaluatedKey = evalKeyStr
+				evalKeyStr, err := EvaluateStringResolvable(k, state, resolver)
+				if err != nil {
+					return nil, err
+				}
+				if str, ok := evalKeyStr.(string); ok {
+					evaluatedKey = str
 				}
 			}
-			evaluatedMap[evaluatedKey] = EvaluateObject(childStr, state)
+			childRes, err := EvaluateObjectResolvable(childStr, state, resolver)
+			if err != nil {
+				return nil, err
+			}
+			evaluatedMap[evaluatedKey] = childRes
 		}
-		return evaluatedMap
+		return evaluatedMap, nil
 
 	case []interface{}:
 		evaluatedSlice := make([]interface{}, len(v))
 		for i, elem := range v {
-			evaluatedSlice[i] = EvaluateObject(elem, state)
+			childRes, err := EvaluateObjectResolvable(elem, state, resolver)
+			if err != nil {
+				return nil, err
+			}
+			evaluatedSlice[i] = childRes
 		}
-		return evaluatedSlice
+		return evaluatedSlice, nil
 
 	case []string:
 		evaluatedSlice := make([]interface{}, len(v))
 		for i, elem := range v {
-			evaluatedSlice[i] = EvaluateObject(elem, state)
+			childRes, err := EvaluateObjectResolvable(elem, state, resolver)
+			if err != nil {
+				return nil, err
+			}
+			evaluatedSlice[i] = childRes
 		}
-		return evaluatedSlice
+		return evaluatedSlice, nil
 
 	default:
-		return val
+		return val, nil
 	}
 }
+
+// EvaluateString resolves ${variableName} expressions in a string.
+func EvaluateString(input string, state map[string]interface{}) interface{} {
+	res, _ := EvaluateStringResolvable(input, state, nil)
+	return res
+}
+
+// EvaluateObject recursively traverses data structures (maps, slices, strings) and resolves expressions against state.
+func EvaluateObject(val interface{}, state map[string]interface{}) interface{} {
+	res, _ := EvaluateObjectResolvable(val, state, nil)
+	return res
+}
+

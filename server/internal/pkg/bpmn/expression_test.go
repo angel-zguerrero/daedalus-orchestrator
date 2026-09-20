@@ -122,3 +122,58 @@ func TestEvaluateObject(t *testing.T) {
 	assert.Equal(t, "admin@example.com", recipients[0])
 	assert.Equal(t, "dev@example.com", recipients[1])
 }
+
+type mockEnvResolver struct {
+	data map[string]string
+}
+
+func (m *mockEnvResolver) ResolveEnvVar(groupType string, scope string, groupRef string, varKey string) (string, error) {
+	key := groupType + "." + scope + "." + groupRef + "." + varKey
+	if val, ok := m.data[key]; ok {
+		return val, nil
+	}
+	return "", assert.AnError
+}
+
+func TestEvaluateConfigAndSecrets(t *testing.T) {
+	resolver := &mockEnvResolver{
+		data: map[string]string{
+			"config.global.code_config.DB_HOST":  "master.db.local",
+			"secret.global.sec_global.API_KEY":   "master-secret-key-99",
+			"config.tenant.app_tenant.APP_NAME":  "Tenant Store Front",
+			"secret.tenant.sec_tenant.DB_PASS":   "decrypted-db-pass-123",
+		},
+	}
+
+	state := map[string]interface{}{"env": "production"}
+
+	// 1. Config Global
+	val1, err := bpmn.EvaluateStringResolvable("${config.global[\"code_config\"][\"DB_HOST\"]}", state, resolver)
+	assert.NoError(t, err)
+	assert.Equal(t, "master.db.local", val1)
+
+	// 2. Secret Global
+	val2, err := bpmn.EvaluateStringResolvable("${secret.global[\"sec_global\"][\"API_KEY\"]}", state, resolver)
+	assert.NoError(t, err)
+	assert.Equal(t, "master-secret-key-99", val2)
+
+	// 3. Config Tenant
+	val3, err := bpmn.EvaluateStringResolvable("${config.tenant[\"app_tenant\"][\"APP_NAME\"]}", state, resolver)
+	assert.NoError(t, err)
+	assert.Equal(t, "Tenant Store Front", val3)
+
+	// 4. Secret Tenant with single quotes
+	val4, err := bpmn.EvaluateStringResolvable("${secret.tenant['sec_tenant']['DB_PASS']}", state, resolver)
+	assert.NoError(t, err)
+	assert.Equal(t, "decrypted-db-pass-123", val4)
+
+	// 5. Interpolated string with config
+	strVal, err := bpmn.EvaluateStringResolvable("Database connection: postgres://${secret.tenant['sec_tenant']['DB_PASS']}@${config.global['code_config']['DB_HOST']}:5432", state, resolver)
+	assert.NoError(t, err)
+	assert.Equal(t, "Database connection: postgres://decrypted-db-pass-123@master.db.local:5432", strVal)
+
+	// 6. Missing config/secret -> error
+	_, errMissing := bpmn.EvaluateStringResolvable("${config.global['code_config']['MISSING_VAR']}", state, resolver)
+	assert.Error(t, errMissing)
+}
+

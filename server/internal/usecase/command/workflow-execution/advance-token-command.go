@@ -116,6 +116,14 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 		}
 	}
 
+	dbResolver := &db.DBEnvResolver{
+		UOW:        uow,
+		TenantCF:   cmd.CF,
+		TenantCFS:  cmd.CFS,
+		VNamespace: execution.VNamespace,
+		Now:        now,
+	}
+
 	// 5. Advance Token Loop
 	maxSteps := 50
 	for step := 0; step < maxSteps; step++ {
@@ -186,7 +194,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				}
 
 				condStr := strings.TrimSpace(flow.Condition)
-				matched, err := bpmn.EvaluateCondition(condStr, execution.StateData)
+				matched, err := bpmn.EvaluateConditionWithResolver(condStr, execution.StateData, dbResolver)
 
 				if err != nil {
 					log.Warn().
@@ -456,7 +464,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				}
 
 				condStr := strings.TrimSpace(flow.Condition)
-				matched, err := bpmn.EvaluateCondition(condStr, execution.StateData)
+				matched, err := bpmn.EvaluateConditionWithResolver(condStr, execution.StateData, dbResolver)
 
 				if err != nil {
 					log.Warn().
@@ -635,8 +643,29 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			}
 
 			// Core Execution Interceptor: Dynamically resolve all ${variableName} expressions in task properties/payload
-			if evaluatedPayload, ok := bpmn.EvaluateObject(jobInputPayload, execution.StateData).(map[string]interface{}); ok {
-				jobInputPayload = evaluatedPayload
+			evaluatedPayload, err := bpmn.EvaluateObjectResolvable(jobInputPayload, execution.StateData, dbResolver)
+			if err != nil {
+				errMsg := fmt.Sprintf("expression evaluation failed for node %s (%s): %v", currentNode.ID, currentNode.Name, err)
+				log.Error().
+					Err(err).
+					Str("executionID", execution.ID).
+					Str("nodeID", currentNode.ID).
+					Msg("❌ Expression evaluation failed for node")
+
+				token.Status = models.ExecutionTokenStatusCancelled
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				execution.Status = models.WorkflowExecutionStatusFailed
+				execution.Error = errMsg
+				execution.CompletedAt = &now
+				execRepo.UpdateWorkflowExecution(execution, now)
+
+				commandResult.Error = errMsg
+				commandResult.Result = execution
+				return *commandResult
+			}
+			if evaluatedMap, ok := evaluatedPayload.(map[string]interface{}); ok {
+				jobInputPayload = evaluatedMap
 			}
 
 			job := &models.WorkflowJob{
