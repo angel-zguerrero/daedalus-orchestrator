@@ -13,6 +13,7 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"sync"
@@ -206,10 +207,14 @@ func (app *Application) Run() {
 			Msgf("❌ Getting database path")
 	}
 
+	nodeDirName := selfMember.IP + "-" + strconv.Itoa(selfMember.Port)
+	walDir := filepath.Join(base_path, "wal", strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10), nodeDirName)
+	nodeHostDir := filepath.Join(base_path, "node", strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10), nodeDirName)
+
 	RTTMillisecond := RecommendRTTMillisecond()
 	NH, err := dragonboatV4.NewNodeHost(dragonboatV4Config.NodeHostConfig{
-		WALDir:         base_path + "/wal/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
-		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+		WALDir:         walDir,
+		NodeHostDir:    nodeHostDir,
 		RTTMillisecond: RTTMillisecond,
 		RaftAddress:    dragonboat.MemmberToAddr(selfMember),
 		DeploymentID:   config.GlobalConfiguration.DeploymentID,

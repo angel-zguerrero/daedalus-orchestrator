@@ -697,21 +697,19 @@ func LoadDefaultConfiguration() error {
 	}
 
 	// Specific default logic for cluster setup
-	if !config.Join && config.SelfMemberHost == "" && config.ClusterBasePort == 0 && config.InitialMembers == "" && config.ReplicaID == 0 {
+	if !config.Join {
 		if config.SelfMemberHost == "" {
 			config.SelfMemberHost = "127.0.0.1"
 		}
 		if config.ClusterBasePort == 0 {
 			config.ClusterBasePort = 17000
 		}
-		config.ReplicaID = 1
-		// Construct InitialMembers from SelfMemberHost and ClusterBasePort if not specified
+		if config.ReplicaID == 0 {
+			config.ReplicaID = 1
+		}
 		if config.InitialMembers == "" {
 			config.InitialMembers = fmt.Sprintf("%s:r%d", config.SelfMemberHost, config.ReplicaID)
 		}
-	} else if !config.Join && config.SelfMemberHost != "" && config.ClusterBasePort != 0 && config.InitialMembers == "" && config.ReplicaID != 0 {
-		// If host and port are set, and replica ID is set, but initial members is not, default initial members to self.
-		config.InitialMembers = fmt.Sprintf("%s:r%d", config.SelfMemberHost, config.ReplicaID)
 	}
 
 	// Apply default for MaxShards if not set by any source
