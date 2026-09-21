@@ -8,6 +8,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/envconfig"
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
+	oauth_rest "deadalus-orch/server/internal/infrastructure/server/rest/oauth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/scheduledjob"
@@ -36,6 +37,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	userController := user.NewUserController(s.Config)
 	scheduledJobController := scheduledjob.NewScheduledJobController(s.Config)
 	envConfigController := envconfig.NewEnvConfigController(s.Config)
+	oauthAppController := oauth_rest.NewAppController(s.Config)
+	oauthTokenController := oauth_rest.NewTokenController(s.Config)
 
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
@@ -44,6 +47,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	{
 
 		restAPIGroup.GET("/auth/status", adminController.AuthStatusHandler)
+		restAPIGroup.POST("/oauth/token", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 30), oauthTokenController.GenerateTokenHandler)
 		restAPIGroup.POST("/auth/setup", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.AuthSetupHandler)
 		restAPIGroup.POST("/login", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.LoginHandler)
 		restAPIGroup.POST("/logout",
@@ -57,7 +61,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			tenantsGroup.GET("", tenantController.GetTenantsHandler)
-			tenantsGroup.POST("", tenantController.CreateTenantHandler)
+			tenantsGroup.POST("", requireScope(s.Config.MasterNode, s.Config.Logger, "tenants", "create"), tenantController.CreateTenantHandler)
 			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
 			tenantsGroup.GET("/:code", tenantController.GetTenantHandler)
 			tenantsGroup.GET("/:code/summary", tenantController.GetTenantSummaryHandler)
@@ -71,7 +75,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.GetExchangeHandler)
 				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.DeleteExchangeHandler)
 
-				tenantsGroup.POST("/:code/queue", queueController.CreateQueueHandler)
+				tenantsGroup.POST("/:code/queue", requireScope(s.Config.MasterNode, s.Config.Logger, "queues", "create"), queueController.CreateQueueHandler)
 				tenantsGroup.POST("/:code/queue/bulk", queueController.BulkCreateQueueHandler)
 				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", queueController.EnqueueMessageHandler)
 				tenantsGroup.GET("/:code/queue", queueController.GetQueuesHandler)
@@ -101,6 +105,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.POST("/:code/env-groups/:groupId/vars", envConfigController.SaveTenantVarHandler)
 				tenantsGroup.DELETE("/:code/env-groups/:groupId/vars/:varId", envConfigController.DeleteTenantVarHandler)
 				tenantsGroup.PUT("/:code/env-groups/:groupId/vars/bulk", envConfigController.BulkSaveTenantVarsHandler)
+				tenantsGroup.POST("/:code/oauth-apps", oauthAppController.CreateAppHandler)
+				tenantsGroup.POST("/:code/oauth-apps/:id/rotate-secret", oauthAppController.RotateSecretHandler)
 			}
 		}
 

@@ -12,6 +12,7 @@ import (
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	scheduled_job_command "deadalus-orch/server/internal/usecase/command/scheduled-job"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
+	oauth_command "deadalus-orch/server/internal/usecase/command/oauth"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	user_command "deadalus-orch/server/internal/usecase/command/user"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
@@ -208,4 +209,10 @@ func init() {
 	RegisterRepoCommand("CreateColumnFamilyCommand", func() commands.Command { return &CreateColumnFamilyCommand{} })
 	RegisterRepoCommand("DeleteColumnFamilyCommand", func() commands.Command { return &DeleteColumnFamilyCommand{} })
 	RegisterRepoCommand("DeleteColumnFamilySectorCommand", func() commands.Command { return &DeleteColumnFamilySectorCommand{} })
+
+	RegisterRepoCommand("CreateOAuthAppCommand", func() commands.Command { return &oauth_command.CreateOAuthAppCommand{} })
+	RegisterRepoCommand("RotateOAuthSecretCommand", func() commands.Command { return &oauth_command.RotateOAuthSecretCommand{} })
+	RegisterRepoCommand("FindOAuthAppCommand", func() commands.Command { return &oauth_command.FindOAuthAppCommand{} })
+	RegisterRepoCommand("RegisterOAuthTokenCommand", func() commands.Command { return &oauth_command.RegisterOAuthTokenCommand{} })
+	RegisterRepoCommand("ValidateOAuthTokenCommand", func() commands.Command { return &oauth_command.ValidateOAuthTokenCommand{} })
 }

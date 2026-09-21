@@ -13,9 +13,14 @@ import (
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	"fmt"
 	"net/http"
+	"crypto/sha256"
+	"encoding/hex"
 	"strconv"
 	"strings"
 	"time"
+
+	oauth_command "deadalus-orch/server/internal/usecase/command/oauth"
+	"deadalus-orch/shared/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -109,6 +114,14 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 		})
 
 		if err != nil {
+			// Try as OAuth Bearer Token
+			if strings.Contains(tokenString, "-") && len(tokenString) > 30 {
+				c.Set("is_oauth", true)
+				c.Set("oauth_token_raw", tokenString)
+				c.Next()
+				return
+			}
+
 			if err == jwt.ErrTokenExpired {
 				logger.Warn().Msg("JWT token expired")
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token expired"})
@@ -158,6 +171,79 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 		if !sessionExists {
 			logger.Warn().Str("token_subject", claims.Subject).Msg("Session does not exist or has been invalidated")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session is invalid or has expired"})
+			return
+		}
+
+		c.Set("is_oauth", false)
+		c.Next()
+	}
+}
+
+// requireScope middleware enforces resource:action permissions for OAuth tokens.
+// If it's a standard user (is_oauth=false), it bypasses scope check assuming admin privileges for now.
+func requireScope(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, resource, action string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		isOAuth, exists := c.Get("is_oauth")
+		if !exists || !isOAuth.(bool) {
+			// Regular user session, allow for now
+			c.Next()
+			return
+		}
+
+		rawToken, exists := c.Get("oauth_token_raw")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "OAuth token missing in context"})
+			return
+		}
+
+		tokenString := rawToken.(string)
+
+		// 1. Hash the token string to compare with DB using SHA-256
+		hasher := sha256.New()
+		hasher.Write([]byte(tokenString))
+		tokenHashHex := hex.EncodeToString(hasher.Sum(nil))
+
+		validateCmd := &oauth_command.ValidateOAuthTokenCommand{
+			TokenHash: tokenHashHex,
+		}
+
+		queryCmd := &general_command.Query_Command{
+			Command: &general_command.Repository_Command{
+				CMD: validateCmd,
+			},
+			Now: time.Now().UnixNano(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+		defer cancel()
+
+		result, err := MasterNode.Read(ctx, *queryCmd)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to validate OAuth token via Raft")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify token"})
+			return
+		}
+
+		tokenRecord, err := commands.DecodeCommandResult[*models.OAuthToken](result.([]byte))
+		if err != nil || tokenRecord == nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired OAuth token"})
+			return
+		}
+
+		// 2. Validate Scopes
+		hasScope := false
+		requiredScope := fmt.Sprintf("%s:%s", resource, action)
+		adminScope := fmt.Sprintf("%s:admin", resource)
+
+		for _, scope := range tokenRecord.Scopes {
+			if scope == requiredScope || scope == adminScope || scope == "admin:admin" {
+				hasScope = true
+				break
+			}
+		}
+
+		if !hasScope {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Insufficient scopes. Required: " + requiredScope})
 			return
 		}
 
