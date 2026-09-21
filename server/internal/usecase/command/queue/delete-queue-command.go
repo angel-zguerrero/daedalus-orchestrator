@@ -14,10 +14,11 @@ func init() {
 }
 
 type DeleteQueueCommand struct {
-	Code       string
-	VNamespace string
-	CF         string
-	CFS        string
+	Code            string
+	VNamespace      string
+	CF              string
+	CFS             string
+	InternalCascade bool
 }
 
 func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.CommandResult {
@@ -70,6 +71,12 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 
 	if queue == nil {
 		commandResult.Error = "queue not found"
+		return *commandResult
+	}
+
+	// Direct Deletion Protection: Workflow execution and activity queues cannot be manually deleted
+	if queue.Type != "" && queue.Type != models.StandardQueue && !cmd.InternalCascade {
+		commandResult.Error = "cannot manually delete a workflow execution or activity queue"
 		return *commandResult
 	}
 

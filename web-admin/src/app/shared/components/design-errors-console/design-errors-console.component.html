@@ -1,0 +1,31 @@
+<div class="errors-console-container" [ngClass]="['mode-' + mode, isCollapsed ? 'is-collapsed' : '']">
+  <div class="console-header" (click)="toggleCollapse()">
+    <div class="console-title">
+      <span class="error-icon">⚠️</span>
+      <span class="title-text">{{ title }}</span>
+      <span class="error-badge" *ngIf="errors && errors.length > 0">
+        {{ errors.length }} {{ errors.length === 1 ? 'error' : 'errors' }}
+      </span>
+    </div>
+
+    <div class="console-actions">
+      <button class="toggle-btn" type="button" [attr.aria-label]="isCollapsed ? 'Expand' : 'Collapse'">
+        {{ isCollapsed ? '▲ Show Details' : '▼ Hide' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="console-body" *ngIf="!isCollapsed">
+    <div class="no-errors-msg" *ngIf="!errors || errors.length === 0">
+      <span class="check-icon">✓</span> No design errors detected.
+    </div>
+
+    <ul class="error-list" *ngIf="errors && errors.length > 0">
+      <li class="error-item" *ngFor="let err of errors; let i = index">
+        <span class="line-num">{{ i + 1 }}.</span>
+        <span class="err-bullet">✖</span>
+        <span class="err-text">{{ err }}</span>
+      </li>
+    </ul>
+  </div>
+</div>

@@ -272,16 +272,18 @@ func replaceCurrentDBFile(dir string) error {
 //   - An error if any role string is invalid.
 func ParseRolesList(list []string) ([]NodeRole, error) {
 	var validRoles = map[string]bool{
-		string(RoleConsensus): true,
-		string(RoleConnector): true,
-		string(RoleAdmin):     true,
+		string(RoleConsensus):               true,
+		string(RoleConnector):               true,
+		string(RoleAdmin):                   true,
+		string(RoleWorkflowExecutionWorker): true,
+		string(RoleWorkflowActivityWorker):  true,
 	}
 
 	roles := make([]NodeRole, 0, len(list))
 	for _, r := range list {
 		role := strings.TrimSpace(r)
 		if !validRoles[role] {
-			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, connector, admin", role)
+			return nil, fmt.Errorf("invalid role: %s. Valid roles are: consensus, connector, admin, workflow-execution-worker, workflow-activity-worker", role)
 		}
 		roles = append(roles, NodeRole(role))
 	}
@@ -311,6 +313,8 @@ func ParseRolesFlag(roleSeparateComma *string) ([]NodeRole, error) {
 			string(RoleConsensus),
 			string(RoleConnector),
 			string(RoleAdmin),
+			string(RoleWorkflowExecutionWorker),
+			string(RoleWorkflowActivityWorker),
 		})
 	}
 

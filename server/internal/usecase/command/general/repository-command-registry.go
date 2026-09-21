@@ -15,6 +15,8 @@ import (
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	user_command "deadalus-orch/server/internal/usecase/command/user"
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
+	workflow_definition_command "deadalus-orch/server/internal/usecase/command/workflow-definition"
+	workflow_execution_command "deadalus-orch/server/internal/usecase/command/workflow-execution"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -203,6 +205,24 @@ func init() {
 	RegisterRepoCommand("DeleteEnvVarCommand", func() commands.Command { return &env_config_command.DeleteEnvVarCommand{} })
 	RegisterRepoCommand("GetEnvVarsCommand", func() commands.Command { return &env_config_command.GetEnvVarsCommand{} })
 	RegisterRepoCommand("BulkSaveEnvVarsCommand", func() commands.Command { return &env_config_command.BulkSaveEnvVarsCommand{} })
+
+	// Workflow Definition commands
+	RegisterRepoCommand("CreateWorkflowDefinitionCommand", func() commands.Command { return &workflow_definition_command.CreateWorkflowDefinitionCommand{} })
+	RegisterRepoCommand("UpdateWorkflowDefinitionCommand", func() commands.Command { return &workflow_definition_command.UpdateWorkflowDefinitionCommand{} })
+	RegisterRepoCommand("DeleteWorkflowDefinitionCommand", func() commands.Command { return &workflow_definition_command.DeleteWorkflowDefinitionCommand{} })
+	RegisterRepoCommand("GetWorkflowDefinitionCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowDefinitionCommand{} })
+	RegisterRepoCommand("ListWorkflowDefinitionsCommand", func() commands.Command { return &workflow_definition_command.ListWorkflowDefinitionsCommand{} })
+	RegisterRepoCommand("GetWorkflowQueuesCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowQueuesCommand{} })
+	RegisterRepoCommand("ListWorkflowVersionsCommand", func() commands.Command { return &workflow_definition_command.ListWorkflowVersionsCommand{} })
+	RegisterRepoCommand("GetWorkflowVersionCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowVersionCommand{} })
+
+	// Workflow Execution commands
+	RegisterRepoCommand("StartWorkflowExecutionCommand", func() commands.Command { return &workflow_execution_command.StartWorkflowExecutionCommand{} })
+	RegisterRepoCommand("AdvanceTokenCommand", func() commands.Command { return &workflow_execution_command.AdvanceTokenCommand{} })
+	RegisterRepoCommand("CompleteJobCommand", func() commands.Command { return &workflow_execution_command.CompleteJobCommand{} })
+	RegisterRepoCommand("HandleJobFailureCommand", func() commands.Command { return &workflow_execution_command.HandleJobFailureCommand{} })
+	RegisterRepoCommand("GetWorkflowExecutionCommand", func() commands.Command { return &workflow_execution_command.GetWorkflowExecutionCommand{} })
+	RegisterRepoCommand("ListWorkflowExecutionsCommand", func() commands.Command { return &workflow_execution_command.ListWorkflowExecutionsCommand{} })
 
 	// General commands
 	RegisterRepoCommand("CreateColumnFamilyCommand", func() commands.Command { return &CreateColumnFamilyCommand{} })

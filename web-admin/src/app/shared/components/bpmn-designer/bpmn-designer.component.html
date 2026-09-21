@@ -1,0 +1,92 @@
+<div class="bpmn-designer-wrapper" [class.is-readonly]="readonly">
+  <div class="bpmn-designer-container">
+    <div #canvasRef class="bpmn-canvas"></div>
+    <div #propertiesRef class="bpmn-properties-panel" [style.display]="readonly ? 'none' : 'block'"></div>
+
+    <!-- Hidden File Input for BPMN/XML Upload -->
+    <input
+      type="file"
+      #fileInputRef
+      accept=".xml,.bpmn"
+      style="display: none"
+      (change)="onFileSelected($event)"
+    />
+
+    <!-- Floating Canvas Controls Overlay (Undo, Redo, Zoom In, Zoom Out, Fit, Upload, Download) -->
+    <div class="bpmn-zoom-overlay">
+      <ng-container *ngIf="!readonly">
+        <!-- Undo -->
+        <button type="button" class="zoom-btn" (click)="undo()" [disabled]="!canUndo()" title="Undo (Ctrl+Z / Cmd+Z)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7v6h6"></path>
+            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+          </svg>
+        </button>
+
+        <!-- Redo -->
+        <button type="button" class="zoom-btn" (click)="redo()" [disabled]="!canRedo()" title="Redo (Ctrl+Y / Cmd+Shift+Z)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 7v6h-6"></path>
+            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+          </svg>
+        </button>
+
+        <div class="overlay-divider"></div>
+      </ng-container>
+
+      <!-- Zoom In -->
+      <button type="button" class="zoom-btn" (click)="zoomIn()" title="Zoom In">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+
+      <!-- Zoom Out -->
+      <button type="button" class="zoom-btn" (click)="zoomOut()" title="Zoom Out">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+
+      <!-- Fit View -->
+      <button type="button" class="zoom-btn" (click)="zoomReset()" title="Fit View">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h6v6"></path>
+          <path d="M9 21H3v-6"></path>
+          <path d="M21 3l-7 7"></path>
+          <path d="M3 21l7-7"></path>
+        </svg>
+      </button>
+
+      <div class="overlay-divider"></div>
+
+      <!-- Upload XML (Editable mode only) -->
+      <button type="button" class="zoom-btn" *ngIf="!readonly" (click)="triggerFileUpload()" title="Upload BPMN / XML Diagram File">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </button>
+
+      <!-- Download XML -->
+      <button type="button" class="zoom-btn" (click)="downloadXml()" title="Download BPMN / XML Diagram File">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Dedicated section below the designer for Workflow Design Errors -->
+  <div class="bpmn-designer-errors-section" *ngIf="!readonly && hasLintErrors">
+    <app-design-errors-console
+      [errors]="currentLintErrors"
+      mode="table-row"
+      title="Workflow Design Errors">
+    </app-design-errors-console>
+  </div>
+</div>

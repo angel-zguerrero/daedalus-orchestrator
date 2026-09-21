@@ -13,6 +13,7 @@ import (
 	"deadalus-orch/shared/constants"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"sync"
@@ -79,6 +80,8 @@ type Application struct {
 	MetricsAggregationWorkerStopper *syncutil.Stopper
 	MetricsDownsampleWorkerStopper *syncutil.Stopper
 	MemoryScavengerStopper         *syncutil.Stopper
+	WorkflowExecutionStopper       *syncutil.Stopper
+	WorkflowActivityStopper        *syncutil.Stopper
 
 	MetricsCollector *metrics.MetricsCollector
 
@@ -204,10 +207,14 @@ func (app *Application) Run() {
 			Msgf("❌ Getting database path")
 	}
 
+	nodeDirName := selfMember.IP + "-" + strconv.Itoa(selfMember.Port)
+	walDir := filepath.Join(base_path, "wal", strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10), nodeDirName)
+	nodeHostDir := filepath.Join(base_path, "node", strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10), nodeDirName)
+
 	RTTMillisecond := RecommendRTTMillisecond()
 	NH, err := dragonboatV4.NewNodeHost(dragonboatV4Config.NodeHostConfig{
-		WALDir:         base_path + "/wal/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
-		NodeHostDir:    base_path + "/node/" + strconv.FormatUint(config.GlobalConfiguration.ReplicaID, 10) + "/" + selfMember.IP + "-" + strconv.Itoa(selfMember.Port),
+		WALDir:         walDir,
+		NodeHostDir:    nodeHostDir,
 		RTTMillisecond: RTTMillisecond,
 		RaftAddress:    dragonboat.MemmberToAddr(selfMember),
 		DeploymentID:   config.GlobalConfiguration.DeploymentID,
@@ -285,6 +292,14 @@ func (app *Application) Run() {
 	app.StartJobWorkerHeartbeatMonitor(30 * time.Second)
 
 	app.StartMemoryScavengerWorker(1 * time.Minute)
+
+	if dragonboat.ContainsRole(roles, dragonboat.RoleWorkflowExecutionWorker) {
+		app.StartWorkflowExecutionWorker(2*time.Second, 100)
+	}
+
+	if dragonboat.ContainsRole(roles, dragonboat.RoleWorkflowActivityWorker) {
+		app.StartWorkflowActivityWorker(2*time.Second, 100)
+	}
 
 	if dragonboat.ContainsRole(roles, dragonboat.RoleAdmin) {
 		app.StartRestAPI()
@@ -461,7 +476,13 @@ func (app *Application) Stop() {
 		if app.MemoryScavengerStopper != nil {
 			app.MemoryScavengerStopper.Stop()
 		}
-		log.Info().Msg("✅ OutboxRelayWorkerStopper, Metrics Workers and MemoryScavenger stopped.")
+		if app.WorkflowExecutionStopper != nil {
+			app.WorkflowExecutionStopper.Stop()
+		}
+		if app.WorkflowActivityStopper != nil {
+			app.WorkflowActivityStopper.Stop()
+		}
+		log.Info().Msg("✅ OutboxRelayWorkerStopper, Metrics Workers, MemoryScavenger and Workflow Workers stopped.")
 	}()
 
 	// Stop Job Worker Heartbeat Monitor
@@ -515,6 +536,8 @@ func NewApplication() *Application {
 		MetricsRelayWorkerStopper:     syncutil.NewStopper(),
 		JobWorkerHeartbeatStopper:     syncutil.NewStopper(),
 		MemoryScavengerStopper:        syncutil.NewStopper(),
+		WorkflowExecutionStopper:      syncutil.NewStopper(),
+		WorkflowActivityStopper:       syncutil.NewStopper(),
 
 		TenantNodes:           make([]*dragonboat.RaftNode, 0),
 		TenantNodesDictionary: make(map[string]*dragonboat.RaftNode),

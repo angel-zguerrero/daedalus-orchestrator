@@ -55,6 +55,19 @@ func (r *EnvGroupRepository) GetEnvGroupByCode(code string, vnamespace string, n
 	return &res.Entities[0], nil
 }
 
+func (r *EnvGroupRepository) GetEnvGroupByName(name string, vnamespace string, now time.Time) (*models.EnvGroup, error) {
+	if vnamespace == "" {
+		vnamespace = "default"
+	}
+	query := fmt.Sprintf("Name = %s & VNamespace = %s", name, vnamespace)
+	res, err := r.Find(query, 1, "", now)
+	if err != nil || len(res.Entities) == 0 {
+		return nil, err
+	}
+	return &res.Entities[0], nil
+}
+
+
 func (r *EnvGroupRepository) ListEnvGroups(scope string, tenantID string, pageSize int, cursor string, now time.Time) (*FindResult[models.EnvGroup], error) {
 	var query string
 	if scope != "" {

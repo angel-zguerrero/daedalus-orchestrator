@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package workflowdefinition;
+
+option go_package = "pb/workflowdefinition;workflowdefinition";
+
+service WorkflowDefinitionService {
+  rpc CreateWorkflowDefinition (CreateWorkflowDefinitionRequest) returns (CreateWorkflowDefinitionResponse);
+  rpc UpdateWorkflowDefinition (UpdateWorkflowDefinitionRequest) returns (UpdateWorkflowDefinitionResponse);
+  rpc GetWorkflowDefinition (GetWorkflowDefinitionRequest) returns (GetWorkflowDefinitionResponse);
+  rpc ListWorkflowDefinitions (ListWorkflowDefinitionsRequest) returns (ListWorkflowDefinitionsResponse);
+  rpc DeleteWorkflowDefinition (DeleteWorkflowDefinitionRequest) returns (DeleteWorkflowDefinitionResponse);
+}
+
+message WorkflowDefinitionProto {
+  string id = 1;
+  string code = 2;
+  string vnamespace = 3;
+  string name = 4;
+  string description = 5;
+  int32 version = 6;
+  bytes payload = 7;
+  string payloadFormat = 8;
+  int32 maxDurationSeconds = 9;
+  bool isActive = 10;
+  string scope = 11;
+  string tenantId = 12;
+  string createdAt = 13;
+  string updatedAt = 14;
+}
+
+message CreateWorkflowDefinitionRequest {
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  int32 version = 4;
+  bytes payload = 5;
+  string payloadFormat = 6;
+  int32 maxDurationSeconds = 7;
+  bool isActive = 8;
+  string scope = 9;
+  string tenantCode = 10;
+  string vnamespace = 11;
+}
+
+message CreateWorkflowDefinitionResponse {
+  string message = 1;
+  WorkflowDefinitionProto result = 2;
+}
+
+message UpdateWorkflowDefinitionRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 version = 4;
+  bytes payload = 5;
+  string payloadFormat = 6;
+  int32 maxDurationSeconds = 7;
+  bool isActive = 8;
+  string scope = 9;
+  string tenantCode = 10;
+}
+
+message UpdateWorkflowDefinitionResponse {
+  string message = 1;
+  WorkflowDefinitionProto result = 2;
+}
+
+message GetWorkflowDefinitionRequest {
+  string id = 1;
+  string code = 2;
+  string scope = 3;
+  string tenantCode = 4;
+  string vnamespace = 5;
+}
+
+message GetWorkflowDefinitionResponse {
+  string message = 1;
+  WorkflowDefinitionProto result = 2;
+}
+
+message ListWorkflowDefinitionsRequest {
+  string scope = 1;
+  string tenantCode = 2;
+  string cursor = 3;
+  int32 pageSize = 4;
+}
+
+message WorkflowDefinitionFindResult {
+  repeated WorkflowDefinitionProto entities = 1;
+  string cursor = 2;
+}
+
+message ListWorkflowDefinitionsResponse {
+  string message = 1;
+  WorkflowDefinitionFindResult result = 2;
+}
+
+message DeleteWorkflowDefinitionRequest {
+  string id = 1;
+  string scope = 2;
+  string tenantCode = 3;
+}
+
+message DeleteWorkflowDefinitionResponse {
+  string message = 1;
+}

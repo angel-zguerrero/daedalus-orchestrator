@@ -22,6 +22,10 @@ const (
 	RoleConnector NodeRole = "connector"
 	// RoleAdmin indicates that the node should expose administrator-level APIs.
 	RoleAdmin NodeRole = "admin"
+	// RoleWorkflowExecutionWorker indicates that the node consumes workflow execution queue events.
+	RoleWorkflowExecutionWorker NodeRole = "workflow-execution-worker"
+	// RoleWorkflowActivityWorker indicates that the node consumes workflow activity queue tasks.
+	RoleWorkflowActivityWorker NodeRole = "workflow-activity-worker"
 )
 
 // MasterShardID is the dedicated Shard ID for the master shard, which handles cluster-wide metadata and coordination.

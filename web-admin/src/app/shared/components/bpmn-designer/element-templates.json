@@ -1,0 +1,470 @@
+[
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "HTTP REST Connector",
+    "id": "io.camunda.connectors.HttpJson.v1",
+    "description": "Execute HTTP REST requests (GET, POST, PUT, DELETE, PATCH, HEAD) with full authentication, headers, query parameters, body payload, and response mapping",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/rest/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "groups": [
+      {
+        "id": "authentication",
+        "label": "Authentication"
+      },
+      {
+        "id": "request",
+        "label": "HTTP Request"
+      },
+      {
+        "id": "headers",
+        "label": "Headers & Query Parameters"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response & Mapping"
+      },
+      {
+        "id": "errorHandling",
+        "label": "Error Handling & Retry"
+      }
+    ],
+    "properties": [
+      {
+        "label": "Authentication Type",
+        "type": "Dropdown",
+        "value": "noAuth",
+        "group": "authentication",
+        "choices": [
+          {
+            "name": "None",
+            "value": "noAuth"
+          },
+          {
+            "name": "Basic Auth",
+            "value": "basic"
+          },
+          {
+            "name": "Bearer Token",
+            "value": "bearer"
+          },
+          {
+            "name": "OAuth 2.0 Client Credentials",
+            "value": "oauth-client-credentials"
+          }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.type"
+        }
+      },
+      {
+        "label": "Basic Auth Username",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.username"
+        }
+      },
+      {
+        "label": "Basic Auth Password",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.password"
+        }
+      },
+      {
+        "label": "Bearer Token",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.token"
+        }
+      },
+      {
+        "label": "OAuth 2.0 Token Endpoint",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.oauthTokenEndpoint"
+        }
+      },
+      {
+        "label": "OAuth 2.0 Client ID",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.clientId"
+        }
+      },
+      {
+        "label": "OAuth 2.0 Client Secret",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.clientSecret"
+        }
+      },
+      {
+        "label": "OAuth 2.0 Audience",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.audience"
+        }
+      },
+      {
+        "label": "OAuth 2.0 Scope",
+        "type": "String",
+        "group": "authentication",
+        "binding": {
+          "type": "camunda:property",
+          "name": "authentication.scope"
+        }
+      },
+      {
+        "label": "HTTP Method",
+        "type": "Dropdown",
+        "value": "GET",
+        "group": "request",
+        "choices": [
+          {
+            "name": "GET",
+            "value": "GET"
+          },
+          {
+            "name": "POST",
+            "value": "POST"
+          },
+          {
+            "name": "PUT",
+            "value": "PUT"
+          },
+          {
+            "name": "PATCH",
+            "value": "PATCH"
+          },
+          {
+            "name": "DELETE",
+            "value": "DELETE"
+          },
+          {
+            "name": "HEAD",
+            "value": "HEAD"
+          }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "method"
+        }
+      },
+      {
+        "label": "Target URL",
+        "type": "String",
+        "group": "request",
+        "binding": {
+          "type": "camunda:property",
+          "name": "url"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Connection Timeout (seconds)",
+        "type": "String",
+        "group": "request",
+        "binding": {
+          "type": "camunda:property",
+          "name": "connectionTimeout"
+        }
+      },
+      {
+        "label": "HTTP Headers (JSON / key-value format)",
+        "type": "String",
+        "multiline": true,
+        "group": "headers",
+        "binding": {
+          "type": "camunda:property",
+          "name": "headers"
+        }
+      },
+      {
+        "label": "Query Parameters (JSON / key-value format)",
+        "type": "String",
+        "multiline": true,
+        "group": "headers",
+        "binding": {
+          "type": "camunda:property",
+          "name": "queryParameters"
+        }
+      },
+      {
+        "label": "Request Body / Payload (JSON or Raw Text)",
+        "type": "String",
+        "multiline": true,
+        "group": "request",
+        "binding": {
+          "type": "camunda:property",
+          "name": "body"
+        }
+      },
+      {
+        "label": "Response Result Variable Name",
+        "type": "String",
+        "group": "responseMapping",
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
+      },
+      {
+        "label": "Response Result Expression (FEEL / JSONPath)",
+        "type": "String",
+        "group": "responseMapping",
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultExpression"
+        }
+      },
+      {
+        "label": "Error Catch Expression",
+        "type": "String",
+        "group": "errorHandling",
+        "binding": {
+          "type": "camunda:property",
+          "name": "errorExpression"
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Redis Cache Connector",
+    "id": "io.camunda.connectors.Redis.v1",
+    "description": "Execute Redis commands (GET, SET, DEL, EXPIRE, PUBLISH, HSET) against in-memory key-value store",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/redis/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "groups": [
+      {
+        "id": "connection",
+        "label": "Redis Server Connection"
+      },
+      {
+        "id": "operation",
+        "label": "Command & Arguments"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Response Mapping"
+      }
+    ],
+    "properties": [
+      {
+        "label": "Redis Host / Connection String (redis://host:6379)",
+        "type": "String",
+        "group": "connection",
+        "binding": {
+          "type": "camunda:property",
+          "name": "connectionString"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Password / Auth Token",
+        "type": "String",
+        "group": "connection",
+        "binding": {
+          "type": "camunda:property",
+          "name": "password"
+        }
+      },
+      {
+        "label": "Command",
+        "type": "Dropdown",
+        "value": "GET",
+        "group": "operation",
+        "choices": [
+          {
+            "name": "GET",
+            "value": "GET"
+          },
+          {
+            "name": "SET",
+            "value": "SET"
+          },
+          {
+            "name": "DEL",
+            "value": "DEL"
+          },
+          {
+            "name": "EXPIRE",
+            "value": "EXPIRE"
+          },
+          {
+            "name": "PUBLISH",
+            "value": "PUBLISH"
+          },
+          {
+            "name": "HSET",
+            "value": "HSET"
+          }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "command"
+        }
+      },
+      {
+        "label": "Key Name",
+        "type": "String",
+        "group": "operation",
+        "binding": {
+          "type": "camunda:property",
+          "name": "key"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Value / Payload (for SET, HSET, PUBLISH)",
+        "type": "String",
+        "multiline": true,
+        "group": "operation",
+        "binding": {
+          "type": "camunda:property",
+          "name": "value"
+        }
+      },
+      {
+        "label": "Expiration Time in Seconds (for SET / EXPIRE)",
+        "type": "String",
+        "group": "operation",
+        "binding": {
+          "type": "camunda:property",
+          "name": "ttl"
+        }
+      },
+      {
+        "label": "Response Result Variable Name",
+        "type": "String",
+        "group": "responseMapping",
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "Log Task Connector",
+    "id": "io.camunda.connectors.LogTask.v1",
+    "description": "Log structured message events and process context to execution logs or audit trails",
+    "documentationRef": "https://docs.camunda.io/docs/components/connectors/outbound/log/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask"
+    ],
+    "groups": [
+      {
+        "id": "configuration",
+        "label": "Log Message & Severity"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Output Mapping"
+      }
+    ],
+    "properties": [
+      {
+        "label": "Log Level",
+        "type": "Dropdown",
+        "value": "INFO",
+        "group": "configuration",
+        "choices": [
+          {
+            "name": "INFO",
+            "value": "INFO"
+          },
+          {
+            "name": "WARN",
+            "value": "WARN"
+          },
+          {
+            "name": "ERROR",
+            "value": "ERROR"
+          },
+          {
+            "name": "DEBUG",
+            "value": "DEBUG"
+          }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "level"
+        }
+      },
+      {
+        "label": "Log Message Text",
+        "type": "String",
+        "multiline": true,
+        "group": "configuration",
+        "binding": {
+          "type": "camunda:property",
+          "name": "message"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Additional Context / Metadata (JSON format)",
+        "type": "String",
+        "multiline": true,
+        "group": "configuration",
+        "binding": {
+          "type": "camunda:property",
+          "name": "context"
+        }
+      },
+      {
+        "label": "Response Result Variable Name",
+        "type": "String",
+        "group": "responseMapping",
+        "binding": {
+          "type": "camunda:property",
+          "name": "resultVariable"
+        }
+      }
+    ]
+  }
+]

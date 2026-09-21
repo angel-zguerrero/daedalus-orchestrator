@@ -8,6 +8,8 @@ enum QueueType {
   STANDARD = 0;
   DELAYED = 1;
   DEAD_LETTER = 2;
+  WORKFLOW_EXECUTION = 3;
+  WORKFLOW_ACTIVITY = 4;
 }
 
 service QueueService {
@@ -38,6 +40,7 @@ message CreateQueueRequest {
   string deadLetterExchangeRoutingKeyOrPattern = 15;
   int32 maxQueueSize = 16;
   int32 maxDeliveringMessages = 17;
+  string workflowDefinitionID = 18;
 }
 
 message CreateQueueResponse {
@@ -67,6 +70,7 @@ message CreateQueueItem {
   string deadLetterExchangeRoutingKeyOrPattern = 14;
   int32 maxQueueSize = 15;
   int32 maxDeliveringMessages = 16;
+  string workflowDefinitionID = 17;
 }
 
 message BulkCreateQueueResponse {
@@ -122,6 +126,7 @@ message Queue {
   string nodeSchedulerQueueSupervisionState = 25;
   int32 maxDeliveringMessages = 26;
   int32 currentDeliveringMessages = 27;
+  string workflowDefinitionID = 28;
 }
 
 message QueueFindResult {

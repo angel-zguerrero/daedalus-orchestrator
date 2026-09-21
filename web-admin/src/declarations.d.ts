@@ -3,3 +3,5 @@ declare module '*.json' {
   export default value;
 }
 
+declare module 'bpmn-js-bpmnlint';
+declare module 'bpmnlint';

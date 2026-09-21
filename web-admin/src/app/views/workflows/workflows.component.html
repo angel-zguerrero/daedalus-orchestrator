@@ -1,0 +1,1151 @@
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-task" class="me-2"></svg>
+      Workflows Management {{ scope === 'tenant' ? '(' + tenantCode + ')' : '(Global)' }}
+    </h5>
+  </c-card-header>
+  <c-card-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="success" *ngIf="successMsg" dismissible>{{ successMsg }}</c-alert>
+
+    <!-- Search and Actions Row -->
+    <c-row class="mb-3">
+      <c-col [md]="scope === 'global' ? 6 : 3">
+        <div class="input-group">
+          <input 
+            type="text" 
+            cFormControl 
+            placeholder="Search by name or code" 
+            [(ngModel)]="searchQuery" 
+            (keydown.enter)="searchWorkflows()"/>
+          <button 
+            cButton 
+            type="button" 
+            color="secondary" 
+            variant="outline" 
+            (click)="searchWorkflows()">
+            <svg cIcon name="cil-search"></svg>
+          </button>
+        </div>
+      </c-col>
+      <c-col [md]="3" *ngIf="scope !== 'global'">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by VNamespace</mat-label>
+          <input type="text" matInput [formControl]="vnamespaceFilterCtrl" [matAutocomplete]="autoFilter"
+            (ngModelChange)="onVNamespaceFilterChange($event)">
+          <mat-autocomplete #autoFilter="matAutocomplete">
+            <mat-option *ngFor="let vns of filteredFilterVNamespaces | async" [value]="vns.Name || vns">
+              {{vns.Name || vns}}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+      <c-col [md]="6" class="d-flex justify-content-end align-items-end">
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create Workflow
+        </button>
+      </c-col>
+    </c-row>
+
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loading">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading workflows...</p>
+    </div>
+
+    <!-- Workflows Table -->
+    <div class="table-responsive" *ngIf="!loading">
+      <table cTable class="mt-4" [hover]="true">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Code</th>
+            <th *ngIf="scope !== 'global'" style="min-width: 120px;">VNamespace</th>
+            <th>Version</th>
+            <th>Payload Format</th>
+            <th>Max Duration</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let wf of filteredWorkflows">
+            <tr class="align-middle" [class.table-danger]="wf.hasDesignErrors">
+              <td class="text-truncate" style="max-width: 180px;" title="{{ wf.name }}">
+                <strong>{{ wf.name }}</strong>
+                <span *ngIf="wf.hasDesignErrors" class="badge bg-danger ms-1" title="Workflow has design errors">Design Error</span>
+              </td>
+              <td class="text-truncate" style="max-width: 150px;" title="{{ wf.code }}">
+                <code>{{ wf.code }}</code>
+              </td>
+              <td *ngIf="scope !== 'global'" class="text-truncate" style="max-width: 120px;" title="{{ wf.vnamespace || '-' }}">
+                {{ wf.vnamespace || '-' }}
+              </td>
+              <td>v{{ wf.version }}</td>
+              <td>
+                <c-badge [color]="wf.payloadFormat === 'json' ? 'info' : 'warning'" shape="rounded-pill">
+                  {{ wf.payloadFormat | uppercase }}
+                </c-badge>
+              </td>
+              <td>{{ wf.maxDurationSeconds }}s</td>
+              <td>
+                <c-badge [color]="wf.isActive ? 'success' : 'secondary'" shape="rounded-pill">
+                  {{ wf.isActive ? 'Active' : 'Inactive' }}
+                </c-badge>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button 
+                    cButton 
+                    [color]="wf.hasDesignErrors ? 'danger' : 'success'" 
+                    size="sm" 
+                    [disabled]="wf.hasDesignErrors"
+                    (click)="openExecuteModal(wf)" 
+                    [title]="wf.hasDesignErrors ? 'Cannot execute workflow with design errors' : 'Run / Execute Workflow'">
+                    <svg cIcon name="cil-media-play"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="primary" 
+                    size="sm" 
+                    (click)="openExecutionsModal(wf)" 
+                    title="View Executions History">
+                    <svg cIcon name="cil-history"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="secondary" 
+                    size="sm" 
+                    (click)="openVersionHistoryModal(wf)" 
+                    title="Version History">
+                    <svg cIcon name="cil-list-numbered"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="info" 
+                    size="sm" 
+                    (click)="openDetailModal(wf)" 
+                    title="View Details">
+                    <svg cIcon name="cil-info"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="warning" 
+                    size="sm" 
+                    (click)="openEditModal(wf)" 
+                    title="Edit Workflow">
+                    <svg cIcon name="cil-pencil"></svg>
+                  </button>
+                  <button 
+                    cButton 
+                    color="danger" 
+                    size="sm" 
+                    (click)="confirmDelete(wf)" 
+                    title="Delete Workflow">
+                    <svg cIcon name="cil-trash"></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Expanded full-width error sub-row when workflow has design errors -->
+            <tr *ngIf="wf.hasDesignErrors && wf.designErrorMessages && wf.designErrorMessages.length > 0">
+              <td [attr.colspan]="scope !== 'global' ? 8 : 7" class="p-0 border-0">
+                <app-design-errors-console
+                  [errors]="wf.designErrorMessages"
+                  mode="table-row"
+                  title="Design Errors for {{ wf.name }}">
+                </app-design-errors-console>
+              </td>
+            </tr>
+          </ng-container>
+          <tr *ngIf="filteredWorkflows.length === 0">
+            <td [attr.colspan]="scope === 'global' ? 7 : 8" class="text-center py-4">
+              <div class="text-muted">
+                <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
+                <h6>No workflows found</h6>
+                <p class="mb-0">Create your first workflow definition to get started.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex justify-content-end mt-3" *ngIf="filteredWorkflows.length > 0">
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="cursors.length === 1" 
+        (click)="previousPage()">
+        <svg cIcon name="cil-chevron-left" class="me-1"></svg>
+        Previous
+      </button>
+      <button 
+        cButton 
+        color="secondary" 
+        [disabled]="!nextCursor" 
+        (click)="nextPage()" 
+        class="ms-2">
+        Next
+        <svg cIcon name="cil-chevron-right" class="ms-1"></svg>
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Create / Edit Workflow Modal (Google Docs / Document Studio Workspace Style) -->
+<c-modal id="workflowModal" [visible]="showModal" (visibleChange)="onModalVisibleChange($event)" size="xl" class="doc-studio-modal">
+  <div class="doc-studio-container" [formGroup]="workflowForm">
+    
+    <!-- Magnetic / Sticky Top Header Bar (Google Docs style) -->
+    <div class="doc-studio-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+      
+      <!-- Left: Icon + Document Title + Code + Namespace -->
+      <div class="d-flex align-items-center gap-3 flex-grow-1 me-3">
+        <div class="doc-icon-badge d-flex align-items-center justify-content-center rounded p-2 text-info bg-dark border border-secondary">
+          <svg cIcon name="cil-description" size="lg"></svg>
+        </div>
+        
+        <div class="doc-title-container flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <!-- Document Title Input (Google Docs style) -->
+            <input 
+              type="text" 
+              formControlName="name" 
+              class="doc-title-input fw-bold text-white bg-transparent border-0 fs-5 px-2 py-1" 
+              placeholder="Untitled Workflow..." 
+              title="Workflow Name"/>
+
+            <!-- Code Badge -->
+            <span class="badge bg-dark text-info border border-secondary font-monospace px-2 py-1" title="Workflow Code">
+              {{ workflowForm.get('code')?.value || 'auto-code' }}
+            </span>
+
+            <!-- Version Tag -->
+            <span class="badge bg-secondary text-light px-2 py-1">
+              v{{ currentWorkflowVersion || 1 }}
+            </span>
+          </div>
+
+          <div class="d-flex align-items-center gap-3">
+            <!-- VNamespace Compact Picker -->
+            <div class="vnamespace-compact-picker d-flex align-items-center gap-1" *ngIf="scope !== 'global'">
+              <span class="text-muted small">VNamespace:</span>
+              <mat-form-field appearance="outline" class="compact-mat-field">
+                <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="autoHeader" placeholder="Namespace">
+                <mat-autocomplete #autoHeader="matAutocomplete">
+                  <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name || vns">
+                    {{vns.Name || vns}}
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+            </div>
+
+            <!-- Active Status Toggle -->
+            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1 small ms-2">
+              <input class="form-check-input mt-0" type="checkbox" id="headerActiveSwitch" formControlName="isActive">
+              <label class="form-check-label text-muted cursor-pointer" for="headerActiveSwitch">
+                <span class="badge" [ngClass]="workflowForm.get('isActive')?.value ? 'bg-success' : 'bg-secondary'">
+                  {{ workflowForm.get('isActive')?.value ? 'Active' : 'Inactive' }}
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Action Buttons & Advanced Settings Toggle -->
+      <div class="d-flex align-items-center gap-2">
+        <button 
+          cButton 
+          color="dark" 
+          variant="outline" 
+          size="sm" 
+          type="button"
+          class="d-flex align-items-center gap-1 text-light border-secondary"
+          (click)="toggleAdvancedSettings()"
+          title="Workflow Description & Extra Settings">
+          <svg cIcon name="cil-options" size="sm"></svg>
+          <span class="d-none d-md-inline">Settings</span>
+        </button>
+
+        <button (click)="requestCloseModal()" cButton color="secondary" size="sm" type="button">
+          Cancel
+        </button>
+
+        <!-- Save (Save only, without closing) -->
+        <button 
+          cButton 
+          color="success" 
+          variant="outline" 
+          size="sm" 
+          type="button" 
+          (click)="saveWorkflow(false)" 
+          [disabled]="!workflowForm.valid"
+          title="Save changes and keep editing">
+          <svg cIcon name="cil-save" class="me-1"></svg>
+          Save
+        </button>
+
+        <!-- Save & Close (Save and close) -->
+        <button 
+          cButton 
+          color="primary" 
+          size="sm" 
+          type="button" 
+          (click)="saveWorkflow(true)" 
+          [disabled]="!workflowForm.valid"
+          title="Save changes and close editor">
+          <svg cIcon name="cil-check" class="me-1"></svg>
+          Save & Close
+        </button>
+
+        <!-- Execute Workflow -->
+        <button 
+          cButton 
+          [color]="bpmnDesigner?.hasLintErrors ? 'danger' : 'success'" 
+          size="sm" 
+          type="button" 
+          (click)="openExecuteModalFromForm()" 
+          [disabled]="!isEditing || bpmnDesigner?.hasLintErrors"
+          [title]="bpmnDesigner?.hasLintErrors ? 'Cannot execute workflow with design errors' : 'Run / Execute Workflow'">
+          <svg cIcon name="cil-media-play" class="me-1"></svg>
+          Execute
+        </button>
+
+        <button (click)="requestCloseModal()" cButtonClose class="btn-close-white ms-1"></button>
+      </div>
+
+    </div>
+
+    <!-- Advanced Settings Dropdown / Panel -->
+    <div class="doc-settings-panel p-3 bg-dark border-bottom" *ngIf="showAdvancedSettings">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Workflow Code</label>
+          <input cFormControl size="sm" formControlName="code" placeholder="Enter custom code" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">On Version Change Policy</label>
+          <select cSelect size="sm" formControlName="onVersionChange">
+            <option value="defined_in_execution">Defined in execution (Default)</option>
+            <option value="continue">Continue (keep running executions on original version)</option>
+            <option value="restart">Restart (terminate & relaunch executions on new version)</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Max Duration (seconds)</label>
+          <input cFormControl size="sm" type="number" formControlName="maxDurationSeconds" min="0" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small text-muted">Description</label>
+          <textarea cFormControl size="sm" formControlName="description" rows="2" placeholder="Brief description of the workflow logic..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert error message if any -->
+    <c-alert color="danger" *ngIf="showAlert" class="m-2" [innerHTML]="errorMessage"></c-alert>
+
+    <!-- Main Workspace Area (BPMN Designer as Main Focus) -->
+    <div class="doc-studio-body p-0 flex-grow-1 position-relative">
+      <app-bpmn-designer
+        #bpmnDesigner
+        [payload]="workflowForm.get('payload')?.value"
+        (xmlChange)="onBpmnXmlChange($event)">
+      </app-bpmn-designer>
+    </div>
+  </div>
+</c-modal>
+
+<!-- Unsaved Changes Confirmation Modal (Word / Google Docs style) -->
+<c-modal id="unsavedModal" [visible]="showUnsavedConfirmModal" (visibleChange)="showUnsavedConfirmModal = $event">
+  <c-modal-header class="bg-dark text-light border-secondary">
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-warning" class="text-warning"></svg>
+      Unsaved Changes
+    </h5>
+    <button (click)="cancelCloseUnsavedModal()" cButtonClose class="btn-close-white"></button>
+  </c-modal-header>
+  <c-modal-body class="bg-dark text-light">
+    <div class="d-flex align-items-start gap-3 py-2">
+      <div class="rounded-circle p-2 bg-warning-subtle text-warning d-flex align-items-center justify-content-center">
+        <svg cIcon name="cil-warning" size="2xl"></svg>
+      </div>
+      <div>
+        <h6 class="fw-bold mb-1">
+          Do you want to save changes to "{{ workflowForm.get('name')?.value || 'this workflow' }}"?
+        </h6>
+        <p class="text-muted small mb-0">
+          Your diagram modifications will be lost if you close without saving.
+        </p>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary d-flex justify-content-end gap-2">
+    <button (click)="cancelCloseUnsavedModal()" cButton color="secondary" variant="outline">
+      Cancel
+    </button>
+    <button (click)="confirmDiscardAndClose()" cButton color="danger">
+      Don't Save
+    </button>
+    <button (click)="saveWorkflowAndClose()" cButton color="primary" [disabled]="!workflowForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Save Changes
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Delete Workflow Modal -->
+<c-modal id="deleteModal" [visible]="showDeleteModal" (visibleChange)="showDeleteModal = $event">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-trash" class="me-2"></svg>
+      Delete Workflow
+    </h5>
+    <button (click)="showDeleteModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center">
+      <svg cIcon name="cil-warning" size="3xl" class="text-warning mb-3"></svg>
+      <h6>Are you sure you want to delete this workflow?</h6>
+      <p class="text-muted mb-0">
+        <strong>{{ workflowToDelete?.name }}</strong> (<code>{{ workflowToDelete?.code }}</code>)
+        <br>This action cannot be undone.
+      </p>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="showDeleteModal = false" cButton color="secondary">
+      Cancel
+    </button>
+    <button cButton color="danger" (click)="deleteWorkflow()">
+      <svg cIcon name="cil-trash" class="me-1"></svg>
+      Delete Workflow
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Workflow Details Modal -->
+<c-modal id="detailsModal" [visible]="showDetailModal" (visibleChange)="showDetailModal = $event" size="xl">
+  <c-modal-header>
+    <h5 cModalTitle>
+      <svg cIcon name="cil-info" class="me-2"></svg>
+      Workflow Details
+    </h5>
+    <button (click)="showDetailModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedWorkflow">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">ID</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.id }}</div>
+          <div class="form-text">Unique system identifier</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Name</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.name }}</div>
+          <div class="form-text">Display name for the workflow</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Code</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedWorkflow.code }}</code>
+          </div>
+          <div class="form-text">Unique workflow code</div>
+        </div>
+        <div class="mb-3" *ngIf="scope !== 'global'">
+          <label class="form-label fw-bold">VNamespace</label>
+          <div class="p-2 bg-dark rounded">
+            <code>{{ selectedWorkflow.vnamespace || 'default' }}</code>
+          </div>
+          <div class="form-text">Virtual namespace</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Status</label>
+          <div class="p-2 bg-dark rounded">
+            <c-badge [color]="selectedWorkflow.isActive ? 'success' : 'secondary'" shape="rounded-pill">
+              {{ selectedWorkflow.isActive ? 'Active' : 'Inactive' }}
+            </c-badge>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Version</label>
+          <div class="p-2 bg-dark rounded">v{{ selectedWorkflow.version }}</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Payload Format</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.payloadFormat | uppercase }}</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Max Duration</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.maxDurationSeconds }} seconds</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Scope</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflow.scope | titlecase }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="mb-3" *ngIf="selectedWorkflow.description">
+      <label class="form-label fw-bold">Description</label>
+      <div class="p-2 bg-dark rounded">{{ selectedWorkflow.description }}</div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-bold">Payload Content</label>
+      <div *ngIf="selectedWorkflow.payloadFormat === 'bpmn' || payloadDisplayText.trim().startsWith('<?xml')">
+        <app-bpmn-designer [payload]="payloadDisplayText" [readonly]="true"></app-bpmn-designer>
+      </div>
+      <div *ngIf="selectedWorkflow.payloadFormat !== 'bpmn' && !payloadDisplayText.trim().startsWith('<?xml')">
+        <pre class="p-3 bg-dark rounded text-light font-monospace border-0" style="max-height: 250px; overflow-y: auto;">{{ payloadDisplayText }}</pre>
+      </div>
+    </div>
+
+    <!-- Associated Workflow Queues Accordion -->
+    <h6 class="mt-4 mb-3 border-bottom pb-2">
+      <svg cIcon name="cil-transfer" class="me-2"></svg>
+      Isolated Workflow Queues
+    </h6>
+
+    <div *ngIf="loadingWorkflowQueues" class="text-center py-2">
+      <c-spinner size="sm"></c-spinner>
+      <span class="ms-2 text-muted">Loading workflow queues...</span>
+    </div>
+
+    <c-accordion [alwaysOpen]="false" class="shadow-sm rounded mb-3" *ngIf="!loadingWorkflowQueues && workflowQueues.length > 0">
+      <c-accordion-item *ngFor="let q of workflowQueues; let i = index" #item="cAccordionItem" [visible]="false">
+        <ng-template cTemplateId="accordionHeaderTemplate">
+          <button (click)="item.toggleItem()" [collapsed]="!item.visible" cAccordionButton class="d-flex align-items-center justify-content-between w-100 pe-3">
+            <span>
+              <strong class="me-2">{{ q.Name || q.name }}</strong>
+              <code class="me-2">{{ q.Code || q.code }}</code>
+            </span>
+            <span class="d-flex gap-2 align-items-center me-3">
+              <c-badge [color]="(q.Type || q.type) === 'workflow_execution' ? 'primary' : 'info'" shape="rounded-pill">
+                {{ (q.Type || q.type) === 'workflow_execution' ? 'Workflow Execution' : 'Workflow Activity' }}
+              </c-badge>
+              <c-badge [color]="(q.State || q.state) === 'active' ? 'success' : 'secondary'" shape="rounded-pill">
+                {{ q.State || q.state || 'active' }}
+              </c-badge>
+            </span>
+          </button>
+        </ng-template>
+        <ng-template cTemplateId="accordionBodyTemplate">
+          <div class="accordion-body p-3">
+            <app-queue-detail [queue]="q" [tenantCode]="tenantCode" [isWorkflowQueue]="true"></app-queue-detail>
+          </div>
+        </ng-template>
+      </c-accordion-item>
+    </c-accordion>
+
+    <div *ngIf="!loadingWorkflowQueues && workflowQueues.length === 0" class="text-muted small py-2">
+      No isolated workflow queues found for this definition.
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="showDetailModal = false" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Execute Workflow Modal -->
+<c-modal id="executeModal" [visible]="showExecuteModal" (visibleChange)="showExecuteModal = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-media-play" class="text-success"></svg>
+      Execute Workflow: {{ executingWorkflow?.name }}
+    </h5>
+    <button (click)="closeExecuteModal()" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="executingWorkflow">
+    <c-alert color="danger" *ngIf="executeErrorMessage" dismissible>{{ executeErrorMessage }}</c-alert>
+    
+    <div class="mb-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="badge bg-dark text-info font-monospace">{{ executingWorkflow.code }}</span>
+        <span class="badge bg-secondary">v{{ executingWorkflow.version }}</span>
+        <span class="badge bg-outline-secondary" *ngIf="executingWorkflow.vnamespace">VNamespace: {{ executingWorkflow.vnamespace }}</span>
+      </div>
+    </div>
+
+    <!-- Execution Key (Optional) -->
+    <div class="mb-3">
+      <label class="form-label font-weight-bold">Execution Business Key (Optional)</label>
+      <input type="text" cFormControl [(ngModel)]="executionKey" placeholder="e.g. ORDER-998234 or USER-REG-12" />
+      <small class="text-muted d-block mt-1">An optional unique key to track this execution in external systems.</small>
+    </div>
+
+    <!-- On Version Change Policy (Execution Level) -->
+    <div class="mb-3">
+      <label class="form-label font-weight-bold">On Version Change Policy</label>
+      <select cSelect [(ngModel)]="executionOnVersionChange" [disabled]="isExecutionPolicyDisabled">
+        <option value="continue">Continue (keep running on created version snapshot)</option>
+        <option value="restart">Restart (terminate & relaunch on new version upgrade)</option>
+      </select>
+      <small class="text-muted d-block mt-1" *ngIf="isExecutionPolicyDisabled">
+        Overridden by workflow definition policy: <strong class="text-info">{{ executingWorkflow?.onVersionChange }}</strong>
+      </small>
+      <small class="text-muted d-block mt-1" *ngIf="!isExecutionPolicyDisabled">
+        Select how this execution handles structural workflow version upgrades.
+      </small>
+    </div>
+
+    <!-- Mode Switcher (if Start Form exists) -->
+    <div *ngIf="hasStartForm" class="mb-3 d-flex align-items-center justify-content-between p-2 bg-dark rounded border border-secondary">
+      <span class="badge bg-info text-dark font-weight-bold d-flex align-items-center gap-1">
+        <svg cIcon name="cil-list-rich" class="me-1"></svg> Generated Form (Start Event)
+      </span>
+      <div class="btn-group btn-group-sm">
+        <button cButton [color]="executionInputMode === 'form' ? 'info' : 'outline-secondary'" (click)="executionInputMode = 'form'">
+          Visual Form
+        </button>
+        <button cButton [color]="executionInputMode === 'json' ? 'info' : 'outline-secondary'" (click)="executionInputMode = 'json'">
+          Raw JSON
+        </button>
+      </div>
+    </div>
+
+    <!-- DYNAMIC FORM INPUTS -->
+    <div *ngIf="hasStartForm && executionInputMode === 'form'" class="p-3 bg-dark text-light rounded border border-secondary mb-3">
+      <h6 class="text-info mb-3">Workflow Input Fields</h6>
+      <div *ngFor="let field of startFormFields" class="mb-3 p-2 bg-dark rounded border" [class.border-danger]="formErrors[field.id]" [class.border-secondary]="!formErrors[field.id]">
+        <label class="form-label small text-light d-flex align-items-center justify-content-between mb-1">
+          <span class="d-flex align-items-center gap-1">
+            <strong>{{ field.label || field.id }}</strong>
+            <span class="text-muted font-monospace me-1">({{ field.id }})</span>
+            <span *ngIf="field.type" class="badge bg-secondary text-light font-monospace">{{ field.type }}</span>
+          </span>
+          <div class="d-flex align-items-center gap-1 flex-wrap">
+            <span *ngIf="field.required" class="badge bg-danger">Required</span>
+            <span *ngIf="field.readonly" class="badge bg-warning text-dark">Read-only</span>
+            <span *ngIf="(field.minlength !== undefined || field.min !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Min Length: {{ field.minlength !== undefined ? field.minlength : field.min }}</span>
+            <span *ngIf="(field.maxlength !== undefined || field.max !== undefined) && (field.type === 'string' || field.type === 'text' || !field.type)" class="badge bg-secondary">Max Length: {{ field.maxlength !== undefined ? field.maxlength : field.max }}</span>
+            <span *ngIf="(field.min !== undefined || field.minlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Min: {{ field.min !== undefined ? field.min : field.minlength }}</span>
+            <span *ngIf="(field.max !== undefined || field.maxlength !== undefined) && (field.type === 'long' || field.type === 'integer' || field.type === 'number')" class="badge bg-secondary">Max: {{ field.max !== undefined ? field.max : field.maxlength }}</span>
+            <span *ngIf="field.pattern" class="badge bg-dark border border-info text-info" [title]="'Regex Pattern: ' + field.pattern">Regex</span>
+          </div>
+        </label>
+
+        <!-- String Input -->
+        <input *ngIf="field.type === 'string' || field.type === 'text' || field.type === 'longtext' || !field.type"
+               type="text"
+               cFormControl
+               [(ngModel)]="formValues[field.id]"
+               (input)="onFormFieldChange(field)"
+               (ngModelChange)="onFormFieldChange(field)"
+               [placeholder]="field.label || field.id"
+               [readonly]="!!field.readonly"
+               [attr.minlength]="field.minlength !== undefined ? field.minlength : field.min"
+               [attr.maxlength]="field.maxlength !== undefined ? field.maxlength : field.max"
+               [class.is-invalid]="formErrors[field.id]" />
+
+        <!-- Long/Integer Input -->
+        <input *ngIf="field.type === 'long' || field.type === 'integer' || field.type === 'number' || field.type === 'float' || field.type === 'double'"
+               type="number"
+               cFormControl
+               [(ngModel)]="formValues[field.id]"
+               (input)="onFormFieldChange(field)"
+               (ngModelChange)="onFormFieldChange(field)"
+               [placeholder]="field.label || field.id"
+               [readonly]="!!field.readonly"
+               [attr.min]="field.min !== undefined ? field.min : field.minlength"
+               [attr.max]="field.max !== undefined ? field.max : field.maxlength"
+               [class.is-invalid]="formErrors[field.id]" />
+
+        <!-- Date Input -->
+        <input *ngIf="field.type === 'date'"
+               type="date"
+               cFormControl
+               [(ngModel)]="formValues[field.id]"
+               (input)="onFormFieldChange(field)"
+               (ngModelChange)="onFormFieldChange(field)"
+               [readonly]="!!field.readonly"
+               [class.is-invalid]="formErrors[field.id]" />
+
+        <!-- Boolean Switch -->
+        <div *ngIf="field.type === 'boolean'" class="form-check form-switch mt-1">
+          <input class="form-check-input"
+                 type="checkbox"
+                 [id]="'form_switch_' + field.id"
+                 [(ngModel)]="formValues[field.id]"
+                 (ngModelChange)="onFormFieldChange(field)"
+                 [disabled]="!!field.readonly" />
+          <label class="form-check-label text-muted" [for]="'form_switch_' + field.id">
+            {{ formValues[field.id] ? 'Yes (True)' : 'No (False)' }}
+          </label>
+        </div>
+
+        <!-- Enum Select -->
+        <select *ngIf="field.type === 'enum'"
+                cSelect
+                [(ngModel)]="formValues[field.id]"
+                (change)="onFormFieldChange(field)"
+                (ngModelChange)="onFormFieldChange(field)"
+                [disabled]="!!field.readonly"
+                [class.is-invalid]="formErrors[field.id]">
+          <option *ngFor="let opt of field.values" [value]="opt.id">{{ opt.name || opt.id }}</option>
+        </select>
+
+        <!-- Live Validation Error Message -->
+        <div *ngIf="formErrors[field.id]" class="text-danger small mt-1 font-weight-bold d-flex align-items-center gap-1">
+          <svg cIcon name="cil-warning" class="me-1"></svg> {{ formErrors[field.id] }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Payload JSON -->
+    <div class="mb-3" *ngIf="!hasStartForm || executionInputMode === 'json'">
+      <label class="form-label font-weight-bold">Input Payload (JSON format)</label>
+      <textarea cFormControl rows="6" [(ngModel)]="executeInputJson" class="font-monospace bg-dark text-light border-secondary" placeholder='{ "param": "value" }'></textarea>
+      <small class="text-muted d-block mt-1">Variables provided here will populate the execution's initial state context.</small>
+    </div>
+
+    <!-- Execution Result Box -->
+    <div *ngIf="executionResult" class="mt-4 p-3 bg-dark text-light rounded border border-success">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="text-success mb-0">
+          <svg cIcon name="cil-check" class="me-1"></svg> Execution Triggered Successfully!
+        </h6>
+        <span class="badge bg-success">{{ executionResult.status | uppercase }}</span>
+      </div>
+      <div class="small font-monospace text-muted">
+        <div><strong>Execution ID:</strong> {{ executionResult.id }}</div>
+        <div><strong>Definition ID:</strong> {{ executionResult.workflowDefinitionId }}</div>
+        <div><strong>Started At:</strong> {{ executionResult.startedAt || executionResult.createdAt }}</div>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="closeExecuteModal()" cButton color="secondary">
+      Close
+    </button>
+    <button (click)="confirmExecuteWorkflow()" cButton color="success" [disabled]="executing">
+      <c-spinner size="sm" *ngIf="executing" class="me-1"></c-spinner>
+      <svg cIcon name="cil-media-play" class="me-1" *ngIf="!executing"></svg>
+      {{ executing ? 'Triggering...' : 'Run Workflow' }}
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Executions List Modal -->
+<c-modal id="executionsModal" [visible]="showExecutionsModal" (visibleChange)="showExecutionsModal = $event" size="xl">
+  <c-modal-header>
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-history" class="text-primary"></svg>
+      Workflow Executions: {{ executionsWorkflow?.name }}
+    </h5>
+    <button (click)="closeExecutionsModal()" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="executionsWorkflow">
+    <c-alert color="danger" *ngIf="executionsErrorMessage" dismissible>{{ executionsErrorMessage }}</c-alert>
+    
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-dark text-info font-monospace">{{ executionsWorkflow.code }}</span>
+        <span class="badge bg-secondary">v{{ executionsWorkflow.version }}</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <select cSelect [(ngModel)]="executionStatusFilter" (change)="loadExecutions()" class="form-select-sm">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <button cButton color="secondary" variant="outline" size="sm" (click)="loadExecutions()" title="Refresh">
+          <svg cIcon name="cil-reload"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loadingExecutions">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading executions...</p>
+    </div>
+
+    <!-- Executions Table -->
+    <div class="table-responsive" *ngIf="!loadingExecutions">
+      <table cTable class="mt-2" [hover]="true">
+        <thead>
+          <tr>
+            <th>Execution ID</th>
+            <th>Execution Key</th>
+            <th>VNamespace</th>
+            <th>Status</th>
+            <th>Started At</th>
+            <th>Completed At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let exec of executionsList" class="align-middle">
+            <td>
+              <code class="font-monospace text-primary" style="font-size: 0.85rem;">{{ exec.id }}</code>
+            </td>
+            <td>
+              <span *ngIf="exec.executionKey" class="badge bg-dark font-monospace">{{ exec.executionKey }}</span>
+              <span *ngIf="!exec.executionKey" class="text-muted small">-</span>
+            </td>
+            <td>{{ exec.vnamespace || '-' }}</td>
+            <td>
+              <c-badge [color]="getExecutionStatusBadgeColor(exec.status)" shape="rounded-pill">
+                {{ exec.status | uppercase }}
+              </c-badge>
+            </td>
+            <td class="small">{{ exec.startedAt ? (exec.startedAt | date:'medium') : (exec.createdAt | date:'medium') }}</td>
+            <td class="small">{{ exec.completedAt ? (exec.completedAt | date:'medium') : '-' }}</td>
+            <td>
+              <button cButton color="info" size="sm" (click)="openExecutionDetail(exec.id)" title="View Full Execution Detail">
+                <svg cIcon name="cil-options" class="me-1"></svg> Detail
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="executionsList.length === 0">
+            <td colspan="7" class="text-center py-4 text-muted">
+              <svg cIcon name="cil-inbox" size="2xl" class="d-block mx-auto mb-2"></svg>
+              No executions found for this workflow definition.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="closeExecutionsModal()" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Execution Detail Modal -->
+<c-modal id="executionDetailModal" [visible]="showExecutionDetailModal" (visibleChange)="showExecutionDetailModal = $event" size="xl">
+  <c-modal-header>
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-options" class="text-info"></svg>
+      Execution Detail: {{ selectedExecutionDetail?.execution?.id }}
+    </h5>
+    <button (click)="closeExecutionDetailModal()" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    <c-alert color="danger" *ngIf="executionDetailError" dismissible>{{ executionDetailError }}</c-alert>
+    
+    <div class="text-center py-4" *ngIf="loadingExecutionDetail">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading execution database details...</p>
+    </div>
+
+    <div *ngIf="!loadingExecutionDetail && selectedExecutionDetail">
+      <!-- Top Status Banner -->
+      <div class="card mb-3 bg-dark text-light border-secondary">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h6 class="mb-1 text-light">Execution ID: <code class="text-info">{{ selectedExecutionDetail.execution.id }}</code></h6>
+            <div class="small text-muted">
+              <span class="me-3">Definition ID: {{ selectedExecutionDetail.execution.workflowDefinitionId }}</span>
+              <span class="me-3">Version: v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }}</span>
+              <span *ngIf="selectedExecutionDetail.execution.executionKey">Key: <code>{{ selectedExecutionDetail.execution.executionKey }}</code></span>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <c-badge [color]="getExecutionStatusBadgeColor(selectedExecutionDetail.execution.status)" shape="rounded-pill" class="px-3 py-2 fs-6">
+              {{ selectedExecutionDetail.execution.status | uppercase }}
+            </c-badge>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Alert if Failed -->
+      <c-alert color="danger" *ngIf="selectedExecutionDetail.execution.error">
+        <strong>Execution Error:</strong> {{ selectedExecutionDetail.execution.error }}
+      </c-alert>
+
+      <!-- Navigation Tabs -->
+      <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'overview'" (click)="activeDetailTab = 'overview'">
+            <svg cIcon name="cil-task" class="me-1"></svg> DB Summary
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'payloads'" (click)="activeDetailTab = 'payloads'">
+            <svg cIcon name="cil-code" class="me-1"></svg> Inputs & Outputs
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'activities'" (click)="activeDetailTab = 'activities'">
+            <svg cIcon name="cil-list" class="me-1"></svg> Activities ({{ selectedExecutionDetail.jobs.length }})
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'tokens'" (click)="selectDetailTab('tokens')">
+            <svg cIcon name="cil-cursor" class="me-1"></svg> BPMN Tokens ({{ selectedExecutionDetail.tokens.length }})
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'diagram'" (click)="selectDetailTab('diagram')">
+            <svg cIcon name="cil-map" class="me-1"></svg> BPMN Diagram (v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }})
+          </button>
+        </li>
+      </ul>
+
+      <!-- TAB 1: OVERVIEW -->
+      <div *ngIf="activeDetailTab === 'overview'">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Database Metadata</div>
+              <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                  <tbody>
+                    <tr><td><strong>Execution ID:</strong></td><td><code>{{ selectedExecutionDetail.execution.id }}</code></td></tr>
+                    <tr><td><strong>Definition ID:</strong></td><td><code>{{ selectedExecutionDetail.execution.workflowDefinitionId }}</code></td></tr>
+                    <tr><td><strong>Version:</strong></td><td>v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }}</td></tr>
+                    <tr><td><strong>VNamespace:</strong></td><td>{{ selectedExecutionDetail.execution.vnamespace || '-' }}</td></tr>
+                    <tr><td><strong>Execution Key:</strong></td><td>{{ selectedExecutionDetail.execution.executionKey || '-' }}</td></tr>
+                    <tr><td><strong>Version Change Policy:</strong></td><td><span class="badge bg-info text-dark">{{ selectedExecutionDetail.execution.onVersionChange || 'continue' }}</span></td></tr>
+                    <tr><td><strong>Current Status:</strong></td><td>
+                      <c-badge [color]="getExecutionStatusBadgeColor(selectedExecutionDetail.execution.status)" shape="rounded-pill">
+                        {{ selectedExecutionDetail.execution.status | uppercase }}
+                      </c-badge>
+                    </td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Dates & Timestamps</div>
+              <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                  <tbody>
+                    <tr><td><strong>Started (StartedAt):</strong></td><td>{{ selectedExecutionDetail.execution.startedAt ? (selectedExecutionDetail.execution.startedAt | date:'medium') : '-' }}</td></tr>
+                    <tr><td><strong>Completed (CompletedAt):</strong></td><td>{{ selectedExecutionDetail.execution.completedAt ? (selectedExecutionDetail.execution.completedAt | date:'medium') : '-' }}</td></tr>
+                    <tr><td><strong>Created (CreatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.createdAt | date:'medium' }}</td></tr>
+                    <tr><td><strong>Updated (UpdatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.updatedAt | date:'medium' }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: PAYLOADS (INPUT, OUTPUT, STATEDATA) -->
+      <div *ngIf="activeDetailTab === 'payloads'">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Initial Input</div>
+              <div class="card-body p-0">
+                <pre class="m-0 p-3 bg-dark text-success font-monospace rounded-bottom" style="max-height: 350px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.input) }}</pre>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Result (Output)</div>
+              <div class="card-body p-0">
+                <pre class="m-0 p-3 bg-dark text-info font-monospace rounded-bottom" style="max-height: 350px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.output) }}</pre>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Context Variables (StateData)</div>
+              <div class="card-body p-0">
+                <pre class="m-0 p-3 bg-dark text-warning font-monospace rounded-bottom" style="max-height: 350px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.stateData) }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: ACTIVITIES (JOBS) -->
+      <div *ngIf="activeDetailTab === 'activities'">
+        <div class="table-responsive">
+          <table cTable [hover]="true" class="align-middle">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Activity ID / Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Worker</th>
+                <th>Retries</th>
+                <th>Timestamps</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let j of selectedExecutionDetail.jobs">
+                <td><code class="font-monospace text-primary">{{ j.id }}</code></td>
+                <td>
+                  <strong>{{ j.activityName || j.activityId }}</strong>
+                  <div class="small text-muted font-monospace" *ngIf="j.activityName">{{ j.activityId }}</div>
+                </td>
+                <td><span class="badge bg-dark border border-secondary text-info font-monospace">{{ j.activityType || 'ServiceTask' }}</span></td>
+                <td>
+                  <c-badge [color]="j.status === 'completed' ? 'success' : (j.status === 'failed' ? 'danger' : 'warning')" shape="rounded-pill">
+                    {{ j.status | uppercase }}
+                  </c-badge>
+                </td>
+                <td><code>{{ j.assignedWorkerId || '-' }}</code></td>
+                <td>{{ j.retries }}/{{ j.maxRetries }}</td>
+                <td class="small">{{ j.createdAt | date:'medium' }}</td>
+              </tr>
+              <tr *ngIf="selectedExecutionDetail.jobs.length === 0">
+                <td colspan="7" class="text-center py-3 text-muted">
+                  No activity jobs recorded for this execution.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 4: TOKENS BPMN -->
+      <div *ngIf="activeDetailTab === 'tokens'">
+        <div class="table-responsive">
+          <table cTable [hover]="true" class="align-middle">
+            <thead>
+              <tr>
+                <th>Token ID</th>
+                <th>Current BPMN Node</th>
+                <th>Token Status</th>
+                <th>Parent Token ID</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of selectedExecutionDetail.tokens">
+                <td><code class="font-monospace text-warning">{{ t.id }}</code></td>
+                <td><code>{{ t.currentNodeId }}</code></td>
+                <td>
+                  <c-badge [color]="t.status === 'active' ? 'success' : (t.status === 'waiting' ? 'info' : 'secondary')" shape="rounded-pill">
+                    {{ t.status | uppercase }}
+                  </c-badge>
+                </td>
+                <td><code class="text-muted">{{ t.parentTokenId || '-' }}</code></td>
+                <td class="small">{{ t.updatedAt | date:'medium' }}</td>
+              </tr>
+              <tr *ngIf="selectedExecutionDetail.tokens.length === 0">
+                <td colspan="5" class="text-center py-3 text-muted">
+                  No BPMN tokens recorded for this execution.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 5: DIAGRAM SNAPSHOT WITH HIGHLIGHTS -->
+      <div *ngIf="activeDetailTab === 'diagram'" style="height: 520px; width: 100%; position: relative;" class="border rounded bg-dark">
+        <app-bpmn-designer
+          #executionBpmnDesigner
+          [payload]="getExecutionSnapshotPayload()"
+          [readonly]="true">
+        </app-bpmn-designer>
+      </div>
+
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button (click)="closeExecutionDetailModal()" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Version History Modal -->
+<c-modal id="versionHistoryModal" [visible]="showVersionHistoryModal" (visibleChange)="showVersionHistoryModal = $event" size="lg">
+  <c-modal-header class="bg-dark text-light border-secondary">
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-list-numbered" class="text-info"></svg>
+      Version History: {{ selectedVersionWorkflow?.name }}
+    </h5>
+    <button (click)="closeVersionHistoryModal()" cButtonClose class="btn-close-white"></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center py-4" *ngIf="loadingVersionHistory">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading workflow versions...</p>
+    </div>
+
+    <c-alert color="danger" *ngIf="versionHistoryError">{{ versionHistoryError }}</c-alert>
+
+    <div class="table-responsive" *ngIf="!loadingVersionHistory">
+      <table cTable [hover]="true" class="align-middle">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Structural Hash (SHA-256)</th>
+            <th>Created Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let ver of versionHistoryList">
+            <td>
+              <c-badge color="primary" shape="rounded-pill">v{{ ver.version }}</c-badge>
+            </td>
+            <td>
+              <code class="small text-truncate d-inline-block" style="max-width: 260px;" title="{{ ver.structuralHash }}">{{ ver.structuralHash || 'N/A' }}</code>
+            </td>
+            <td>{{ ver.createdAt | date:'medium' }}</td>
+            <td>
+              <button cButton color="info" size="sm" (click)="openVersionDiagramModal(ver)">
+                <svg cIcon name="cil-eye" class="me-1"></svg> View Diagram
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="versionHistoryList.length === 0">
+            <td colspan="4" class="text-center text-muted py-3">No version history recorded.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" (click)="closeVersionHistoryModal()">Close</button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Version Read-Only Diagram Modal -->
+<c-modal id="versionDiagramModal" [visible]="showVersionDiagramModal" (visibleChange)="showVersionDiagramModal = $event" size="xl">
+  <c-modal-header class="bg-dark text-light border-secondary d-flex justify-content-between align-items-center">
+    <h5 cModalTitle class="d-flex align-items-center gap-2 mb-0">
+      <svg cIcon name="cil-map" class="text-success"></svg>
+      BPMN Diagram (Read-Only)
+      <span class="badge bg-primary rounded-pill">v{{ selectedVersionRecord?.version }}</span>
+    </h5>
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted small d-none d-md-inline" *ngIf="selectedVersionRecord?.structuralHash">
+        Structural Hash: <code class="text-info">{{ selectedVersionRecord?.structuralHash }}</code>
+      </span>
+      <button (click)="closeVersionDiagramModal()" cButtonClose class="btn-close-white ms-2"></button>
+    </div>
+  </c-modal-header>
+  <c-modal-body class="p-0 bg-dark">
+    <div style="height: 600px; width: 100%; position: relative;">
+      <app-bpmn-designer
+        #versionBpmnDesigner
+        *ngIf="showVersionDiagramModal"
+        [payload]="versionDiagramPayload"
+        [readonly]="true">
+      </app-bpmn-designer>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary">
+    <button cButton color="secondary" (click)="closeVersionDiagramModal()">Close</button>
+  </c-modal-footer>
+</c-modal>

@@ -30,6 +30,7 @@ func (r *ActiveQueueRepository) PutActiveQueue(q *models.Queue, now time.Time) (
 		ID:         q.ID,
 		Code:       q.Code,
 		VNamespace: q.VNamespace,
+		Type:       q.Type,
 	}
 	_, err := r.Create(aq, now)
 	if err != nil {
@@ -81,6 +82,7 @@ func (r *ActiveQueueRepository) PaginateWithClaimWorkFilter(f models.ClaimWorkFi
 				ID:            aq.ID,
 				Code:          aq.Code,
 				VNamespace:    aq.VNamespace,
+				Type:          aq.Type,
 				MessagesCount: 1, // We know it has messages because it's in ActiveQueue
 			}
 
