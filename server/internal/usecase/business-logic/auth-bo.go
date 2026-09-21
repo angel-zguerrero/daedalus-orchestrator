@@ -113,12 +113,24 @@ func (bo *AuthBO) Logout(ctx context.Context, token string) error {
 	return nil
 }
 
+// SessionClaims extends RegisteredClaims with a token_type discriminator.
+// The unified auth middleware uses token_type to distinguish admin session tokens
+// from OAuth machine tokens. Missing token_type is treated as "session" for
+// backward compatibility with JWTs issued before this field was added.
+type SessionClaims struct {
+	jwt.RegisteredClaims
+	TokenType string `json:"token_type"` // Always "session" for human admin logins
+}
+
 func (bo *AuthBO) generateJWT(username string) (string, error) {
 	expirationTime := time.Now().Add(bo.JwtDuration)
-	claims := &jwt.RegisteredClaims{
-		Subject:   username,
-		ExpiresAt: jwt.NewNumericDate(expirationTime),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	claims := &SessionClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   username,
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		TokenType: "session",
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

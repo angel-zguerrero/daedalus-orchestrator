@@ -9,6 +9,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
+	"deadalus-orch/server/internal/infrastructure/server/rest/oauthapp"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/scheduledjob"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
@@ -37,6 +38,15 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	scheduledJobController := scheduledjob.NewScheduledJobController(s.Config)
 	envConfigController := envconfig.NewEnvConfigController(s.Config)
 
+	// OAuth controllers
+	oauthTokenController := oauthapp.NewOAuthController(s.Config)
+	oauthAppController := oauthapp.NewOAuthAppController(s.Config)
+
+	// ── OAuth token endpoint — PUBLIC, rate-limited, NO auth middleware ────
+	engine.POST("/rest-api/oauth/token",
+		rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 10),
+		oauthTokenController.TokenHandler)
+
 	// Crear el TenantBO para el middleware
 	tenantBO := bo.NewTenantBO(s.Config)
 
@@ -47,12 +57,12 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		restAPIGroup.POST("/auth/setup", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.AuthSetupHandler)
 		restAPIGroup.POST("/login", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.LoginHandler)
 		restAPIGroup.POST("/logout",
-			authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey),
+			unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey),
 			rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4),
 			adminController.LogoutHandler)
 
 		tenantsGroup := restAPIGroup.Group("/tenants")
-		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		tenantsGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		tenantsGroup.Use(tenantContextMiddleware(tenantBO, s.Config, s.Config.Logger))
 		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
@@ -64,34 +74,39 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.GET("/:code/metrics/tsdb", tsdbMetricsController.GetTSDBMetricsHandler)
 			tenantsGroup.DELETE("/:code", tenantController.DeleteTenantHandler)
 			{
-				tenantsGroup.POST("/:code/exchange", exchangeController.CreateExchangeHandler)
-				tenantsGroup.POST("/:code/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
-				tenantsGroup.POST("/:code/exchange/publish-message", exchangeController.PublishMessageHandler)
-				tenantsGroup.GET("/:code/exchange", exchangeController.GetExchangesHandler)
-				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.GetExchangeHandler)
-				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.DeleteExchangeHandler)
+				// ── Exchanges ────────────────────────────────────────────────────────
+				tenantsGroup.POST("/:code/exchange", requireScope("exchanges:create", "exchanges:admin"), exchangeController.CreateExchangeHandler)
+				tenantsGroup.POST("/:code/exchange/bulk", requireScope("exchanges:create", "exchanges:admin"), exchangeController.BulkCreateExchangeHandler)
+				tenantsGroup.POST("/:code/exchange/publish-message", requireScope("exchanges:create", "exchanges:admin"), exchangeController.PublishMessageHandler)
+				tenantsGroup.GET("/:code/exchange", requireScope("exchanges:list", "exchanges:admin"), exchangeController.GetExchangesHandler)
+				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", requireScope("exchanges:list", "exchanges:admin"), exchangeController.GetExchangeHandler)
+				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", requireScope("exchanges:delete", "exchanges:admin"), exchangeController.DeleteExchangeHandler)
 
-				tenantsGroup.POST("/:code/queue", queueController.CreateQueueHandler)
-				tenantsGroup.POST("/:code/queue/bulk", queueController.BulkCreateQueueHandler)
-				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", queueController.EnqueueMessageHandler)
-				tenantsGroup.GET("/:code/queue", queueController.GetQueuesHandler)
-				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace", queueController.GetQueueHandler)
-				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace/messages", queueController.GetQueueMessagesHandler)
-				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", queueController.DeleteQueueHandler)
+				// ── Queues ───────────────────────────────────────────────────────────
+				tenantsGroup.POST("/:code/queue", requireScope("queues:create", "queues:admin"), queueController.CreateQueueHandler)
+				tenantsGroup.POST("/:code/queue/bulk", requireScope("queues:create", "queues:admin"), queueController.BulkCreateQueueHandler)
+				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", requireScope("queues:create", "queues:admin"), queueController.EnqueueMessageHandler)
+				tenantsGroup.GET("/:code/queue", requireScope("queues:list", "queues:admin"), queueController.GetQueuesHandler)
+				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace", requireScope("queues:list", "queues:admin"), queueController.GetQueueHandler)
+				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace/messages", requireScope("queues:list", "queues:admin"), queueController.GetQueueMessagesHandler)
+				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", requireScope("queues:delete", "queues:admin"), queueController.DeleteQueueHandler)
 
-				tenantsGroup.POST("/:code/binding", bindingController.CreateBindingHandler)
-				tenantsGroup.GET("/:code/bindings", bindingController.GetBindingsHandler)
-				tenantsGroup.GET("/:code/binding/:exchangeCode/:queueCode/:vnamespace", bindingController.GetBindingHandler)
-				tenantsGroup.DELETE("/:code/binding/:bindingCode/:vnamespace", bindingController.DeleteBindingHandler)
+				// ── Bindings ─────────────────────────────────────────────────────────
+				tenantsGroup.POST("/:code/binding", requireScope("bindings:create", "bindings:admin"), bindingController.CreateBindingHandler)
+				tenantsGroup.GET("/:code/bindings", requireScope("bindings:list", "bindings:admin"), bindingController.GetBindingsHandler)
+				tenantsGroup.GET("/:code/binding/:exchangeCode/:queueCode/:vnamespace", requireScope("bindings:list", "bindings:admin"), bindingController.GetBindingHandler)
+				tenantsGroup.DELETE("/:code/binding/:bindingCode/:vnamespace", requireScope("bindings:delete", "bindings:admin"), bindingController.DeleteBindingHandler)
 
 				tenantsGroup.GET("/:code/vnamespaces", vnamespaceController.GetVNamespacesHandler)
 
-				tenantsGroup.POST("/:code/scheduled-job/one-off", scheduledJobController.CreateOneOffScheduledJobHandler)
-				tenantsGroup.POST("/:code/scheduled-job/recurring", scheduledJobController.CreateRecurringScheduledJobHandler)
-				tenantsGroup.GET("/:code/scheduled-jobs", scheduledJobController.GetScheduledJobsHandler)
-				tenantsGroup.GET("/:code/scheduled-job/:id", scheduledJobController.GetScheduledJobHandler)
-				tenantsGroup.DELETE("/:code/scheduled-job/:id", scheduledJobController.DeleteScheduledJobHandler)
+				// ── Scheduled Jobs ───────────────────────────────────────────────────
+				tenantsGroup.POST("/:code/scheduled-job/one-off", requireScope("workflows:create", "workflows:admin"), scheduledJobController.CreateOneOffScheduledJobHandler)
+				tenantsGroup.POST("/:code/scheduled-job/recurring", requireScope("workflows:create", "workflows:admin"), scheduledJobController.CreateRecurringScheduledJobHandler)
+				tenantsGroup.GET("/:code/scheduled-jobs", requireScope("workflows:list", "workflows:admin"), scheduledJobController.GetScheduledJobsHandler)
+				tenantsGroup.GET("/:code/scheduled-job/:id", requireScope("workflows:list", "workflows:admin"), scheduledJobController.GetScheduledJobHandler)
+				tenantsGroup.DELETE("/:code/scheduled-job/:id", requireScope("workflows:delete", "workflows:admin"), scheduledJobController.DeleteScheduledJobHandler)
 
+				// ── Env Groups (internal config — no OAuth scope, session only via sessionOnlyMiddleware) ──
 				tenantsGroup.POST("/:code/env-groups", envConfigController.CreateTenantGroupHandler)
 				tenantsGroup.GET("/:code/env-groups", envConfigController.ListTenantGroupsHandler)
 				tenantsGroup.GET("/:code/env-groups/:groupId", envConfigController.GetTenantGroupHandler)
@@ -101,11 +116,18 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.POST("/:code/env-groups/:groupId/vars", envConfigController.SaveTenantVarHandler)
 				tenantsGroup.DELETE("/:code/env-groups/:groupId/vars/:varId", envConfigController.DeleteTenantVarHandler)
 				tenantsGroup.PUT("/:code/env-groups/:groupId/vars/bulk", envConfigController.BulkSaveTenantVarsHandler)
+
+				// ── OAuth App Management (session-only — OAuth tokens cannot manage other apps) ──
+				tenantsGroup.GET("/:code/oauth-apps", sessionOnlyMiddleware(), oauthAppController.ListAppsHandler)
+				tenantsGroup.POST("/:code/oauth-apps", sessionOnlyMiddleware(), oauthAppController.CreateAppHandler)
+				tenantsGroup.GET("/:code/oauth-apps/:id", sessionOnlyMiddleware(), oauthAppController.GetAppHandler)
+				tenantsGroup.DELETE("/:code/oauth-apps/:id", sessionOnlyMiddleware(), oauthAppController.DeleteAppHandler)
+				tenantsGroup.POST("/:code/oauth-apps/:id/rotate-secret", sessionOnlyMiddleware(), oauthAppController.RotateSecretHandler)
 			}
 		}
 
 		envGroupsGroup := restAPIGroup.Group("/env-groups")
-		envGroupsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		envGroupsGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		envGroupsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			envGroupsGroup.POST("", envConfigController.CreateGlobalGroupHandler)
@@ -120,7 +142,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		}
 
 		usersGroup := restAPIGroup.Group("/users")
-		usersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		usersGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		usersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			usersGroup.GET("", userController.GetUsersHandler)
@@ -130,7 +152,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		}
 
 		jobWorkersGroup := restAPIGroup.Group("/job-workers")
-		jobWorkersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		jobWorkersGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		jobWorkersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			jobWorkersGroup.GET("", jobWorkerController.GetJobWorkersHandler)
@@ -139,7 +161,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 		// Cluster management endpoints
 		apiV1Group := restAPIGroup.Group("/v1")
-		apiV1Group.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		apiV1Group.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		apiV1Group.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 30))
 		{
 			clusterController.RegisterRoutes(apiV1Group)
@@ -148,7 +170,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 
 		// Dashboard endpoints
 		dashboardGroup := restAPIGroup.Group("/dashboard")
-		dashboardGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		dashboardGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		dashboardGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			dashboardGroup.GET("/summary", dashboardController.GetDashboardSummaryHandler)
@@ -157,7 +179,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	}
 
 	metricsAPIGroup := engine.Group("/metrics")
-	metricsAPIGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+	metricsAPIGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 	metricsAPIGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 	metricsAPIGroup.GET("/", metricsController.GetSystemMetricsHandler)
 }
