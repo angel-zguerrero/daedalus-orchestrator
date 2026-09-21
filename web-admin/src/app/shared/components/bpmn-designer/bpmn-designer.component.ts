@@ -555,6 +555,37 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     }
   }
 
+  public highlightElements(markers: Array<{ id: string; type: 'active' | 'error' }>): void {
+    if (!this.bpmnModeler) return;
+    try {
+      const canvas = this.bpmnModeler.get('canvas');
+      if (!canvas) return;
+      markers.forEach(m => {
+        const cssClass = m.type === 'active' ? 'highlight-active' : 'highlight-error';
+        canvas.addMarker(m.id, cssClass);
+      });
+    } catch (e) {
+      console.warn('Failed to add markers:', e);
+    }
+  }
+
+  public clearHighlights(): void {
+    if (!this.bpmnModeler) return;
+    try {
+      const canvas = this.bpmnModeler.get('canvas');
+      const elementRegistry = this.bpmnModeler.get('elementRegistry');
+      if (!canvas || !elementRegistry) return;
+      elementRegistry.getAll().forEach((el: any) => {
+        if (el && el.id) {
+          canvas.removeMarker(el.id, 'highlight-active');
+          canvas.removeMarker(el.id, 'highlight-error');
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to clear markers:', e);
+    }
+  }
+
   public async importXml(xml: string): Promise<void> {
     if (!this.bpmnModeler) return;
     try {

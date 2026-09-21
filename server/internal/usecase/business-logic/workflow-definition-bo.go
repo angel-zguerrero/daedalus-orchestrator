@@ -44,7 +44,7 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 	code string,
 	name string,
 	description string,
-	version int32,
+	onVersionChange models.VersionChangePolicy,
 	payload []byte,
 	payloadFormat models.WorkflowPayloadFormat,
 	maxDurationSeconds int32,
@@ -66,8 +66,8 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 	if name == "" {
 		name = code
 	}
-	if version <= 0 {
-		version = 1
+	if onVersionChange == "" {
+		onVersionChange = models.VersionChangePolicyContinue
 	}
 	if payloadFormat == "" {
 		payloadFormat = models.WorkflowPayloadFormatJSON
@@ -129,7 +129,8 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 		Code:               code,
 		Name:               name,
 		Description:        description,
-		Version:            version,
+		Version:            1,
+		OnVersionChange:    onVersionChange,
 		Payload:            payload,
 		PayloadFormat:      payloadFormat,
 		MaxDurationSeconds: maxDurationSeconds,
@@ -171,7 +172,7 @@ func (bo *WorkflowDefinitionBO) UpdateWorkflow(
 	id string,
 	name string,
 	description string,
-	version int32,
+	onVersionChange models.VersionChangePolicy,
 	payload []byte,
 	payloadFormat models.WorkflowPayloadFormat,
 	maxDurationSeconds int32,
@@ -193,7 +194,7 @@ func (bo *WorkflowDefinitionBO) UpdateWorkflow(
 		ID:                 id,
 		Name:               name,
 		Description:        description,
-		Version:            version,
+		OnVersionChange:    onVersionChange,
 		Payload:            payload,
 		PayloadFormat:      payloadFormat,
 		MaxDurationSeconds: maxDurationSeconds,
@@ -376,4 +377,87 @@ func (bo *WorkflowDefinitionBO) GetWorkflowQueues(
 		return nil, err
 	}
 	return queues, nil
+}
+
+func (bo *WorkflowDefinitionBO) ListWorkflowVersions(
+	ctx context.Context,
+	scope models.WorkflowScope,
+	workflowID string,
+	pageSize int,
+	cursor string,
+	cf, cfs string,
+	tenantNode *dragonboat.RaftNode,
+) (*db.FindResult[models.WorkflowDefinitionVersion], error) {
+	node, targetCF, targetCFS, err := bo.resolveRaftNode(scope, tenantNode)
+	if err != nil {
+		return nil, err
+	}
+	if scope == models.WorkflowScopeTenant {
+		targetCF = cf
+		targetCFS = cfs
+	}
+
+	cmd := &workflow_definition_command.ListWorkflowVersionsCommand{
+		WorkflowDefinitionID: workflowID,
+		PageSize:             pageSize,
+		Cursor:               cursor,
+		CF:                   targetCF,
+		CFS:                  targetCFS,
+	}
+
+	timeout := config.GlobalConfiguration.ApiRaftTimeout
+	res, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.WorkflowDefinitionVersion]](
+		node,
+		ctx,
+		cmd,
+		timeout,
+		bo.Config.Logger,
+		"list workflow versions",
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (bo *WorkflowDefinitionBO) GetWorkflowVersion(
+	ctx context.Context,
+	scope models.WorkflowScope,
+	workflowID string,
+	version int32,
+	cf, cfs string,
+	tenantNode *dragonboat.RaftNode,
+) (*models.WorkflowDefinitionVersion, error) {
+	node, targetCF, targetCFS, err := bo.resolveRaftNode(scope, tenantNode)
+	if err != nil {
+		return nil, err
+	}
+	if scope == models.WorkflowScopeTenant {
+		targetCF = cf
+		targetCFS = cfs
+	}
+
+	cmd := &workflow_definition_command.GetWorkflowVersionCommand{
+		WorkflowDefinitionID: workflowID,
+		Version:              version,
+		CF:                   targetCF,
+		CFS:                  targetCFS,
+	}
+
+	timeout := config.GlobalConfiguration.ApiRaftTimeout
+	ver, err := dragonboat.ExecuteRepositoryQuery[models.WorkflowDefinitionVersion](
+		node,
+		ctx,
+		cmd,
+		timeout,
+		bo.Config.Logger,
+		"get workflow version",
+	)
+	if err != nil {
+		return nil, err
+	}
+	if ver.ID == "" {
+		return nil, nil
+	}
+	return &ver, nil
 }

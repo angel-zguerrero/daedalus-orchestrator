@@ -28,7 +28,7 @@ type createWorkflowRequest struct {
 	Code               string                       `json:"code"`
 	Name               string                       `json:"name"`
 	Description        string                       `json:"description"`
-	Version            int32                        `json:"version"`
+	OnVersionChange    models.VersionChangePolicy   `json:"onVersionChange"`
 	Payload            json.RawMessage              `json:"payload"`
 	PayloadFormat      models.WorkflowPayloadFormat `json:"payloadFormat"`
 	MaxDurationSeconds int32                        `json:"maxDurationSeconds"`
@@ -39,7 +39,7 @@ type createWorkflowRequest struct {
 type updateWorkflowRequest struct {
 	Name               string                       `json:"name"`
 	Description        string                       `json:"description"`
-	Version            int32                        `json:"version"`
+	OnVersionChange    models.VersionChangePolicy   `json:"onVersionChange"`
 	Payload            json.RawMessage              `json:"payload"`
 	PayloadFormat      models.WorkflowPayloadFormat `json:"payloadFormat"`
 	MaxDurationSeconds int32                        `json:"maxDurationSeconds"`
@@ -79,7 +79,7 @@ func (ctrl *WorkflowDefinitionController) CreateGlobalWorkflowHandler(c *gin.Con
 		req.Code,
 		req.Name,
 		req.Description,
-		req.Version,
+		req.OnVersionChange,
 		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
@@ -156,7 +156,7 @@ func (ctrl *WorkflowDefinitionController) UpdateGlobalWorkflowHandler(c *gin.Con
 		id,
 		req.Name,
 		req.Description,
-		req.Version,
+		req.OnVersionChange,
 		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
@@ -188,6 +188,47 @@ func (ctrl *WorkflowDefinitionController) DeleteGlobalWorkflowHandler(c *gin.Con
 	c.JSON(http.StatusOK, gin.H{"message": "Workflow definition deleted successfully"})
 }
 
+func (ctrl *WorkflowDefinitionController) ListGlobalWorkflowVersionsHandler(c *gin.Context) {
+	id := c.Param("id")
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	cursor := c.Query("cursor")
+
+	res, err := ctrl.WorkflowDefinitionBO.ListWorkflowVersions(
+		c.Request.Context(),
+		models.WorkflowScopeGlobal,
+		id,
+		pageSize,
+		cursor,
+		"", "", nil,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (ctrl *WorkflowDefinitionController) GetGlobalWorkflowVersionHandler(c *gin.Context) {
+	id := c.Param("id")
+	verNum, _ := strconv.Atoi(c.Param("version"))
+	ver, err := ctrl.WorkflowDefinitionBO.GetWorkflowVersion(
+		c.Request.Context(),
+		models.WorkflowScopeGlobal,
+		id,
+		int32(verNum),
+		"", "", nil,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if ver == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Workflow version not found"})
+		return
+	}
+	c.JSON(http.StatusOK, ver)
+}
+
 // --- TENANT HANDLERS ---
 
 func (ctrl *WorkflowDefinitionController) CreateTenantWorkflowHandler(c *gin.Context) {
@@ -211,7 +252,7 @@ func (ctrl *WorkflowDefinitionController) CreateTenantWorkflowHandler(c *gin.Con
 		req.Code,
 		req.Name,
 		req.Description,
-		req.Version,
+		req.OnVersionChange,
 		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
@@ -292,7 +333,7 @@ func (ctrl *WorkflowDefinitionController) UpdateTenantWorkflowHandler(c *gin.Con
 		id,
 		req.Name,
 		req.Description,
-		req.Version,
+		req.OnVersionChange,
 		parsePayloadBytes(req.Payload),
 		req.PayloadFormat,
 		req.MaxDurationSeconds,
@@ -324,6 +365,50 @@ func (ctrl *WorkflowDefinitionController) DeleteTenantWorkflowHandler(c *gin.Con
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Workflow definition deleted successfully"})
+}
+
+func (ctrl *WorkflowDefinitionController) ListTenantWorkflowVersionsHandler(c *gin.Context) {
+	_, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+	id := c.Param("id")
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	cursor := c.Query("cursor")
+
+	res, err := ctrl.WorkflowDefinitionBO.ListWorkflowVersions(
+		c.Request.Context(),
+		models.WorkflowScopeTenant,
+		id,
+		pageSize,
+		cursor,
+		cf, cfs, tenantNode,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (ctrl *WorkflowDefinitionController) GetTenantWorkflowVersionHandler(c *gin.Context) {
+	_, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+	id := c.Param("id")
+	verNum, _ := strconv.Atoi(c.Param("version"))
+
+	ver, err := ctrl.WorkflowDefinitionBO.GetWorkflowVersion(
+		c.Request.Context(),
+		models.WorkflowScopeTenant,
+		id,
+		int32(verNum),
+		cf, cfs, tenantNode,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if ver == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Workflow version not found"})
+		return
+	}
+	c.JSON(http.StatusOK, ver)
 }
 
 func (ctrl *WorkflowDefinitionController) GetGlobalWorkflowQueuesHandler(c *gin.Context) {

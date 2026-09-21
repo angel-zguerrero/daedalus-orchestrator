@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"deadalus-orch/server/internal/infrastructure/db"
+	"deadalus-orch/server/internal/pkg/bpmn"
 	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
@@ -43,10 +44,32 @@ func (cmd *CreateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 		return *commandResult
 	}
 
+	cmd.WorkflowDefinition.Version = 1
+	if cmd.WorkflowDefinition.OnVersionChange == "" {
+		cmd.WorkflowDefinition.OnVersionChange = models.VersionChangePolicyDefinedInExecution
+	}
+
 	id, err := repo.CreateWorkflowDefinition(&cmd.WorkflowDefinition, now)
 	if err != nil {
 		commandResult.Error = fmt.Sprintf("failed to create workflow definition: %s", err.Error())
 		return *commandResult
+	}
+
+	// Create initial version record
+	versionRepo, err := db.NewWorkflowDefinitionVersionRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	if err == nil {
+		structHash, _ := bpmn.ComputeStructuralHash(cmd.WorkflowDefinition.Payload)
+		versionRecord := &models.WorkflowDefinitionVersion{
+			ID:                   fmt.Sprintf("%s-v1", id),
+			WorkflowDefinitionID: id,
+			Version:              1,
+			VNamespace:           cmd.WorkflowDefinition.VNamespace,
+			Payload:              cmd.WorkflowDefinition.Payload,
+			PayloadFormat:        cmd.WorkflowDefinition.PayloadFormat,
+			StructuralHash:       structHash,
+			CreatedAt:            now,
+		}
+		_, _ = versionRepo.CreateVersion(versionRecord, now)
 	}
 
 	// Prepare Execution and Activity queues

@@ -24,6 +24,7 @@ type StartWorkflowExecutionCommand struct {
 	InitialTokenID       string
 	WorkflowDefinitionID string
 	ExecutionKey         string
+	OnVersionChange      models.VersionChangePolicy
 	Input                map[string]interface{}
 	VNamespace           string
 	CF                   string
@@ -115,6 +116,12 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		stateData[k] = v
 	}
 
+	// Determine execution version change policy
+	execOnVersionChange := cmd.OnVersionChange
+	if execOnVersionChange == "" {
+		execOnVersionChange = models.VersionChangePolicyContinue
+	}
+
 	// 3. Create WorkflowExecution record
 	execRepo, err := db.NewWorkflowExecutionRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	if err != nil {
@@ -135,17 +142,19 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 	}
 
 	execution := &models.WorkflowExecution{
-		ID:                         execID,
-		WorkflowDefinitionID:       def.ID,
+		ID:                        execID,
+		WorkflowDefinitionID:      def.ID,
 		WorkflowDefinitionVersion: def.Version,
-		VNamespace:                 vns,
-		ExecutionKey:               cmd.ExecutionKey,
-		Status:                     models.WorkflowExecutionStatusRunning,
-		Input:                      inputData,
-		StateData:                  stateData,
-		StartedAt:                  &now,
-		CreatedAt:                  now,
-		UpdatedAt:                  now,
+		OnVersionChange:           execOnVersionChange,
+		PayloadSnapshot:           def.Payload,
+		VNamespace:                vns,
+		ExecutionKey:              cmd.ExecutionKey,
+		Status:                    models.WorkflowExecutionStatusRunning,
+		Input:                     inputData,
+		StateData:                 stateData,
+		StartedAt:                 &now,
+		CreatedAt:                 now,
+		UpdatedAt:                 now,
 	}
 
 	_, err = execRepo.CreateWorkflowExecution(execution, now)

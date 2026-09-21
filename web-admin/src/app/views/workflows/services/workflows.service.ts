@@ -2,6 +2,19 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+export type VersionChangePolicy = 'defined_in_execution' | 'continue' | 'restart';
+
+export interface WorkflowDefinitionVersion {
+  id: string;
+  workflowDefinitionId: string;
+  version: number;
+  vnamespace: string;
+  payload: string;
+  payloadFormat: string;
+  structuralHash: string;
+  createdAt: string;
+}
+
 export interface WorkflowDefinition {
   id?: string;
   code: string;
@@ -9,6 +22,7 @@ export interface WorkflowDefinition {
   name: string;
   description?: string;
   version: number;
+  onVersionChange?: VersionChangePolicy;
   payload?: string;
   payloadFormat: 'json' | 'yaml' | 'bpmn';
   maxDurationSeconds: number;
@@ -25,6 +39,8 @@ export interface WorkflowExecution {
   id: string;
   workflowDefinitionId: string;
   workflowDefinitionVersion: number;
+  onVersionChange?: VersionChangePolicy;
+  payloadSnapshot?: string;
   vnamespace?: string;
   executionKey?: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'terminated' | 'cancelled';
@@ -115,6 +131,14 @@ export class WorkflowsService {
     return this.http.get(`${this.globalUrl}/${id}/queues`);
   }
 
+  getGlobalWorkflowVersions(id: string, pageSize: number = 50, cursor: string = ''): Observable<any> {
+    return this.http.get(`${this.globalUrl}/${id}/versions?pageSize=${pageSize}&cursor=${cursor}`);
+  }
+
+  getGlobalWorkflowVersion(id: string, version: number): Observable<WorkflowDefinitionVersion> {
+    return this.http.get<WorkflowDefinitionVersion>(`${this.globalUrl}/${id}/versions/${version}`);
+  }
+
   // --- TENANT API ---
   getTenantWorkflows(tenantCode: string, pageSize: number = 50, cursor: string = '', vnamespace: string = ''): Observable<any> {
     let params = `pageSize=${pageSize}&cursor=${cursor}`;
@@ -144,20 +168,30 @@ export class WorkflowsService {
     return this.http.get(`${this.tenantUrl}/${tenantCode}/workflows/${id}/queues`);
   }
 
+  getTenantWorkflowVersions(tenantCode: string, id: string, pageSize: number = 50, cursor: string = ''): Observable<any> {
+    return this.http.get(`${this.tenantUrl}/${tenantCode}/workflows/${id}/versions?pageSize=${pageSize}&cursor=${cursor}`);
+  }
+
+  getTenantWorkflowVersion(tenantCode: string, id: string, version: number): Observable<WorkflowDefinitionVersion> {
+    return this.http.get<WorkflowDefinitionVersion>(`${this.tenantUrl}/${tenantCode}/workflows/${id}/versions/${version}`);
+  }
+
   // --- EXECUTION API ---
-  executeGlobalWorkflow(workflowDefinitionId: string, input: any = {}, executionKey: string = '', vnamespace: string = ''): Observable<any> {
+  executeGlobalWorkflow(workflowDefinitionId: string, input: any = {}, executionKey: string = '', vnamespace: string = '', onVersionChange: string = 'continue'): Observable<any> {
     return this.http.post(`${this.globalUrl}/executions`, {
       workflowDefinitionId,
       executionKey,
+      onVersionChange,
       input,
       vnamespace
     });
   }
 
-  executeTenantWorkflow(tenantCode: string, workflowDefinitionId: string, input: any = {}, executionKey: string = '', vnamespace: string = ''): Observable<any> {
+  executeTenantWorkflow(tenantCode: string, workflowDefinitionId: string, input: any = {}, executionKey: string = '', vnamespace: string = '', onVersionChange: string = 'continue'): Observable<any> {
     return this.http.post(`${this.tenantUrl}/${tenantCode}/workflow-executions`, {
       workflowDefinitionId,
       executionKey,
+      onVersionChange,
       input,
       vnamespace
     });

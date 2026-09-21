@@ -24,10 +24,11 @@ func NewWorkflowExecutionController(config *common.ServerConfing) *WorkflowExecu
 }
 
 type startExecutionRequest struct {
-	WorkflowDefinitionID string                 `json:"workflowDefinitionId"`
-	ExecutionKey         string                 `json:"executionKey"`
-	Input                map[string]interface{} `json:"input"`
-	VNamespace           string                 `json:"vnamespace"`
+	WorkflowDefinitionID string                     `json:"workflowDefinitionId"`
+	ExecutionKey         string                     `json:"executionKey"`
+	OnVersionChange      models.VersionChangePolicy `json:"onVersionChange"`
+	Input                map[string]interface{}     `json:"input"`
+	VNamespace           string                     `json:"vnamespace"`
 }
 
 type completeJobRequest struct {
@@ -50,6 +51,7 @@ func (ctrl *WorkflowExecutionController) StartGlobalExecutionHandler(c *gin.Cont
 		models.WorkflowScopeGlobal,
 		req.WorkflowDefinitionID,
 		req.ExecutionKey,
+		req.OnVersionChange,
 		req.Input,
 		req.VNamespace,
 		"", "", nil,
@@ -148,6 +150,7 @@ func (ctrl *WorkflowExecutionController) StartTenantExecutionHandler(c *gin.Cont
 		models.WorkflowScopeTenant,
 		req.WorkflowDefinitionID,
 		req.ExecutionKey,
+		req.OnVersionChange,
 		req.Input,
 		req.VNamespace,
 		cf, cfs, tenantNode,

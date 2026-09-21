@@ -213,6 +213,8 @@ func init() {
 	RegisterRepoCommand("GetWorkflowDefinitionCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowDefinitionCommand{} })
 	RegisterRepoCommand("ListWorkflowDefinitionsCommand", func() commands.Command { return &workflow_definition_command.ListWorkflowDefinitionsCommand{} })
 	RegisterRepoCommand("GetWorkflowQueuesCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowQueuesCommand{} })
+	RegisterRepoCommand("ListWorkflowVersionsCommand", func() commands.Command { return &workflow_definition_command.ListWorkflowVersionsCommand{} })
+	RegisterRepoCommand("GetWorkflowVersionCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowVersionCommand{} })
 
 	// Workflow Execution commands
 	RegisterRepoCommand("StartWorkflowExecutionCommand", func() commands.Command { return &workflow_execution_command.StartWorkflowExecutionCommand{} })

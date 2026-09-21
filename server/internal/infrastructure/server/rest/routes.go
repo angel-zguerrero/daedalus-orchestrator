@@ -112,6 +112,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.PUT("/:code/workflows/:id", workflowDefinitionController.UpdateTenantWorkflowHandler)
 				tenantsGroup.DELETE("/:code/workflows/:id", workflowDefinitionController.DeleteTenantWorkflowHandler)
 				tenantsGroup.GET("/:code/workflows/:id/queues", workflowDefinitionController.GetTenantWorkflowQueuesHandler)
+				tenantsGroup.GET("/:code/workflows/:id/versions", workflowDefinitionController.ListTenantWorkflowVersionsHandler)
+				tenantsGroup.GET("/:code/workflows/:id/versions/:version", workflowDefinitionController.GetTenantWorkflowVersionHandler)
 
 				tenantsGroup.POST("/:code/workflow-executions", workflowExecutionController.StartTenantExecutionHandler)
 				tenantsGroup.GET("/:code/workflow-executions", workflowExecutionController.ListTenantExecutionsHandler)
@@ -129,6 +131,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			workflowsGroup.PUT("/:id", workflowDefinitionController.UpdateGlobalWorkflowHandler)
 			workflowsGroup.DELETE("/:id", workflowDefinitionController.DeleteGlobalWorkflowHandler)
 			workflowsGroup.GET("/:id/queues", workflowDefinitionController.GetGlobalWorkflowQueuesHandler)
+			workflowsGroup.GET("/:id/versions", workflowDefinitionController.ListGlobalWorkflowVersionsHandler)
+			workflowsGroup.GET("/:id/versions/:version", workflowDefinitionController.GetGlobalWorkflowVersionHandler)
 
 			workflowsGroup.POST("/executions", workflowExecutionController.StartGlobalExecutionHandler)
 			workflowsGroup.GET("/executions", workflowExecutionController.ListGlobalExecutionsHandler)

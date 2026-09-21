@@ -116,6 +116,14 @@
                   </button>
                   <button 
                     cButton 
+                    color="secondary" 
+                    size="sm" 
+                    (click)="openVersionHistoryModal(wf)" 
+                    title="Version History">
+                    <svg cIcon name="cil-list-numbered"></svg>
+                  </button>
+                  <button 
+                    cButton 
                     color="info" 
                     size="sm" 
                     (click)="openDetailModal(wf)" 
@@ -219,7 +227,7 @@
 
             <!-- Version Tag -->
             <span class="badge bg-secondary text-light px-2 py-1">
-              v{{ workflowForm.get('version')?.value || 1 }}
+              v{{ currentWorkflowVersion || 1 }}
             </span>
           </div>
 
@@ -322,8 +330,12 @@
           <input cFormControl size="sm" formControlName="code" placeholder="Enter custom code" />
         </div>
         <div class="col-md-4">
-          <label class="form-label small text-muted">Version</label>
-          <input cFormControl size="sm" type="number" formControlName="version" min="1" />
+          <label class="form-label small text-muted">On Version Change Policy</label>
+          <select cSelect size="sm" formControlName="onVersionChange">
+            <option value="defined_in_execution">Defined in execution (Default)</option>
+            <option value="continue">Continue (keep running executions on original version)</option>
+            <option value="restart">Restart (terminate & relaunch executions on new version)</option>
+          </select>
         </div>
         <div class="col-md-4">
           <label class="form-label small text-muted">Max Duration (seconds)</label>
@@ -569,6 +581,21 @@
       <label class="form-label font-weight-bold">Execution Business Key (Optional)</label>
       <input type="text" cFormControl [(ngModel)]="executionKey" placeholder="e.g. ORDER-998234 or USER-REG-12" />
       <small class="text-muted d-block mt-1">An optional unique key to track this execution in external systems.</small>
+    </div>
+
+    <!-- On Version Change Policy (Execution Level) -->
+    <div class="mb-3">
+      <label class="form-label font-weight-bold">On Version Change Policy</label>
+      <select cSelect [(ngModel)]="executionOnVersionChange" [disabled]="isExecutionPolicyDisabled">
+        <option value="continue">Continue (keep running on created version snapshot)</option>
+        <option value="restart">Restart (terminate & relaunch on new version upgrade)</option>
+      </select>
+      <small class="text-muted d-block mt-1" *ngIf="isExecutionPolicyDisabled">
+        Overridden by workflow definition policy: <strong class="text-info">{{ executingWorkflow?.onVersionChange }}</strong>
+      </small>
+      <small class="text-muted d-block mt-1" *ngIf="!isExecutionPolicyDisabled">
+        Select how this execution handles structural workflow version upgrades.
+      </small>
     </div>
 
     <!-- Mode Switcher (if Start Form exists) -->
@@ -860,8 +887,13 @@
           </button>
         </li>
         <li class="nav-item">
-          <button class="nav-link" [class.active]="activeDetailTab === 'tokens'" (click)="activeDetailTab = 'tokens'">
+          <button class="nav-link" [class.active]="activeDetailTab === 'tokens'" (click)="selectDetailTab('tokens')">
             <svg cIcon name="cil-cursor" class="me-1"></svg> BPMN Tokens ({{ selectedExecutionDetail.tokens.length }})
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'diagram'" (click)="selectDetailTab('diagram')">
+            <svg cIcon name="cil-map" class="me-1"></svg> BPMN Diagram (v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }})
           </button>
         </li>
       </ul>
@@ -880,6 +912,7 @@
                     <tr><td><strong>Version:</strong></td><td>v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }}</td></tr>
                     <tr><td><strong>VNamespace:</strong></td><td>{{ selectedExecutionDetail.execution.vnamespace || '-' }}</td></tr>
                     <tr><td><strong>Execution Key:</strong></td><td>{{ selectedExecutionDetail.execution.executionKey || '-' }}</td></tr>
+                    <tr><td><strong>Version Change Policy:</strong></td><td><span class="badge bg-info text-dark">{{ selectedExecutionDetail.execution.onVersionChange || 'continue' }}</span></td></tr>
                     <tr><td><strong>Current Status:</strong></td><td>
                       <c-badge [color]="getExecutionStatusBadgeColor(selectedExecutionDetail.execution.status)" shape="rounded-pill">
                         {{ selectedExecutionDetail.execution.status | uppercase }}
@@ -958,11 +991,11 @@
                 <td><code class="font-monospace text-primary">{{ j.id }}</code></td>
                 <td>
                   <strong>{{ j.activityName || j.activityId }}</strong>
-                  <div class="text-muted small">ID: {{ j.activityId }}</div>
+                  <div class="small text-muted font-monospace" *ngIf="j.activityName">{{ j.activityId }}</div>
                 </td>
-                <td><span class="badge bg-secondary">{{ j.activityType }}</span></td>
+                <td><span class="badge bg-dark border border-secondary text-info font-monospace">{{ j.activityType || 'ServiceTask' }}</span></td>
                 <td>
-                  <c-badge [color]="getExecutionStatusBadgeColor(j.status)" shape="rounded-pill">
+                  <c-badge [color]="j.status === 'completed' ? 'success' : (j.status === 'failed' ? 'danger' : 'warning')" shape="rounded-pill">
                     {{ j.status | uppercase }}
                   </c-badge>
                 </td>
@@ -1014,11 +1047,105 @@
           </table>
         </div>
       </div>
+
+      <!-- TAB 5: DIAGRAM SNAPSHOT WITH HIGHLIGHTS -->
+      <div *ngIf="activeDetailTab === 'diagram'" style="height: 520px; width: 100%; position: relative;" class="border rounded bg-dark">
+        <app-bpmn-designer
+          #executionBpmnDesigner
+          [payload]="getExecutionSnapshotPayload()"
+          [readonly]="true">
+        </app-bpmn-designer>
+      </div>
+
     </div>
   </c-modal-body>
   <c-modal-footer>
     <button (click)="closeExecutionDetailModal()" cButton color="secondary">
       Close
     </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Version History Modal -->
+<c-modal id="versionHistoryModal" [visible]="showVersionHistoryModal" (visibleChange)="showVersionHistoryModal = $event" size="lg">
+  <c-modal-header class="bg-dark text-light border-secondary">
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-list-numbered" class="text-info"></svg>
+      Version History: {{ selectedVersionWorkflow?.name }}
+    </h5>
+    <button (click)="closeVersionHistoryModal()" cButtonClose class="btn-close-white"></button>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="text-center py-4" *ngIf="loadingVersionHistory">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading workflow versions...</p>
+    </div>
+
+    <c-alert color="danger" *ngIf="versionHistoryError">{{ versionHistoryError }}</c-alert>
+
+    <div class="table-responsive" *ngIf="!loadingVersionHistory">
+      <table cTable [hover]="true" class="align-middle">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Structural Hash (SHA-256)</th>
+            <th>Created Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let ver of versionHistoryList">
+            <td>
+              <c-badge color="primary" shape="rounded-pill">v{{ ver.version }}</c-badge>
+            </td>
+            <td>
+              <code class="small text-truncate d-inline-block" style="max-width: 260px;" title="{{ ver.structuralHash }}">{{ ver.structuralHash || 'N/A' }}</code>
+            </td>
+            <td>{{ ver.createdAt | date:'medium' }}</td>
+            <td>
+              <button cButton color="info" size="sm" (click)="openVersionDiagramModal(ver)">
+                <svg cIcon name="cil-eye" class="me-1"></svg> View Diagram
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="versionHistoryList.length === 0">
+            <td colspan="4" class="text-center text-muted py-3">No version history recorded.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" (click)="closeVersionHistoryModal()">Close</button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Version Read-Only Diagram Modal -->
+<c-modal id="versionDiagramModal" [visible]="showVersionDiagramModal" (visibleChange)="showVersionDiagramModal = $event" size="xl">
+  <c-modal-header class="bg-dark text-light border-secondary d-flex justify-content-between align-items-center">
+    <h5 cModalTitle class="d-flex align-items-center gap-2 mb-0">
+      <svg cIcon name="cil-map" class="text-success"></svg>
+      BPMN Diagram (Read-Only)
+      <span class="badge bg-primary rounded-pill">v{{ selectedVersionRecord?.version }}</span>
+    </h5>
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted small d-none d-md-inline" *ngIf="selectedVersionRecord?.structuralHash">
+        Structural Hash: <code class="text-info">{{ selectedVersionRecord?.structuralHash }}</code>
+      </span>
+      <button (click)="closeVersionDiagramModal()" cButtonClose class="btn-close-white ms-2"></button>
+    </div>
+  </c-modal-header>
+  <c-modal-body class="p-0 bg-dark">
+    <div style="height: 600px; width: 100%; position: relative;">
+      <app-bpmn-designer
+        #versionBpmnDesigner
+        *ngIf="showVersionDiagramModal"
+        [payload]="versionDiagramPayload"
+        [readonly]="true">
+      </app-bpmn-designer>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary">
+    <button cButton color="secondary" (click)="closeVersionDiagramModal()">Close</button>
   </c-modal-footer>
 </c-modal>

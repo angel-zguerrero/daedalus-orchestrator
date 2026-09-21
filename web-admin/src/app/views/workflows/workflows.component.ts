@@ -25,7 +25,7 @@ import {
   AccordionButtonDirective
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
-import { WorkflowsService, WorkflowDefinition, WorkflowExecution, WorkflowExecutionDetail } from './services/workflows.service';
+import { WorkflowsService, WorkflowDefinition, WorkflowExecution, WorkflowExecutionDetail, WorkflowDefinitionVersion } from './services/workflows.service';
 import { VNamespacesService } from '../tenants/tenant-management/services/vnamespaces.service';
 import { ErrorUtil } from '../../shared/utils/error.util';
 import { QueueDetailComponent } from '../tenants/tenant-management/queues/queue-detail/queue-detail.component';
@@ -96,6 +96,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   workflowForm: FormGroup;
   isEditing: boolean = false;
   editingWorkflowId: string = '';
+  currentWorkflowVersion: number = 1;
   @ViewChild('bpmnDesigner') bpmnDesigner?: BpmnDesignerComponent;
 
   toggleAdvancedSettings(): void {
@@ -116,6 +117,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   executingWorkflow: WorkflowDefinition | null = null;
   executeInputJson: string = '{\n  "approved": true\n}';
   executionKey: string = '';
+  executionOnVersionChange: string = 'continue';
   executing: boolean = false;
   executionResult: any = null;
   executeErrorMessage: string = '';
@@ -133,12 +135,24 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   executionsErrorMessage: string = '';
   executionStatusFilter: string = '';
 
+  @ViewChild('executionBpmnDesigner') executionBpmnDesigner?: BpmnDesignerComponent;
+
   // Execution Detail Modal
   showExecutionDetailModal: boolean = false;
   selectedExecutionDetail: WorkflowExecutionDetail | null = null;
   loadingExecutionDetail: boolean = false;
   executionDetailError: string = '';
-  activeDetailTab: 'overview' | 'payloads' | 'activities' | 'tokens' = 'overview';
+  activeDetailTab: 'overview' | 'payloads' | 'activities' | 'tokens' | 'diagram' = 'overview';
+
+  // Version History Modal
+  showVersionHistoryModal: boolean = false;
+  selectedVersionWorkflow: WorkflowDefinition | null = null;
+  versionHistoryList: WorkflowDefinitionVersion[] = [];
+  loadingVersionHistory: boolean = false;
+  versionHistoryError: string = '';
+  showVersionDiagramModal: boolean = false;
+  selectedVersionRecord: WorkflowDefinitionVersion | null = null;
+  versionDiagramPayload: string = '';
 
   // VNamespace properties
   vnamespaceCtrl = new FormControl('default');
@@ -159,7 +173,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       code: ['', [Validators.pattern('^[a-z0-9-]*$')]],
       vnamespace: this.vnamespaceCtrl,
       description: [''],
-      version: [1, [Validators.required, Validators.min(1)]],
+      onVersionChange: ['defined_in_execution', Validators.required],
       payloadFormat: ['json', Validators.required],
       payload: ['{}'],
       maxDurationSeconds: [3600, [Validators.required, Validators.min(0)]],
@@ -232,6 +246,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       name: w.name || w.Name || w.code || w.Code || '',
       description: w.description || w.Description || '',
       version: w.version || w.Version || 1,
+      onVersionChange: w.onVersionChange || w.OnVersionChange || 'defined_in_execution',
       payload: w.payload || w.Payload || '',
       payloadFormat: (w.payloadFormat || w.PayloadFormat || 'json').toLowerCase() as 'json' | 'yaml' | 'bpmn',
       maxDurationSeconds: w.maxDurationSeconds || w.MaxDurationSeconds || 0,
@@ -334,10 +349,11 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   openCreateModal(): void {
     this.isEditing = false;
     this.editingWorkflowId = '';
+    this.currentWorkflowVersion = 1;
     this.showAdvancedSettings = false;
     this.workflowForm.reset({
       vnamespace: this.scope === 'global' ? '' : 'default',
-      version: 1,
+      onVersionChange: 'defined_in_execution',
       payloadFormat: 'bpmn',
       payload: DEFAULT_BPMN_XML,
       maxDurationSeconds: 3600,
@@ -356,6 +372,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   openEditModal(wf: WorkflowDefinition): void {
     this.isEditing = true;
     this.editingWorkflowId = wf.id || '';
+    this.currentWorkflowVersion = wf.version || 1;
     this.showAdvancedSettings = false;
     const decodedPayload = this.decodePayload(wf.payload);
 
@@ -364,7 +381,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       name: wf.name,
       vnamespace: this.scope === 'global' ? '' : (wf.vnamespace || 'default'),
       description: wf.description,
-      version: wf.version,
+      onVersionChange: wf.onVersionChange || 'defined_in_execution',
       payloadFormat: 'bpmn',
       payload: decodedPayload || DEFAULT_BPMN_XML,
       maxDurationSeconds: wf.maxDurationSeconds,
@@ -475,7 +492,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       name: val.name ? val.name.trim() : '',
       vnamespace: this.scope === 'global' ? '' : (val.vnamespace ? val.vnamespace.trim() : 'default'),
       description: val.description,
-      version: Number(val.version),
+      onVersionChange: val.onVersionChange || 'defined_in_execution',
       payloadFormat: 'bpmn',
       payload: val.payload,
       maxDurationSeconds: Number(val.maxDurationSeconds),
@@ -491,9 +508,13 @@ export class WorkflowsComponent implements OnInit, OnChanges {
         : this.workflowsService.updateTenantWorkflow(this.tenantCode, this.editingWorkflowId, payload);
 
       update$.subscribe({
-        next: () => {
+        next: (res: any) => {
           this.hasUnsavedChanges = false;
           this.showUnsavedConfirmModal = false;
+          const updatedEntity = res?.Entity || res?.entity || res;
+          if (updatedEntity && updatedEntity.version) {
+            this.currentWorkflowVersion = updatedEntity.version;
+          }
           if (closeAfterSave) {
             this.showModal = false;
           }
@@ -519,6 +540,9 @@ export class WorkflowsComponent implements OnInit, OnChanges {
           if (createdEntity && createdEntity.id) {
             this.isEditing = true;
             this.editingWorkflowId = createdEntity.id;
+            if (createdEntity.version) {
+              this.currentWorkflowVersion = createdEntity.version;
+            }
             this.workflowForm.get('code')?.disable();
           }
           if (closeAfterSave) {
@@ -563,12 +587,23 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     });
   }
 
+  get isExecutionPolicyDisabled(): boolean {
+    return !!(this.executingWorkflow?.onVersionChange && this.executingWorkflow.onVersionChange !== 'defined_in_execution');
+  }
+
   // --- EXECUTE WORKFLOW HANDLERS ---
   async openExecuteModal(wf: WorkflowDefinition): Promise<void> {
     this.executingWorkflow = wf;
     this.executionKey = '';
     this.executionResult = null;
     this.executeErrorMessage = '';
+
+    const wfPolicy = wf.onVersionChange || (wf as any).OnVersionChange || 'defined_in_execution';
+    if (wfPolicy === 'continue' || wfPolicy === 'restart') {
+      this.executionOnVersionChange = wfPolicy;
+    } else {
+      this.executionOnVersionChange = 'continue';
+    }
 
     // Extract BPMN XML payload from definition or active editor
     let xmlPayload = '';
@@ -753,9 +788,13 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.executionResult = null;
 
     const vns = this.executingWorkflow.vnamespace || 'default';
+    const execPolicy = (this.executingWorkflow?.onVersionChange && this.executingWorkflow.onVersionChange !== 'defined_in_execution')
+      ? this.executingWorkflow.onVersionChange
+      : (this.executionOnVersionChange || 'continue');
+
     const exec$ = this.scope === 'global'
-      ? this.workflowsService.executeGlobalWorkflow(this.executingWorkflow.id, inputObj, this.executionKey, vns)
-      : this.workflowsService.executeTenantWorkflow(this.tenantCode, this.executingWorkflow.id, inputObj, this.executionKey, vns);
+      ? this.workflowsService.executeGlobalWorkflow(this.executingWorkflow.id, inputObj, this.executionKey, vns, execPolicy)
+      : this.workflowsService.executeTenantWorkflow(this.tenantCode, this.executingWorkflow.id, inputObj, this.executionKey, vns, execPolicy);
 
     exec$.subscribe({
       next: (res: any) => {
@@ -857,6 +896,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
             id: rawExec.id || rawExec.ID || '',
             workflowDefinitionId: rawExec.workflowDefinitionId || rawExec.WorkflowDefinitionID || '',
             workflowDefinitionVersion: rawExec.workflowDefinitionVersion || rawExec.WorkflowDefinitionVersion || 1,
+            payloadSnapshot: rawExec.payloadSnapshot || rawExec.PayloadSnapshot || '',
             vnamespace: rawExec.vnamespace || rawExec.VNamespace || '',
             executionKey: rawExec.executionKey || rawExec.ExecutionKey || '',
             status: (rawExec.status || rawExec.Status || 'pending').toLowerCase(),
@@ -937,5 +977,162 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       }
     }
     return JSON.stringify(data, null, 2);
+  }
+
+  selectDetailTab(tab: 'overview' | 'payloads' | 'activities' | 'tokens' | 'diagram'): void {
+    this.activeDetailTab = tab;
+    if (tab === 'diagram') {
+      setTimeout(() => this.highlightExecutionDiagram(), 250);
+    }
+  }
+
+  getExecutionSnapshotPayload(): string {
+    if (!this.selectedExecutionDetail?.execution) return DEFAULT_BPMN_XML;
+    const snap = this.selectedExecutionDetail.execution.payloadSnapshot;
+    if (snap) {
+      return this.decodePayload(snap) || DEFAULT_BPMN_XML;
+    }
+    if (this.selectedWorkflow?.payload) {
+      return this.decodePayload(this.selectedWorkflow.payload) || DEFAULT_BPMN_XML;
+    }
+    return DEFAULT_BPMN_XML;
+  }
+
+  highlightExecutionDiagram(): void {
+    if (!this.executionBpmnDesigner || !this.selectedExecutionDetail) return;
+    this.executionBpmnDesigner.clearHighlights();
+
+    const markers: Array<{ id: string; type: 'active' | 'error' }> = [];
+
+    // Active tokens -> blue highlight
+    const activeTokens = this.selectedExecutionDetail.tokens || [];
+    activeTokens.forEach(t => {
+      if (t.currentNodeId && (t.status === 'active' || t.status === 'running' || t.status === 'pending')) {
+        markers.push({ id: t.currentNodeId, type: 'active' });
+      }
+    });
+
+    // Failed jobs -> red highlight
+    const jobs = this.selectedExecutionDetail.jobs || [];
+    jobs.forEach(j => {
+      if (j.activityId && (j.status === 'failed' || j.error)) {
+        markers.push({ id: j.activityId, type: 'error' });
+      }
+    });
+
+    this.executionBpmnDesigner.highlightElements(markers);
+  }
+
+  // --- VERSION HISTORY HANDLERS ---
+  openVersionHistoryModal(wf: WorkflowDefinition): void {
+    this.selectedVersionWorkflow = wf;
+    this.showVersionHistoryModal = true;
+    this.loadVersionHistory();
+  }
+
+  loadVersionHistory(): void {
+    if (!this.selectedVersionWorkflow?.id) return;
+    this.loadingVersionHistory = true;
+    this.versionHistoryError = '';
+
+    const req$ = this.scope === 'global'
+      ? this.workflowsService.getGlobalWorkflowVersions(this.selectedVersionWorkflow.id)
+      : this.workflowsService.getTenantWorkflowVersions(this.tenantCode, this.selectedVersionWorkflow.id);
+
+    req$.subscribe({
+      next: (res: any) => {
+        const raw = res?.Entities || res?.entities || res?.items || (Array.isArray(res) ? res : []);
+        this.versionHistoryList = raw.map((v: any) => ({
+          id: v.id || v.ID || '',
+          workflowDefinitionId: v.workflowDefinitionId || v.WorkflowDefinitionID || '',
+          version: v.version || v.Version || 1,
+          vnamespace: v.vnamespace || v.VNamespace || '',
+          payload: v.payload || v.Payload || '',
+          payloadFormat: v.payloadFormat || v.PayloadFormat || 'bpmn',
+          structuralHash: v.structuralHash || v.StructuralHash || '',
+          createdAt: v.createdAt || v.CreatedAt || ''
+        }));
+
+        if (this.versionHistoryList.length === 0 && this.selectedVersionWorkflow) {
+          this.versionHistoryList = [{
+            id: this.selectedVersionWorkflow.id || 'v1',
+            workflowDefinitionId: this.selectedVersionWorkflow.id || '',
+            version: this.selectedVersionWorkflow.version || 1,
+            vnamespace: this.selectedVersionWorkflow.vnamespace || '',
+            payload: this.selectedVersionWorkflow.payload || '',
+            payloadFormat: this.selectedVersionWorkflow.payloadFormat || 'bpmn',
+            structuralHash: 'Current (Initial Version)',
+            createdAt: this.selectedVersionWorkflow.updatedAt || this.selectedVersionWorkflow.createdAt || new Date().toISOString()
+          }];
+        } else if (this.selectedVersionWorkflow && this.versionHistoryList.length > 0) {
+          const minVersion = Math.min(...this.versionHistoryList.map(v => v.version));
+          if (minVersion > 1) {
+            this.versionHistoryList.push({
+              id: `${this.selectedVersionWorkflow.id}-v1`,
+              workflowDefinitionId: this.selectedVersionWorkflow.id || '',
+              version: 1,
+              vnamespace: this.selectedVersionWorkflow.vnamespace || '',
+              payload: this.selectedVersionWorkflow.payload || '',
+              payloadFormat: this.selectedVersionWorkflow.payloadFormat || 'bpmn',
+              structuralHash: 'Current (Initial Version)',
+              createdAt: this.selectedVersionWorkflow.createdAt || new Date().toISOString()
+            });
+          }
+        }
+
+        this.versionHistoryList.sort((a, b) => b.version - a.version);
+        this.loadingVersionHistory = false;
+      },
+      error: (err) => {
+        this.versionHistoryError = ErrorUtil.formatErrorMessage(err);
+        this.loadingVersionHistory = false;
+      }
+    });
+  }
+
+  closeVersionHistoryModal(): void {
+    this.showVersionHistoryModal = false;
+    this.selectedVersionWorkflow = null;
+    this.versionHistoryList = [];
+  }
+
+  @ViewChild('versionBpmnDesigner') versionBpmnDesigner?: BpmnDesignerComponent;
+
+  openVersionDiagramModal(ver: WorkflowDefinitionVersion): void {
+    this.selectedVersionRecord = ver;
+
+    const loadPayloadAndOpen = (payloadRaw: any) => {
+      this.versionDiagramPayload = this.decodePayload(payloadRaw) || DEFAULT_BPMN_XML;
+      this.showVersionDiagramModal = true;
+      setTimeout(() => {
+        if (this.versionBpmnDesigner) {
+          this.versionBpmnDesigner.refresh();
+        }
+      }, 150);
+    };
+
+    if (!ver.payload || (typeof ver.payload === 'string' && !ver.payload.trim())) {
+      const req$ = this.scope === 'global'
+        ? this.workflowsService.getGlobalWorkflowVersion(ver.workflowDefinitionId, ver.version)
+        : this.workflowsService.getTenantWorkflowVersion(this.tenantCode, ver.workflowDefinitionId, ver.version);
+
+      req$.subscribe({
+        next: (res: any) => {
+          const fetchedPayload = res?.payload || res?.Payload || ver.payload;
+          loadPayloadAndOpen(fetchedPayload);
+        },
+        error: () => {
+          loadPayloadAndOpen(ver.payload);
+        }
+      });
+    } else {
+      loadPayloadAndOpen(ver.payload);
+    }
+  }
+
+  closeVersionDiagramModal(): void {
+    this.showVersionDiagramModal = false;
+    this.selectedVersionRecord = null;
+    this.versionDiagramPayload = '';
   }
 }
