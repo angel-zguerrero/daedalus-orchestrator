@@ -1,6 +1,8 @@
 package rest_server
 
 import (
+	"time"
+
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
 	"deadalus-orch/server/internal/infrastructure/server/rest/cluster"
@@ -9,6 +11,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
+	"deadalus-orch/server/internal/infrastructure/server/rest/oauthapp"
 	"deadalus-orch/server/internal/infrastructure/server/rest/queue"
 	"deadalus-orch/server/internal/infrastructure/server/rest/scheduledjob"
 	"deadalus-orch/server/internal/infrastructure/server/rest/tenant"
@@ -17,7 +20,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/server/rest/workflowdefinition"
 	"deadalus-orch/server/internal/infrastructure/server/rest/workflowexecution"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,107 +43,128 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	workflowDefinitionController := workflowdefinition.NewWorkflowDefinitionController(s.Config)
 	workflowExecutionController := workflowexecution.NewWorkflowExecutionController(s.Config)
 
-	// Crear el TenantBO para el middleware
+	oauthController := oauthapp.NewOAuthController(s.Config)
+	oauthAppController := oauthapp.NewOAuthAppController(s.Config)
+
 	tenantBO := bo.NewTenantBO(s.Config)
 
 	restAPIGroup := engine.Group("/rest-api")
 	{
+		// Public OAuth Token Endpoint
+		restAPIGroup.POST("/oauth/token",
+			rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 10),
+			oauthController.TokenHandler)
 
 		restAPIGroup.GET("/auth/status", adminController.AuthStatusHandler)
 		restAPIGroup.POST("/auth/setup", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.AuthSetupHandler)
 		restAPIGroup.POST("/login", rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4), adminController.LoginHandler)
 		restAPIGroup.POST("/logout",
-			authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey),
+			unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey),
 			rateLimitMiddleware(s.Config.MasterNode, "ip", 1*time.Minute, 4),
 			adminController.LogoutHandler)
 
 		tenantsGroup := restAPIGroup.Group("/tenants")
-		tenantsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		tenantsGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		tenantsGroup.Use(tenantContextMiddleware(tenantBO, s.Config, s.Config.Logger))
 		tenantsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
-			tenantsGroup.GET("", tenantController.GetTenantsHandler)
-			tenantsGroup.POST("", tenantController.CreateTenantHandler)
-			tenantsGroup.POST("/bulk", tenantController.BulkCreateTenantHandler)
-			tenantsGroup.GET("/:code", tenantController.GetTenantHandler)
-			tenantsGroup.GET("/:code/summary", tenantController.GetTenantSummaryHandler)
-			tenantsGroup.GET("/:code/metrics/tsdb", tsdbMetricsController.GetTSDBMetricsHandler)
-			tenantsGroup.DELETE("/:code", tenantController.DeleteTenantHandler)
+			tenantsGroup.GET("", requireScope("tenants:list", "tenants:admin"), tenantController.GetTenantsHandler)
+			tenantsGroup.POST("", requireScope("tenants:create", "tenants:admin"), tenantController.CreateTenantHandler)
+			tenantsGroup.POST("/bulk", requireScope("tenants:create", "tenants:admin"), tenantController.BulkCreateTenantHandler)
+			tenantsGroup.GET("/:code", requireScope("tenants:list", "tenants:admin"), tenantController.GetTenantHandler)
+			tenantsGroup.GET("/:code/summary", requireScope("tenants:list", "tenants:admin"), tenantController.GetTenantSummaryHandler)
+			tenantsGroup.GET("/:code/metrics/tsdb", requireScope("tenants:list", "tenants:admin"), tsdbMetricsController.GetTSDBMetricsHandler)
+			tenantsGroup.DELETE("/:code", requireScope("tenants:delete", "tenants:admin"), tenantController.DeleteTenantHandler)
+
+			// OAuth Service Account Management (Admin Session Only)
+			tenantsGroup.GET("/:code/oauth-apps", sessionOnlyMiddleware(), oauthAppController.ListAppsHandler)
+			tenantsGroup.POST("/:code/oauth-apps", sessionOnlyMiddleware(), oauthAppController.CreateAppHandler)
+			tenantsGroup.GET("/:code/oauth-apps/:id", sessionOnlyMiddleware(), oauthAppController.GetAppHandler)
+			tenantsGroup.DELETE("/:code/oauth-apps/:id", sessionOnlyMiddleware(), oauthAppController.DeleteAppHandler)
+			tenantsGroup.POST("/:code/oauth-apps/:id/rotate-secret", sessionOnlyMiddleware(), oauthAppController.RotateSecretHandler)
+
 			{
-				tenantsGroup.POST("/:code/exchange", exchangeController.CreateExchangeHandler)
-				tenantsGroup.POST("/:code/exchange/bulk", exchangeController.BulkCreateExchangeHandler)
-				tenantsGroup.POST("/:code/exchange/publish-message", exchangeController.PublishMessageHandler)
-				tenantsGroup.GET("/:code/exchange", exchangeController.GetExchangesHandler)
-				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.GetExchangeHandler)
-				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", exchangeController.DeleteExchangeHandler)
+				// Exchanges
+				tenantsGroup.POST("/:code/exchange", requireScope("exchanges:create", "exchanges:admin"), exchangeController.CreateExchangeHandler)
+				tenantsGroup.POST("/:code/exchange/bulk", requireScope("exchanges:create", "exchanges:admin"), exchangeController.BulkCreateExchangeHandler)
+				tenantsGroup.POST("/:code/exchange/publish-message", requireScope("exchanges:create", "exchanges:admin"), exchangeController.PublishMessageHandler)
+				tenantsGroup.GET("/:code/exchange", requireScope("exchanges:list", "exchanges:admin"), exchangeController.GetExchangesHandler)
+				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", requireScope("exchanges:list", "exchanges:admin"), exchangeController.GetExchangeHandler)
+				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", requireScope("exchanges:delete", "exchanges:admin"), exchangeController.DeleteExchangeHandler)
 
-				tenantsGroup.POST("/:code/queue", queueController.CreateQueueHandler)
-				tenantsGroup.POST("/:code/queue/bulk", queueController.BulkCreateQueueHandler)
-				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", queueController.EnqueueMessageHandler)
-				tenantsGroup.GET("/:code/queue", queueController.GetQueuesHandler)
-				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace", queueController.GetQueueHandler)
-				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace/messages", queueController.GetQueueMessagesHandler)
-				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", queueController.DeleteQueueHandler)
+				// Queues
+				tenantsGroup.POST("/:code/queue", requireScope("queues:create", "queues:admin"), queueController.CreateQueueHandler)
+				tenantsGroup.POST("/:code/queue/bulk", requireScope("queues:create", "queues:admin"), queueController.BulkCreateQueueHandler)
+				tenantsGroup.POST("/:code/queue/:queueCode/:vnamespace/enqueue", requireScope("queues:create", "queues:admin"), queueController.EnqueueMessageHandler)
+				tenantsGroup.GET("/:code/queue", requireScope("queues:list", "queues:admin"), queueController.GetQueuesHandler)
+				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace", requireScope("queues:list", "queues:admin"), queueController.GetQueueHandler)
+				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace/messages", requireScope("queues:list", "queues:admin"), queueController.GetQueueMessagesHandler)
+				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", requireScope("queues:delete", "queues:admin"), queueController.DeleteQueueHandler)
 
-				tenantsGroup.POST("/:code/binding", bindingController.CreateBindingHandler)
-				tenantsGroup.GET("/:code/bindings", bindingController.GetBindingsHandler)
-				tenantsGroup.GET("/:code/binding/:exchangeCode/:queueCode/:vnamespace", bindingController.GetBindingHandler)
-				tenantsGroup.DELETE("/:code/binding/:bindingCode/:vnamespace", bindingController.DeleteBindingHandler)
+				// Bindings
+				tenantsGroup.POST("/:code/binding", requireScope("bindings:create", "bindings:admin"), bindingController.CreateBindingHandler)
+				tenantsGroup.GET("/:code/bindings", requireScope("bindings:list", "bindings:admin"), bindingController.GetBindingsHandler)
+				tenantsGroup.GET("/:code/binding/:exchangeCode/:queueCode/:vnamespace", requireScope("bindings:list", "bindings:admin"), bindingController.GetBindingHandler)
+				tenantsGroup.DELETE("/:code/binding/:bindingCode/:vnamespace", requireScope("bindings:delete", "bindings:admin"), bindingController.DeleteBindingHandler)
 
-				tenantsGroup.GET("/:code/vnamespaces", vnamespaceController.GetVNamespacesHandler)
+				tenantsGroup.GET("/:code/vnamespaces", requireScope("exchanges:list", "queues:list", "workflows:list", "tenants:list", "tenants:admin"), vnamespaceController.GetVNamespacesHandler)
 
-				tenantsGroup.POST("/:code/scheduled-job/one-off", scheduledJobController.CreateOneOffScheduledJobHandler)
-				tenantsGroup.POST("/:code/scheduled-job/recurring", scheduledJobController.CreateRecurringScheduledJobHandler)
-				tenantsGroup.GET("/:code/scheduled-jobs", scheduledJobController.GetScheduledJobsHandler)
-				tenantsGroup.GET("/:code/scheduled-job/:id", scheduledJobController.GetScheduledJobHandler)
-				tenantsGroup.DELETE("/:code/scheduled-job/:id", scheduledJobController.DeleteScheduledJobHandler)
+				// Scheduled Jobs
+				tenantsGroup.POST("/:code/scheduled-job/one-off", requireScope("workflows:create", "workflows:admin"), scheduledJobController.CreateOneOffScheduledJobHandler)
+				tenantsGroup.POST("/:code/scheduled-job/recurring", requireScope("workflows:create", "workflows:admin"), scheduledJobController.CreateRecurringScheduledJobHandler)
+				tenantsGroup.GET("/:code/scheduled-jobs", requireScope("workflows:list", "workflows:admin"), scheduledJobController.GetScheduledJobsHandler)
+				tenantsGroup.GET("/:code/scheduled-job/:id", requireScope("workflows:list", "workflows:admin"), scheduledJobController.GetScheduledJobHandler)
+				tenantsGroup.DELETE("/:code/scheduled-job/:id", requireScope("workflows:delete", "workflows:admin"), scheduledJobController.DeleteScheduledJobHandler)
 
-				tenantsGroup.POST("/:code/env-groups", envConfigController.CreateTenantGroupHandler)
-				tenantsGroup.GET("/:code/env-groups", envConfigController.ListTenantGroupsHandler)
-				tenantsGroup.GET("/:code/env-groups/:groupId", envConfigController.GetTenantGroupHandler)
-				tenantsGroup.PUT("/:code/env-groups/:groupId", envConfigController.UpdateTenantGroupHandler)
-				tenantsGroup.DELETE("/:code/env-groups/:groupId", envConfigController.DeleteTenantGroupHandler)
-				tenantsGroup.GET("/:code/env-groups/:groupId/vars", envConfigController.GetTenantVarsHandler)
-				tenantsGroup.POST("/:code/env-groups/:groupId/vars", envConfigController.SaveTenantVarHandler)
-				tenantsGroup.DELETE("/:code/env-groups/:groupId/vars/:varId", envConfigController.DeleteTenantVarHandler)
-				tenantsGroup.PUT("/:code/env-groups/:groupId/vars/bulk", envConfigController.BulkSaveTenantVarsHandler)
+				// Env Groups (admin only, no OAuth scope mapping)
+				tenantsGroup.POST("/:code/env-groups", sessionOnlyMiddleware(), envConfigController.CreateTenantGroupHandler)
+				tenantsGroup.GET("/:code/env-groups", sessionOnlyMiddleware(), envConfigController.ListTenantGroupsHandler)
+				tenantsGroup.GET("/:code/env-groups/:groupId", sessionOnlyMiddleware(), envConfigController.GetTenantGroupHandler)
+				tenantsGroup.PUT("/:code/env-groups/:groupId", sessionOnlyMiddleware(), envConfigController.UpdateTenantGroupHandler)
+				tenantsGroup.DELETE("/:code/env-groups/:groupId", sessionOnlyMiddleware(), envConfigController.DeleteTenantGroupHandler)
+				tenantsGroup.GET("/:code/env-groups/:groupId/vars", sessionOnlyMiddleware(), envConfigController.GetTenantVarsHandler)
+				tenantsGroup.POST("/:code/env-groups/:groupId/vars", sessionOnlyMiddleware(), envConfigController.SaveTenantVarHandler)
+				tenantsGroup.DELETE("/:code/env-groups/:groupId/vars/:varId", sessionOnlyMiddleware(), envConfigController.DeleteTenantVarHandler)
+				tenantsGroup.PUT("/:code/env-groups/:groupId/vars/bulk", sessionOnlyMiddleware(), envConfigController.BulkSaveTenantVarsHandler)
 
-				tenantsGroup.POST("/:code/workflows", workflowDefinitionController.CreateTenantWorkflowHandler)
-				tenantsGroup.GET("/:code/workflows", workflowDefinitionController.ListTenantWorkflowsHandler)
-				tenantsGroup.GET("/:code/workflows/:id", workflowDefinitionController.GetTenantWorkflowHandler)
-				tenantsGroup.PUT("/:code/workflows/:id", workflowDefinitionController.UpdateTenantWorkflowHandler)
-				tenantsGroup.DELETE("/:code/workflows/:id", workflowDefinitionController.DeleteTenantWorkflowHandler)
-				tenantsGroup.GET("/:code/workflows/:id/queues", workflowDefinitionController.GetTenantWorkflowQueuesHandler)
-				tenantsGroup.GET("/:code/workflows/:id/versions", workflowDefinitionController.ListTenantWorkflowVersionsHandler)
-				tenantsGroup.GET("/:code/workflows/:id/versions/:version", workflowDefinitionController.GetTenantWorkflowVersionHandler)
+				// Workflows
+				tenantsGroup.POST("/:code/workflows", requireScope("workflows:create", "workflows:admin"), workflowDefinitionController.CreateTenantWorkflowHandler)
+				tenantsGroup.GET("/:code/workflows", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.ListTenantWorkflowsHandler)
+				tenantsGroup.GET("/:code/workflows/:id", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.GetTenantWorkflowHandler)
+				tenantsGroup.PUT("/:code/workflows/:id", requireScope("workflows:edit", "workflows:admin"), workflowDefinitionController.UpdateTenantWorkflowHandler)
+				tenantsGroup.DELETE("/:code/workflows/:id", requireScope("workflows:delete", "workflows:admin"), workflowDefinitionController.DeleteTenantWorkflowHandler)
+				tenantsGroup.GET("/:code/workflows/:id/queues", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.GetTenantWorkflowQueuesHandler)
+				tenantsGroup.GET("/:code/workflows/:id/versions", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.ListTenantWorkflowVersionsHandler)
+				tenantsGroup.GET("/:code/workflows/:id/versions/:version", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.GetTenantWorkflowVersionHandler)
 
-				tenantsGroup.POST("/:code/workflow-executions", workflowExecutionController.StartTenantExecutionHandler)
-				tenantsGroup.GET("/:code/workflow-executions", workflowExecutionController.ListTenantExecutionsHandler)
-				tenantsGroup.GET("/:code/workflow-executions/:id", workflowExecutionController.GetTenantExecutionHandler)
+				tenantsGroup.POST("/:code/workflow-executions", requireScope("workflows:create", "workflows:admin"), workflowExecutionController.StartTenantExecutionHandler)
+				tenantsGroup.GET("/:code/workflow-executions", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.ListTenantExecutionsHandler)
+				tenantsGroup.GET("/:code/workflow-executions/:id", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetTenantExecutionHandler)
 			}
 		}
 
 		workflowsGroup := restAPIGroup.Group("/workflows")
-		workflowsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		workflowsGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		workflowsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
-			workflowsGroup.POST("", workflowDefinitionController.CreateGlobalWorkflowHandler)
-			workflowsGroup.GET("", workflowDefinitionController.ListGlobalWorkflowsHandler)
-			workflowsGroup.GET("/:id", workflowDefinitionController.GetGlobalWorkflowHandler)
-			workflowsGroup.PUT("/:id", workflowDefinitionController.UpdateGlobalWorkflowHandler)
-			workflowsGroup.DELETE("/:id", workflowDefinitionController.DeleteGlobalWorkflowHandler)
-			workflowsGroup.GET("/:id/queues", workflowDefinitionController.GetGlobalWorkflowQueuesHandler)
-			workflowsGroup.GET("/:id/versions", workflowDefinitionController.ListGlobalWorkflowVersionsHandler)
-			workflowsGroup.GET("/:id/versions/:version", workflowDefinitionController.GetGlobalWorkflowVersionHandler)
+			workflowsGroup.POST("", requireScope("workflows:create", "workflows:admin"), workflowDefinitionController.CreateGlobalWorkflowHandler)
+			workflowsGroup.GET("", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.ListGlobalWorkflowsHandler)
+			workflowsGroup.GET("/:id", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.GetGlobalWorkflowHandler)
+			workflowsGroup.PUT("/:id", requireScope("workflows:edit", "workflows:admin"), workflowDefinitionController.UpdateGlobalWorkflowHandler)
+			workflowsGroup.DELETE("/:id", requireScope("workflows:delete", "workflows:admin"), workflowDefinitionController.DeleteGlobalWorkflowHandler)
+			workflowsGroup.GET("/:id/queues", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.GetGlobalWorkflowQueuesHandler)
+			workflowsGroup.GET("/:id/versions", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.ListGlobalWorkflowVersionsHandler)
+			workflowsGroup.GET("/:id/versions/:version", requireScope("workflows:list", "workflows:admin"), workflowDefinitionController.GetGlobalWorkflowVersionHandler)
 
-			workflowsGroup.POST("/executions", workflowExecutionController.StartGlobalExecutionHandler)
-			workflowsGroup.GET("/executions", workflowExecutionController.ListGlobalExecutionsHandler)
-			workflowsGroup.GET("/executions/:id", workflowExecutionController.GetGlobalExecutionHandler)
-			workflowsGroup.POST("/executions/jobs/:jobId/complete", workflowExecutionController.CompleteGlobalJobHandler)
+			workflowsGroup.POST("/executions", requireScope("workflows:create", "workflows:admin"), workflowExecutionController.StartGlobalExecutionHandler)
+			workflowsGroup.GET("/executions", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.ListGlobalExecutionsHandler)
+			workflowsGroup.GET("/executions/:id", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetGlobalExecutionHandler)
+			workflowsGroup.POST("/executions/jobs/:jobId/complete", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.CompleteGlobalJobHandler)
 		}
 
 		envGroupsGroup := restAPIGroup.Group("/env-groups")
-		envGroupsGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		envGroupsGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		envGroupsGroup.Use(sessionOnlyMiddleware())
 		envGroupsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			envGroupsGroup.POST("", envConfigController.CreateGlobalGroupHandler)
@@ -155,8 +178,21 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			envGroupsGroup.PUT("/:groupId/vars/bulk", envConfigController.BulkSaveGlobalVarsHandler)
 		}
 
+		oauthAppsGroup := restAPIGroup.Group("/oauth-apps")
+		oauthAppsGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		oauthAppsGroup.Use(sessionOnlyMiddleware())
+		oauthAppsGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
+		{
+			oauthAppsGroup.GET("", oauthAppController.ListGlobalAppsHandler)
+			oauthAppsGroup.POST("", oauthAppController.CreateGlobalAppHandler)
+			oauthAppsGroup.GET("/:id", oauthAppController.GetAppHandler)
+			oauthAppsGroup.DELETE("/:id", oauthAppController.DeleteAppHandler)
+			oauthAppsGroup.POST("/:id/rotate-secret", oauthAppController.RotateSecretHandler)
+		}
+
 		usersGroup := restAPIGroup.Group("/users")
-		usersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		usersGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		usersGroup.Use(sessionOnlyMiddleware())
 		usersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			usersGroup.GET("", userController.GetUsersHandler)
@@ -166,34 +202,33 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		}
 
 		jobWorkersGroup := restAPIGroup.Group("/job-workers")
-		jobWorkersGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		jobWorkersGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		jobWorkersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
-			jobWorkersGroup.GET("", jobWorkerController.GetJobWorkersHandler)
-			jobWorkersGroup.GET("/:id", jobWorkerController.GetJobWorkerHandler)
+			jobWorkersGroup.GET("", requireScope("workflows:list", "workflows:admin"), jobWorkerController.GetJobWorkersHandler)
+			jobWorkersGroup.GET("/:id", requireScope("workflows:list", "workflows:admin"), jobWorkerController.GetJobWorkerHandler)
 		}
 
-		// Cluster management endpoints
 		apiV1Group := restAPIGroup.Group("/v1")
-		apiV1Group.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		apiV1Group.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		apiV1Group.Use(sessionOnlyMiddleware())
 		apiV1Group.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 30))
 		{
 			clusterController.RegisterRoutes(apiV1Group)
 			apiV1Group.GET("/cluster/metrics/tsdb", tsdbMetricsController.GetGlobalTSDBMetricsHandler)
 		}
 
-		// Dashboard endpoints
 		dashboardGroup := restAPIGroup.Group("/dashboard")
-		dashboardGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		dashboardGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
 		dashboardGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
-			dashboardGroup.GET("/summary", dashboardController.GetDashboardSummaryHandler)
+			dashboardGroup.GET("/summary", requireScope("tenants:list", "tenants:admin"), dashboardController.GetDashboardSummaryHandler)
 		}
-
 	}
 
 	metricsAPIGroup := engine.Group("/metrics")
-	metricsAPIGroup.Use(authMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+	metricsAPIGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+	metricsAPIGroup.Use(sessionOnlyMiddleware())
 	metricsAPIGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 	metricsAPIGroup.GET("/", metricsController.GetSystemMetricsHandler)
 }

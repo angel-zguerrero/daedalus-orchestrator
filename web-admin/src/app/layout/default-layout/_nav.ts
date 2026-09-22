@@ -7,6 +7,11 @@ export const navItems: INavData[] = [
     iconComponent: { name: 'cil-speedometer' }
   },
   {
+    name: 'Workflows',
+    url: '/workflows',
+    iconComponent: { name: 'cil-transfer' }
+  },
+  {
     name: 'Tenants',
     url: '/tenants',
     iconComponent: { name: 'cil-people' }
@@ -17,9 +22,9 @@ export const navItems: INavData[] = [
     iconComponent: { name: 'cil-lock-locked' }
   },
   {
-    name: 'Workflows',
-    url: '/workflows',
-    iconComponent: { name: 'cil-transfer' }
+    name: 'Service Accounts',
+    url: '/service-accounts',
+    iconComponent: { name: 'cil-shield-alt' }
   },
   {
     name: 'Cluster Management',

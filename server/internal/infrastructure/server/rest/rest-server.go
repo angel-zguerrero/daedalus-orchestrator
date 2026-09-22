@@ -45,7 +45,7 @@ func NewRestServer(config *common.ServerConfing) *RestServer {
 		isReady := config.IsReady != nil && config.IsReady()
 		if !isReady {
 			if strings.HasPrefix(c.Request.URL.Path, "/rest-api/") {
-				c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "System is starting..."})
+				c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "System is starting."})
 				return
 			}
 			if c.Request.URL.Path != "/starting" {
