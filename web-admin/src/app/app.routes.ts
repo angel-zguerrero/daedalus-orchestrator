@@ -31,6 +31,10 @@ export const routes: Routes = [
         loadChildren: () => import('./views/configs-secrets/routes').then((m) => m.routes)
       },
       {
+        path: 'service-accounts',
+        loadChildren: () => import('./views/service-accounts/routes').then((m) => m.routes)
+      },
+      {
         path: 'workflows',
         loadChildren: () => import('./views/workflows/routes').then((m) => m.routes)
       },

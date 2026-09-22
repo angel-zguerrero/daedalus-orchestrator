@@ -34,6 +34,10 @@
               <svg cIcon name="cil-chart-pie" class="me-2"></svg>
               Summary
             </button>
+            <button cTab itemKey="workflows">
+              <svg cIcon name="cil-transfer" class="me-2"></svg>
+              Workflows
+            </button>
             <button cTab itemKey="exchanges">
               <svg cIcon name="cil-share" class="me-2"></svg>
               Exchanges
@@ -54,9 +58,9 @@
               <svg cIcon name="cil-shield-alt" class="me-2"></svg>
               Configs & Secrets
             </button>
-            <button cTab itemKey="workflows">
-              <svg cIcon name="cil-transfer" class="me-2"></svg>
-              Workflows
+            <button cTab itemKey="service-accounts">
+              <svg cIcon name="cil-lock-locked" class="me-2"></svg>
+              Service Accounts
             </button>
           </c-tabs-list>
           
@@ -243,6 +247,13 @@
               </c-card>
             </c-tab-panel>
 
+            <!-- Workflows Tab -->
+            <c-tab-panel itemKey="workflows" class="p-3">
+              <ng-container *ngIf="activeTab === 'workflows'">
+                <app-workflows scope="tenant" [tenantCode]="tenantCode"></app-workflows>
+              </ng-container>
+            </c-tab-panel>
+
             <!-- Exchanges Tab -->
             <c-tab-panel itemKey="exchanges" class="p-3">
               <ng-container *ngIf="activeTab === 'exchanges'">
@@ -278,10 +289,10 @@
               </ng-container>
             </c-tab-panel>
 
-            <!-- Workflows Tab -->
-            <c-tab-panel itemKey="workflows" class="p-3">
-              <ng-container *ngIf="activeTab === 'workflows'">
-                <app-workflows scope="tenant" [tenantCode]="tenantCode"></app-workflows>
+            <!-- Service Accounts Tab -->
+            <c-tab-panel itemKey="service-accounts" class="p-3">
+              <ng-container *ngIf="activeTab === 'service-accounts'">
+                <app-service-accounts [tenantCode]="tenantCode"></app-service-accounts>
               </ng-container>
             </c-tab-panel>
           </c-tabs-content>

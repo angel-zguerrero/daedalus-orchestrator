@@ -17,6 +17,7 @@ import (
 	vnamespace_command "deadalus-orch/server/internal/usecase/command/vnamespace"
 	workflow_definition_command "deadalus-orch/server/internal/usecase/command/workflow-definition"
 	workflow_execution_command "deadalus-orch/server/internal/usecase/command/workflow-execution"
+	oauth_command "deadalus-orch/server/internal/usecase/command/oauth"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -223,6 +224,14 @@ func init() {
 	RegisterRepoCommand("HandleJobFailureCommand", func() commands.Command { return &workflow_execution_command.HandleJobFailureCommand{} })
 	RegisterRepoCommand("GetWorkflowExecutionCommand", func() commands.Command { return &workflow_execution_command.GetWorkflowExecutionCommand{} })
 	RegisterRepoCommand("ListWorkflowExecutionsCommand", func() commands.Command { return &workflow_execution_command.ListWorkflowExecutionsCommand{} })
+
+	// OAuth commands
+	RegisterRepoCommand("CreateOAuthAppCommand", func() commands.Command { return &oauth_command.CreateOAuthAppCommand{} })
+	RegisterRepoCommand("GetOAuthAppByClientIDCommand", func() commands.Command { return &oauth_command.GetOAuthAppByClientIDCommand{} })
+	RegisterRepoCommand("GetOAuthAppByIDCommand", func() commands.Command { return &oauth_command.GetOAuthAppByIDCommand{} })
+	RegisterRepoCommand("GetOAuthAppsByTenantCommand", func() commands.Command { return &oauth_command.GetOAuthAppsByTenantCommand{} })
+	RegisterRepoCommand("DeleteOAuthAppCommand", func() commands.Command { return &oauth_command.DeleteOAuthAppCommand{} })
+	RegisterRepoCommand("RotateOAuthSecretCommand", func() commands.Command { return &oauth_command.RotateOAuthSecretCommand{} })
 
 	// General commands
 	RegisterRepoCommand("CreateColumnFamilyCommand", func() commands.Command { return &CreateColumnFamilyCommand{} })

@@ -113,12 +113,20 @@ func (bo *AuthBO) Logout(ctx context.Context, token string) error {
 	return nil
 }
 
+type SessionClaims struct {
+	jwt.RegisteredClaims
+	TokenType string `json:"token_type"`
+}
+
 func (bo *AuthBO) generateJWT(username string) (string, error) {
 	expirationTime := time.Now().Add(bo.JwtDuration)
-	claims := &jwt.RegisteredClaims{
-		Subject:   username,
-		ExpiresAt: jwt.NewNumericDate(expirationTime),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	claims := &SessionClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   username,
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		TokenType: "session",
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

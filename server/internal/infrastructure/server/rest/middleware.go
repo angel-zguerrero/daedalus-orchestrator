@@ -11,6 +11,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -28,15 +29,12 @@ import (
 // tenantContextMiddleware creates a middleware that extracts tenant information and injects it into the context
 func tenantContextMiddleware(tenantBO *bo.TenantBO, serverConfig *common.ServerConfing, logger zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Solo aplica a rutas que tienen un parámetro :code de tenant
 		tenantCode := c.Param("code")
 		if tenantCode == "" {
-			// Si no hay código de tenant, continúa sin inyectar contexto
 			c.Next()
 			return
 		}
 
-		// Obtener información del tenant
 		tenant, _, _, err := tenantBO.GetTenant(c.Request.Context(), tenantCode)
 		if err != nil {
 			logger.Error().Err(err).Str("tenantCode", tenantCode).Msg("Failed to get tenant in middleware")
@@ -45,11 +43,28 @@ func tenantContextMiddleware(tenantBO *bo.TenantBO, serverConfig *common.ServerC
 			return
 		}
 
-		// Construir CF y CFS
+		// Tenant-boundary enforcement for OAuth tokens:
+		// If oauth_tenant_id is present and non-empty (Tenant OAuth App), it MUST match target tenant ID.
+		// If oauth_tenant_id is empty (Global OAuth App), bypass check for cross-tenant access.
+		if oauthTenantIDRaw, exists := c.Get("oauth_tenant_id"); exists {
+			if oauthTenantID, ok := oauthTenantIDRaw.(string); ok && oauthTenantID != "" {
+				if oauthTenantID != tenant.ID {
+					logger.Warn().
+						Str("token_tenant_id", oauthTenantID).
+						Str("request_tenant_id", tenant.ID).
+						Msg("Tenant boundary violation for OAuth token")
+					c.JSON(http.StatusForbidden, gin.H{
+						"error": fmt.Sprintf("OAuth token is restricted to tenant %s", oauthTenantID),
+					})
+					c.Abort()
+					return
+				}
+			}
+		}
+
 		cf := db.ColumnFamilyPrefix + strconv.Itoa(tenant.ColumnFamilyIndex)
 		cfs := tenant.ID
 
-		// Obtener el nodo correspondiente al tenant usando ShardId
 		var node *dragonboat.RaftNode
 		serverConfig.TenantNodesLock.Lock()
 		for i := range serverConfig.TenantNodes {
@@ -67,7 +82,6 @@ func tenantContextMiddleware(tenantBO *bo.TenantBO, serverConfig *common.ServerC
 			return
 		}
 
-		// Crear el contexto del tenant
 		tenantCtx := &common.TenantContext{
 			Tenant: &tenant,
 			Node:   node,
@@ -75,7 +89,6 @@ func tenantContextMiddleware(tenantBO *bo.TenantBO, serverConfig *common.ServerC
 			CFS:    cfs,
 		}
 
-		// Inyectar en el contexto de la request
 		newCtx := common.SetTenantContext(c.Request.Context(), tenantCtx)
 		c.Request = c.Request.WithContext(newCtx)
 
@@ -83,7 +96,13 @@ func tenantContextMiddleware(tenantBO *bo.TenantBO, serverConfig *common.ServerC
 	}
 }
 
-func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtKey []byte) gin.HandlerFunc {
+// unifiedAuthMiddleware handles both human admin session tokens and OAuth 2.0 machine tokens
+// on the same set of routes. It branches on the token_type JWT claim:
+//
+//	"session" (or missing — backward compat): validates signature + checks KV session via Raft
+//	"oauth": validates signature only (stateless), injects oauth_scopes, oauth_tenant_id,
+//	         oauth_client_id into gin.Context for downstream requireScope middleware
+func unifiedAuthMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtKey []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -100,16 +119,14 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 		}
 		tokenString := parts[1]
 
-		claims := &jwt.RegisteredClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		rawToken, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return jwtKey, nil
 		})
-
 		if err != nil {
-			if err == jwt.ErrTokenExpired {
+			if errors.Is(err, jwt.ErrTokenExpired) {
 				logger.Warn().Msg("JWT token expired")
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token expired"})
 			} else {
@@ -118,54 +135,132 @@ func authMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logger, jwtK
 			}
 			return
 		}
-
-		if !token.Valid {
-			logger.Warn().Msg("JWT token is invalid")
+		if !rawToken.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
 
-		// Locally validated, now check session existence via Raft
-		checkSessionCmd := &auth_command.CheckSessionExistsCommand{
-			JWTToken: tokenString,
-			JWTKey:   jwtKey, // Assuming the command needs the key for its own validation if any
-		}
-
-		queryCmd := &general_command.Query_Command{
-			Command: &general_command.Repository_Command{
-				CMD: checkSessionCmd,
-			},
-			Now: time.Now().UnixNano(),
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
-		defer cancel()
-
-		result, err := MasterNode.Read(ctx, *queryCmd)
-		if err != nil {
-			logger.Error().Err(err).Msg("Failed to execute CheckSessionExistsCommand via Raft")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify session"})
+		mapClaims, ok := rawToken.Claims.(jwt.MapClaims)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Malformed token claims"})
 			return
 		}
 
-		sessionExists, err := commands.DecodeCommandResult[bool](result.([]byte))
-		if err != nil {
-			logger.Error().Err(err).Msg("Session does not exist or has been invalidated")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Session does not exist or has been invalidated:" + err.Error()})
+		tokenType, _ := mapClaims["token_type"].(string)
+		if tokenType == "" {
+			tokenType = "session"
+		}
+
+		switch tokenType {
+
+		case "oauth":
+			oauthToken, err := jwt.ParseWithClaims(tokenString, &bo.OAuthClaims{}, func(t *jwt.Token) (interface{}, error) {
+				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return jwtKey, nil
+			})
+			if err != nil || !oauthToken.Valid {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid OAuth token"})
+				return
+			}
+			claims, ok := oauthToken.Claims.(*bo.OAuthClaims)
+			if !ok {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Malformed OAuth token claims"})
+				return
+			}
+			c.Set("oauth_scopes", claims.Scopes)
+			c.Set("oauth_tenant_id", claims.TenantID)
+			c.Set("oauth_client_id", claims.Subject)
+			logger.Debug().
+				Str("client_id", claims.Subject).
+				Strs("scopes", claims.Scopes).
+				Msg("OAuth machine token authenticated")
+			c.Next()
+
+		default:
+			checkSessionCmd := &auth_command.CheckSessionExistsCommand{
+				JWTToken: tokenString,
+				JWTKey:   jwtKey,
+			}
+			queryCmd := &general_command.Query_Command{
+				Command: &general_command.Repository_Command{CMD: checkSessionCmd},
+				Now:     time.Now().UnixNano(),
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), config.GlobalConfiguration.ApiRaftTimeout)
+			defer cancel()
+
+			result, err := MasterNode.Read(ctx, *queryCmd)
+			if err != nil {
+				logger.Error().Err(err).Msg("Failed to execute CheckSessionExistsCommand via Raft")
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify session"})
+				return
+			}
+			sessionExists, err := commands.DecodeCommandResult[bool](result.([]byte))
+			if err != nil {
+				logger.Error().Err(err).Msg("Failed to decode session check result")
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify session: " + err.Error()})
+				return
+			}
+			if !sessionExists {
+				logger.Warn().Msg("Session does not exist or has been invalidated")
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session is invalid or has expired"})
+				return
+			}
+			logger.Debug().Msg("Admin session token authenticated")
+			c.Next()
+		}
+	}
+}
+
+// requireScope enforces OAuth scope restrictions on routes that both admin users and
+// OAuth Service Accounts can access.
+func requireScope(required ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rawScopes, isOAuthToken := c.Get("oauth_scopes")
+		if !isOAuthToken {
+			c.Next()
 			return
 		}
 
-		if !sessionExists {
-			logger.Warn().Str("token_subject", claims.Subject).Msg("Session does not exist or has been invalidated")
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session is invalid or has expired"})
+		scopes, ok := rawScopes.([]string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid scope format in token"})
 			return
 		}
 
+		scopeSet := make(map[string]bool, len(scopes))
+		for _, s := range scopes {
+			scopeSet[s] = true
+		}
+		for _, req := range required {
+			if scopeSet[req] {
+				c.Next()
+				return
+			}
+		}
+
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"error":           "Insufficient scope",
+			"required_one_of": required,
+		})
+	}
+}
+
+// sessionOnlyMiddleware blocks OAuth machine tokens from accessing admin-only routes.
+func sessionOnlyMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, isOAuth := c.Get("oauth_scopes"); isOAuth {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "This endpoint requires an admin session. OAuth tokens are not permitted here.",
+			})
+			return
+		}
 		c.Next()
 	}
 }
-func rateLimitMiddleware(MasterNode *dragonboat.RaftNode, keyStrategy string, Period time.Duration, Limit int64) gin.HandlerFunc {
 
+func rateLimitMiddleware(MasterNode *dragonboat.RaftNode, keyStrategy string, Period time.Duration, Limit int64) gin.HandlerFunc {
 	rate := limiter.Rate{
 		Period: Period,
 		Limit:  Limit,
@@ -179,26 +274,20 @@ func rateLimitMiddleware(MasterNode *dragonboat.RaftNode, keyStrategy string, Pe
 			authHeader := c.GetHeader("Authorization")
 			if authHeader == "" {
 				log.Warn().Msg("Rate limiting by token: Authorization header missing, falling back to IP.")
-				return c.ClientIP() // Fallback to IP if no token
+				return c.ClientIP()
 			}
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 				log.Warn().Msg("Rate limiting by token: Invalid Authorization header format, falling back to IP.")
-				return c.ClientIP() // Fallback to IP if format is wrong
+				return c.ClientIP()
 			}
-			return parts[1] // Use token string as key
+			return parts[1]
 		})
 	} else {
-		// Default IP-based strategy, mgin handles this by default if no KeyGetter or specific context key is set.
-		// Explicitly setting it for clarity.
 		options = mgin.WithKeyGetter(func(c *gin.Context) string {
 			return c.ClientIP()
 		})
 	}
 
-	// It's important to pass the options to NewMiddleware.
-	// If multiple options are needed in the future, they can be passed as additional arguments.
 	return mgin.NewMiddleware(limiter.New(store, rate), options)
 }
-
-// authMiddleware creates a middleware handler for JWT authentication and session validation.
