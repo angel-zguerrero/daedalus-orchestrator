@@ -49,7 +49,7 @@ func (r *Registry) Get(activityType string) (ActivityExecutor, bool) {
 
 	// Secondary match for partial aliases (e.g. contains "http" or "redis")
 	for k, exec := range r.executors {
-		if strings.Contains(key, k) || strings.Contains(k, key) {
+		if strings.Contains(key, k) {
 			return exec, true
 		}
 	}
@@ -75,8 +75,23 @@ func (r *Registry) RegisterDefaults() {
 	r.executors["io.camunda:connector-redis"] = redisExec
 	r.executors["redis"] = redisExec
 
-	// Log / Debug
+	// Log / Debug & Standard BPMN Task Elements
 	r.executors["io.camunda.connectors.logtask.v1"] = logExec
 	r.executors["logtask"] = logExec
 	r.executors["log"] = logExec
+	r.executors["task"] = logExec
+	r.executors["servicetask"] = logExec
+	r.executors["service-task"] = logExec
+	r.executors["scripttask"] = logExec
+	r.executors["script-task"] = logExec
+	r.executors["usertask"] = logExec
+	r.executors["user-task"] = logExec
+	r.executors["sendtask"] = logExec
+	r.executors["send-task"] = logExec
+	r.executors["receivetask"] = logExec
+	r.executors["receive-task"] = logExec
+	r.executors["manualtask"] = logExec
+	r.executors["manual-task"] = logExec
+	r.executors["businessruletask"] = logExec
+	r.executors["business-rule-task"] = logExec
 }

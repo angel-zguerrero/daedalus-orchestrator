@@ -22,6 +22,7 @@ import { BindingsComponent } from './bindings/bindings.component';
 import { ScheduledJobsComponent } from './scheduled-jobs/scheduled-jobs.component';
 import { ConfigsSecretsComponent } from '../../configs-secrets/configs-secrets.component';
 import { WorkflowsComponent } from '../../workflows/workflows.component';
+import { ActivityTemplatesComponent } from '../../activity-templates/activity-templates.component';
 import { ServiceAccountsComponent } from '../../service-accounts/service-accounts.component';
 import { TenantsService } from '../services/tenants.service';
 import { TSDBMetricsService } from '../services/tsdb-metrics.service';
@@ -52,6 +53,7 @@ import { SpinnerComponent } from '@coreui/angular';
     ScheduledJobsComponent,
     ConfigsSecretsComponent,
     WorkflowsComponent,
+    ActivityTemplatesComponent,
     ServiceAccountsComponent,
     ChartjsModule,
     SpinnerComponent,

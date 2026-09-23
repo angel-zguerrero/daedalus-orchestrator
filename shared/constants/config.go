@@ -92,9 +92,6 @@ const ConfigPublishBufferFlushIntervalMsKey = "publish_buffer_flush_interval_ms"
 // ConfigPublishBufferMaxSizeKey is the key for the publish buffer max size setting in the configuration file.
 const ConfigPublishBufferMaxSizeKey = "publish_buffer_max_size"
 
-// ConfigCamundaConnectorRunnerURLKey is the key for the Camunda connector runner URL setting in the configuration file.
-const ConfigCamundaConnectorRunnerURLKey = "camunda_connector_runner_url"
-
 // ConfigAutoCompleteMockActivitiesKey is the key for the auto complete mock activities setting in the configuration file.
 const ConfigAutoCompleteMockActivitiesKey = "auto_complete_mock_activities"
 
@@ -199,9 +196,6 @@ const EnvVarPublishBufferMaxSize = "PUBLISH_BUFFER_MAX_SIZE"
 // EnvVarPublishBufferFlushConcurrency is the environment variable name for the publish buffer flush concurrency.
 const EnvVarPublishBufferFlushConcurrency = "PUBLISH_BUFFER_FLUSH_CONCURRENCY"
 
-// EnvVarCamundaConnectorRunnerURL is the environment variable name for the Camunda connector runner URL.
-const EnvVarCamundaConnectorRunnerURL = "CAMUNDA_CONNECTOR_RUNNER_URL"
-
 // EnvVarAutoCompleteMockActivities is the environment variable name for enabling auto-completion of mock activities ("true" or "false").
 const EnvVarAutoCompleteMockActivities = "AUTO_COMPLETE_MOCK_ACTIVITIES"
 
@@ -293,9 +287,6 @@ const PublishBufferFlushIntervalMsFlagName = "publish-buffer-flush-interval-ms"
 
 // PublishBufferMaxSizeFlagName is the command-line flag name for the publish buffer max size.
 const PublishBufferMaxSizeFlagName = "publish-buffer-max-size"
-
-// CamundaConnectorRunnerURLFlagName is the command-line flag name for the Camunda connector runner URL.
-const CamundaConnectorRunnerURLFlagName = "camunda-connector-runner-url"
 
 // AutoCompleteMockActivitiesFlagName is the command-line flag name for auto-completing mock activities.
 const AutoCompleteMockActivitiesFlagName = "auto-complete-mock-activities"

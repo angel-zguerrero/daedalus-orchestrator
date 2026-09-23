@@ -5,7 +5,10 @@ import (
 	"deadalus-orch/server/internal/usecase/command"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func init() {
@@ -118,8 +121,12 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		if existing != nil {
 			// Update: preserve the existing code and other immutable fields
 			queue.ID = existing.ID
-			queue.Code = existing.Code // Frontend cannot edit code
-			queue.Type = existing.Type
+			if queue.Type == "" && existing.Type != "" {
+				queue.Type = existing.Type
+			}
+			if queue.WorkflowDefinitionID == "" && existing.WorkflowDefinitionID != "" {
+				queue.WorkflowDefinitionID = existing.WorkflowDefinitionID
+			}
 			queue.MessagesCount = existing.MessagesCount
 			queue.VNamespace = existing.VNamespace
 			queue.CreatedAt = existing.CreatedAt
@@ -135,7 +142,7 @@ func (cmd *AssertQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		} else {
 			// For new queues, generate ID first if empty
 			if queue.ID == "" {
-				queue.ID = idFactory.GenerateID()
+				queue.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
 			}
 
 			queue.NodeSchedulerQueueSupervisionState = models.Unsupervised

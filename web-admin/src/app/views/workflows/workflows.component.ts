@@ -352,7 +352,10 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.currentWorkflowVersion = 1;
     this.showAdvancedSettings = false;
     this.workflowForm.reset({
+      name: 'Untitled Workflow',
+      code: '',
       vnamespace: this.scope === 'global' ? '' : 'default',
+      description: '',
       onVersionChange: 'defined_in_execution',
       payloadFormat: 'bpmn',
       payload: DEFAULT_BPMN_XML,
@@ -377,15 +380,15 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     const decodedPayload = this.decodePayload(wf.payload);
 
     this.workflowForm.patchValue({
-      code: wf.code,
-      name: wf.name,
+      code: wf.code || '',
+      name: wf.name || wf.code || 'Untitled Workflow',
       vnamespace: this.scope === 'global' ? '' : (wf.vnamespace || 'default'),
-      description: wf.description,
+      description: wf.description || '',
       onVersionChange: wf.onVersionChange || 'defined_in_execution',
       payloadFormat: 'bpmn',
       payload: decodedPayload || DEFAULT_BPMN_XML,
-      maxDurationSeconds: wf.maxDurationSeconds,
-      isActive: wf.isActive
+      maxDurationSeconds: wf.maxDurationSeconds ?? 3600,
+      isActive: wf.isActive ?? true
     });
     this.workflowForm.get('code')?.disable();
     this.hasUnsavedChanges = false;
@@ -471,7 +474,12 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   }
 
   async saveWorkflow(closeAfterSave: boolean = true): Promise<void> {
-    if (this.workflowForm.invalid) return;
+    if (!this.workflowForm.get('name')?.value?.trim()) {
+      this.workflowForm.patchValue({ name: 'Untitled Workflow' });
+    }
+    if (this.workflowForm.get('maxDurationSeconds')?.value === null || this.workflowForm.get('maxDurationSeconds')?.value === undefined) {
+      this.workflowForm.patchValue({ maxDurationSeconds: 3600 });
+    }
 
     let hasDesignErrors = false;
     let designErrorMessages: string[] = [];
@@ -489,7 +497,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     const val = this.workflowForm.getRawValue();
     const payload: Partial<WorkflowDefinition> = {
       code: val.code ? val.code.trim() : '',
-      name: val.name ? val.name.trim() : '',
+      name: val.name ? val.name.trim() : 'Untitled Workflow',
       vnamespace: this.scope === 'global' ? '' : (val.vnamespace ? val.vnamespace.trim() : 'default'),
       description: val.description,
       onVersionChange: val.onVersionChange || 'defined_in_execution',

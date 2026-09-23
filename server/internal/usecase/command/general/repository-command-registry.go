@@ -2,6 +2,7 @@ package general_command
 
 import (
 	commands "deadalus-orch/server/internal/usecase/command"
+	activity_template_command "deadalus-orch/server/internal/usecase/command/activity-template"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	env_config_command "deadalus-orch/server/internal/usecase/command/env-config"
@@ -217,11 +218,20 @@ func init() {
 	RegisterRepoCommand("ListWorkflowVersionsCommand", func() commands.Command { return &workflow_definition_command.ListWorkflowVersionsCommand{} })
 	RegisterRepoCommand("GetWorkflowVersionCommand", func() commands.Command { return &workflow_definition_command.GetWorkflowVersionCommand{} })
 
+	// Activity Template commands
+	RegisterRepoCommand("CreateActivityTemplateCommand", func() commands.Command { return &activity_template_command.CreateActivityTemplateCommand{} })
+	RegisterRepoCommand("UpdateActivityTemplateCommand", func() commands.Command { return &activity_template_command.UpdateActivityTemplateCommand{} })
+	RegisterRepoCommand("DeleteActivityTemplateCommand", func() commands.Command { return &activity_template_command.DeleteActivityTemplateCommand{} })
+	RegisterRepoCommand("GetActivityTemplateCommand", func() commands.Command { return &activity_template_command.GetActivityTemplateCommand{} })
+	RegisterRepoCommand("GetActivityTemplateByCodeOrIDCommand", func() commands.Command { return &activity_template_command.GetActivityTemplateByCodeOrIDCommand{} })
+	RegisterRepoCommand("ListActivityTemplatesCommand", func() commands.Command { return &activity_template_command.ListActivityTemplatesCommand{} })
+
 	// Workflow Execution commands
 	RegisterRepoCommand("StartWorkflowExecutionCommand", func() commands.Command { return &workflow_execution_command.StartWorkflowExecutionCommand{} })
 	RegisterRepoCommand("AdvanceTokenCommand", func() commands.Command { return &workflow_execution_command.AdvanceTokenCommand{} })
 	RegisterRepoCommand("CompleteJobCommand", func() commands.Command { return &workflow_execution_command.CompleteJobCommand{} })
 	RegisterRepoCommand("HandleJobFailureCommand", func() commands.Command { return &workflow_execution_command.HandleJobFailureCommand{} })
+	RegisterRepoCommand("ReconcilePendingWorkflowJobsCommand", func() commands.Command { return &workflow_execution_command.ReconcilePendingWorkflowJobsCommand{} })
 	RegisterRepoCommand("GetWorkflowExecutionCommand", func() commands.Command { return &workflow_execution_command.GetWorkflowExecutionCommand{} })
 	RegisterRepoCommand("ListWorkflowExecutionsCommand", func() commands.Command { return &workflow_execution_command.ListWorkflowExecutionsCommand{} })
 

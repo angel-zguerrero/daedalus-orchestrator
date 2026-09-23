@@ -3,6 +3,7 @@ package rest_server
 import (
 	"time"
 
+	"deadalus-orch/server/internal/infrastructure/server/rest/activitytemplate"
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
 	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
 	"deadalus-orch/server/internal/infrastructure/server/rest/cluster"
@@ -42,6 +43,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	envConfigController := envconfig.NewEnvConfigController(s.Config)
 	workflowDefinitionController := workflowdefinition.NewWorkflowDefinitionController(s.Config)
 	workflowExecutionController := workflowexecution.NewWorkflowExecutionController(s.Config)
+	activityTemplateController := activitytemplate.NewActivityTemplateController(s.Config)
 
 	oauthController := oauthapp.NewOAuthController(s.Config)
 	oauthAppController := oauthapp.NewOAuthAppController(s.Config)
@@ -140,6 +142,14 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.POST("/:code/workflow-executions", requireScope("workflows:create", "workflows:admin"), workflowExecutionController.StartTenantExecutionHandler)
 				tenantsGroup.GET("/:code/workflow-executions", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.ListTenantExecutionsHandler)
 				tenantsGroup.GET("/:code/workflow-executions/:id", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetTenantExecutionHandler)
+
+				// Activity Templates (Tenant)
+				tenantsGroup.POST("/:code/activity-templates", requireScope("workflows:create", "workflows:admin"), activityTemplateController.CreateTenantActivityTemplateHandler)
+				tenantsGroup.GET("/:code/activity-templates", requireScope("workflows:list", "workflows:admin"), activityTemplateController.ListTenantActivityTemplatesHandler)
+				tenantsGroup.GET("/:code/activity-templates/for-designer", requireScope("workflows:list", "workflows:admin"), activityTemplateController.ListForDesignerHandler)
+				tenantsGroup.GET("/:code/activity-templates/:id", requireScope("workflows:list", "workflows:admin"), activityTemplateController.GetTenantActivityTemplateHandler)
+				tenantsGroup.PUT("/:code/activity-templates/:id", requireScope("workflows:edit", "workflows:admin"), activityTemplateController.UpdateTenantActivityTemplateHandler)
+				tenantsGroup.DELETE("/:code/activity-templates/:id", requireScope("workflows:delete", "workflows:admin"), activityTemplateController.DeleteTenantActivityTemplateHandler)
 			}
 		}
 
@@ -160,6 +170,18 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			workflowsGroup.GET("/executions", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.ListGlobalExecutionsHandler)
 			workflowsGroup.GET("/executions/:id", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetGlobalExecutionHandler)
 			workflowsGroup.POST("/executions/jobs/:jobId/complete", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.CompleteGlobalJobHandler)
+		}
+
+		activityTemplatesGroup := restAPIGroup.Group("/activity-templates")
+		activityTemplatesGroup.Use(unifiedAuthMiddleware(s.Config.MasterNode, s.Config.Logger, s.Config.JwtKey))
+		activityTemplatesGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
+		{
+			activityTemplatesGroup.POST("", requireScope("workflows:create", "workflows:admin"), activityTemplateController.CreateGlobalActivityTemplateHandler)
+			activityTemplatesGroup.GET("", requireScope("workflows:list", "workflows:admin"), activityTemplateController.ListGlobalActivityTemplatesHandler)
+			activityTemplatesGroup.GET("/for-designer", requireScope("workflows:list", "workflows:admin"), activityTemplateController.ListForDesignerHandler)
+			activityTemplatesGroup.GET("/:id", requireScope("workflows:list", "workflows:admin"), activityTemplateController.GetGlobalActivityTemplateHandler)
+			activityTemplatesGroup.PUT("/:id", requireScope("workflows:edit", "workflows:admin"), activityTemplateController.UpdateGlobalActivityTemplateHandler)
+			activityTemplatesGroup.DELETE("/:id", requireScope("workflows:delete", "workflows:admin"), activityTemplateController.DeleteGlobalActivityTemplateHandler)
 		}
 
 		envGroupsGroup := restAPIGroup.Group("/env-groups")

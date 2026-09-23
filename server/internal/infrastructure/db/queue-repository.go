@@ -24,6 +24,9 @@ func NewQueueRepository(uow *UnitOfWork, factory IDGeneratorFactory, cf, cfs str
 }
 
 func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (string, error) {
+	if strings.TrimSpace(input.VNamespace) == "" {
+		input.VNamespace = "default"
+	}
 	if input.Type == "" {
 		input.Type = models.StandardQueue
 	}
@@ -69,6 +72,9 @@ func (r *QueueRepository) CreateQueue(input *models.Queue, now time.Time) (strin
 }
 
 func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool, error) {
+	if strings.TrimSpace(input.VNamespace) == "" {
+		input.VNamespace = "default"
+	}
 	if input.Type == "" {
 		input.Type = models.StandardQueue
 	}
@@ -108,6 +114,9 @@ func (r *QueueRepository) UpdateQueue(input *models.Queue, now time.Time) (bool,
 }
 
 func (r *QueueRepository) GetQueueByCode(code string, vnamespace string, now time.Time) (*models.Queue, error) {
+	if strings.TrimSpace(vnamespace) == "" {
+		vnamespace = "default"
+	}
 	query := "Code = " + code + " & VNamespace = " + vnamespace
 	result, err := r.Find(query, 1, "", now)
 	if err != nil {
@@ -147,32 +156,32 @@ func (r *QueueRepository) PaginateBySupervisionState(q string, supervisionState 
 func (r *QueueRepository) paginate(q string, supervisionState models.QueueSupervisionState, queueType models.QueueType, includeAllTypes bool, pageSize int, cursor string, vNamespace string, now time.Time) (*FindResult[models.Queue], error) {
 	var query string
 
-	if q == "" && vNamespace == "" && supervisionState == "" {
+	var conditions []string
+
+	// Add name search condition if q is provided
+	if q != "" {
+		conditions = append(conditions, "Name LIKE *"+q+"*")
+	}
+
+	// Add vNamespace filter condition if vNamespace is provided
+	if vNamespace != "" {
+		conditions = append(conditions, "VNamespace = "+vNamespace)
+	}
+
+	// Add supervisionState filter condition if supervisionState is provided
+	if supervisionState != "" {
+		conditions = append(conditions, "NodeSchedulerQueueSupervisionState = "+string(supervisionState))
+	}
+
+	// Directly query the Type index for workflow execution and activity queues
+	if !includeAllTypes && (queueType == models.WorkflowExecutionQueue || queueType == models.WorkflowActivityQueue) {
+		conditions = append(conditions, "Type = "+string(queueType))
+	}
+
+	if len(conditions) == 0 {
 		query = "ID != 0" // ID != 0 Workaround
 	} else {
-		var conditions []string
-
-		// Add name search condition if q is provided
-		if q != "" {
-			conditions = append(conditions, "Name LIKE *"+q+"*")
-		}
-
-		// Add vNamespace filter condition if vNamespace is provided
-		if vNamespace != "" {
-			conditions = append(conditions, "VNamespace = "+vNamespace)
-		}
-
-		// Add supervisionState filter condition if supervisionState is provided
-		if supervisionState != "" {
-			conditions = append(conditions, "NodeSchedulerQueueSupervisionState = "+string(supervisionState))
-		}
-
-		// If no conditions but we got here, use the workaround
-		if len(conditions) == 0 {
-			query = "ID != 0"
-		} else {
-			query = strings.Join(conditions, " & ")
-		}
+		query = strings.Join(conditions, " & ")
 	}
 
 	result, err := r.Find(query, pageSize, cursor, now)

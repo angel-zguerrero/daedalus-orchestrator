@@ -93,10 +93,7 @@ type Config struct {
 	// ScheduledJobsBatchSize specifies the batch size for scheduled jobs poller range scans. Default: 1000.
 	ScheduledJobsBatchSize int
 
-	// CamundaConnectorRunnerURL is the URL for the external Camunda connector runner.
-	CamundaConnectorRunnerURL string
-
-	// AutoCompleteMockActivities indicates whether to auto-complete mock activities when no external runner is available.
+	// AutoCompleteMockActivities indicates whether to auto-complete mock activities when no native executor is available.
 	AutoCompleteMockActivities bool
 }
 
@@ -135,7 +132,6 @@ type ConfigFromMap struct {
 	// publish_buffer_flush_concurrency specifies number of concurrent flush workers. Default: 6.
 	publish_buffer_flush_concurrency int
 	scheduled_jobs_batch_size        int
-	camunda_connector_runner_url     string
 	auto_complete_mock_activities    bool
 }
 
@@ -178,7 +174,6 @@ func ConfigFromMapToConfig(configFromMapInstance ConfigFromMap) *Config {
 		PublishBufferFlushIntervalMs:   configFromMapInstance.publish_buffer_flush_interval_ms,
 		PublishBufferMaxSize:           configFromMapInstance.publish_buffer_max_size,
 		ScheduledJobsBatchSize:         configFromMapInstance.scheduled_jobs_batch_size,
-		CamundaConnectorRunnerURL:      configFromMapInstance.camunda_connector_runner_url,
 		AutoCompleteMockActivities:     configFromMapInstance.auto_complete_mock_activities,
 
 		// TenantPortLowerBound and TenantPortUpperBound are set in LoadDefaultConfiguration

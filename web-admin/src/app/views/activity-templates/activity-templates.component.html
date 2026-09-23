@@ -1,0 +1,595 @@
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">
+      <svg cIcon name="cil-puzzle" class="me-2"></svg>
+      Activity Templates {{ scope === 'tenant' ? '(' + tenantCode + ')' : '(Global)' }}
+    </h5>
+  </c-card-header>
+  <c-card-body>
+    <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
+    <c-alert color="success" *ngIf="successMsg" dismissible>{{ successMsg }}</c-alert>
+
+    <!-- Search, Activity Family Filter, VNamespace Filter & Create Button -->
+    <c-row class="mb-3 g-2 align-items-end">
+      <c-col [md]="scope === 'global' ? 4 : 3">
+        <div class="input-group">
+          <input
+            type="text"
+            cFormControl
+            placeholder="Search by name, code, or family"
+            [(ngModel)]="searchQuery"
+            (keydown.enter)="searchTemplates()" />
+          <button
+            cButton
+            type="button"
+            color="secondary"
+            variant="outline"
+            (click)="searchTemplates()">
+            <svg cIcon name="cil-search"></svg>
+          </button>
+        </div>
+      </c-col>
+
+      <!-- Activity Family Filter (Same MatAutocomplete HTML component as VNamespace) -->
+      <c-col [md]="3">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by Activity Family</mat-label>
+          <input
+            type="text"
+            matInput
+            [formControl]="activityFamilyFilterCtrl"
+            [matAutocomplete]="autoFamilyFilter"
+            (ngModelChange)="onActivityFamilyFilterChange($event)" />
+          <mat-autocomplete #autoFamilyFilter="matAutocomplete">
+            <mat-option value="">All Families</mat-option>
+            <mat-option *ngFor="let fam of filteredFilterActivityFamilies | async" [value]="fam">
+              {{ fam }}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+
+      <!-- VNamespace Filter (Tenant Scope) -->
+      <c-col [md]="3" *ngIf="scope !== 'global'">
+        <mat-form-field class="w-100">
+          <mat-label>Filter by VNamespace</mat-label>
+          <input
+            type="text"
+            matInput
+            [formControl]="vnamespaceFilterCtrl"
+            [matAutocomplete]="autoVnsFilter"
+            (ngModelChange)="onVNamespaceFilterChange($event)" />
+          <mat-autocomplete #autoVnsFilter="matAutocomplete">
+            <mat-option value="">All VNamespaces</mat-option>
+            <mat-option *ngFor="let vns of filteredFilterVNamespaces | async" [value]="vns.Name || vns">
+              {{ vns.Name || vns }}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </c-col>
+
+      <c-col [md]="scope === 'global' ? 5 : 3" class="d-flex justify-content-end">
+        <button cButton color="primary" (click)="openCreateModal()">
+          <svg cIcon name="cil-plus" class="me-1"></svg>
+          Create Activity Template
+        </button>
+      </c-col>
+    </c-row>
+
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loading">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading activity templates...</p>
+    </div>
+
+    <!-- Templates Table -->
+    <div class="table-responsive" *ngIf="!loading">
+      <table cTable class="mt-3" [hover]="true">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Code</th>
+            <th>Activity Family</th>
+            <th>Base Template</th>
+            <th *ngIf="scope !== 'global'">VNamespace</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tpl of filteredTemplates" class="align-middle">
+            <td class="fw-bold">{{ tpl.name }}</td>
+            <td><code>{{ tpl.code }}</code></td>
+            <td>
+              <c-badge color="info" shape="rounded-pill">
+                {{ tpl.activityFamily || 'default' }}
+              </c-badge>
+            </td>
+            <td>
+              <span class="badge bg-dark border border-secondary text-light">
+                {{ getParentDisplayName(tpl.parentTemplateId) }}
+              </span>
+            </td>
+            <td *ngIf="scope !== 'global'">{{ tpl.vnamespace || 'default' }}</td>
+            <td>
+              <c-badge [color]="tpl.isActive ? 'success' : 'secondary'" shape="rounded-pill">
+                {{ tpl.isActive ? 'Active' : 'Inactive' }}
+              </c-badge>
+            </td>
+            <td>
+              <div class="btn-group" role="group">
+                <button
+                  cButton
+                  color="info"
+                  variant="outline"
+                  size="sm"
+                  (click)="openDetailModal(tpl)"
+                  title="View Details">
+                  <svg cIcon name="cil-info"></svg>
+                </button>
+                <button
+                  cButton
+                  color="warning"
+                  variant="outline"
+                  size="sm"
+                  (click)="openEditModal(tpl)"
+                  title="Open Activity Designer">
+                  <svg cIcon name="cil-pencil"></svg>
+                </button>
+                <button
+                  cButton
+                  color="danger"
+                  variant="outline"
+                  size="sm"
+                  (click)="openDeleteModal(tpl)"
+                  title="Delete Template">
+                  <svg cIcon name="cil-trash"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="filteredTemplates.length === 0">
+            <td [attr.colspan]="scope === 'global' ? 6 : 7" class="empty-state text-muted">
+              No activity templates found. Click "Create Activity Template" to design one.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="d-flex justify-content-between align-items-center mt-3" *ngIf="!loading && (cursors.length > 1 || nextCursor)">
+      <button cButton color="secondary" variant="outline" size="sm" [disabled]="cursors.length <= 1" (click)="prevPage()">
+        Previous
+      </button>
+      <span class="text-muted small">Page {{ cursors.length }}</span>
+      <button cButton color="secondary" variant="outline" size="sm" [disabled]="!nextCursor" (click)="nextPage()">
+        Next
+      </button>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- ========================================================================= -->
+<!-- STEP 1 MODAL: ONE-TIME IDENTITY & BASE TEMPLATE SELECTION                 -->
+<!-- ========================================================================= -->
+<c-modal id="identityStepModal" [visible]="showModal && currentStep === 'identity'" (visibleChange)="showModal = $event" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-puzzle"></svg>
+      New Activity Template — Step 1: Select Base Activity & Family
+    </h5>
+    <button (click)="showModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body [formGroup]="identityForm">
+    <p class="text-muted small mb-3">
+      Configure the template identity, assign its <strong>Activity Family</strong>, and select a base Activity Template (Redis, HTTP, Log, or an existing custom template) to inherit from.
+    </p>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Template Name *</label>
+        <input
+          type="text"
+          cFormControl
+          formControlName="name"
+          placeholder="e.g. Redis Primary Cache" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Template Code <span class="text-muted fw-normal">(optional, auto-generated)</span></label>
+        <input
+          type="text"
+          cFormControl
+          formControlName="code"
+          placeholder="e.g. redis-primary-cache" />
+      </div>
+
+      <!-- Activity Family using the exact same MatAutocomplete component as VNamespace -->
+      <div [class]="scope !== 'global' ? 'col-md-6' : 'col-md-12'">
+        <label class="form-label fw-semibold">Activity Family *</label>
+        <mat-form-field class="w-100">
+          <mat-label>Activity Family</mat-label>
+          <input
+            type="text"
+            matInput
+            [formControl]="activityFamilyCtrl"
+            [matAutocomplete]="autoCreateFamily"
+            placeholder="e.g. cache, payments, internal-http" />
+          <mat-autocomplete #autoCreateFamily="matAutocomplete">
+            <mat-option *ngFor="let fam of filteredActivityFamilies | async" [value]="fam">
+              {{ fam }}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </div>
+
+      <!-- VNamespace (shown for tenant scope, using the same MatAutocomplete component) -->
+      <div class="col-md-6" *ngIf="scope !== 'global'">
+        <label class="form-label fw-semibold">VNamespace</label>
+        <mat-form-field class="w-100">
+          <mat-label>VNamespace</mat-label>
+          <input
+            type="text"
+            matInput
+            [formControl]="vnamespaceCtrl"
+            [matAutocomplete]="autoCreateVns"
+            placeholder="default" />
+          <mat-autocomplete #autoCreateVns="matAutocomplete">
+            <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name || vns">
+              {{ vns.Name || vns }}
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
+      </div>
+
+      <!-- Base Activity Template Selector -->
+      <div class="col-12 mt-2">
+        <label class="form-label fw-semibold">Base Activity Template to Inherit From *</label>
+        <select
+          cSelect
+          formControlName="parentTemplateId"
+          (change)="onParentSelectionChange(identityForm.get('parentTemplateId')?.value)">
+          <optgroup label="Built-in Native Connectors (Redis, HTTP, Logs)">
+            <option *ngFor="let b of builtinOptions" [value]="b.id">
+              {{ b.name }} ({{ b.id }})
+            </option>
+          </optgroup>
+          <optgroup label="Existing Custom Activity Templates" *ngIf="customParentOptions.length > 0">
+            <option *ngFor="let c of customParentOptions" [value]="c.id">
+              {{ c.name }} ({{ c.id }})
+            </option>
+          </optgroup>
+        </select>
+        <div class="form-text text-info mt-1" *ngIf="selectedParentOption">
+          {{ selectedParentOption.description }}
+        </div>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" (click)="showModal = false">Cancel</button>
+    <button
+      cButton
+      color="primary"
+      (click)="proceedToDesigner()"
+      [disabled]="!identityForm.get('name')?.value?.trim() || !identityForm.get('parentTemplateId')?.value">
+      Next: Open Activity Designer →
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- ========================================================================= -->
+<!-- STEP 2 MODAL: FULL-SCREEN ACTIVITY TEMPLATE DESIGNER                      -->
+<!-- ========================================================================= -->
+<c-modal
+  id="activityDesignerModal"
+  [visible]="showModal && currentStep === 'designer'"
+  (visibleChange)="showModal = $event"
+  size="xl"
+  class="doc-studio-modal">
+  <div class="doc-studio-container" [formGroup]="designerForm">
+    <!-- Top Header Bar -->
+    <div class="doc-studio-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+      <div class="d-flex align-items-center gap-3 flex-grow-1 me-3">
+        <div class="d-flex align-items-center justify-content-center rounded p-2 text-info bg-dark border border-secondary">
+          <svg cIcon name="cil-puzzle" size="lg"></svg>
+        </div>
+
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <input
+              type="text"
+              formControlName="name"
+              (input)="onDesignerNameOrCodeChange()"
+              class="doc-title-input fw-bold text-white bg-transparent border-0 fs-5 px-2 py-1"
+              placeholder="Activity Template Name..." />
+
+            <span class="badge bg-dark text-info border border-secondary font-monospace px-2 py-1">
+              {{ designerForm.get('code')?.value || 'auto-code' }}
+            </span>
+
+            <span class="badge bg-secondary text-light px-2 py-1" title="Immediate Parent Template">
+              Inherits: {{ getParentDisplayName(designerForm.get('parentTemplateId')?.value) }}
+            </span>
+
+            <span class="badge bg-info text-dark px-2 py-1" title="Root Native Executor">
+              Root: {{ getParentDisplayName(designerForm.get('rootActivity')?.value || designerForm.get('parentTemplateId')?.value) }}
+            </span>
+          </div>
+
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <!-- Compact Activity Family Picker (Same HTML component as VNamespace) -->
+            <div class="d-flex align-items-center gap-1">
+              <span class="text-muted small">Activity Family:</span>
+              <mat-form-field appearance="outline" class="compact-mat-field">
+                <input
+                  type="text"
+                  matInput
+                  [formControl]="activityFamilyCtrl"
+                  [matAutocomplete]="autoHeaderFamily"
+                  (input)="onDesignerNameOrCodeChange()"
+                  placeholder="Family" />
+                <mat-autocomplete #autoHeaderFamily="matAutocomplete" (optionSelected)="onDesignerNameOrCodeChange()">
+                  <mat-option *ngFor="let fam of filteredActivityFamilies | async" [value]="fam">
+                    {{ fam }}
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+            </div>
+
+            <!-- Compact VNamespace Picker (Tenant Scope) -->
+            <div class="d-flex align-items-center gap-1" *ngIf="scope !== 'global'">
+              <span class="text-muted small">VNamespace:</span>
+              <mat-form-field appearance="outline" class="compact-mat-field">
+                <input
+                  type="text"
+                  matInput
+                  [formControl]="vnamespaceCtrl"
+                  [matAutocomplete]="autoHeaderVns"
+                  placeholder="Namespace" />
+                <mat-autocomplete #autoHeaderVns="matAutocomplete">
+                  <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name || vns">
+                    {{ vns.Name || vns }}
+                  </mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+            </div>
+
+            <!-- Active Toggle -->
+            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1 small ms-2">
+              <input class="form-check-input mt-0" type="checkbox" id="tplActiveSwitch" formControlName="isActive" />
+              <label class="form-check-label text-muted" for="tplActiveSwitch">
+                <span class="badge" [ngClass]="designerForm.get('isActive')?.value ? 'bg-success' : 'bg-secondary'">
+                  {{ designerForm.get('isActive')?.value ? 'Active' : 'Inactive' }}
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Action Buttons -->
+      <div class="d-flex align-items-center gap-2">
+        <button
+          cButton
+          color="dark"
+          variant="outline"
+          size="sm"
+          type="button"
+          class="text-light border-secondary"
+          (click)="toggleAdvancedSettings()">
+          <svg cIcon name="cil-options" size="sm" class="me-1"></svg>
+          Settings
+        </button>
+
+        <button
+          cButton
+          color="info"
+          variant="outline"
+          size="sm"
+          type="button"
+          (click)="validateTemplate()"
+          title="Validate template structure and burned properties">
+          <svg cIcon name="cil-check-circle" size="sm" class="me-1"></svg>
+          Validate
+        </button>
+
+        <button (click)="showModal = false" cButton color="secondary" size="sm" type="button">
+          Cancel
+        </button>
+
+        <button
+          cButton
+          color="success"
+          variant="outline"
+          size="sm"
+          type="button"
+          (click)="saveTemplate(false)">
+          <svg cIcon name="cil-save" class="me-1"></svg>
+          Save
+        </button>
+
+        <button
+          cButton
+          color="primary"
+          size="sm"
+          type="button"
+          (click)="saveTemplate(true)">
+          <svg cIcon name="cil-check" class="me-1"></svg>
+          Save & Close
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsible Settings Bar -->
+    <div class="doc-settings-panel p-3 bg-dark border-bottom" *ngIf="showAdvancedSettings">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Template Code</label>
+          <input cFormControl size="sm" formControlName="code" (input)="onDesignerNameOrCodeChange()" />
+        </div>
+        <div class="col-md-8">
+          <label class="form-label small text-muted">Description</label>
+          <input cFormControl size="sm" formControlName="description" placeholder="Describe this activity template..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- Validation Error Banner -->
+    <div *ngIf="validationErrors.length > 0" class="p-2 bg-danger bg-opacity-25 border-bottom border-danger">
+      <div class="fw-bold text-danger small mb-1">Template Validation Errors:</div>
+      <div *ngFor="let err of validationErrors" class="text-light small">• {{ err }}</div>
+    </div>
+
+    <!-- Split Designer Body: Left Raw Definition Editor + Right Interactive Visual Preview & Burn Controls -->
+    <div class="template-designer-split">
+      <!-- Left: Connector Template Definition Editor -->
+      <div class="template-editor-pane">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-dark border-bottom border-secondary">
+          <span class="small fw-semibold text-light">
+            Connector Template Definition (Edit properties, defaults, or set <code>"editable": false</code> to burn values)
+          </span>
+          <span class="badge" [ngClass]="validationPassed ? 'bg-success' : 'bg-danger'">
+            {{ validationPassed ? 'Valid Template' : 'Validation Errors' }}
+          </span>
+        </div>
+        <textarea
+          class="json-editor-textarea"
+          [ngModel]="payloadJson"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="onPayloadChange($event)"
+          spellcheck="false"></textarea>
+      </div>
+
+      <!-- Right: Live Properties Panel Preview & One-Click Burn/Lock Controls -->
+      <div class="template-preview-pane p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary">
+          <div>
+            <h6 class="text-light mb-0">Workflow Designer Properties Preview</h6>
+            <small class="text-muted">
+              Set default values below and click <strong>Burn / Lock</strong> to freeze fields (e.g. Redis <code>connectionString</code>) so they cannot be edited in the workflow editor.
+            </small>
+          </div>
+        </div>
+
+        <div *ngFor="let group of previewGroups" class="preview-group-card">
+          <div class="fw-bold text-info small text-uppercase mb-3 pb-1 border-bottom border-secondary">
+            {{ group.label }}
+          </div>
+
+          <div
+            *ngFor="let prop of group.properties"
+            class="mb-3"
+            [ngClass]="{ 'frozen-field-card': !prop.editable }">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label small text-light mb-0 d-flex align-items-center gap-2">
+                <span>{{ prop.label }}</span>
+                <code class="text-muted">({{ prop.bindingName }})</code>
+                <span *ngIf="!prop.editable" class="badge bg-warning text-dark">
+                  🔒 Burned / Read-Only in Flow Editor
+                </span>
+              </label>
+
+              <button
+                cButton
+                [color]="!prop.editable ? 'warning' : 'secondary'"
+                [variant]="!prop.editable ? undefined : 'outline'"
+                size="sm"
+                type="button"
+                class="py-0 px-2"
+                style="font-size: 0.72rem;"
+                (click)="toggleBurnProperty(prop)"
+                title="When burned/locked, this value is pre-baked into the activity and read-only in the workflow designer">
+                {{ !prop.editable ? '🔒 Burned (Unlock)' : '🔓 Burn / Lock Value' }}
+              </button>
+            </div>
+
+            <!-- Dropdown property -->
+            <select
+              *ngIf="prop.type === 'Dropdown'"
+              class="form-select form-select-sm bg-dark text-light border-secondary"
+              [ngModel]="prop.value"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="onPreviewPropertyValueChange(prop, $event)">
+              <option *ngFor="let c of prop.choices" [value]="c.value">{{ c.name }}</option>
+            </select>
+
+            <!-- Multiline property -->
+            <textarea
+              *ngIf="prop.type !== 'Dropdown' && prop.multiline"
+              rows="2"
+              class="form-control form-control-sm bg-dark text-light border-secondary"
+              [ngModel]="prop.value"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="onPreviewPropertyValueChange(prop, $event)"
+              placeholder="Enter default or burned value..."></textarea>
+
+            <!-- Single-line String property -->
+            <input
+              *ngIf="prop.type !== 'Dropdown' && !prop.multiline"
+              type="text"
+              class="form-control form-control-sm bg-dark text-light border-secondary"
+              [ngModel]="prop.value"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="onPreviewPropertyValueChange(prop, $event)"
+              placeholder="Enter default or burned value (e.g. redis://host:6379)..." />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</c-modal>
+
+<!-- Details Modal -->
+<c-modal id="tplDetailModal" [visible]="showDetailModal" (visibleChange)="showDetailModal = $event" size="xl">
+  <c-modal-header>
+    <h5 cModalTitle>Activity Template Details</h5>
+    <button (click)="showDetailModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body *ngIf="selectedTemplate">
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <strong>Name:</strong> {{ selectedTemplate.name }}
+      </div>
+      <div class="col-md-4">
+        <strong>Code:</strong> <code>{{ selectedTemplate.code }}</code>
+      </div>
+      <div class="col-md-4">
+        <strong>Activity Family:</strong>
+        <c-badge color="info" class="ms-1">{{ selectedTemplate.activityFamily }}</c-badge>
+      </div>
+    </div>
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <strong>Parent Template:</strong> <code>{{ selectedTemplate.parentTemplateId }}</code>
+      </div>
+      <div class="col-md-3">
+        <strong>Root Activity:</strong> <code>{{ selectedTemplate.rootActivity || selectedTemplate.parentTemplateId }}</code>
+      </div>
+      <div class="col-md-3" *ngIf="scope !== 'global'">
+        <strong>VNamespace:</strong> <code>{{ selectedTemplate.vnamespace || 'default' }}</code>
+      </div>
+      <div class="col-md-3">
+        <strong>Scope:</strong> {{ selectedTemplate.scope | titlecase }}
+      </div>
+    </div>
+    <label class="form-label fw-bold">Template Payload</label>
+    <pre class="p-3 bg-dark text-light rounded border border-secondary" style="max-height: 400px; overflow-y: auto;">{{ detailPayloadText }}</pre>
+  </c-modal-body>
+</c-modal>
+
+<!-- Delete Confirm Modal -->
+<c-modal id="tplDeleteModal" [visible]="showDeleteModal" (visibleChange)="showDeleteModal = $event">
+  <c-modal-header>
+    <h5 cModalTitle>Delete Activity Template</h5>
+    <button (click)="showDeleteModal = false" cButtonClose></button>
+  </c-modal-header>
+  <c-modal-body>
+    Are you sure you want to delete Activity Template <strong>{{ templateToDelete?.name }}</strong> (<code>{{ templateToDelete?.code }}</code>)?
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" (click)="showDeleteModal = false">Cancel</button>
+    <button cButton color="danger" (click)="deleteTemplate()">Delete</button>
+  </c-modal-footer>
+</c-modal>

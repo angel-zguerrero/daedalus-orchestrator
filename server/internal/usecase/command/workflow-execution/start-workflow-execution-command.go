@@ -209,8 +209,23 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 	}
 
 	if execQ == nil {
-		commandResult.Error = fmt.Sprintf("execution queue not found for workflow definition %s", def.ID)
+		execCode := fmt.Sprintf("wf-exec-%s", def.Code)
+		if qByCode, _ := queueRepo.GetQueueByCode(execCode, vns, now); qByCode != nil {
+			execQ = qByCode
+		} else if qByCodeDef, _ := queueRepo.GetQueueByCode(execCode, "default", now); qByCodeDef != nil {
+			execQ = qByCodeDef
+		}
+	}
+
+	if execQ == nil {
+		commandResult.Error = fmt.Sprintf("execution queue not found for workflow definition %s (%s)", def.ID, def.Code)
 		return *commandResult
+	}
+
+	if execQ.Type != models.WorkflowExecutionQueue || execQ.WorkflowDefinitionID != def.ID {
+		execQ.Type = models.WorkflowExecutionQueue
+		execQ.WorkflowDefinitionID = def.ID
+		queueRepo.UpdateQueue(execQ, now)
 	}
 
 	if execQ.DesiredPriorityThresholds == nil {
