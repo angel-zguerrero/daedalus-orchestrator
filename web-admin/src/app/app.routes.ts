@@ -39,6 +39,10 @@ export const routes: Routes = [
         loadChildren: () => import('./views/workflows/routes').then((m) => m.routes)
       },
       {
+        path: 'activity-templates',
+        loadChildren: () => import('./views/activity-templates/routes').then((m) => m.routes)
+      },
+      {
         path: 'cluster',
         loadChildren: () => import('./views/cluster/routes').then((m) => m.routes)
       },

@@ -20,6 +20,9 @@ func parseRedisHostPort(uriStr string) string {
 	if idx := strings.Index(uriStr, "/"); idx != -1 {
 		uriStr = uriStr[:idx]
 	}
+	if atIdx := strings.LastIndex(uriStr, "@"); atIdx != -1 {
+		uriStr = uriStr[atIdx+1:]
+	}
 	uriStr = strings.ReplaceAll(uriStr, "localhost", "127.0.0.1")
 	uriStr = strings.ReplaceAll(uriStr, "host.docker.internal", "127.0.0.1")
 	if !strings.Contains(uriStr, ":") {
@@ -35,14 +38,26 @@ func (e *RedisExecutor) Execute(ctx context.Context, input map[string]interface{
 
 	// 1. Extract Connection String (strictly 'connectionString')
 	hostPort := "127.0.0.1:6379"
-	if cs, ok := input["connectionString"].(string); ok && cs != "" {
-		hostPort = parseRedisHostPort(cs)
+	if csRaw, ok := input["connectionString"]; ok && csRaw != nil {
+		if cs := strings.TrimSpace(fmt.Sprintf("%v", csRaw)); cs != "" && cs != "<nil>" {
+			hostPort = parseRedisHostPort(cs)
+		}
+	}
+
+	// Extract optional password ('password')
+	password := ""
+	if pwRaw, ok := input["password"]; ok && pwRaw != nil {
+		if pw := strings.TrimSpace(fmt.Sprintf("%v", pwRaw)); pw != "" && pw != "<nil>" {
+			password = pw
+		}
 	}
 
 	// 2. Extract Command (strictly 'command')
 	cmdType := ""
-	if c, ok := input["command"].(string); ok && c != "" {
-		cmdType = strings.ToUpper(strings.TrimSpace(c))
+	if cRaw, ok := input["command"]; ok && cRaw != nil {
+		if c := strings.TrimSpace(fmt.Sprintf("%v", cRaw)); c != "" && c != "<nil>" {
+			cmdType = strings.ToUpper(c)
+		}
 	}
 	if cmdType == "" {
 		cmdType = "GET"
@@ -50,8 +65,10 @@ func (e *RedisExecutor) Execute(ctx context.Context, input map[string]interface{
 
 	// 3. Extract Key (strictly 'key' - REQUIRED)
 	cmdKey := ""
-	if k, ok := input["key"].(string); ok && k != "" {
-		cmdKey = strings.TrimSpace(k)
+	if kRaw, ok := input["key"]; ok && kRaw != nil {
+		if k := strings.TrimSpace(fmt.Sprintf("%v", kRaw)); k != "" && k != "<nil>" {
+			cmdKey = k
+		}
 	}
 	if cmdKey == "" {
 		return nil, fmt.Errorf("missing required property 'key' for Redis activity execution")
@@ -59,8 +76,10 @@ func (e *RedisExecutor) Execute(ctx context.Context, input map[string]interface{
 
 	// 4. Extract Value (strictly 'value')
 	cmdVal := ""
-	if v, ok := input["value"].(string); ok {
-		cmdVal = v
+	if vRaw, ok := input["value"]; ok && vRaw != nil {
+		if v := fmt.Sprintf("%v", vRaw); v != "<nil>" {
+			cmdVal = v
+		}
 	}
 
 	// 5. Extract TTL (strictly 'ttl')
@@ -120,11 +139,21 @@ func (e *RedisExecutor) Execute(ctx context.Context, input map[string]interface{
 	}
 	defer conn.Close()
 
+	reader := bufio.NewReader(conn)
+	if password != "" {
+		authCmd := fmt.Sprintf("*2\r\n$4\r\nAUTH\r\n$%d\r\n%s\r\n", len(password), password)
+		if _, err := conn.Write([]byte(authCmd)); err != nil {
+			return nil, fmt.Errorf("failed to send AUTH command to Redis: %w", err)
+		}
+		if authResp, err := reader.ReadString('\n'); err != nil || strings.HasPrefix(strings.TrimSpace(authResp), "-") {
+			return nil, fmt.Errorf("redis AUTH failed: %s", strings.TrimSpace(authResp))
+		}
+	}
+
 	if _, err := conn.Write([]byte(respBuf.String())); err != nil {
 		return nil, fmt.Errorf("failed to send command to Redis: %w", err)
 	}
 
-	reader := bufio.NewReader(conn)
 	firstLine, err := reader.ReadString('\n')
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response from Redis: %w", err)

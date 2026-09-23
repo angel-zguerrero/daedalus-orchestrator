@@ -285,7 +285,6 @@
           size="sm" 
           type="button" 
           (click)="saveWorkflow(false)" 
-          [disabled]="!workflowForm.valid"
           title="Save changes and keep editing">
           <svg cIcon name="cil-save" class="me-1"></svg>
           Save
@@ -298,7 +297,6 @@
           size="sm" 
           type="button" 
           (click)="saveWorkflow(true)" 
-          [disabled]="!workflowForm.valid"
           title="Save changes and close editor">
           <svg cIcon name="cil-check" class="me-1"></svg>
           Save & Close
@@ -355,6 +353,8 @@
     <div class="doc-studio-body p-0 flex-grow-1 position-relative">
       <app-bpmn-designer
         #bpmnDesigner
+        [scope]="scope"
+        [tenantCode]="tenantCode"
         [payload]="workflowForm.get('payload')?.value"
         (xmlChange)="onBpmnXmlChange($event)">
       </app-bpmn-designer>

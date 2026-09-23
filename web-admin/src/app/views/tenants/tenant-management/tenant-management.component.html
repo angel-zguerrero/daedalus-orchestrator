@@ -38,6 +38,10 @@
               <svg cIcon name="cil-transfer" class="me-2"></svg>
               Workflows
             </button>
+            <button cTab itemKey="activity-templates">
+              <svg cIcon name="cil-puzzle" class="me-2"></svg>
+              Activity Templates
+            </button>
             <button cTab itemKey="exchanges">
               <svg cIcon name="cil-share" class="me-2"></svg>
               Exchanges
@@ -251,6 +255,13 @@
             <c-tab-panel itemKey="workflows" class="p-3">
               <ng-container *ngIf="activeTab === 'workflows'">
                 <app-workflows scope="tenant" [tenantCode]="tenantCode"></app-workflows>
+              </ng-container>
+            </c-tab-panel>
+
+            <!-- Activity Templates Tab -->
+            <c-tab-panel itemKey="activity-templates" class="p-3">
+              <ng-container *ngIf="activeTab === 'activity-templates'">
+                <app-activity-templates scope="tenant" [tenantCode]="tenantCode"></app-activity-templates>
               </ng-container>
             </c-tab-panel>
 

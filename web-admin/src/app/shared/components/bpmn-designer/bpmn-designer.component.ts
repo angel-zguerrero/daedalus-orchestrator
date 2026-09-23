@@ -29,6 +29,7 @@ import elementTemplatesData from './element-templates.json';
 
 import lintModule from 'bpmn-js-bpmnlint';
 import { DesignErrorsConsoleComponent } from '../design-errors-console/design-errors-console.component';
+import { ActivityTemplatesService, ActivityTemplate } from '../../../views/activity-templates/services/activity-templates.service';
 
 export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -64,6 +65,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
   @Input() payload: string = '';
   @Input() readonly: boolean = false;
+  @Input() scope: 'global' | 'tenant' = 'global';
+  @Input() tenantCode: string = '';
   @Output() xmlChange = new EventEmitter<string>();
   @Output() designErrorsChange = new EventEmitter<{ hasErrors: boolean; errors: string[] }>();
 
@@ -75,6 +78,13 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   private lastEmittedXml: string = '';
   private constraintObserver?: MutationObserver;
 
+  private customElementTemplates: any[] = [];
+  private customTemplatesCursor: string = '';
+  private loadingCustomTemplates: boolean = false;
+  private frozenPropertyLabelsByTemplate = new Map<string, Set<string>>();
+
+  constructor(private activityTemplatesService: ActivityTemplatesService) {}
+
   ngAfterViewInit(): void {
     this.initModeler();
   }
@@ -82,6 +92,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['readonly'] && this.isInitialized && !changes['readonly'].firstChange) {
       this.reinitModeler();
+    } else if ((changes['tenantCode'] || changes['scope']) && this.isInitialized && !this.readonly) {
+      this.customElementTemplates = [];
+      this.customTemplatesCursor = '';
+      this.loadCustomActivityTemplates(false);
     } else if (changes['payload'] && this.isInitialized && !changes['payload'].firstChange) {
       const newPayload = (this.payload || '').trim();
       if (newPayload !== this.lastEmittedXml.trim()) {
@@ -225,6 +239,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       } catch (e) {
         console.warn('Element templates loader notice:', e);
       }
+
+      this.customElementTemplates = [];
+      this.customTemplatesCursor = '';
+      this.loadCustomActivityTemplates(false);
 
       this.setupPropertiesPanelConstraintEnhancer();
     }
@@ -546,6 +564,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
   public refresh(): void {
     if (!this.bpmnModeler) return;
+    if (!this.readonly) {
+      this.loadCustomActivityTemplates(false);
+    }
     try {
       const canvas = this.bpmnModeler.get('canvas');
       canvas.resized();
@@ -864,6 +885,62 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     const enhanceConstraintEntries = () => {
       hideUnsupportedGroups();
 
+      // Enforce read-only state on any burned/frozen properties of custom Activity Templates
+      const allPropInputs = parent.querySelectorAll(
+        '[data-entry-id*="custom-entry-"] input, [data-entry-id*="custom-entry-"] textarea, [data-entry-id*="custom-entry-"] select'
+      );
+      allPropInputs.forEach((el) => {
+        const htmlEl = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+        if (htmlEl.disabled) {
+          htmlEl.style.opacity = '0.65';
+          htmlEl.style.cursor = 'not-allowed';
+          htmlEl.title = 'Burned / Locked by Activity Template';
+        }
+      });
+
+      // Also check by label against frozenPropertyLabelsByTemplate for the currently selected element
+      try {
+        const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
+        const selectedEl = selection[0];
+        const tplId =
+          selectedEl?.businessObject?.modelerTemplate ||
+          selectedEl?.businessObject?.$attrs?.['camunda:modelerTemplate'] ||
+          '';
+        if (tplId && this.frozenPropertyLabelsByTemplate.has(tplId)) {
+          const frozenLabels = this.frozenPropertyLabelsByTemplate.get(tplId)!;
+          const entries = parent.querySelectorAll('.bio-properties-panel-entry, [data-entry-id]');
+          entries.forEach((entryEl) => {
+            const lbl = entryEl.querySelector('label, .bio-properties-panel-label');
+            const lblTxt = (lbl?.textContent || '').trim();
+            if (lblTxt && frozenLabels.has(lblTxt)) {
+              const inputs = entryEl.querySelectorAll('input, textarea, select');
+              inputs.forEach((inp: any) => {
+                inp.disabled = true;
+                inp.readOnly = true;
+                inp.style.opacity = '0.65';
+                inp.style.cursor = 'not-allowed';
+                inp.title = 'Burned / Locked by Activity Template';
+              });
+            }
+          });
+        }
+      } catch {
+        // ignore selection inspection error
+      }
+
+      // Inject lazy-fetch "Load More Templates" button in properties panel template section if more cursor pages exist
+      if (this.customTemplatesCursor && !parent.querySelector('.lazy-load-templates-btn')) {
+        const templateGroup = parent.querySelector('[data-group-id*="template"], .bio-properties-panel-template-header');
+        if (templateGroup) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn-sm btn-outline-info w-100 mt-1 lazy-load-templates-btn';
+          btn.textContent = 'Load More Activity Templates...';
+          btn.onclick = () => this.loadCustomActivityTemplates(true);
+          templateGroup.appendChild(btn);
+        }
+      }
+
       const nameEntries = parent.querySelectorAll('[data-entry-id*="-constraint-"][data-entry-id$="-name"]');
       nameEntries.forEach((entryEl) => {
         const input = entryEl.querySelector('input') as HTMLInputElement;
@@ -945,5 +1022,92 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
     this.constraintObserver.observe(parent, { childList: true, subtree: true });
     setTimeout(enhanceConstraintEntries, 100);
+  }
+
+  public loadCustomActivityTemplates(append: boolean = false): void {
+    if (this.readonly || this.loadingCustomTemplates || !this.bpmnModeler) {
+      return;
+    }
+    this.loadingCustomTemplates = true;
+    const effectiveTenantCode = this.scope === 'tenant' ? this.tenantCode : '';
+    const cursorToUse = append ? this.customTemplatesCursor : '';
+
+    this.activityTemplatesService.getForDesigner(effectiveTenantCode, 20, cursorToUse).subscribe({
+      next: (res: any) => {
+        const list: ActivityTemplate[] = res?.Entities || res?.entities || [];
+        this.customTemplatesCursor = res?.Cursor || res?.cursor || '';
+
+        const parsedList: any[] = [];
+        list.forEach((item) => {
+          const decoded = this.activityTemplatesService.decodePayload(item.payload);
+          if (!decoded) return;
+          try {
+            const obj = JSON.parse(decoded);
+            const tplId = item.code || obj.id || item.id;
+            obj.id = tplId;
+            obj.name = item.name || obj.name;
+            obj.description =
+              item.description ||
+              obj.description ||
+              `Activity Family: ${item.activityFamily || 'default'}`;
+            obj.category = {
+              id: item.activityFamily || 'custom',
+              name: `Family: ${item.activityFamily || 'default'} (${item.scope === 'global' ? 'Global' : 'Tenant'})`
+            };
+
+            const frozenSet = new Set<string>();
+            if (Array.isArray(obj.properties)) {
+              obj.properties.forEach((p: any) => {
+                if (p.value !== undefined && p.value !== null && typeof p.value !== 'boolean') {
+                  p.value = String(p.value);
+                }
+                if (p.editable === false && p.label) {
+                  frozenSet.add(String(p.label).trim());
+                }
+              });
+            }
+            if (frozenSet.size > 0) {
+              this.frozenPropertyLabelsByTemplate.set(tplId, frozenSet);
+            }
+            parsedList.push(obj);
+          } catch {
+            // Skip malformed template JSON
+          }
+        });
+
+        if (append) {
+          const existingIds = new Set(this.customElementTemplates.map((t) => t.id));
+          parsedList.forEach((p) => {
+            if (!existingIds.has(p.id)) {
+              this.customElementTemplates.push(p);
+            }
+          });
+        } else {
+          this.customElementTemplates = parsedList;
+        }
+
+        // Built-in templates ALWAYS come first, followed by custom templates
+        const combinedTemplates = [...(elementTemplatesData as any[]), ...this.customElementTemplates];
+        try {
+          const loader = this.bpmnModeler.get('elementTemplatesLoader');
+          if (loader) {
+            loader._loadTemplates = combinedTemplates;
+            if (loader.setTemplates) {
+              loader.setTemplates(combinedTemplates);
+            }
+          }
+          const elementTemplates = this.bpmnModeler.get('elementTemplates');
+          if (elementTemplates && elementTemplates.set) {
+            elementTemplates.set(combinedTemplates);
+          }
+        } catch (e) {
+          console.warn('Failed to update custom element templates:', e);
+        }
+        this.loadingCustomTemplates = false;
+      },
+      error: () => {
+        this.loadingCustomTemplates = false;
+      }
+    });
   }
 }

@@ -621,13 +621,15 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			}
 
 			jobID := strings.ReplaceAll(uuid.New().String(), "-", "")
-			actType := currentNode.Properties["taskType"]
-			if actType == "" {
-				actType = currentNode.Properties["modelerTemplate"]
+			rawActType := currentNode.Properties["taskType"]
+			if rawActType == "" {
+				rawActType = currentNode.Properties["modelerTemplate"]
 			}
-			if actType == "" {
-				actType = string(currentNode.Type)
+			if rawActType == "" {
+				rawActType = string(currentNode.Type)
 			}
+			actType := rawActType
+
 			jobInputPayload := make(map[string]interface{})
 			if execution.StateData != nil {
 				for k, v := range execution.StateData {
@@ -639,6 +641,89 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					if k != "modelerTemplate" && k != "taskType" {
 						jobInputPayload[k] = v
 					}
+				}
+			}
+
+			// If rawActType references a custom ActivityTemplate, resolve its RootActivity and merge its inherited properties
+			// before evaluating ${...} expressions.
+			if !db.IsBuiltinActivityType(rawActType) {
+				jobInputPayload["_templateCode"] = rawActType
+
+				primaryTplRepo, _ := db.NewActivityTemplateRepository(uow, idFactory, cmd.CF, cmd.CFS)
+				var globalTplRepo *db.ActivityTemplateRepository
+				if cmd.CF != db.AdminFC || cmd.CFS != db.AdminFCSector {
+					globalTplRepo, _ = db.NewActivityTemplateRepository(uow, idFactory, db.AdminFC, db.AdminFCSector)
+				}
+
+				resolveSingleTpl := func(codeOrID string) *models.ActivityTemplate {
+					if primaryTplRepo != nil {
+						if found, _ := primaryTplRepo.ResolveByCodeOrID(codeOrID, execution.VNamespace, now); found != nil {
+							return found
+						}
+					}
+					if globalTplRepo != nil {
+						if found, _ := globalTplRepo.ResolveByCodeOrID(codeOrID, execution.VNamespace, now); found != nil {
+							return found
+						}
+					}
+					return nil
+				}
+
+				var chainRootToLeaf []*models.ActivityTemplate
+				visited := make(map[string]bool)
+				currCode := strings.TrimSpace(rawActType)
+				resolvedRoot := ""
+
+				for depth := 0; depth < 10 && currCode != ""; depth++ {
+					lower := strings.ToLower(currCode)
+					if visited[lower] {
+						break
+					}
+					visited[lower] = true
+
+					if canonical := db.NormalizeBuiltinActivityType(currCode); canonical != "" {
+						if resolvedRoot == "" {
+							resolvedRoot = canonical
+						}
+						break
+					}
+
+					tpl := resolveSingleTpl(currCode)
+					if tpl == nil {
+						break
+					}
+
+					chainRootToLeaf = append([]*models.ActivityTemplate{tpl}, chainRootToLeaf...)
+					if resolvedRoot == "" {
+						if canonicalRoot := db.NormalizeBuiltinActivityType(tpl.RootActivity); canonicalRoot != "" {
+							resolvedRoot = canonicalRoot
+						}
+					}
+
+					nextParent := strings.TrimSpace(tpl.ParentTemplateId)
+					if nextParent == "" || db.IsBuiltinActivityType(nextParent) {
+						if resolvedRoot == "" {
+							if canonicalParent := db.NormalizeBuiltinActivityType(nextParent); canonicalParent != "" {
+								resolvedRoot = canonicalParent
+							} else if inferred := db.InferBaseActivityTypeFromPayload(tpl.Payload); inferred != "" {
+								resolvedRoot = inferred
+							}
+						}
+						break
+					}
+					currCode = nextParent
+				}
+
+				if len(chainRootToLeaf) > 0 {
+					jobInputPayload = db.MergeActivityTemplateHierarchy(chainRootToLeaf, jobInputPayload)
+					if resolvedRoot == "" {
+						if inferred := db.InferBaseActivityTypeFromPayload(chainRootToLeaf[0].Payload); inferred != "" {
+							resolvedRoot = inferred
+						}
+					}
+				}
+				if resolvedRoot != "" {
+					actType = resolvedRoot
 				}
 			}
 
@@ -702,39 +787,86 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					break
 				}
 			}
-			if actQ != nil {
-				if actQ.DesiredPriorityThresholds == nil {
-					actQ.DesiredPriorityThresholds = map[int]int{0: 0}
-					actQ.PriorityThresholds = map[int]int{0: 0}
-					queueRepo.UpdateQueue(actQ, now)
+
+			if actQ == nil {
+				// Fallback: Search queue by convention code
+				actCode := fmt.Sprintf("wf-act-%s", def.Code)
+				if qByCode, _ := queueRepo.GetQueueByCode(actCode, execution.VNamespace, now); qByCode != nil {
+					actQ = qByCode
+				} else if qByCodeDef, _ := queueRepo.GetQueueByCode(actCode, "default", now); qByCodeDef != nil {
+					actQ = qByCodeDef
 				}
-				msgID := strings.ReplaceAll(uuid.New().String(), "-", "")
-				contentBytes, _ := json.Marshal(map[string]interface{}{
-					"executionId":  execution.ID,
-					"tokenId":      token.ID,
-					"jobId":        job.ID,
-					"activityId":   currentNode.ID,
-					"activityName": currentNode.Name,
-					"activityType": actType,
-					"input":        jobInputPayload,
-				})
-				enqueueCmd := &queue.EnqueueCommand{
-					Messages: []models.QueueMessage{
-						{
-							ID:          msgID,
-							MessageID:   msgID,
-							QueueID:     actQ.ID,
-							VNamespace:  execution.VNamespace,
-							Content:     contentBytes,
-							ContentType: "application/json",
-							CreatedAt:   now,
-							UpdatedAt:   now,
-						},
+			}
+
+			if actQ == nil {
+				errMsg := fmt.Sprintf("activity queue not found for workflow definition %s (%s)", def.ID, def.Code)
+				log.Error().Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg(errMsg)
+				token.Status = models.ExecutionTokenStatusCancelled
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				execution.Status = models.WorkflowExecutionStatusFailed
+				execution.Error = errMsg
+				execution.CompletedAt = &now
+				execRepo.UpdateWorkflowExecution(execution, now)
+
+				commandResult.Error = errMsg
+				commandResult.Result = execution
+				return *commandResult
+			}
+
+			if actQ.Type != models.WorkflowActivityQueue || actQ.WorkflowDefinitionID != def.ID {
+				actQ.Type = models.WorkflowActivityQueue
+				actQ.WorkflowDefinitionID = def.ID
+				queueRepo.UpdateQueue(actQ, now)
+			}
+
+			if actQ.DesiredPriorityThresholds == nil {
+				actQ.DesiredPriorityThresholds = map[int]int{0: 0}
+				actQ.PriorityThresholds = map[int]int{0: 0}
+				queueRepo.UpdateQueue(actQ, now)
+			}
+
+			msgID := strings.ReplaceAll(uuid.New().String(), "-", "")
+			contentBytes, _ := json.Marshal(map[string]interface{}{
+				"executionId":  execution.ID,
+				"tokenId":      token.ID,
+				"jobId":        job.ID,
+				"activityId":   currentNode.ID,
+				"activityName": currentNode.Name,
+				"activityType": actType,
+				"input":        jobInputPayload,
+			})
+			enqueueCmd := &queue.EnqueueCommand{
+				Messages: []models.QueueMessage{
+					{
+						ID:          msgID,
+						MessageID:   msgID,
+						QueueID:     actQ.ID,
+						VNamespace:  execution.VNamespace,
+						Content:     contentBytes,
+						ContentType: "application/json",
+						CreatedAt:   now,
+						UpdatedAt:   now,
 					},
-					CF:  cmd.CF,
-					CFS: cmd.CFS,
-				}
-				enqueueCmd.Execute(uow, now)
+				},
+				CF:  cmd.CF,
+				CFS: cmd.CFS,
+			}
+			enqRes := enqueueCmd.Execute(uow, now)
+			if enqRes.Error != "" {
+				errMsg := fmt.Sprintf("failed to enqueue activity job message: %s", enqRes.Error)
+				log.Error().Err(fmt.Errorf("%s", enqRes.Error)).Str("executionID", execution.ID).Str("jobID", job.ID).Msg(errMsg)
+				token.Status = models.ExecutionTokenStatusCancelled
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				execution.Status = models.WorkflowExecutionStatusFailed
+				execution.Error = errMsg
+				execution.CompletedAt = &now
+				execRepo.UpdateWorkflowExecution(execution, now)
+
+				commandResult.Error = errMsg
+				commandResult.Result = execution
+				return *commandResult
 			}
 
 			// Stop advancing this token until job completes

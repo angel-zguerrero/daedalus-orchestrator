@@ -131,107 +131,116 @@ func (app *Application) processExecutionQueuesForNode(
 		return
 	}
 
-	pagCmd := &queue_command.PaginateQueuesCommand{
-		PageSize:  100,
-		QueueType: models.WorkflowExecutionQueue,
-		CF:        cf,
-		CFS:       cfs,
-	}
-
-	res, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Queue]](
-		node,
-		ctx,
-		pagCmd,
-		config.GlobalConfiguration.ApiRaftTimeout,
-		log.Logger,
-		"paginate execution queues",
-	)
-	if err != nil || len(res.Entities) == 0 {
-		return
-	}
-
-	for _, q := range res.Entities {
-		if q.Type != models.WorkflowExecutionQueue || q.State != models.QueueActive || q.MessagesCount == 0 {
-			continue
+	cursor := ""
+	for {
+		pagCmd := &queue_command.PaginateQueuesCommand{
+			PageSize:  100,
+			QueueType: models.WorkflowExecutionQueue,
+			Cursor:    cursor,
+			CF:        cf,
+			CFS:       cfs,
 		}
 
-		deqCmd := &queue_command.DequeueCommand{
-			QueueID:       q.ID,
-			JobWorkerID:   "WorkflowExecutionWorker-1",
-			LeaseDuration: 30 * time.Second,
-			CF:            cf,
-			CFS:           cfs,
-		}
-
-		deqRes, err := dragonboat.ExecuteRepositoryCommand[queue_command.DequeueResult](
+		res, err := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.Queue]](
 			node,
 			ctx,
-			deqCmd,
+			pagCmd,
 			config.GlobalConfiguration.ApiRaftTimeout,
 			log.Logger,
-			"dequeue execution token message",
+			"paginate execution queues",
 		)
-		if err != nil || deqRes.Message.ID == "" {
-			if err != nil {
-				log.Debug().Err(err).Str("queueID", q.ID).Msg("⚠️ Failed to dequeue execution token message")
-			}
-			continue
+		if err != nil || len(res.Entities) == 0 {
+			break
 		}
 
-		log.Info().
-			Str("queueID", q.ID).
-			Str("messageID", deqRes.Message.ID).
-			Msg("📥 Dequeued workflow execution token message")
-
-		var tokenMsg ExecutionTokenMessage
-		if err := json.Unmarshal(deqRes.Message.Content, &tokenMsg); err == nil && tokenMsg.ExecutionID != "" && tokenMsg.TokenID != "" {
-			advanceCmd := &workflow_execution_command.AdvanceTokenCommand{
-				ExecutionID: tokenMsg.ExecutionID,
-				TokenID:     tokenMsg.TokenID,
-				CF:          cf,
-				CFS:         cfs,
+		for _, q := range res.Entities {
+			if q.Type != models.WorkflowExecutionQueue || q.State != models.QueueActive || q.MessagesCount == 0 {
+				continue
 			}
-			_, advanceErr := dragonboat.ExecuteRepositoryCommand[models.WorkflowExecution](
+
+			deqCmd := &queue_command.DequeueCommand{
+				QueueID:       q.ID,
+				JobWorkerID:   "WorkflowExecutionWorker-1",
+				LeaseDuration: 30 * time.Second,
+				CF:            cf,
+				CFS:           cfs,
+			}
+
+			deqRes, err := dragonboat.ExecuteRepositoryCommand[queue_command.DequeueResult](
 				node,
 				ctx,
-				advanceCmd,
+				deqCmd,
 				config.GlobalConfiguration.ApiRaftTimeout,
 				log.Logger,
-				"advance token",
+				"dequeue execution token message",
 			)
-			if advanceErr != nil {
-				log.Error().Err(advanceErr).
-					Str("executionID", tokenMsg.ExecutionID).
-					Str("tokenID", tokenMsg.TokenID).
-					Msg("❌ Failed to advance workflow execution token")
+			if err != nil || deqRes.Message.ID == "" {
+				if err != nil {
+					log.Debug().Err(err).Str("queueID", q.ID).Msg("⚠️ Failed to dequeue execution token message")
+				}
+				continue
+			}
+
+			log.Info().
+				Str("queueID", q.ID).
+				Str("messageID", deqRes.Message.ID).
+				Msg("📥 Dequeued workflow execution token message")
+
+			var tokenMsg ExecutionTokenMessage
+			if err := json.Unmarshal(deqRes.Message.Content, &tokenMsg); err == nil && tokenMsg.ExecutionID != "" && tokenMsg.TokenID != "" {
+				advanceCmd := &workflow_execution_command.AdvanceTokenCommand{
+					ExecutionID: tokenMsg.ExecutionID,
+					TokenID:     tokenMsg.TokenID,
+					CF:          cf,
+					CFS:         cfs,
+				}
+				_, advanceErr := dragonboat.ExecuteRepositoryCommand[models.WorkflowExecution](
+					node,
+					ctx,
+					advanceCmd,
+					config.GlobalConfiguration.ApiRaftTimeout,
+					log.Logger,
+					"advance token",
+				)
+				if advanceErr != nil {
+					log.Error().Err(advanceErr).
+						Str("executionID", tokenMsg.ExecutionID).
+						Str("tokenID", tokenMsg.TokenID).
+						Msg("❌ Failed to advance workflow execution token")
+				} else {
+					log.Info().
+						Str("executionID", tokenMsg.ExecutionID).
+						Str("tokenID", tokenMsg.TokenID).
+						Msg("🚀 Successfully advanced workflow execution token")
+				}
+
+				// Ack message
+				ackCmd := &queue_command.AckMessageCommand{
+					LeaseID: deqRes.Lease.ID,
+					CF:      cf,
+					CFS:     cfs,
+				}
+				_, ackErr := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
+					node,
+					ctx,
+					ackCmd,
+					config.GlobalConfiguration.ApiRaftTimeout,
+					log.Logger,
+					"ack token message",
+				)
+				if ackErr != nil {
+					log.Warn().Err(ackErr).Str("leaseID", deqRes.Lease.ID).Msg("⚠️ Failed to ack token message")
+				}
 			} else {
-				log.Info().
-					Str("executionID", tokenMsg.ExecutionID).
-					Str("tokenID", tokenMsg.TokenID).
-					Msg("🚀 Successfully advanced workflow execution token")
+				log.Error().
+					Str("content", string(deqRes.Message.Content)).
+					Msg("❌ Failed to unmarshal ExecutionTokenMessage or missing fields")
 			}
-
-			// Ack message
-			ackCmd := &queue_command.AckMessageCommand{
-				LeaseID: deqRes.Lease.ID,
-				CF:      cf,
-				CFS:     cfs,
-			}
-			_, ackErr := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
-				node,
-				ctx,
-				ackCmd,
-				config.GlobalConfiguration.ApiRaftTimeout,
-				log.Logger,
-				"ack token message",
-			)
-			if ackErr != nil {
-				log.Warn().Err(ackErr).Str("leaseID", deqRes.Lease.ID).Msg("⚠️ Failed to ack token message")
-			}
-		} else {
-			log.Error().
-				Str("content", string(deqRes.Message.Content)).
-				Msg("❌ Failed to unmarshal ExecutionTokenMessage or missing fields")
 		}
+
+		if res.Cursor == "" || len(res.Entities) < 100 {
+			break
+		}
+		cursor = res.Cursor
 	}
 }
