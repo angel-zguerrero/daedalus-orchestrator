@@ -100,6 +100,7 @@
                   <button 
                     cButton 
                     [color]="wf.hasDesignErrors ? 'danger' : 'success'" 
+                    variant="outline"
                     size="sm" 
                     [disabled]="wf.hasDesignErrors"
                     (click)="openExecuteModal(wf)" 
@@ -109,6 +110,7 @@
                   <button 
                     cButton 
                     color="primary" 
+                    variant="outline"
                     size="sm" 
                     (click)="openExecutionsModal(wf)" 
                     title="View Executions History">
@@ -117,6 +119,7 @@
                   <button 
                     cButton 
                     color="secondary" 
+                    variant="outline"
                     size="sm" 
                     (click)="openVersionHistoryModal(wf)" 
                     title="Version History">
@@ -125,6 +128,7 @@
                   <button 
                     cButton 
                     color="info" 
+                    variant="outline"
                     size="sm" 
                     (click)="openDetailModal(wf)" 
                     title="View Details">
@@ -133,6 +137,7 @@
                   <button 
                     cButton 
                     color="warning" 
+                    variant="outline"
                     size="sm" 
                     (click)="openEditModal(wf)" 
                     title="Edit Workflow">
@@ -141,6 +146,7 @@
                   <button 
                     cButton 
                     color="danger" 
+                    variant="outline"
                     size="sm" 
                     (click)="confirmDelete(wf)" 
                     title="Delete Workflow">
