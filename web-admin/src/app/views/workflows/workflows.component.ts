@@ -1003,15 +1003,29 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     if (!this.executionBpmnDesigner || !this.selectedExecutionDetail) return;
     this.executionBpmnDesigner.clearHighlights();
 
-    const markers: Array<{ id: string; type: 'active' | 'error' }> = [];
+    const execStatus = (this.selectedExecutionDetail.execution?.status || '').toLowerCase();
+    const markers: Array<{ id: string; type: 'active' | 'error' | 'waiting' | 'completed' }> = [];
 
-    // Active tokens -> blue highlight
-    const activeTokens = this.selectedExecutionDetail.tokens || [];
-    activeTokens.forEach(t => {
-      if (t.currentNodeId && (t.status === 'active' || t.status === 'running' || t.status === 'pending')) {
-        markers.push({ id: t.currentNodeId, type: 'active' });
+    if (execStatus === 'completed') {
+      // Strictly highlight End Event node(s) in green when workflow execution has completed
+      if (this.executionBpmnDesigner) {
+        const endEventIds = this.executionBpmnDesigner.getEndEventIds();
+        endEventIds.forEach(id => markers.push({ id, type: 'completed' }));
       }
-    });
+    } else if (execStatus === 'running' || execStatus === 'pending') {
+      // Highlight active/waiting token positions if execution is currently in progress
+      const activeTokens = this.selectedExecutionDetail.tokens || [];
+      activeTokens.forEach(t => {
+        const statusLower = (t.status || '').toLowerCase();
+        if (t.currentNodeId) {
+          if (statusLower === 'waiting') {
+            markers.push({ id: t.currentNodeId, type: 'waiting' });
+          } else if (statusLower === 'active' || statusLower === 'running' || statusLower === 'pending') {
+            markers.push({ id: t.currentNodeId, type: 'active' });
+          }
+        }
+      });
+    }
 
     // Failed jobs -> red highlight
     const jobs = this.selectedExecutionDetail.jobs || [];
