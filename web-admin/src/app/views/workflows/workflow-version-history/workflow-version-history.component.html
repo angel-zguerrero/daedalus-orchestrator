@@ -1,0 +1,84 @@
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0 d-flex align-items-center gap-2">
+      <svg cIcon name="cil-list-numbered" class="text-info me-1"></svg>
+      Version History: <strong>{{ workflow?.name || workflowId }}</strong>
+      <span class="badge bg-dark text-info font-monospace ms-2" *ngIf="workflow?.code">{{ workflow?.code }}</span>
+      <span class="badge bg-secondary" *ngIf="workflow?.version">Current: v{{ workflow?.version }}</span>
+    </h5>
+    <button cButton color="secondary" variant="outline" size="sm" (click)="navigateBack()">
+      <svg cIcon name="cil-arrow-left" class="me-1"></svg> Back to Workflows
+    </button>
+  </c-card-header>
+  <c-card-body>
+    <div class="text-center py-4" *ngIf="loadingVersionHistory">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading workflow versions...</p>
+    </div>
+
+    <c-alert color="danger" *ngIf="versionHistoryError" dismissible>{{ versionHistoryError }}</c-alert>
+
+    <div class="table-responsive" *ngIf="!loadingVersionHistory">
+      <table cTable [hover]="true" class="align-middle">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Structural Hash (SHA-256)</th>
+            <th>Created Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let ver of versionHistoryList">
+            <td>
+              <c-badge color="primary" shape="rounded-pill">v{{ ver.version }}</c-badge>
+            </td>
+            <td>
+              <code class="small text-truncate d-inline-block" style="max-width: 320px;" title="{{ ver.structuralHash }}">{{ ver.structuralHash || 'N/A' }}</code>
+            </td>
+            <td>{{ ver.createdAt | date:'medium' }}</td>
+            <td>
+              <button cButton color="info" size="sm" class="d-inline-flex align-items-center gap-1 text-nowrap" (click)="openVersionDiagramModal(ver)">
+                <svg cIcon name="cil-eye" size="sm"></svg>
+                <span>View Diagram</span>
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="versionHistoryList.length === 0">
+            <td colspan="4" class="text-center text-muted py-3">No version history recorded.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Version Read-Only Diagram Modal (Supports Element Selection & Properties Inspection) -->
+<c-modal id="versionDiagramModal" [visible]="showVersionDiagramModal" (visibleChange)="showVersionDiagramModal = $event" size="xl">
+  <c-modal-header class="bg-dark text-light border-secondary d-flex justify-content-between align-items-center">
+    <h5 cModalTitle class="d-flex align-items-center gap-2 mb-0">
+      <svg cIcon name="cil-map" class="text-success"></svg>
+      BPMN Diagram (Read-Only)
+      <span class="badge bg-primary rounded-pill">v{{ selectedVersionRecord?.version }}</span>
+    </h5>
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted small d-none d-md-inline" *ngIf="selectedVersionRecord?.structuralHash">
+        Structural Hash: <code class="text-info">{{ selectedVersionRecord?.structuralHash }}</code>
+      </span>
+      <button (click)="closeVersionDiagramModal()" cButtonClose class="btn-close-white ms-2"></button>
+    </div>
+  </c-modal-header>
+  <c-modal-body class="p-0 bg-dark">
+    <div style="height: 620px; width: 100%; position: relative;">
+      <app-bpmn-designer
+        #versionBpmnDesigner
+        *ngIf="showVersionDiagramModal"
+        [payload]="versionDiagramPayload"
+        [readonly]="true">
+      </app-bpmn-designer>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary">
+    <button cButton color="secondary" (click)="closeVersionDiagramModal()">Close</button>
+  </c-modal-footer>
+</c-modal>

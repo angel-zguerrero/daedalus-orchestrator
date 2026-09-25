@@ -31,6 +31,12 @@ import lintModule from 'bpmn-js-bpmnlint';
 import { DesignErrorsConsoleComponent } from '../design-errors-console/design-errors-console.component';
 import { ActivityTemplatesService, ActivityTemplate } from '../../../views/activity-templates/services/activity-templates.service';
 
+export interface FrozenPropertyInfo {
+  label: string;
+  value: any;
+  bindingName: string;
+}
+
 export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
@@ -62,6 +68,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   @ViewChild('canvasRef', { static: true }) private canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('propertiesRef', { static: true }) private propertiesRef!: ElementRef<HTMLDivElement>;
   @ViewChild('fileInputRef') private fileInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('errorsSectionRef') private errorsSectionRef?: ElementRef<HTMLDivElement>;
 
   @Input() payload: string = '';
   @Input() readonly: boolean = false;
@@ -72,6 +79,153 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
   public currentLintErrors: string[] = [];
   public hasLintErrors: boolean = false;
+  public selectedElementInfo: any = null;
+
+  public scrollToErrorsSection(): void {
+    if (this.errorsSectionRef && this.errorsSectionRef.nativeElement) {
+      this.errorsSectionRef.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  public inspectElement(element: any): void {
+    if (!element) {
+      this.selectedElementInfo = null;
+      return;
+    }
+    const bo = element.businessObject || {};
+    const attrs: Array<{ key: string; value: string; category?: string }> = [];
+
+    const rawType = (element.type || bo.$type || '').replace(/^bpmn:/, '');
+    let cleanType = rawType;
+    switch (rawType) {
+      case 'ServiceTask': cleanType = 'Service Task'; break;
+      case 'UserTask': cleanType = 'User Task'; break;
+      case 'SendTask': cleanType = 'Send Task'; break;
+      case 'ReceiveTask': cleanType = 'Receive Task'; break;
+      case 'ScriptTask': cleanType = 'Script Task'; break;
+      case 'BusinessRuleTask': cleanType = 'Business Rule Task'; break;
+      case 'ExclusiveGateway': cleanType = 'Exclusive Gateway (XOR)'; break;
+      case 'ParallelGateway': cleanType = 'Parallel Gateway (AND)'; break;
+      case 'InclusiveGateway': cleanType = 'Inclusive Gateway (OR)'; break;
+      case 'ComplexGateway': cleanType = 'Complex Gateway'; break;
+      case 'EventBasedGateway': cleanType = 'Event-Based Gateway'; break;
+      case 'StartEvent': cleanType = 'Start Event'; break;
+      case 'EndEvent': cleanType = 'End Event'; break;
+      case 'IntermediateCatchEvent': cleanType = 'Intermediate Catch Event'; break;
+      case 'IntermediateThrowEvent': cleanType = 'Intermediate Throw Event'; break;
+      case 'SequenceFlow': cleanType = 'Sequence Flow'; break;
+    }
+
+    const docText = bo.documentation && bo.documentation.length > 0
+      ? (typeof bo.documentation[0] === 'string' ? bo.documentation[0] : (bo.documentation[0].text || ''))
+      : '';
+
+    const info: any = {
+      id: element.id || bo.id || '',
+      name: bo.name || (element.id && !element.id.startsWith('Process_') ? element.id : ''),
+      type: cleanType,
+      rawType: rawType,
+      documentation: docText,
+      attributes: []
+    };
+
+    // Core Properties
+    if (bo.topic || (bo.$attrs && bo.$attrs['camunda:topic'])) {
+      attrs.push({ key: 'Topic / Queue Name', value: bo.topic || bo.$attrs['camunda:topic'], category: 'Execution' });
+    }
+    if (bo.type || (bo.$attrs && bo.$attrs['camunda:type'])) {
+      attrs.push({ key: 'Job Type', value: bo.type || bo.$attrs['camunda:type'], category: 'Execution' });
+    }
+    if (bo.assignee || (bo.$attrs && bo.$attrs['camunda:assignee'])) {
+      attrs.push({ key: 'Assignee', value: bo.assignee || bo.$attrs['camunda:assignee'], category: 'Assignment' });
+    }
+    if (bo.candidateGroups || (bo.$attrs && bo.$attrs['camunda:candidateGroups'])) {
+      attrs.push({ key: 'Candidate Groups', value: bo.candidateGroups || bo.$attrs['camunda:candidateGroups'], category: 'Assignment' });
+    }
+    if (bo.candidateUsers || (bo.$attrs && bo.$attrs['camunda:candidateUsers'])) {
+      attrs.push({ key: 'Candidate Users', value: bo.candidateUsers || bo.$attrs['camunda:candidateUsers'], category: 'Assignment' });
+    }
+    if (bo.formKey || (bo.$attrs && bo.$attrs['camunda:formKey'])) {
+      attrs.push({ key: 'Form Key', value: bo.formKey || bo.$attrs['camunda:formKey'], category: 'Form' });
+    }
+
+    // Sequence Flow details
+    if (bo.sourceRef) {
+      attrs.push({ key: 'Source Element', value: `${bo.sourceRef.name || bo.sourceRef.id} (${(bo.sourceRef.$type || '').replace(/^bpmn:/, '')})`, category: 'Flow' });
+    }
+    if (bo.targetRef) {
+      attrs.push({ key: 'Target Element', value: `${bo.targetRef.name || bo.targetRef.id} (${(bo.targetRef.$type || '').replace(/^bpmn:/, '')})`, category: 'Flow' });
+    }
+    if (bo.conditionExpression && bo.conditionExpression.body) {
+      attrs.push({ key: 'Condition Expression', value: bo.conditionExpression.body, category: 'Flow' });
+    }
+
+    // $attrs loop for extra custom definitions
+    if (bo.$attrs) {
+      for (const [k, v] of Object.entries(bo.$attrs)) {
+        if (typeof v === 'string' && v.trim() && !k.startsWith('xmlns') && !k.startsWith('xsi:')) {
+          const cleanKey = k.replace(/^camunda:/, '').replace(/^custom:/, '');
+          if (!attrs.some(a => a.key.toLowerCase() === cleanKey.toLowerCase())) {
+            attrs.push({ key: cleanKey, value: v, category: 'Configuration' });
+          }
+        }
+      }
+    }
+
+    // Extension Elements
+    if (bo.extensionElements && bo.extensionElements.values) {
+      for (const ext of bo.extensionElements.values) {
+        const extType = (ext.$type || '').toLowerCase();
+
+        // Form Data & Form Fields
+        if (extType.includes('formdata') && ext.fields) {
+          for (const f of ext.fields) {
+            let desc = `Type: ${f.type || 'string'}`;
+            if (f.label) desc += ` | Label: "${f.label}"`;
+            if (f.defaultValue) desc += ` | Default: "${f.defaultValue}"`;
+
+            const constraints: string[] = [];
+            if (f.validation && f.validation.constraints) {
+              for (const c of f.validation.constraints) {
+                constraints.push(`${c.name}=${c.config}`);
+              }
+            }
+            if (constraints.length > 0) {
+              desc += ` | Rules: ${constraints.join(', ')}`;
+            }
+
+            attrs.push({ key: `Form Field: ${f.id}`, value: desc, category: 'Form Fields' });
+          }
+        }
+
+        // Input & Output Parameters
+        if (extType.includes('inputoutput')) {
+          if (ext.inputParameters) {
+            for (const inp of ext.inputParameters) {
+              const valStr = typeof inp.value === 'string' ? inp.value : JSON.stringify(inp.value);
+              attrs.push({ key: `Input: ${inp.name}`, value: valStr, category: 'Inputs & Outputs' });
+            }
+          }
+          if (ext.outputParameters) {
+            for (const out of ext.outputParameters) {
+              const valStr = typeof out.value === 'string' ? out.value : JSON.stringify(out.value);
+              attrs.push({ key: `Output: ${out.name}`, value: valStr, category: 'Inputs & Outputs' });
+            }
+          }
+        }
+
+        // Extension Properties
+        if (extType.includes('properties') && ext.values) {
+          for (const prop of ext.values) {
+            attrs.push({ key: `Property: ${prop.name}`, value: prop.value || '', category: 'Custom Properties' });
+          }
+        }
+      }
+    }
+
+    info.attributes = attrs;
+    this.selectedElementInfo = info;
+  }
 
   private bpmnModeler!: any;
   private isInitialized = false;
@@ -81,7 +235,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   private customElementTemplates: any[] = [];
   private customTemplatesCursor: string = '';
   private loadingCustomTemplates: boolean = false;
-  private frozenPropertyLabelsByTemplate = new Map<string, Set<string>>();
+  private frozenPropertyMapByTemplate = new Map<string, Map<string, FrozenPropertyInfo>>();
 
   constructor(private activityTemplatesService: ActivityTemplatesService) {}
 
@@ -228,6 +382,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       }
 
       try {
+        (elementTemplatesData as any[]).forEach((tpl: any) => {
+          this.registerFrozenProperties([tpl.id, tpl.name], tpl);
+        });
+
         const elementTemplates = this.bpmnModeler.get('elementTemplates');
         if (elementTemplates && elementTemplates.set) {
           elementTemplates.set(elementTemplatesData);
@@ -249,16 +407,26 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
     this.isInitialized = true;
 
-    // Listen for diagram changes to emit xmlChange and run lint validation
-    if (!this.readonly && this.bpmnModeler) {
+    // Listen for diagram events
+    if (this.bpmnModeler) {
       const eventBus = this.bpmnModeler.get('eventBus');
       if (eventBus) {
-        eventBus.on('commandStack.changed', () => {
-          this.emitCurrentXml();
-          this.runLintValidation();
-        });
-        eventBus.on('import.done', () => {
-          setTimeout(() => this.runLintValidation(), 150);
+        if (!this.readonly) {
+          eventBus.on('commandStack.changed', () => {
+            this.emitCurrentXml();
+            this.runLintValidation();
+          });
+          eventBus.on('import.done', () => {
+            setTimeout(() => this.runLintValidation(), 150);
+          });
+        }
+        eventBus.on('element.click', (event: any) => {
+          const element = event.element;
+          if (element && element.id && !element.id.startsWith('Process_') && !element.id.includes('_plane')) {
+            this.inspectElement(element);
+          } else {
+            this.selectedElementInfo = null;
+          }
         });
       }
     }
@@ -898,30 +1066,68 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         }
       });
 
-      // Also check by label against frozenPropertyLabelsByTemplate for the currently selected element
+      // Also check by label & property against frozenPropertyMapByTemplate for the currently selected element
       try {
         const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
         const selectedEl = selection[0];
-        const tplId =
+        const tplId = (
           selectedEl?.businessObject?.modelerTemplate ||
           selectedEl?.businessObject?.$attrs?.['camunda:modelerTemplate'] ||
-          '';
-        if (tplId && this.frozenPropertyLabelsByTemplate.has(tplId)) {
-          const frozenLabels = this.frozenPropertyLabelsByTemplate.get(tplId)!;
+          ''
+        ).trim().toLowerCase();
+
+        let frozenMap = tplId ? this.frozenPropertyMapByTemplate.get(tplId) : undefined;
+        if (!frozenMap && tplId) {
+          for (const [k, mapVal] of this.frozenPropertyMapByTemplate.entries()) {
+            if (k === tplId || k.includes(tplId) || tplId.includes(k)) {
+              frozenMap = mapVal;
+              break;
+            }
+          }
+        }
+
+        if (frozenMap && frozenMap.size > 0) {
           const entries = parent.querySelectorAll('.bio-properties-panel-entry, [data-entry-id]');
           entries.forEach((entryEl) => {
             const lbl = entryEl.querySelector('label, .bio-properties-panel-label');
-            const lblTxt = (lbl?.textContent || '').trim();
-            if (lblTxt && frozenLabels.has(lblTxt)) {
-              const inputs = entryEl.querySelectorAll('input, textarea, select');
-              inputs.forEach((inp: any) => {
-                inp.disabled = true;
-                inp.readOnly = true;
-                inp.style.opacity = '0.65';
-                inp.style.cursor = 'not-allowed';
-                inp.title = 'Burned / Locked by Activity Template';
-              });
-            }
+            const lblTxt = (lbl?.textContent || '').trim().toLowerCase();
+            const entryId = (entryEl.getAttribute('data-entry-id') || '').toLowerCase();
+
+            frozenMap!.forEach((frozenInfo, labelKey) => {
+              const bName = (frozenInfo.bindingName || '').toLowerCase().replace(/^camunda:/, '');
+              const isMatchLabel = lblTxt && (lblTxt === labelKey || lblTxt === frozenInfo.label.toLowerCase());
+              const isMatchBinding = entryId && bName && entryId.includes(bName);
+              const isResultVarMatch = (bName.includes('resultvariable') || labelKey.includes('result variable')) &&
+                                      (entryId.includes('resultvariable') || lblTxt.includes('result variable'));
+
+              if (isMatchLabel || isMatchBinding || isResultVarMatch) {
+                const inputs = entryEl.querySelectorAll('input, textarea, select');
+                inputs.forEach((inp: any) => {
+                  if (frozenInfo.value !== undefined && frozenInfo.value !== null && frozenInfo.value !== '') {
+                    const strVal = String(frozenInfo.value);
+                    if (inp.type === 'checkbox') {
+                      const shouldCheck = strVal.toLowerCase() === 'true';
+                      if (inp.checked !== shouldCheck) {
+                        inp.checked = shouldCheck;
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        inp.dispatchEvent(new Event('change', { bubbles: true }));
+                      }
+                    } else {
+                      if (!inp.value || inp.value !== strVal) {
+                        inp.value = strVal;
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        inp.dispatchEvent(new Event('change', { bubbles: true }));
+                      }
+                    }
+                  }
+                  inp.disabled = true;
+                  inp.readOnly = true;
+                  inp.style.opacity = '0.65';
+                  inp.style.cursor = 'not-allowed';
+                  inp.title = 'Burned / Locked by Activity Template';
+                });
+              }
+            });
           });
         }
       } catch {
@@ -1024,6 +1230,48 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     setTimeout(enhanceConstraintEntries, 100);
   }
 
+  private registerFrozenProperties(keys: (string | undefined)[], obj: any): void {
+    if (!obj || !Array.isArray(obj.properties)) return;
+    const propMap = new Map<string, FrozenPropertyInfo>();
+
+    obj.properties.forEach((p: any) => {
+      const bName = (p.binding?.name || '').trim();
+      if (bName === 'resultVariable' || bName === 'camunda:resultVariable') {
+        p.binding = {
+          type: 'property',
+          name: 'camunda:resultVariable'
+        };
+      }
+      if (p.value !== undefined && p.value !== null && typeof p.value !== 'boolean') {
+        p.value = String(p.value);
+      }
+      if (p.editable === false && p.label) {
+        const lblTxt = String(p.label).trim();
+        const info: FrozenPropertyInfo = {
+          label: lblTxt,
+          value: p.value !== undefined ? p.value : '',
+          bindingName: bName || p.label
+        };
+        propMap.set(lblTxt.toLowerCase(), info);
+        if (bName === 'resultVariable' || bName === 'camunda:resultVariable') {
+          propMap.set('result variable', info);
+          propMap.set('response result variable name', info);
+        }
+      }
+    });
+
+    if (propMap.size > 0) {
+      keys.forEach((k) => {
+        if (k && k.trim()) {
+          const keyKey = k.trim().toLowerCase();
+          const existing = this.frozenPropertyMapByTemplate.get(keyKey) || new Map<string, FrozenPropertyInfo>();
+          propMap.forEach((val, keyName) => existing.set(keyName, val));
+          this.frozenPropertyMapByTemplate.set(keyKey, existing);
+        }
+      });
+    }
+  }
+
   public loadCustomActivityTemplates(append: boolean = false): void {
     if (this.readonly || this.loadingCustomTemplates || !this.bpmnModeler) {
       return;
@@ -1055,20 +1303,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               name: `Family: ${item.activityFamily || 'default'} (${item.scope === 'global' ? 'Global' : 'Tenant'})`
             };
 
-            const frozenSet = new Set<string>();
-            if (Array.isArray(obj.properties)) {
-              obj.properties.forEach((p: any) => {
-                if (p.value !== undefined && p.value !== null && typeof p.value !== 'boolean') {
-                  p.value = String(p.value);
-                }
-                if (p.editable === false && p.label) {
-                  frozenSet.add(String(p.label).trim());
-                }
-              });
-            }
-            if (frozenSet.size > 0) {
-              this.frozenPropertyLabelsByTemplate.set(tplId, frozenSet);
-            }
+            this.registerFrozenProperties(
+              [tplId, item.code, item.id, obj.id, item.parentTemplateId, item.rootActivity],
+              obj
+            );
             parsedList.push(obj);
           } catch {
             // Skip malformed template JSON

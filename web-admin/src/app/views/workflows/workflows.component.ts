@@ -33,6 +33,8 @@ import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../shared/components
 import { BpmnFormParserUtil, GeneratedFormField } from '../../shared/utils/bpmn-form-parser.util';
 import { DesignErrorsConsoleComponent } from '../../shared/components/design-errors-console/design-errors-console.component';
 
+import { Router, RouterModule } from '@angular/router';
+
 @Component({
   selector: 'app-workflows',
   templateUrl: './workflows.component.html',
@@ -43,6 +45,7 @@ import { DesignErrorsConsoleComponent } from '../../shared/components/design-err
     AsyncPipe,
     FormsModule,
     ReactiveFormsModule,
+    RouterModule,
     TableModule,
     UtilitiesModule,
     ButtonModule,
@@ -114,7 +117,9 @@ export class WorkflowsComponent implements OnInit, OnChanges {
 
   // Execute Workflow Modal
   showExecuteModal: boolean = false;
+  showExecutionSuccessModal: boolean = false;
   executingWorkflow: WorkflowDefinition | null = null;
+  lastExecutedWorkflow: WorkflowDefinition | null = null;
   executeInputJson: string = '{\n  "approved": true\n}';
   executionKey: string = '';
   executionOnVersionChange: string = 'continue';
@@ -166,7 +171,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   constructor(
     private fb: FormBuilder,
     private workflowsService: WorkflowsService,
-    private vNamespacesService: VNamespacesService
+    private vNamespacesService: VNamespacesService,
+    private router: Router
   ) {
     this.workflowForm = this.fb.group({
       name: ['', Validators.required],
@@ -346,58 +352,32 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     }
   }
 
+  navigateToCreate(): void {
+    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
+    this.router.navigate(['/workflows', 'new'], { queryParams });
+  }
+
+  navigateToEdit(wf: WorkflowDefinition): void {
+    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
+    this.router.navigate(['/workflows', wf.id, 'edit'], { queryParams });
+  }
+
+  navigateToExecutions(wf: WorkflowDefinition): void {
+    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
+    this.router.navigate(['/workflows', wf.id, 'executions'], { queryParams });
+  }
+
+  navigateToVersionHistory(wf: WorkflowDefinition): void {
+    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
+    this.router.navigate(['/workflows', wf.id, 'versions'], { queryParams });
+  }
+
   openCreateModal(): void {
-    this.isEditing = false;
-    this.editingWorkflowId = '';
-    this.currentWorkflowVersion = 1;
-    this.showAdvancedSettings = false;
-    this.workflowForm.reset({
-      name: 'Untitled Workflow',
-      code: '',
-      vnamespace: this.scope === 'global' ? '' : 'default',
-      description: '',
-      onVersionChange: 'defined_in_execution',
-      payloadFormat: 'bpmn',
-      payload: DEFAULT_BPMN_XML,
-      maxDurationSeconds: 3600,
-      isActive: true
-    });
-    this.workflowForm.get('code')?.enable();
-    this.hasUnsavedChanges = false;
-    this.showModal = true;
-    setTimeout(() => {
-      if (this.bpmnDesigner) {
-        this.bpmnDesigner.refresh();
-      }
-    }, 150);
+    this.navigateToCreate();
   }
 
   openEditModal(wf: WorkflowDefinition): void {
-    this.isEditing = true;
-    this.editingWorkflowId = wf.id || '';
-    this.currentWorkflowVersion = wf.version || 1;
-    this.showAdvancedSettings = false;
-    const decodedPayload = this.decodePayload(wf.payload);
-
-    this.workflowForm.patchValue({
-      code: wf.code || '',
-      name: wf.name || wf.code || 'Untitled Workflow',
-      vnamespace: this.scope === 'global' ? '' : (wf.vnamespace || 'default'),
-      description: wf.description || '',
-      onVersionChange: wf.onVersionChange || 'defined_in_execution',
-      payloadFormat: 'bpmn',
-      payload: decodedPayload || DEFAULT_BPMN_XML,
-      maxDurationSeconds: wf.maxDurationSeconds ?? 3600,
-      isActive: wf.isActive ?? true
-    });
-    this.workflowForm.get('code')?.disable();
-    this.hasUnsavedChanges = false;
-    this.showModal = true;
-    setTimeout(() => {
-      if (this.bpmnDesigner) {
-        this.bpmnDesigner.refresh();
-      }
-    }, 150);
+    this.navigateToEdit(wf);
   }
 
   onBpmnXmlChange(xml: string): void {
@@ -808,8 +788,9 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       next: (res: any) => {
         this.executing = false;
         this.executionResult = res?.Result || res?.result || res;
-        this.successMsg = `Workflow execution started successfully! Execution ID: ${this.executionResult?.id || ''}`;
-        setTimeout(() => this.successMsg = '', 6000);
+        this.lastExecutedWorkflow = this.executingWorkflow;
+        this.showExecuteModal = false;
+        this.showExecutionSuccessModal = true;
       },
       error: (err) => {
         this.executing = false;
@@ -828,12 +809,24 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.hasStartForm = false;
   }
 
+  closeSuccessModal(): void {
+    this.showExecutionSuccessModal = false;
+    this.executionResult = null;
+    this.lastExecutedWorkflow = null;
+  }
+
+  async runAnotherWorkflow(): Promise<void> {
+    const targetWf = this.lastExecutedWorkflow;
+    this.showExecutionSuccessModal = false;
+    this.executionResult = null;
+    if (targetWf) {
+      await this.openExecuteModal(targetWf);
+    }
+  }
+
   // --- EXECUTIONS LIST HANDLERS ---
   openExecutionsModal(wf: WorkflowDefinition): void {
-    this.executionsWorkflow = wf;
-    this.executionStatusFilter = '';
-    this.showExecutionsModal = true;
-    this.loadExecutions();
+    this.navigateToExecutions(wf);
   }
 
   loadExecutions(): void {
@@ -1033,9 +1026,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
 
   // --- VERSION HISTORY HANDLERS ---
   openVersionHistoryModal(wf: WorkflowDefinition): void {
-    this.selectedVersionWorkflow = wf;
-    this.showVersionHistoryModal = true;
-    this.loadVersionHistory();
+    this.navigateToVersionHistory(wf);
   }
 
   loadVersionHistory(): void {

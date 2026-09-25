@@ -228,8 +228,8 @@
         "type": "String",
         "group": "responseMapping",
         "binding": {
-          "type": "camunda:property",
-          "name": "resultVariable"
+          "type": "property",
+          "name": "camunda:resultVariable"
         }
       },
       {
@@ -374,8 +374,8 @@
         "type": "String",
         "group": "responseMapping",
         "binding": {
-          "type": "camunda:property",
-          "name": "resultVariable"
+          "type": "property",
+          "name": "camunda:resultVariable"
         }
       }
     ]
@@ -461,8 +461,8 @@
         "type": "String",
         "group": "responseMapping",
         "binding": {
-          "type": "camunda:property",
-          "name": "resultVariable"
+          "type": "property",
+          "name": "camunda:resultVariable"
         }
       }
     ]

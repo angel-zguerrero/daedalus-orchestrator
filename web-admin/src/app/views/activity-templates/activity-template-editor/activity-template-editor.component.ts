@@ -1,29 +1,27 @@
-import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { CommonModule, AsyncPipe } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { Observable, of } from 'rxjs';
 import { map, switchMap, startWith, debounceTime, catchError } from 'rxjs/operators';
 import {
-  TableModule,
-  UtilitiesModule,
   ButtonModule,
-  ModalModule,
   CardModule,
   FormModule,
   GridModule,
   AlertComponent,
   SpinnerComponent,
-  BadgeComponent
+  BadgeComponent,
+  ModalModule
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
-import { ActivityTemplatesService, ActivityTemplate } from './services/activity-templates.service';
-import { VNamespacesService } from '../tenants/tenant-management/services/vnamespaces.service';
-import { ErrorUtil } from '../../shared/utils/error.util';
-import elementTemplatesData from '../../shared/components/bpmn-designer/element-templates.json';
+import { ActivityTemplatesService, ActivityTemplate } from '../services/activity-templates.service';
+import { VNamespacesService } from '../../tenants/tenant-management/services/vnamespaces.service';
+import { ErrorUtil } from '../../../shared/utils/error.util';
+import elementTemplatesData from '../../../shared/components/bpmn-designer/element-templates.json';
 
 export interface PreviewProperty {
   index: number;
@@ -55,77 +53,56 @@ export interface ParentTemplateOption {
 }
 
 @Component({
-  selector: 'app-activity-templates',
-  templateUrl: './activity-templates.component.html',
-  styleUrls: ['./activity-templates.component.scss'],
+  selector: 'app-activity-template-editor',
+  templateUrl: './activity-template-editor.component.html',
+  styleUrls: ['./activity-template-editor.component.scss'],
   standalone: true,
   imports: [
     CommonModule,
-    AsyncPipe,
     FormsModule,
     ReactiveFormsModule,
-    TableModule,
-    UtilitiesModule,
+    RouterModule,
     ButtonModule,
-    ModalModule,
     CardModule,
     FormModule,
     GridModule,
     AlertComponent,
     SpinnerComponent,
     BadgeComponent,
+    ModalModule,
     IconDirective,
     MatFormFieldModule,
     MatInputModule,
-    MatAutocompleteModule,
-    RouterModule
+    MatAutocompleteModule
   ]
 })
-export class ActivityTemplatesComponent implements OnInit, OnChanges {
-  @Input() scope: 'global' | 'tenant' = 'global';
-  @Input() tenantCode: string = '';
+export class ActivityTemplateEditorComponent implements OnInit {
+  isEditing: boolean = false;
+  editingTemplateId: string = '';
+  scope: 'global' | 'tenant' = 'global';
+  tenantCode: string = '';
+  currentStep: 'identity' | 'designer' = 'identity';
 
-  templates: ActivityTemplate[] = [];
-  filteredTemplates: ActivityTemplate[] = [];
   loading: boolean = false;
+  saving: boolean = false;
   showAlert: boolean = false;
   errorMessage: string = '';
   successMsg: string = '';
 
-  searchQuery: string = '';
-
-  // Pagination
-  cursor: string = '';
-  nextCursor: string = '';
-  cursors: string[] = [''];
-  pageSize: number = 20;
-
-  // Create / Edit 2-Step Modal
-  showModal: boolean = false;
-  currentStep: 'identity' | 'designer' = 'identity';
   showAdvancedSettings: boolean = false;
-  isEditing: boolean = false;
-  editingTemplateId: string = '';
-
   identityForm: FormGroup;
   designerForm: FormGroup;
 
-  // Activity Family Autocomplete (handled identically to VNamespace)
+  // Activity Family Autocomplete
   activityFamilyCtrl = new FormControl('default', Validators.required);
   filteredActivityFamilies!: Observable<string[]>;
-  activityFamilyFilterCtrl = new FormControl('');
-  filteredFilterActivityFamilies!: Observable<string[]>;
-  selectedActivityFamilyFilter: string = '';
   knownFamilies: string[] = ['default', 'cache', 'http', 'logging', 'messaging', 'database'];
 
-  // VNamespace Autocomplete (for tenant scope, same as Workflows)
+  // VNamespace Autocomplete
   vnamespaceCtrl = new FormControl('default');
   filteredVNamespaces!: Observable<any[]>;
-  vnamespaceFilterCtrl = new FormControl('');
-  filteredFilterVNamespaces!: Observable<any[]>;
-  selectedVNamespaceFilter: string = '';
 
-  // Parent Templates (Built-in + existing custom templates)
+  // Parent Templates
   builtinOptions: ParentTemplateOption[] = [];
   customParentOptions: ParentTemplateOption[] = [];
   selectedParentOption: ParentTemplateOption | null = null;
@@ -136,17 +113,11 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
   validationErrors: string[] = [];
   validationPassed: boolean = false;
 
-  // Details & Delete Modals
-  showDetailModal: boolean = false;
-  selectedTemplate: ActivityTemplate | null = null;
-  detailPayloadText: string = '';
-
-  showDeleteModal: boolean = false;
-  templateToDelete: ActivityTemplate | null = null;
-
   constructor(
     private fb: FormBuilder,
+    private route: ActivatedRoute,
     private router: Router,
+    private location: Location,
     private activityTemplatesService: ActivityTemplatesService,
     private vNamespacesService: VNamespacesService
   ) {
@@ -171,43 +142,54 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
       isActive: [true]
     });
 
-    // Activity Family Autocomplete streams
     this.filteredActivityFamilies = this.activityFamilyCtrl.valueChanges.pipe(
       startWith(''),
       debounceTime(200),
       map((val) => this._filterFamilies(val || ''))
     );
 
-    this.filteredFilterActivityFamilies = this.activityFamilyFilterCtrl.valueChanges.pipe(
-      startWith(''),
-      debounceTime(200),
-      map((val) => this._filterFamilies(val || ''))
-    );
-
-    // VNamespace Autocomplete streams
     this.filteredVNamespaces = this.vnamespaceCtrl.valueChanges.pipe(
       startWith(''),
       debounceTime(300),
       switchMap((value) => this._filterVNamespaces(value || ''))
     );
 
-    this.filteredFilterVNamespaces = this.vnamespaceFilterCtrl.valueChanges.pipe(
-      startWith(''),
-      debounceTime(300),
-      switchMap((value) => this._filterVNamespaces(value || ''))
-    );
+    // Synchronize identityForm and designerForm controls
+    this.identityForm.valueChanges.subscribe((val) => {
+      this.designerForm.patchValue({
+        name: val.name,
+        code: val.code,
+        activityFamily: val.activityFamily,
+        vnamespace: val.vnamespace,
+        parentTemplateId: val.parentTemplateId
+      }, { emitEvent: false });
+
+      if (val.parentTemplateId) {
+        this.onParentSelectionChange(val.parentTemplateId);
+      }
+      this.onDesignerNameOrCodeChange();
+    });
+
+    this.designerForm.valueChanges.subscribe((val) => {
+      this.identityForm.patchValue({
+        name: val.name,
+        code: val.code,
+        activityFamily: val.activityFamily,
+        vnamespace: val.vnamespace,
+        parentTemplateId: val.parentTemplateId
+      }, { emitEvent: false });
+    });
   }
 
   ngOnInit(): void {
-    this.loadTemplates();
-  }
-
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['tenantCode'] || changes['scope']) {
-      this.cursor = '';
-      this.cursors = [''];
-      this.loadTemplates();
+    const qParams = this.route.snapshot.queryParams;
+    if (qParams['tenantCode']) {
+      this.scope = 'tenant';
+      this.tenantCode = qParams['tenantCode'];
     }
+
+    const templateId = this.route.snapshot.params['id'];
+    this.loadCustomParents(templateId);
   }
 
   private initBuiltinTemplates(): void {
@@ -249,53 +231,7 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
       .replace(/^-+|-+$/g, '');
   }
 
-  loadTemplates(): void {
-    this.loading = true;
-    this.showAlert = false;
-
-    const obs =
-      this.scope === 'global'
-        ? this.activityTemplatesService.getGlobalTemplates(
-            this.pageSize,
-            this.cursor,
-            '',
-            this.selectedActivityFamilyFilter
-          )
-        : this.activityTemplatesService.getTenantTemplates(
-            this.tenantCode,
-            this.pageSize,
-            this.cursor,
-            this.selectedVNamespaceFilter,
-            this.selectedActivityFamilyFilter
-          );
-
-    obs.subscribe({
-      next: (res: any) => {
-        const list: ActivityTemplate[] = res?.Entities || res?.entities || [];
-        this.templates = list;
-        this.nextCursor = res?.Cursor || res?.cursor || '';
-        this.updateKnownFamiliesAndCustomParents(list);
-        this.applyClientFilters();
-        this.loading = false;
-      },
-      error: (err: any) => {
-        this.errorMessage = ErrorUtil.formatErrorMessage(err);
-        this.showAlert = true;
-        this.loading = false;
-      }
-    });
-  }
-
-  private updateKnownFamiliesAndCustomParents(list: ActivityTemplate[]): void {
-    const famSet = new Set<string>(this.knownFamilies);
-    list.forEach((t) => {
-      if (t.activityFamily) {
-        famSet.add(t.activityFamily);
-      }
-    });
-    this.knownFamilies = Array.from(famSet);
-
-    // Also load available templates for inheritance (Global + current Tenant if tenant scope)
+  loadCustomParents(templateId?: string): void {
     this.activityTemplatesService
       .getForDesigner(this.scope === 'tenant' ? this.tenantCode : '', 50, '')
       .subscribe({
@@ -322,60 +258,166 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
               } as ParentTemplateOption;
             })
             .filter((x): x is ParentTemplateOption => x !== null);
+
+          if (templateId) {
+            this.isEditing = true;
+            this.editingTemplateId = templateId;
+            this.currentStep = 'designer';
+            this.loadTemplate(templateId);
+          } else {
+            this.isEditing = false;
+            this.currentStep = 'identity';
+            this.initCreateMode();
+          }
+        },
+        error: () => {
+          if (templateId) {
+            this.isEditing = true;
+            this.editingTemplateId = templateId;
+            this.currentStep = 'designer';
+            this.loadTemplate(templateId);
+          } else {
+            this.isEditing = false;
+            this.currentStep = 'identity';
+            this.initCreateMode();
+          }
         }
       });
   }
 
-  applyClientFilters(): void {
-    const q = (this.searchQuery || '').toLowerCase().trim();
-    this.filteredTemplates = this.templates.filter((t) => {
-      const matchesSearch =
-        !q ||
-        (t.name && t.name.toLowerCase().includes(q)) ||
-        (t.code && t.code.toLowerCase().includes(q)) ||
-        (t.activityFamily && t.activityFamily.toLowerCase().includes(q));
-      return matchesSearch;
+  initCreateMode(): void {
+    this.activityFamilyCtrl.setValue('default', { emitEvent: false });
+    this.vnamespaceCtrl.setValue('default', { emitEvent: false });
+
+    const defaultParent = this.builtinOptions[1] || this.builtinOptions[0];
+    this.selectedParentOption = defaultParent || null;
+
+    this.identityForm.patchValue({
+      name: '',
+      code: '',
+      activityFamily: 'default',
+      vnamespace: 'default',
+      parentTemplateId: defaultParent ? defaultParent.id : ''
+    }, { emitEvent: false });
+
+    this.designerForm.patchValue({
+      name: '',
+      code: '',
+      description: '',
+      activityFamily: 'default',
+      vnamespace: 'default',
+      parentTemplateId: defaultParent ? defaultParent.id : '',
+      rootActivity: defaultParent ? defaultParent.id : '',
+      isActive: true
+    }, { emitEvent: false });
+  }
+
+  loadTemplate(id: string): void {
+    this.loading = true;
+    const obs =
+      this.scope === 'global'
+        ? this.activityTemplatesService.getGlobalTemplate(id)
+        : this.activityTemplatesService.getTenantTemplate(this.tenantCode, id);
+
+    obs.subscribe({
+      next: (tpl: ActivityTemplate) => {
+        this.activityFamilyCtrl.setValue(tpl.activityFamily || 'default', { emitEvent: false });
+        this.vnamespaceCtrl.setValue(tpl.vnamespace || 'default', { emitEvent: false });
+
+        this.identityForm.patchValue({
+          name: tpl.name,
+          code: tpl.code,
+          activityFamily: tpl.activityFamily || 'default',
+          vnamespace: tpl.vnamespace || 'default',
+          parentTemplateId: tpl.parentTemplateId
+        }, { emitEvent: false });
+
+        this.designerForm.patchValue({
+          name: tpl.name,
+          code: tpl.code,
+          description: tpl.description || '',
+          activityFamily: tpl.activityFamily || 'default',
+          vnamespace: tpl.vnamespace || 'default',
+          parentTemplateId: tpl.parentTemplateId,
+          rootActivity: tpl.rootActivity || tpl.parentTemplateId,
+          isActive: tpl.isActive
+        }, { emitEvent: false });
+
+        this.onParentSelectionChange(tpl.parentTemplateId);
+
+        this.payloadJson = this.activityTemplatesService.decodePayload(tpl.payload);
+        this.parsePreviewGroups();
+        this.validateTemplate();
+        this.loading = false;
+      },
+      error: (err: any) => {
+        this.errorMessage = ErrorUtil.formatErrorMessage(err);
+        this.showAlert = true;
+        this.loading = false;
+      }
     });
   }
 
-  searchTemplates(): void {
-    this.applyClientFilters();
+  onParentSelectionChange(parentId: string): void {
+    const allOptions = [...this.builtinOptions, ...this.customParentOptions];
+    this.selectedParentOption = allOptions.find((o) => o.id === parentId) || null;
   }
 
-  onActivityFamilyFilterChange(value: string): void {
-    this.selectedActivityFamilyFilter = (value || '').trim();
-    this.cursor = '';
-    this.cursors = [''];
-    this.loadTemplates();
+  proceedToDesigner(): void {
+    const name = this.identityForm.get('name')?.value?.trim();
+    if (!name) return;
+    const parentId = this.identityForm.get('parentTemplateId')?.value;
+    this.onParentSelectionChange(parentId);
+    if (!this.selectedParentOption) return;
+
+    const rawCode = this.identityForm.get('code')?.value?.trim();
+    const code = rawCode || this.toKebabCase(name);
+    const family = (this.activityFamilyCtrl.value || 'default').trim();
+    const vns = (this.vnamespaceCtrl.value || 'default').trim();
+
+    const inheritedRootActivity = this.selectedParentOption.rootActivity || this.selectedParentOption.id;
+
+    this.designerForm.patchValue({
+      name,
+      code,
+      description: `Custom activity template inheriting from ${this.selectedParentOption.name}`,
+      activityFamily: family,
+      vnamespace: vns,
+      parentTemplateId: this.selectedParentOption.id,
+      rootActivity: inheritedRootActivity,
+      isActive: true
+    }, { emitEvent: false });
+
+    if (!this.payloadJson || !this.isEditing) {
+      const baseJson = JSON.parse(JSON.stringify(this.selectedParentOption.rawTemplate));
+      baseJson.id = code;
+      baseJson.name = name;
+      baseJson.description = `Custom ${this.selectedParentOption.name} template (${family})`;
+      baseJson.category = {
+        id: family,
+        name: `Family: ${family}`
+      };
+
+      if (Array.isArray(baseJson.properties)) {
+        baseJson.properties = baseJson.properties.map((p: any) => ({
+          ...p,
+          editable: p.editable !== undefined ? p.editable : true
+        }));
+      }
+
+      this.payloadJson = JSON.stringify(baseJson, null, 2);
+    }
+    this.parsePreviewGroups();
+    this.validateTemplate();
+    this.currentStep = 'designer';
   }
 
-  onVNamespaceFilterChange(value: string): void {
-    this.selectedVNamespaceFilter = (value || '').trim();
-    this.cursor = '';
-    this.cursors = [''];
-    this.loadTemplates();
-  }
-
-  getParentDisplayName(parentId: string): string {
-    const foundBuiltin = this.builtinOptions.find(
-      (b) => b.id.toLowerCase() === (parentId || '').toLowerCase()
-    );
-    if (foundBuiltin) return foundBuiltin.name;
-    const foundCustom = this.customParentOptions.find(
-      (c) => c.id.toLowerCase() === (parentId || '').toLowerCase()
-    );
-    if (foundCustom) return foundCustom.name;
-    return parentId || '-';
-  }
-
-  openCreateModal(): void {
-    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
-    this.router.navigate(['/activity-templates', 'new'], { queryParams });
-  }
-
-  openEditModal(tpl: ActivityTemplate): void {
-    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
-    this.router.navigate(['/activity-templates', tpl.id, 'edit'], { queryParams });
+  setStep(step: 'identity' | 'designer'): void {
+    if (step === 'designer' && this.currentStep === 'identity' && !this.isEditing && !this.payloadJson) {
+      this.proceedToDesigner();
+    } else {
+      this.currentStep = step;
+    }
   }
 
   toggleAdvancedSettings(): void {
@@ -394,9 +436,7 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
         parsed.category = { id: family, name: `Family: ${family}` };
       }
       this.payloadJson = JSON.stringify(parsed, null, 2);
-    } catch {
-      // Ignore if JSON is mid-edit
-    }
+    } catch {}
   }
 
   onPayloadChange(newJson: string): void {
@@ -405,10 +445,30 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
     this.validateTemplate();
   }
 
-  // Parse JSON into visual property groups for live preview & interactive freeze/burn
+  private normalizeTemplateProperties(parsed: any): boolean {
+    if (!parsed || !Array.isArray(parsed.properties)) return false;
+    let modified = false;
+    parsed.properties.forEach((p: any) => {
+      const bName = (p.binding?.name || '').trim();
+      if (bName === 'resultVariable' || bName === 'camunda:resultVariable') {
+        if (p.binding?.type !== 'property' || p.binding?.name !== 'camunda:resultVariable') {
+          p.binding = {
+            type: 'property',
+            name: 'camunda:resultVariable'
+          };
+          modified = true;
+        }
+      }
+    });
+    return modified;
+  }
+
   parsePreviewGroups(): void {
     try {
       const parsed = JSON.parse(this.payloadJson);
+      if (this.normalizeTemplateProperties(parsed)) {
+        this.payloadJson = JSON.stringify(parsed, null, 2);
+      }
       const groupsDef: { id: string; label: string }[] = Array.isArray(parsed.groups)
         ? parsed.groups
         : [];
@@ -455,40 +515,35 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
         result.push(ungrouped);
       }
       this.previewGroups = result;
-    } catch {
-      // Keep previous preview if JSON is temporarily invalid while typing
-    }
+    } catch {}
   }
 
-  // Interactive helper: update property value directly from the visual preview panel
   onPreviewPropertyValueChange(prop: PreviewProperty, newValue: any): void {
     try {
       const parsed = JSON.parse(this.payloadJson);
       if (Array.isArray(parsed.properties) && parsed.properties[prop.index]) {
         parsed.properties[prop.index].value = newValue;
+        this.normalizeTemplateProperties(parsed);
         this.payloadJson = JSON.stringify(parsed, null, 2);
         prop.value = newValue;
         this.validateTemplate();
       }
-    } catch {
-      // Ignore if JSON invalid
-    }
+    } catch {}
   }
 
-  // Interactive helper: toggle "Burn / Lock" (editable: false) for a property (e.g. Redis connectionString)
   toggleBurnProperty(prop: PreviewProperty): void {
     try {
       const parsed = JSON.parse(this.payloadJson);
       if (Array.isArray(parsed.properties) && parsed.properties[prop.index]) {
         const nextEditable = !prop.editable;
         parsed.properties[prop.index].editable = nextEditable;
+        parsed.properties[prop.index].value = prop.value;
+        this.normalizeTemplateProperties(parsed);
         this.payloadJson = JSON.stringify(parsed, null, 2);
         prop.editable = nextEditable;
         this.validateTemplate();
       }
-    } catch {
-      // Ignore if JSON invalid
-    }
+    } catch {}
   }
 
   validateTemplate(): boolean {
@@ -521,11 +576,6 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
               }
               seenBindings.add(bName);
             }
-            if (p.editable === false && (p.value === undefined || String(p.value).trim() === '')) {
-              errors.push(
-                `Burned/Locked property "${p.label || bName}" (editable: false) must have a non-empty value.`
-              );
-            }
           });
         }
       }
@@ -539,9 +589,10 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
   }
 
   saveTemplate(closeAfterSave: boolean): void {
-    if (!this.validateTemplate()) {
-      return;
-    }
+    if (!this.validateTemplate()) return;
+    this.saving = true;
+    this.showAlert = false;
+    this.successMsg = '';
 
     const name = (this.designerForm.get('name')?.value || '').trim();
     const rawCode = (this.designerForm.get('code')?.value || '').trim();
@@ -553,18 +604,16 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
     const rootActivity = (this.designerForm.get('rootActivity')?.value || '').trim();
     const isActive = !!this.designerForm.get('isActive')?.value;
 
-    // Synchronize the top-level id and name inside the JSON payload with the template's code and name
     let finalPayloadStr = this.payloadJson;
     try {
       const parsed = JSON.parse(this.payloadJson);
       parsed.id = code;
       parsed.name = name;
       parsed.category = { id: activityFamily, name: `Family: ${activityFamily}` };
+      this.normalizeTemplateProperties(parsed);
       finalPayloadStr = JSON.stringify(parsed, null, 2);
       this.payloadJson = finalPayloadStr;
-    } catch {
-      // Validated above
-    }
+    } catch {}
 
     const payloadBody: Partial<ActivityTemplate> = {
       code,
@@ -581,84 +630,56 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
     const req$ = this.isEditing
       ? this.scope === 'global'
         ? this.activityTemplatesService.updateGlobalTemplate(this.editingTemplateId, payloadBody)
-        : this.activityTemplatesService.updateTenantTemplate(
-            this.tenantCode,
-            this.editingTemplateId,
-            payloadBody
-          )
+        : this.activityTemplatesService.updateTenantTemplate(this.tenantCode, this.editingTemplateId, payloadBody)
       : this.scope === 'global'
         ? this.activityTemplatesService.createGlobalTemplate(payloadBody)
         : this.activityTemplatesService.createTenantTemplate(this.tenantCode, payloadBody);
 
     req$.subscribe({
       next: (saved: ActivityTemplate) => {
+        this.saving = false;
         this.successMsg = `Activity template "${saved.name}" saved successfully.`;
         if (!this.isEditing && saved.id) {
           this.isEditing = true;
           this.editingTemplateId = saved.id;
+          this.location.replaceState(
+            this.scope === 'tenant'
+              ? `/activity-templates/${saved.id}/edit?tenantCode=${this.tenantCode}`
+              : `/activity-templates/${saved.id}/edit`
+          );
         }
         if (closeAfterSave) {
-          this.showModal = false;
+          setTimeout(() => {
+            this.goBack();
+          }, 800);
+        } else {
+          setTimeout(() => {
+            this.successMsg = '';
+          }, 4000);
         }
-        this.loadTemplates();
       },
       error: (err: any) => {
+        this.saving = false;
         this.errorMessage = ErrorUtil.formatErrorMessage(err);
         this.showAlert = true;
       }
     });
   }
 
-  openDetailModal(tpl: ActivityTemplate): void {
-    this.selectedTemplate = tpl;
-    this.detailPayloadText = this.activityTemplatesService.decodePayload(tpl.payload);
-    this.showDetailModal = true;
+  getParentDisplayName(parentId: string): string {
+    const foundBuiltin = this.builtinOptions.find(
+      (b) => b.id.toLowerCase() === (parentId || '').toLowerCase()
+    );
+    if (foundBuiltin) return foundBuiltin.name;
+    const foundCustom = this.customParentOptions.find(
+      (c) => c.id.toLowerCase() === (parentId || '').toLowerCase()
+    );
+    if (foundCustom) return foundCustom.name;
+    return parentId || '-';
   }
 
-  openDeleteModal(tpl: ActivityTemplate): void {
-    this.templateToDelete = tpl;
-    this.showDeleteModal = true;
-  }
-
-  deleteTemplate(): void {
-    if (!this.templateToDelete?.id) return;
-
-    const req$ =
-      this.scope === 'global'
-        ? this.activityTemplatesService.deleteGlobalTemplate(this.templateToDelete.id)
-        : this.activityTemplatesService.deleteTenantTemplate(
-            this.tenantCode,
-            this.templateToDelete.id
-          );
-
-    req$.subscribe({
-      next: () => {
-        this.successMsg = `Activity template "${this.templateToDelete?.name}" deleted.`;
-        this.showDeleteModal = false;
-        this.templateToDelete = null;
-        this.loadTemplates();
-      },
-      error: (err: any) => {
-        this.errorMessage = ErrorUtil.formatErrorMessage(err);
-        this.showAlert = true;
-        this.showDeleteModal = false;
-      }
-    });
-  }
-
-  nextPage(): void {
-    if (this.nextCursor) {
-      this.cursors.push(this.nextCursor);
-      this.cursor = this.nextCursor;
-      this.loadTemplates();
-    }
-  }
-
-  prevPage(): void {
-    if (this.cursors.length > 1) {
-      this.cursors.pop();
-      this.cursor = this.cursors[this.cursors.length - 1];
-      this.loadTemplates();
-    }
+  goBack(): void {
+    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
+    this.router.navigate(['/activity-templates'], { queryParams });
   }
 }
