@@ -1078,12 +1078,23 @@
       </div>
 
       <!-- TAB 5: DIAGRAM SNAPSHOT WITH HIGHLIGHTS -->
-      <div *ngIf="activeDetailTab === 'diagram'" style="height: 520px; width: 100%; position: relative;" class="border rounded bg-dark">
-        <app-bpmn-designer
-          #executionBpmnDesigner
-          [payload]="getExecutionSnapshotPayload()"
-          [readonly]="true">
-        </app-bpmn-designer>
+      <div *ngIf="activeDetailTab === 'diagram'">
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-dark rounded border border-secondary text-light">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold">BPMN Diagram (v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }})</span>
+            <span class="badge bg-primary text-light">Active Token</span>
+            <span class="badge bg-warning text-dark">Waiting / Timer Token</span>
+            <span class="badge bg-success text-light">Completed</span>
+            <span class="badge bg-danger text-light" *ngIf="selectedExecutionDetail.execution.error">Error</span>
+          </div>
+        </div>
+        <div style="height: 520px; width: 100%; position: relative;" class="border rounded bg-dark">
+          <app-bpmn-designer
+            #executionBpmnDesigner
+            [payload]="getExecutionSnapshotPayload()"
+            [readonly]="true">
+          </app-bpmn-designer>
+        </div>
       </div>
 
     </div>

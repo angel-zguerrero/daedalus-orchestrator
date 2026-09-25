@@ -808,13 +808,16 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     }
   }
 
-  public highlightElements(markers: Array<{ id: string; type: 'active' | 'error' }>): void {
+  public highlightElements(markers: Array<{ id: string; type: 'active' | 'error' | 'waiting' | 'completed' }>): void {
     if (!this.bpmnModeler) return;
     try {
       const canvas = this.bpmnModeler.get('canvas');
       if (!canvas) return;
       markers.forEach(m => {
-        const cssClass = m.type === 'active' ? 'highlight-active' : 'highlight-error';
+        let cssClass = 'highlight-active';
+        if (m.type === 'error') cssClass = 'highlight-error';
+        if (m.type === 'waiting') cssClass = 'highlight-waiting';
+        if (m.type === 'completed') cssClass = 'highlight-completed';
         canvas.addMarker(m.id, cssClass);
       });
     } catch (e) {
@@ -832,10 +835,30 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         if (el && el.id) {
           canvas.removeMarker(el.id, 'highlight-active');
           canvas.removeMarker(el.id, 'highlight-error');
+          canvas.removeMarker(el.id, 'highlight-waiting');
+          canvas.removeMarker(el.id, 'highlight-completed');
         }
       });
     } catch (e) {
       console.warn('Failed to clear markers:', e);
+    }
+  }
+
+  public getEndEventIds(): string[] {
+    if (!this.bpmnModeler) return [];
+    try {
+      const elementRegistry = this.bpmnModeler.get('elementRegistry');
+      if (!elementRegistry) return [];
+      const endEvents: string[] = [];
+      elementRegistry.getAll().forEach((el: any) => {
+        const typeStr = (el?.type || el?.businessObject?.$type || '').toLowerCase();
+        if (typeStr.includes('endevent') && el.id && !el.id.includes('_plane')) {
+          endEvents.push(el.id);
+        }
+      });
+      return endEvents;
+    } catch {
+      return [];
     }
   }
 

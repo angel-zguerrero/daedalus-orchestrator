@@ -318,6 +318,14 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				token.Status = models.ExecutionTokenStatusCompleted
 				tokenRepo.UpdateExecutionToken(token, now)
 
+				// Complete all other branch tokens that were waiting at this join gateway
+				for _, t := range allTokens {
+					if t.CurrentNodeID == currentNode.ID && (t.Status == models.ExecutionTokenStatusWaiting || t.Status == models.ExecutionTokenStatusActive) {
+						t.Status = models.ExecutionTokenStatusCompleted
+						tokenRepo.UpdateExecutionToken(&t, now)
+					}
+				}
+
 				log.Info().
 					Str("executionID", execution.ID).
 					Str("gatewayID", currentNode.ID).
@@ -1102,8 +1110,15 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 CheckExecutionCompletion:
 	{
-		activeTokens, _ := tokenRepo.GetActiveTokensByExecutionID(execution.ID, now)
-		if len(activeTokens) == 0 {
+		allTokens, _ := tokenRepo.GetTokensByExecutionID(execution.ID, now)
+		hasUnfinishedTokens := false
+		for _, t := range allTokens {
+			if t.Status == models.ExecutionTokenStatusActive || t.Status == models.ExecutionTokenStatusWaiting {
+				hasUnfinishedTokens = true
+				break
+			}
+		}
+		if !hasUnfinishedTokens {
 			execution.Status = models.WorkflowExecutionStatusCompleted
 			execution.CompletedAt = &now
 			execution.Output = execution.StateData
