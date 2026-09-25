@@ -97,6 +97,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
     const rawType = (element.type || bo.$type || '').replace(/^bpmn:/, '');
     let cleanType = rawType;
+    const eventDefs = bo.eventDefinitions || [];
+    const isTimerEvent = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
+
     switch (rawType) {
       case 'ServiceTask': cleanType = 'Service Task'; break;
       case 'UserTask': cleanType = 'User Task'; break;
@@ -109,10 +112,11 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       case 'InclusiveGateway': cleanType = 'Inclusive Gateway (OR)'; break;
       case 'ComplexGateway': cleanType = 'Complex Gateway'; break;
       case 'EventBasedGateway': cleanType = 'Event-Based Gateway'; break;
-      case 'StartEvent': cleanType = 'Start Event'; break;
+      case 'StartEvent': cleanType = isTimerEvent ? 'Timer Start Event' : 'Start Event'; break;
       case 'EndEvent': cleanType = 'End Event'; break;
-      case 'IntermediateCatchEvent': cleanType = 'Intermediate Catch Event'; break;
+      case 'IntermediateCatchEvent': cleanType = isTimerEvent ? 'Timer Intermediate Catch Event' : 'Intermediate Catch Event'; break;
       case 'IntermediateThrowEvent': cleanType = 'Intermediate Throw Event'; break;
+      case 'BoundaryEvent': cleanType = isTimerEvent ? 'Timer Boundary Event' : 'Boundary Event'; break;
       case 'SequenceFlow': cleanType = 'Sequence Flow'; break;
     }
 
@@ -128,6 +132,23 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       documentation: docText,
       attributes: []
     };
+
+    // Timer Properties
+    if (isTimerEvent) {
+      eventDefs.forEach((ed: any) => {
+        if ((ed.$type || '').includes('TimerEventDefinition')) {
+          if (ed.timeDuration && ed.timeDuration.body) {
+            attrs.push({ key: 'Timer Duration', value: ed.timeDuration.body, category: 'Timer Configuration' });
+          }
+          if (ed.timeDate && ed.timeDate.body) {
+            attrs.push({ key: 'Timer Date', value: ed.timeDate.body, category: 'Timer Configuration' });
+          }
+          if (ed.timeCycle && ed.timeCycle.body) {
+            attrs.push({ key: 'Timer Cycle', value: ed.timeCycle.body, category: 'Timer Configuration' });
+          }
+        }
+      });
+    }
 
     // Core Properties
     if (bo.topic || (bo.$attrs && bo.$attrs['camunda:topic'])) {
@@ -346,7 +367,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             const elementType = element && element.type ? element.type.toLowerCase() : '';
             const isGateway = elementType.includes('gateway');
             const isFlow = elementType.includes('flow') || elementType.includes('sequence') || elementType.includes('association');
-            if (!isGateway && !isFlow) {
+            const isEvent = elementType.includes('event') || elementType.includes('intermediate') || elementType.includes('catch');
+            if (!isGateway && !isFlow && !isEvent) {
               delete entries['replace'];
             }
             return entries;
@@ -358,24 +380,66 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
       try {
         const replaceMenuProvider = this.bpmnModeler.get('replaceMenuProvider');
-        if (replaceMenuProvider && replaceMenuProvider.getEntries) {
-          const origGetEntries = replaceMenuProvider.getEntries.bind(replaceMenuProvider);
-          replaceMenuProvider.getEntries = function(element: any) {
-            const entries = origGetEntries(element);
+        if (replaceMenuProvider) {
+          const filterEntries = (entries: any, target: any) => {
+            if (!entries) return entries;
+            const targetElement = Array.isArray(target) ? target[0] : target;
+            const bo = targetElement?.businessObject || targetElement || {};
+            const elementType = (targetElement?.type || bo.$type || '').toLowerCase();
+            const isIntermediate = elementType.includes('intermediate');
+
+            const isAllowedEntry = (e: any, key?: string) => {
+              const k = (key || e.id || e.actionName || '').toLowerCase();
+              const label = (e.label || e.name || '').toLowerCase();
+              const targetType = (e.target?.type || '').toLowerCase();
+              const eventDef = (e.target?.eventDefinitionType || '').toLowerCase();
+
+              // 1. Gateways: filter out complex and event-based gateways
+              if (k.includes('complex') || k.includes('event-based') ||
+                  label.includes('complex') || label.includes('event-based')) {
+                return false;
+              }
+
+              // 2. Intermediates: if target element is an intermediate event, or entry relates to an intermediate event, ONLY allow Timer
+              if (isIntermediate || k.includes('intermediate') || label.includes('intermediate') || targetType.includes('intermediate')) {
+                const isTimer = k.includes('timer') || label.includes('timer') || eventDef.includes('timer');
+                if (!isTimer) {
+                  return false;
+                }
+              }
+
+              return true;
+            };
+
             if (Array.isArray(entries)) {
-              return entries.filter((e: any) => {
-                const id = (e.id || e.actionName || '').toLowerCase();
-                const label = (e.label || e.name || '').toLowerCase();
-                return !id.includes('complex') && !id.includes('event-based') &&
-                       !label.includes('complex') && !label.includes('event-based');
-              });
-            } else if (entries && typeof entries === 'object') {
-              delete entries['replace-with-complex-gateway'];
-              delete entries['replace-with-event-based-gateway'];
-              return entries;
+              return entries.filter((e: any) => isAllowedEntry(e));
+            } else if (typeof entries === 'object') {
+              const filtered: any = {};
+              for (const [k, v] of Object.entries(entries)) {
+                if (isAllowedEntry(v, k)) {
+                  filtered[k] = v;
+                }
+              }
+              return filtered;
             }
             return entries;
           };
+
+          if (replaceMenuProvider.getPopupMenuEntries) {
+            const origGetPopupMenuEntries = replaceMenuProvider.getPopupMenuEntries.bind(replaceMenuProvider);
+            replaceMenuProvider.getPopupMenuEntries = function(target: any) {
+              const entries = origGetPopupMenuEntries(target);
+              return filterEntries(entries, target);
+            };
+          }
+
+          if (replaceMenuProvider.getEntries) {
+            const origGetEntries = replaceMenuProvider.getEntries.bind(replaceMenuProvider);
+            replaceMenuProvider.getEntries = function(element: any) {
+              const entries = origGetEntries(element);
+              return filterEntries(entries, element);
+            };
+          }
         }
       } catch (e) {
         console.warn('Replace menu provider override notice:', e);
@@ -1009,6 +1073,17 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     ];
 
     const hideUnsupportedGroups = () => {
+      let isCurrentElementTimer = false;
+      try {
+        const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
+        const selectedEl = selection[0];
+        const bo = selectedEl?.businessObject || {};
+        const eventDefs = bo.eventDefinitions || [];
+        isCurrentElementTimer = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
+      } catch {
+        // ignore selection check error
+      }
+
       const groupEls = parent.querySelectorAll('.bio-properties-panel-group, [data-group-id]');
       groupEls.forEach((groupEl) => {
         const groupId = (groupEl.getAttribute('data-group-id') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -1018,7 +1093,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwanted = UNWANTED_IDS.some(id => groupId.includes(id)) ||
                            UNWANTED_GROUPS.some(name => headerText.includes(name));
 
-        if (isUnwanted) {
+        const isInputOutputGroup = groupId.includes('input') || groupId.includes('output') ||
+                                   headerText.includes('input') || headerText.includes('output');
+
+        if (isUnwanted || (isCurrentElementTimer && isInputOutputGroup)) {
           (groupEl as HTMLElement).style.display = 'none';
         }
       });
@@ -1032,7 +1110,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwantedEntry = UNWANTED_IDS.some(id => entryId.includes(id)) ||
                                 UNWANTED_GROUPS.some(name => labelText.includes(name));
 
-        if (isUnwantedEntry) {
+        const isInputOutputEntry = entryId.includes('input') || entryId.includes('output') ||
+                                    labelText.includes('input parameter') || labelText.includes('output parameter');
+
+        if (isUnwantedEntry || (isCurrentElementTimer && isInputOutputEntry)) {
           (entryEl as HTMLElement).style.display = 'none';
         }
       });
@@ -1047,6 +1128,37 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             opt.remove();
           }
         });
+      });
+
+      // Filter Timer Event Definition Type options: ONLY allow Date and Duration (remove Cycle)
+      const allSelects = parent.querySelectorAll('select');
+      allSelects.forEach((selectEl) => {
+        const select = selectEl as HTMLSelectElement;
+        const entryEl = select.closest('.bio-properties-panel-entry, [data-entry-id]');
+        const entryId = (entryEl?.getAttribute('data-entry-id') || '').toLowerCase();
+        const labelEl = entryEl?.querySelector('label, .bio-properties-panel-label');
+        const labelTxt = (labelEl?.textContent || '').toLowerCase();
+
+        if (entryId.includes('timer') || labelTxt.includes('timer') || entryId.includes('time-') || labelTxt.includes('type')) {
+          let removedCycle = false;
+          Array.from(select.options).forEach((opt) => {
+            const val = (opt.value || '').toLowerCase();
+            const txt = (opt.textContent || '').toLowerCase();
+            if (val.includes('cycle') || txt.includes('cycle')) {
+              opt.remove();
+              removedCycle = true;
+            }
+          });
+
+          if (removedCycle && select.options.length > 0) {
+            const currentVal = (select.value || '').toLowerCase();
+            if (!currentVal || currentVal.includes('cycle')) {
+              select.selectedIndex = 0;
+              select.dispatchEvent(new Event('input', { bubbles: true }));
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        }
       });
     };
 
