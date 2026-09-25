@@ -552,11 +552,6 @@ export class ActivityTemplateEditorComponent implements OnInit {
               }
               seenBindings.add(bName);
             }
-            if (p.editable === false && (p.value === undefined || String(p.value).trim() === '')) {
-              errors.push(
-                `Burned/Locked property "${p.label || bName}" (editable: false) must have a non-empty value.`
-              );
-            }
           });
         }
       }
