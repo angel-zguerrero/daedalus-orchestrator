@@ -1,9 +1,9 @@
 <div class="doc-studio-page d-flex flex-column h-100">
 
   <!-- Top Navigation / Action Bar -->
-  <div class="doc-studio-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-dark text-light pe-5">
+  <div class="doc-studio-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-dark text-light">
     <!-- Left: Back Button + Icon + Title Input + Code Badge + Active Switch -->
-    <div class="d-flex align-items-center gap-3 me-3 min-w-0">
+    <div class="d-flex align-items-center gap-3 flex-grow-1 me-3 min-w-0">
       <button cButton color="secondary" variant="outline" size="sm" class="d-inline-flex align-items-center gap-1 text-nowrap flex-shrink-0" (click)="goBack()" title="Back to Activity Templates">
         <svg cIcon name="cil-arrow-left"></svg>
         <span>Back</span>
@@ -13,11 +13,11 @@
         <svg cIcon name="cil-puzzle" size="lg"></svg>
       </div>
 
-      <div class="d-flex align-items-center gap-2 flex-wrap min-w-0" [formGroup]="designerForm">
+      <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0" [formGroup]="designerForm">
         <input
           type="text"
           formControlName="name"
-          class="doc-title-input fw-bold text-white bg-transparent border-0 fs-5 px-2 py-0"
+          class="doc-title-input fw-bold text-white bg-transparent border-0 fs-5 px-2 py-0 min-w-0"
           placeholder="Activity Template Name..."
           (input)="onDesignerNameOrCodeChange()"
           title="Activity Template Name" />
@@ -38,8 +38,8 @@
       </div>
     </div>
 
-    <!-- Right: Action Buttons (Shifted to the left with me-5 pe-3 to ensure Save & Exit is never cut off) -->
-    <div class="d-flex align-items-center gap-2 flex-shrink-0 me-5 pe-3">
+    <!-- Right: Action Buttons -->
+    <div class="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">
       <!-- Step Mode Segmented Button Group -->
       <div class="btn-group me-2" role="group" aria-label="Step selector">
         <button
