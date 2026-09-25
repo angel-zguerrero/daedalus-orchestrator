@@ -1162,8 +1162,240 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       });
     };
 
+    const getIsoDateString = (dtValue: string, tzName: string): string => {
+      if (!dtValue) return '';
+      const cleanDt = dtValue.length === 16 ? `${dtValue}:00` : dtValue;
+      if (tzName === 'UTC') {
+        return `${cleanDt}Z`;
+      }
+      try {
+        const dateObj = new Date(cleanDt);
+        if (isNaN(dateObj.getTime())) return cleanDt;
+
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: tzName,
+          timeZoneName: 'longOffset'
+        }).formatToParts(dateObj);
+
+        const tzPart = parts.find(p => p.type === 'timeZoneName')?.value;
+        let offset = 'Z';
+        if (tzPart && tzPart !== 'GMT' && tzPart !== 'UTC') {
+          offset = tzPart.replace(/^(GMT|UTC)/, '');
+        }
+        return `${cleanDt}${offset}`;
+      } catch {
+        return `${cleanDt}Z`;
+      }
+    };
+
+    const enhanceTimerEntries = () => {
+      let isTimerElement = false;
+      try {
+        const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
+        const selectedEl = selection[0];
+        const bo = selectedEl?.businessObject || {};
+        const eventDefs = bo.eventDefinitions || [];
+        isTimerElement = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
+      } catch {
+        // ignore
+      }
+
+      if (!isTimerElement) return;
+
+      const timerTypeSelect = parent.querySelector(
+        '[data-entry-id*="timer"] select, [data-entry-id*="time-"] select, select[name*="timer"]'
+      ) as HTMLSelectElement | null;
+
+      const selectedType = (timerTypeSelect?.value || '').toLowerCase();
+      const isDate = selectedType.includes('date') || selectedType === 'timedate';
+      const isDuration = selectedType.includes('duration') || selectedType === 'timeduration' || (!isDate && selectedType !== '');
+
+      const timerValueEntries = parent.querySelectorAll(
+        '[data-entry-id*="timer"] input, [data-entry-id*="timer"] textarea, [data-entry-id*="time"] input, [data-entry-id*="time"] textarea, [data-entry-id*="value"] input, [data-entry-id*="value"] textarea'
+      );
+
+      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+      timerValueEntries.forEach((rawInputEl) => {
+        const rawInput = rawInputEl as HTMLInputElement | HTMLTextAreaElement;
+        if (rawInput.tagName === 'SELECT') return;
+
+        const entryEl = rawInput.closest('.bio-properties-panel-entry, [data-entry-id]');
+        if (!entryEl) return;
+        const entryId = (entryEl.getAttribute('data-entry-id') || '').toLowerCase();
+        const labelEl = entryEl.querySelector('label, .bio-properties-panel-label');
+        const labelTxt = (labelEl?.textContent || '').toLowerCase();
+
+        const isTimerValueEntry = entryId.includes('timereventdefinition') ||
+                                   entryId.includes('timerdefinition') ||
+                                   entryId.includes('timedate') ||
+                                   entryId.includes('timeduration') ||
+                                   labelTxt.includes('timer definition') ||
+                                   labelTxt.includes('date') ||
+                                   labelTxt.includes('duration') ||
+                                   labelTxt.includes('value');
+
+        if (!isTimerValueEntry) return;
+
+        if (isDuration) {
+          const existingDatePicker = entryEl.querySelector('.timer-date-picker-container');
+          if (existingDatePicker) existingDatePicker.remove();
+
+          rawInput.placeholder = 'e.g. 5m, 10 minutes, 2 hours, 1 day (or PT5M)';
+
+          if (!entryEl.querySelector('.timer-duration-help')) {
+            const helpDiv = document.createElement('div');
+            helpDiv.className = 'timer-duration-help';
+            helpDiv.style.fontSize = '11px';
+            helpDiv.style.color = '#888';
+            helpDiv.style.marginTop = '4px';
+            helpDiv.textContent = 'Supports relative human format: "5m", "10 minutes", "2h", "1 day".';
+            rawInput.parentNode?.insertBefore(helpDiv, rawInput.nextSibling);
+          }
+        } else {
+          const existingHelp = entryEl.querySelector('.timer-duration-help');
+          if (existingHelp) existingHelp.remove();
+
+          let datePickerContainer = entryEl.querySelector('.timer-date-picker-container') as HTMLDivElement;
+
+          if (!datePickerContainer) {
+            datePickerContainer = document.createElement('div');
+            datePickerContainer.className = 'timer-date-picker-container';
+            datePickerContainer.style.marginTop = '8px';
+            datePickerContainer.style.padding = '8px';
+            datePickerContainer.style.backgroundColor = '#181b22';
+            datePickerContainer.style.borderRadius = '4px';
+            datePickerContainer.style.border = '1px solid rgba(255, 255, 255, 0.15)';
+
+            const dtLabel = document.createElement('label');
+            dtLabel.className = 'bio-properties-panel-label';
+            dtLabel.style.fontSize = '11px';
+            dtLabel.style.marginBottom = '2px';
+            dtLabel.style.display = 'block';
+            dtLabel.style.color = '#ccc';
+            dtLabel.textContent = 'Date & Time (Calendar):';
+
+            const dtInput = document.createElement('input');
+            dtInput.type = 'datetime-local';
+            dtInput.className = 'bio-properties-panel-input timer-datetime-input';
+            dtInput.style.width = '100%';
+            dtInput.style.backgroundColor = '#0e1017';
+            dtInput.style.color = '#ffffff';
+            dtInput.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+            dtInput.style.borderRadius = '4px';
+            dtInput.style.padding = '5px 8px';
+            dtInput.style.boxSizing = 'border-box';
+            dtInput.style.fontSize = '12px';
+
+            const tzLabel = document.createElement('label');
+            tzLabel.className = 'bio-properties-panel-label';
+            tzLabel.style.fontSize = '11px';
+            tzLabel.style.marginTop = '6px';
+            tzLabel.style.marginBottom = '2px';
+            tzLabel.style.display = 'block';
+            tzLabel.style.color = '#ccc';
+            tzLabel.textContent = 'Timezone:';
+
+            const tzSelect = document.createElement('select');
+            tzSelect.className = 'bio-properties-panel-input bio-properties-panel-select timer-tz-select';
+            tzSelect.style.width = '100%';
+            tzSelect.style.backgroundColor = '#0e1017';
+            tzSelect.style.color = '#ffffff';
+            tzSelect.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+            tzSelect.style.borderRadius = '4px';
+            tzSelect.style.padding = '5px 8px';
+            tzSelect.style.fontSize = '12px';
+
+            const timezones = [
+              browserTz,
+              'UTC',
+              'America/Santiago',
+              'America/New_York',
+              'America/Chicago',
+              'America/Denver',
+              'America/Los_Angeles',
+              'America/Sao_Paulo',
+              'America/Buenos_Aires',
+              'America/Bogota',
+              'America/Lima',
+              'America/Mexico_City',
+              'Europe/London',
+              'Europe/Paris',
+              'Europe/Berlin',
+              'Europe/Madrid',
+              'Asia/Dubai',
+              'Asia/Kolkata',
+              'Asia/Singapore',
+              'Asia/Tokyo',
+              'Australia/Sydney'
+            ];
+
+            const uniqueTzs = Array.from(new Set(timezones));
+            uniqueTzs.forEach((tz) => {
+              const opt = document.createElement('option');
+              opt.value = tz;
+              opt.textContent = tz === browserTz ? `${tz} (Browser Local)` : tz;
+              if (tz === browserTz) opt.selected = true;
+              tzSelect.appendChild(opt);
+            });
+
+            const previewDiv = document.createElement('div');
+            previewDiv.className = 'timer-iso-preview';
+            previewDiv.style.fontSize = '11px';
+            previewDiv.style.color = '#4fc3f7';
+            previewDiv.style.marginTop = '6px';
+            previewDiv.innerHTML = 'ISO Format: <span class="iso-val" style="font-family:monospace;">--</span>';
+
+            datePickerContainer.appendChild(dtLabel);
+            datePickerContainer.appendChild(dtInput);
+            datePickerContainer.appendChild(tzLabel);
+            datePickerContainer.appendChild(tzSelect);
+            datePickerContainer.appendChild(previewDiv);
+
+            rawInput.parentNode?.insertBefore(datePickerContainer, rawInput.nextSibling);
+
+            const updateRawInputFromPicker = () => {
+              if (!dtInput.value) return;
+              const isoVal = getIsoDateString(dtInput.value, tzSelect.value);
+              const isoSpan = previewDiv.querySelector('.iso-val');
+              if (isoSpan) isoSpan.textContent = isoVal;
+
+              const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
+                                   Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+              if (nativeSetter) {
+                nativeSetter.call(rawInput, isoVal);
+              } else {
+                rawInput.value = isoVal;
+              }
+              rawInput.dispatchEvent(new Event('input', { bubbles: true }));
+              rawInput.dispatchEvent(new Event('change', { bubbles: true }));
+            };
+
+            dtInput.addEventListener('change', updateRawInputFromPicker);
+            dtInput.addEventListener('input', updateRawInputFromPicker);
+            tzSelect.addEventListener('change', updateRawInputFromPicker);
+
+            if (rawInput.value && rawInput.value.length >= 16 && rawInput.value.includes('T')) {
+              dtInput.value = rawInput.value.substring(0, 16);
+              updateRawInputFromPicker();
+            } else {
+              const now = new Date();
+              const year = now.getFullYear();
+              const month = String(now.getMonth() + 1).padStart(2, '0');
+              const day = String(now.getDate()).padStart(2, '0');
+              const hours = String(now.getHours()).padStart(2, '0');
+              const minutes = String(now.getMinutes()).padStart(2, '0');
+              dtInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+              updateRawInputFromPicker();
+            }
+          }
+        }
+      });
+    };
+
     const enhanceConstraintEntries = () => {
       hideUnsupportedGroups();
+      enhanceTimerEntries();
 
       // Enforce read-only state on any burned/frozen properties of custom Activity Templates
       const allPropInputs = parent.querySelectorAll(
