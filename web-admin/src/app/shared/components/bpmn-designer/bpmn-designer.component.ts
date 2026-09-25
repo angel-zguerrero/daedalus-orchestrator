@@ -62,6 +62,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   @ViewChild('canvasRef', { static: true }) private canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('propertiesRef', { static: true }) private propertiesRef!: ElementRef<HTMLDivElement>;
   @ViewChild('fileInputRef') private fileInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('errorsSectionRef') private errorsSectionRef?: ElementRef<HTMLDivElement>;
 
   @Input() payload: string = '';
   @Input() readonly: boolean = false;
@@ -72,6 +73,153 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
   public currentLintErrors: string[] = [];
   public hasLintErrors: boolean = false;
+  public selectedElementInfo: any = null;
+
+  public scrollToErrorsSection(): void {
+    if (this.errorsSectionRef && this.errorsSectionRef.nativeElement) {
+      this.errorsSectionRef.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  public inspectElement(element: any): void {
+    if (!element) {
+      this.selectedElementInfo = null;
+      return;
+    }
+    const bo = element.businessObject || {};
+    const attrs: Array<{ key: string; value: string; category?: string }> = [];
+
+    const rawType = (element.type || bo.$type || '').replace(/^bpmn:/, '');
+    let cleanType = rawType;
+    switch (rawType) {
+      case 'ServiceTask': cleanType = 'Service Task'; break;
+      case 'UserTask': cleanType = 'User Task'; break;
+      case 'SendTask': cleanType = 'Send Task'; break;
+      case 'ReceiveTask': cleanType = 'Receive Task'; break;
+      case 'ScriptTask': cleanType = 'Script Task'; break;
+      case 'BusinessRuleTask': cleanType = 'Business Rule Task'; break;
+      case 'ExclusiveGateway': cleanType = 'Exclusive Gateway (XOR)'; break;
+      case 'ParallelGateway': cleanType = 'Parallel Gateway (AND)'; break;
+      case 'InclusiveGateway': cleanType = 'Inclusive Gateway (OR)'; break;
+      case 'ComplexGateway': cleanType = 'Complex Gateway'; break;
+      case 'EventBasedGateway': cleanType = 'Event-Based Gateway'; break;
+      case 'StartEvent': cleanType = 'Start Event'; break;
+      case 'EndEvent': cleanType = 'End Event'; break;
+      case 'IntermediateCatchEvent': cleanType = 'Intermediate Catch Event'; break;
+      case 'IntermediateThrowEvent': cleanType = 'Intermediate Throw Event'; break;
+      case 'SequenceFlow': cleanType = 'Sequence Flow'; break;
+    }
+
+    const docText = bo.documentation && bo.documentation.length > 0
+      ? (typeof bo.documentation[0] === 'string' ? bo.documentation[0] : (bo.documentation[0].text || ''))
+      : '';
+
+    const info: any = {
+      id: element.id || bo.id || '',
+      name: bo.name || (element.id && !element.id.startsWith('Process_') ? element.id : ''),
+      type: cleanType,
+      rawType: rawType,
+      documentation: docText,
+      attributes: []
+    };
+
+    // Core Properties
+    if (bo.topic || (bo.$attrs && bo.$attrs['camunda:topic'])) {
+      attrs.push({ key: 'Topic / Queue Name', value: bo.topic || bo.$attrs['camunda:topic'], category: 'Execution' });
+    }
+    if (bo.type || (bo.$attrs && bo.$attrs['camunda:type'])) {
+      attrs.push({ key: 'Job Type', value: bo.type || bo.$attrs['camunda:type'], category: 'Execution' });
+    }
+    if (bo.assignee || (bo.$attrs && bo.$attrs['camunda:assignee'])) {
+      attrs.push({ key: 'Assignee', value: bo.assignee || bo.$attrs['camunda:assignee'], category: 'Assignment' });
+    }
+    if (bo.candidateGroups || (bo.$attrs && bo.$attrs['camunda:candidateGroups'])) {
+      attrs.push({ key: 'Candidate Groups', value: bo.candidateGroups || bo.$attrs['camunda:candidateGroups'], category: 'Assignment' });
+    }
+    if (bo.candidateUsers || (bo.$attrs && bo.$attrs['camunda:candidateUsers'])) {
+      attrs.push({ key: 'Candidate Users', value: bo.candidateUsers || bo.$attrs['camunda:candidateUsers'], category: 'Assignment' });
+    }
+    if (bo.formKey || (bo.$attrs && bo.$attrs['camunda:formKey'])) {
+      attrs.push({ key: 'Form Key', value: bo.formKey || bo.$attrs['camunda:formKey'], category: 'Form' });
+    }
+
+    // Sequence Flow details
+    if (bo.sourceRef) {
+      attrs.push({ key: 'Source Element', value: `${bo.sourceRef.name || bo.sourceRef.id} (${(bo.sourceRef.$type || '').replace(/^bpmn:/, '')})`, category: 'Flow' });
+    }
+    if (bo.targetRef) {
+      attrs.push({ key: 'Target Element', value: `${bo.targetRef.name || bo.targetRef.id} (${(bo.targetRef.$type || '').replace(/^bpmn:/, '')})`, category: 'Flow' });
+    }
+    if (bo.conditionExpression && bo.conditionExpression.body) {
+      attrs.push({ key: 'Condition Expression', value: bo.conditionExpression.body, category: 'Flow' });
+    }
+
+    // $attrs loop for extra custom definitions
+    if (bo.$attrs) {
+      for (const [k, v] of Object.entries(bo.$attrs)) {
+        if (typeof v === 'string' && v.trim() && !k.startsWith('xmlns') && !k.startsWith('xsi:')) {
+          const cleanKey = k.replace(/^camunda:/, '').replace(/^custom:/, '');
+          if (!attrs.some(a => a.key.toLowerCase() === cleanKey.toLowerCase())) {
+            attrs.push({ key: cleanKey, value: v, category: 'Configuration' });
+          }
+        }
+      }
+    }
+
+    // Extension Elements
+    if (bo.extensionElements && bo.extensionElements.values) {
+      for (const ext of bo.extensionElements.values) {
+        const extType = (ext.$type || '').toLowerCase();
+
+        // Form Data & Form Fields
+        if (extType.includes('formdata') && ext.fields) {
+          for (const f of ext.fields) {
+            let desc = `Type: ${f.type || 'string'}`;
+            if (f.label) desc += ` | Label: "${f.label}"`;
+            if (f.defaultValue) desc += ` | Default: "${f.defaultValue}"`;
+
+            const constraints: string[] = [];
+            if (f.validation && f.validation.constraints) {
+              for (const c of f.validation.constraints) {
+                constraints.push(`${c.name}=${c.config}`);
+              }
+            }
+            if (constraints.length > 0) {
+              desc += ` | Rules: ${constraints.join(', ')}`;
+            }
+
+            attrs.push({ key: `Form Field: ${f.id}`, value: desc, category: 'Form Fields' });
+          }
+        }
+
+        // Input & Output Parameters
+        if (extType.includes('inputoutput')) {
+          if (ext.inputParameters) {
+            for (const inp of ext.inputParameters) {
+              const valStr = typeof inp.value === 'string' ? inp.value : JSON.stringify(inp.value);
+              attrs.push({ key: `Input: ${inp.name}`, value: valStr, category: 'Inputs & Outputs' });
+            }
+          }
+          if (ext.outputParameters) {
+            for (const out of ext.outputParameters) {
+              const valStr = typeof out.value === 'string' ? out.value : JSON.stringify(out.value);
+              attrs.push({ key: `Output: ${out.name}`, value: valStr, category: 'Inputs & Outputs' });
+            }
+          }
+        }
+
+        // Extension Properties
+        if (extType.includes('properties') && ext.values) {
+          for (const prop of ext.values) {
+            attrs.push({ key: `Property: ${prop.name}`, value: prop.value || '', category: 'Custom Properties' });
+          }
+        }
+      }
+    }
+
+    info.attributes = attrs;
+    this.selectedElementInfo = info;
+  }
 
   private bpmnModeler!: any;
   private isInitialized = false;
@@ -249,16 +397,26 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
     this.isInitialized = true;
 
-    // Listen for diagram changes to emit xmlChange and run lint validation
-    if (!this.readonly && this.bpmnModeler) {
+    // Listen for diagram events
+    if (this.bpmnModeler) {
       const eventBus = this.bpmnModeler.get('eventBus');
       if (eventBus) {
-        eventBus.on('commandStack.changed', () => {
-          this.emitCurrentXml();
-          this.runLintValidation();
-        });
-        eventBus.on('import.done', () => {
-          setTimeout(() => this.runLintValidation(), 150);
+        if (!this.readonly) {
+          eventBus.on('commandStack.changed', () => {
+            this.emitCurrentXml();
+            this.runLintValidation();
+          });
+          eventBus.on('import.done', () => {
+            setTimeout(() => this.runLintValidation(), 150);
+          });
+        }
+        eventBus.on('element.click', (event: any) => {
+          const element = event.element;
+          if (element && element.id && !element.id.startsWith('Process_') && !element.id.includes('_plane')) {
+            this.inspectElement(element);
+          } else {
+            this.selectedElementInfo = null;
+          }
         });
       }
     }

@@ -1,0 +1,220 @@
+<div class="doc-studio-page d-flex flex-column h-100" [formGroup]="workflowForm">
+  
+  <!-- Top Navigation / Action Bar -->
+  <div class="doc-studio-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-dark text-light">
+    
+    <!-- Left: Back Button + Icon + Workflow Name + Code + Namespace -->
+    <div class="d-flex align-items-center gap-3 flex-grow-1 me-3">
+      <button cButton color="secondary" variant="outline" size="sm" (click)="cancelClose()" title="Back to Workflows">
+        <svg cIcon name="cil-arrow-left" class="me-1"></svg>
+        Back
+      </button>
+
+      <div class="doc-icon-badge d-flex align-items-center justify-content-center rounded p-2 text-info bg-dark border border-secondary">
+        <svg cIcon name="cil-description" size="lg"></svg>
+      </div>
+      
+      <div class="doc-title-container flex-grow-1">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <input 
+            type="text" 
+            formControlName="name" 
+            class="doc-title-input fw-bold text-white bg-transparent border-0 fs-5 px-2 py-1" 
+            placeholder="Untitled Workflow..." 
+            title="Workflow Name"/>
+
+          <span class="badge bg-dark text-info border border-secondary font-monospace px-2 py-1" title="Workflow Code">
+            {{ workflowForm.get('code')?.value || 'auto-code' }}
+          </span>
+
+          <span class="badge bg-secondary text-light px-2 py-1">
+            v{{ currentWorkflowVersion || 1 }}
+          </span>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+          <div class="vnamespace-compact-picker d-flex align-items-center gap-1" *ngIf="scope !== 'global'">
+            <span class="text-muted small">VNamespace:</span>
+            <mat-form-field appearance="outline" class="compact-mat-field">
+              <input type="text" matInput formControlName="vnamespace" [matAutocomplete]="autoHeader" placeholder="Namespace">
+              <mat-autocomplete #autoHeader="matAutocomplete">
+                <mat-option *ngFor="let vns of filteredVNamespaces | async" [value]="vns.Name || vns">
+                  {{vns.Name || vns}}
+                </mat-option>
+              </mat-autocomplete>
+            </mat-form-field>
+          </div>
+
+          <div class="form-check form-switch mb-0 d-flex align-items-center gap-1 small ms-2">
+            <input class="form-check-input mt-0" type="checkbox" id="headerActiveSwitch" formControlName="isActive">
+            <label class="form-check-label text-muted cursor-pointer" for="headerActiveSwitch">
+              <span class="badge" [ngClass]="workflowForm.get('isActive')?.value ? 'bg-success' : 'bg-secondary'">
+                {{ workflowForm.get('isActive')?.value ? 'Active' : 'Inactive' }}
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Settings, Save, Save & Close Buttons -->
+    <div class="d-flex align-items-center gap-2">
+      <button 
+        cButton 
+        color="dark" 
+        variant="outline" 
+        size="sm" 
+        type="button"
+        class="d-flex align-items-center gap-1 text-light border-secondary"
+        (click)="toggleAdvancedSettings()"
+        title="Workflow Description & Extra Settings">
+        <svg cIcon name="cil-options" size="sm"></svg>
+        <span>Settings</span>
+      </button>
+
+      <button (click)="cancelClose()" cButton color="secondary" size="sm" type="button">
+        Cancel
+      </button>
+
+      <button 
+        cButton 
+        color="success" 
+        variant="outline" 
+        size="sm" 
+        type="button" 
+        (click)="saveWorkflow(false)" 
+        [disabled]="saving"
+        title="Save changes and keep editing">
+        <c-spinner size="sm" *ngIf="saving" class="me-1"></c-spinner>
+        <svg cIcon name="cil-save" class="me-1" *ngIf="!saving"></svg>
+        Save
+      </button>
+
+      <button 
+        cButton 
+        color="primary" 
+        size="sm" 
+        type="button" 
+        (click)="saveWorkflow(true)" 
+        [disabled]="saving"
+        title="Save changes and return to list">
+        <c-spinner size="sm" *ngIf="saving" class="me-1"></c-spinner>
+        <svg cIcon name="cil-check" class="me-1" *ngIf="!saving"></svg>
+        Save & Exit
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings Modal (Centered in middle of the screen) -->
+  <c-modal id="workflowSettingsModal" [visible]="showAdvancedSettings" (visibleChange)="showAdvancedSettings = $event" size="lg" alignment="center">
+    <c-modal-header class="bg-dark text-light border-secondary">
+      <h5 cModalTitle class="d-flex align-items-center gap-2 mb-0">
+        <svg cIcon name="cil-options" class="text-info"></svg>
+        Workflow Settings
+      </h5>
+      <button (click)="toggleAdvancedSettings()" cButtonClose class="btn-close-white"></button>
+    </c-modal-header>
+    <c-modal-body class="bg-dark text-light">
+      <div class="row g-3 p-1">
+        <div class="col-md-6">
+          <label class="form-label small text-muted">Workflow Code</label>
+          <input cFormControl size="sm" formControlName="code" placeholder="Enter custom code" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted">On Version Change Policy</label>
+          <select cSelect size="sm" formControlName="onVersionChange">
+            <option value="defined_in_execution">Defined in execution (Default)</option>
+            <option value="continue">Continue (keep running executions on original version)</option>
+            <option value="restart">Restart (terminate & relaunch executions on new version)</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label small text-muted">Max Duration (seconds)</label>
+          <input cFormControl size="sm" type="number" formControlName="maxDurationSeconds" min="0" placeholder="e.g. 3600" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small text-muted">Description</label>
+          <textarea cFormControl size="sm" formControlName="description" rows="3" placeholder="Brief description of the workflow logic..."></textarea>
+        </div>
+      </div>
+    </c-modal-body>
+    <c-modal-footer class="bg-dark border-secondary d-flex justify-content-end">
+      <button cButton color="primary" (click)="toggleAdvancedSettings()">
+        <svg cIcon name="cil-check" class="me-1"></svg>
+        Done
+      </button>
+    </c-modal-footer>
+  </c-modal>
+
+  <!-- Floating Toast Alerts (Fixed at bottom center of the browser viewport) -->
+  <div class="position-fixed start-50 translate-middle-x" style="bottom: 30px; z-index: 2000; max-width: 90%; min-width: 380px;" *ngIf="showAlert || successMsg">
+    <c-alert color="danger" *ngIf="showAlert" dismissible (visibleChange)="showAlert = $event" class="shadow-lg mb-0 border-danger" [innerHTML]="errorMessage"></c-alert>
+    
+    <div *ngIf="successMsg" class="d-flex align-items-center justify-content-between gap-3 px-3 py-2.5 rounded-3 shadow-lg border border-success text-white" 
+         style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+      <div class="d-flex align-items-center gap-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span class="fw-bold text-white small">{{ successMsg }}</span>
+      </div>
+      <button type="button" class="btn-close btn-close-white ms-2" (click)="successMsg = ''"></button>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div class="text-center py-5" *ngIf="loading">
+    <c-spinner></c-spinner>
+    <p class="mt-2 text-muted">Loading workflow definition...</p>
+  </div>
+
+  <!-- Main Canvas BPMN Workspace -->
+  <div class="doc-studio-body flex-grow-1 position-relative" *ngIf="!loading">
+    <app-bpmn-designer
+      #bpmnDesigner
+      [scope]="scope"
+      [tenantCode]="tenantCode"
+      [payload]="workflowForm.get('payload')?.value"
+      (xmlChange)="onBpmnXmlChange($event)">
+    </app-bpmn-designer>
+  </div>
+</div>
+
+<!-- Unsaved Changes Modal -->
+<c-modal id="unsavedModal" [visible]="showUnsavedConfirmModal" (visibleChange)="showUnsavedConfirmModal = $event">
+  <c-modal-header class="bg-dark text-light border-secondary">
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-warning" class="text-warning"></svg>
+      Unsaved Changes
+    </h5>
+    <button (click)="cancelCloseUnsavedModal()" cButtonClose class="btn-close-white"></button>
+  </c-modal-header>
+  <c-modal-body class="bg-dark text-light">
+    <div class="d-flex align-items-start gap-3 py-2">
+      <div class="rounded-circle p-2 bg-warning-subtle text-warning d-flex align-items-center justify-content-center">
+        <svg cIcon name="cil-warning" size="2xl"></svg>
+      </div>
+      <div>
+        <h6 class="fw-bold mb-1">
+          Do you want to save changes to "{{ workflowForm.get('name')?.value || 'this workflow' }}"?
+        </h6>
+        <p class="text-muted small mb-0">
+          Your diagram modifications will be lost if you leave without saving.
+        </p>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary d-flex justify-content-end gap-2">
+    <button (click)="cancelCloseUnsavedModal()" cButton color="secondary" variant="outline">
+      Cancel
+    </button>
+    <button (click)="confirmDiscardAndClose()" cButton color="danger">
+      Don't Save
+    </button>
+    <button (click)="saveWorkflowAndClose()" cButton color="primary" [disabled]="!workflowForm.valid">
+      <svg cIcon name="cil-check" class="me-1"></svg>
+      Save Changes
+    </button>
+  </c-modal-footer>
+</c-modal>

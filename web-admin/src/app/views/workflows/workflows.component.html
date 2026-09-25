@@ -500,11 +500,11 @@
     </div>
     <div class="mb-3">
       <label class="form-label fw-bold">Payload Content</label>
-      <div *ngIf="selectedWorkflow.payloadFormat === 'bpmn' || payloadDisplayText.trim().startsWith('<?xml')">
+      <div *ngIf="selectedWorkflow.payloadFormat === 'bpmn' || payloadDisplayText.trim().startsWith('<?xml')" style="height: 500px; width: 100%; position: relative;" class="border rounded bg-dark">
         <app-bpmn-designer [payload]="payloadDisplayText" [readonly]="true"></app-bpmn-designer>
       </div>
       <div *ngIf="selectedWorkflow.payloadFormat !== 'bpmn' && !payloadDisplayText.trim().startsWith('<?xml')">
-        <pre class="p-3 bg-dark rounded text-light font-monospace border-0" style="max-height: 250px; overflow-y: auto;">{{ payloadDisplayText }}</pre>
+        <pre class="p-3 bg-dark rounded text-light font-monospace border-0" style="max-height: 450px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">{{ payloadDisplayText }}</pre>
       </div>
     </div>
 
@@ -708,20 +708,6 @@
       <small class="text-muted d-block mt-1">Variables provided here will populate the execution's initial state context.</small>
     </div>
 
-    <!-- Execution Result Box -->
-    <div *ngIf="executionResult" class="mt-4 p-3 bg-dark text-light rounded border border-success">
-      <div class="d-flex align-items-center justify-content-between mb-2">
-        <h6 class="text-success mb-0">
-          <svg cIcon name="cil-check" class="me-1"></svg> Execution Triggered Successfully!
-        </h6>
-        <span class="badge bg-success">{{ executionResult.status | uppercase }}</span>
-      </div>
-      <div class="small font-monospace text-muted">
-        <div><strong>Execution ID:</strong> {{ executionResult.id }}</div>
-        <div><strong>Definition ID:</strong> {{ executionResult.workflowDefinitionId }}</div>
-        <div><strong>Started At:</strong> {{ executionResult.startedAt || executionResult.createdAt }}</div>
-      </div>
-    </div>
   </c-modal-body>
   <c-modal-footer>
     <button (click)="closeExecuteModal()" cButton color="secondary">
@@ -734,6 +720,43 @@
     </button>
   </c-modal-footer>
 </c-modal>
+
+<!-- Execution Success Modal -->
+<c-modal id="executionSuccessModal" [visible]="showExecutionSuccessModal" (visibleChange)="showExecutionSuccessModal = $event">
+  <c-modal-header class="bg-dark text-light border-secondary">
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-check-circle" class="text-success" size="lg"></svg>
+      Execution Triggered Successfully ...
+    </h5>
+    <button (click)="closeSuccessModal()" cButtonClose class="btn-close-white"></button>
+  </c-modal-header>
+  <c-modal-body class="bg-dark text-light" *ngIf="executionResult">
+    <div class="p-3 bg-dark rounded border border-success mb-3">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="text-success mb-0 font-weight-bold">
+          <svg cIcon name="cil-check" class="me-1"></svg> Execution Started
+        </h6>
+        <span class="badge bg-success px-2 py-1">{{ (executionResult.status || 'running') | uppercase }}</span>
+      </div>
+      <div class="small font-monospace text-muted">
+        <div class="mb-1"><strong>Execution ID:</strong> <code class="text-info">{{ executionResult.id }}</code></div>
+        <div class="mb-1"><strong>Workflow ID:</strong> <code>{{ executionResult.workflowDefinitionId || lastExecutedWorkflow?.id }}</code></div>
+        <div class="mb-1" *ngIf="lastExecutedWorkflow?.name"><strong>Workflow Name:</strong> {{ lastExecutedWorkflow?.name }}</div>
+        <div><strong>Started At:</strong> {{ executionResult.startedAt || executionResult.createdAt || 'Just now' }}</div>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary d-flex justify-content-end gap-2">
+    <button (click)="closeSuccessModal()" cButton color="secondary">
+      Close
+    </button>
+    <button (click)="runAnotherWorkflow()" cButton color="primary">
+      <svg cIcon name="cil-media-play" class="me-1"></svg>
+      Run another workflow
+    </button>
+  </c-modal-footer>
+</c-modal>
+
 
 <!-- Executions List Modal -->
 <c-modal id="executionsModal" [visible]="showExecutionsModal" (visibleChange)="showExecutionsModal = $event" size="xl">

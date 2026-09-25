@@ -1,0 +1,328 @@
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0 d-flex align-items-center gap-2">
+      <svg cIcon name="cil-history" class="text-primary me-1"></svg>
+      Workflow Executions: <strong>{{ workflow?.name || workflowId }}</strong>
+      <span class="badge bg-dark text-info font-monospace ms-2" *ngIf="workflow?.code">{{ workflow?.code }}</span>
+      <span class="badge bg-secondary" *ngIf="workflow?.version">v{{ workflow?.version }}</span>
+    </h5>
+    <button cButton color="secondary" variant="outline" size="sm" (click)="navigateBack()">
+      <svg cIcon name="cil-arrow-left" class="me-1"></svg> Back to Workflows
+    </button>
+  </c-card-header>
+  <c-card-body>
+    <c-alert color="danger" *ngIf="executionsErrorMessage" dismissible>{{ executionsErrorMessage }}</c-alert>
+
+    <!-- Filters & Actions Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0 small text-muted">Status:</label>
+        <select cSelect [(ngModel)]="executionStatusFilter" (change)="loadExecutions()" class="form-select-sm" style="width: 160px;">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <button cButton color="secondary" variant="outline" size="sm" (click)="loadExecutions()" title="Refresh List">
+        <svg cIcon name="cil-reload" class="me-1"></svg> Refresh Executions
+      </button>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="text-center py-4" *ngIf="loadingExecutions">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading executions...</p>
+    </div>
+
+    <!-- Executions Table -->
+    <div class="table-responsive" *ngIf="!loadingExecutions">
+      <table cTable class="mt-2" [hover]="true">
+        <thead>
+          <tr>
+            <th>Execution ID</th>
+            <th>Execution Key</th>
+            <th>VNamespace</th>
+            <th>Status</th>
+            <th>Started At</th>
+            <th>Completed At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let exec of executionsList" class="align-middle" [class.table-active]="exec.id === selectedExecutionId">
+            <td>
+              <code class="font-monospace text-primary" style="font-size: 0.85rem;">{{ exec.id }}</code>
+            </td>
+            <td>
+              <span *ngIf="exec.executionKey" class="badge bg-dark font-monospace">{{ exec.executionKey }}</span>
+              <span *ngIf="!exec.executionKey" class="text-muted small">-</span>
+            </td>
+            <td>{{ exec.vnamespace || '-' }}</td>
+            <td>
+              <c-badge [color]="getExecutionStatusBadgeColor(exec.status)" shape="rounded-pill">
+                {{ exec.status | uppercase }}
+              </c-badge>
+            </td>
+            <td class="small">{{ exec.startedAt ? (exec.startedAt | date:'medium') : (exec.createdAt | date:'medium') }}</td>
+            <td class="small">{{ exec.completedAt ? (exec.completedAt | date:'medium') : '-' }}</td>
+            <td>
+              <button cButton color="info" size="sm" class="d-inline-flex align-items-center gap-1 text-nowrap" (click)="openExecutionDetail(exec.id)" title="View Full Execution Detail">
+                <svg cIcon name="cil-options" size="sm"></svg>
+                <span>Detail</span>
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="executionsList.length === 0">
+            <td colspan="7" class="text-center py-4 text-muted">
+              <svg cIcon name="cil-inbox" size="2xl" class="d-block mx-auto mb-2"></svg>
+              No executions found for this workflow definition.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- EXECUTION DETAIL MODAL -->
+<c-modal id="executionDetailModal" [visible]="showExecutionDetailModal" (visibleChange)="showExecutionDetailModal = $event" size="xl">
+  <c-modal-header class="bg-dark text-light border-secondary">
+    <h5 cModalTitle class="d-flex align-items-center gap-2">
+      <svg cIcon name="cil-options" class="text-info me-1"></svg>
+      Execution Detail: <code class="text-info">{{ selectedExecutionId }}</code>
+    </h5>
+    <button (click)="closeExecutionDetail()" cButtonClose class="btn-close-white"></button>
+  </c-modal-header>
+  <c-modal-body class="bg-dark text-light">
+    <c-alert color="danger" *ngIf="executionDetailError" dismissible>{{ executionDetailError }}</c-alert>
+
+    <div class="text-center py-4" *ngIf="loadingExecutionDetail">
+      <c-spinner></c-spinner>
+      <p class="mt-2 text-muted">Loading execution database details...</p>
+    </div>
+
+    <div *ngIf="!loadingExecutionDetail && selectedExecutionDetail">
+      <!-- Top Status Banner -->
+      <div class="card mb-3 bg-dark text-light border-secondary">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h6 class="mb-1 text-light">Execution ID: <code class="text-info">{{ selectedExecutionDetail.execution.id }}</code></h6>
+            <div class="small text-muted">
+              <span class="me-3">Definition ID: {{ selectedExecutionDetail.execution.workflowDefinitionId }}</span>
+              <span class="me-3">Version: v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }}</span>
+              <span *ngIf="selectedExecutionDetail.execution.executionKey">Key: <code>{{ selectedExecutionDetail.execution.executionKey }}</code></span>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <c-badge [color]="getExecutionStatusBadgeColor(selectedExecutionDetail.execution.status)" shape="rounded-pill" class="px-3 py-2 fs-6">
+              {{ selectedExecutionDetail.execution.status | uppercase }}
+            </c-badge>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Alert if Failed -->
+      <c-alert color="danger" *ngIf="selectedExecutionDetail.execution.error">
+        <strong>Execution Error:</strong> {{ selectedExecutionDetail.execution.error }}
+      </c-alert>
+
+      <!-- Navigation Tabs -->
+      <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'overview'" (click)="activeDetailTab = 'overview'">
+            <svg cIcon name="cil-task" class="me-1"></svg> DB Summary
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'payloads'" (click)="activeDetailTab = 'payloads'">
+            <svg cIcon name="cil-code" class="me-1"></svg> Inputs & Outputs
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'activities'" (click)="activeDetailTab = 'activities'">
+            <svg cIcon name="cil-list" class="me-1"></svg> Activities ({{ selectedExecutionDetail.jobs.length }})
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'tokens'" (click)="selectDetailTab('tokens')">
+            <svg cIcon name="cil-cursor" class="me-1"></svg> BPMN Tokens ({{ selectedExecutionDetail.tokens.length }})
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeDetailTab === 'diagram'" (click)="selectDetailTab('diagram')">
+            <svg cIcon name="cil-map" class="me-1"></svg> BPMN Diagram (v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }})
+          </button>
+        </li>
+      </ul>
+
+      <!-- TAB 1: OVERVIEW -->
+      <div *ngIf="activeDetailTab === 'overview'">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Database Metadata</div>
+              <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                  <tbody>
+                    <tr><td><strong>Execution ID:</strong></td><td><code>{{ selectedExecutionDetail.execution.id }}</code></td></tr>
+                    <tr><td><strong>Definition ID:</strong></td><td><code>{{ selectedExecutionDetail.execution.workflowDefinitionId }}</code></td></tr>
+                    <tr><td><strong>Version:</strong></td><td>v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }}</td></tr>
+                    <tr><td><strong>VNamespace:</strong></td><td>{{ selectedExecutionDetail.execution.vnamespace || '-' }}</td></tr>
+                    <tr><td><strong>Execution Key:</strong></td><td>{{ selectedExecutionDetail.execution.executionKey || '-' }}</td></tr>
+                    <tr><td><strong>Current Status:</strong></td><td>
+                      <c-badge [color]="getExecutionStatusBadgeColor(selectedExecutionDetail.execution.status)" shape="rounded-pill">
+                        {{ selectedExecutionDetail.execution.status | uppercase }}
+                      </c-badge>
+                    </td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Dates & Timestamps</div>
+              <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                  <tbody>
+                    <tr><td><strong>Started (StartedAt):</strong></td><td>{{ selectedExecutionDetail.execution.startedAt ? (selectedExecutionDetail.execution.startedAt | date:'medium') : '-' }}</td></tr>
+                    <tr><td><strong>Completed (CompletedAt):</strong></td><td>{{ selectedExecutionDetail.execution.completedAt ? (selectedExecutionDetail.execution.completedAt | date:'medium') : '-' }}</td></tr>
+                    <tr><td><strong>Created (CreatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.createdAt | date:'medium' }}</td></tr>
+                    <tr><td><strong>Updated (UpdatedAt):</strong></td><td>{{ selectedExecutionDetail.execution.updatedAt | date:'medium' }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: PAYLOADS (INPUT & OUTPUT ONLY - REMOVED StateData) -->
+      <div *ngIf="activeDetailTab === 'payloads'">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Initial Input</div>
+              <div class="card-body p-0">
+                <pre class="m-0 p-3 bg-dark text-success font-monospace rounded-bottom" style="max-height: 400px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.input) }}</pre>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100 border-secondary">
+              <div class="card-header font-weight-bold bg-dark text-light">Result (Output)</div>
+              <div class="card-body p-0">
+                <pre class="m-0 p-3 bg-dark text-info font-monospace rounded-bottom" style="max-height: 400px; overflow-y: auto;">{{ formatJson(selectedExecutionDetail.execution.output) }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: ACTIVITIES (JOBS) -->
+      <div *ngIf="activeDetailTab === 'activities'">
+        <div class="table-responsive">
+          <table cTable [hover]="true" class="align-middle">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Activity ID / Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Worker</th>
+                <th>Retries</th>
+                <th>Timestamps</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let j of selectedExecutionDetail.jobs">
+                <td><code class="font-monospace text-primary">{{ j.id }}</code></td>
+                <td>
+                  <strong>{{ j.activityName || j.activityId }}</strong>
+                  <div class="small text-muted font-monospace" *ngIf="j.activityName">{{ j.activityId }}</div>
+                </td>
+                <td><span class="badge bg-dark border border-secondary text-info font-monospace">{{ j.activityType || 'ServiceTask' }}</span></td>
+                <td>
+                  <c-badge [color]="j.status === 'completed' ? 'success' : (j.status === 'failed' ? 'danger' : 'warning')" shape="rounded-pill">
+                    {{ j.status | uppercase }}
+                  </c-badge>
+                </td>
+                <td><code>{{ j.assignedWorkerId || '-' }}</code></td>
+                <td>{{ j.retries }}/{{ j.maxRetries }}</td>
+                <td class="small">{{ j.createdAt | date:'medium' }}</td>
+              </tr>
+              <tr *ngIf="selectedExecutionDetail.jobs.length === 0">
+                <td colspan="7" class="text-center py-3 text-muted">
+                  No activity jobs recorded for this execution.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 4: TOKENS BPMN -->
+      <div *ngIf="activeDetailTab === 'tokens'">
+        <div class="table-responsive">
+          <table cTable [hover]="true" class="align-middle">
+            <thead>
+              <tr>
+                <th>Token ID</th>
+                <th>Current BPMN Node</th>
+                <th>Token Status</th>
+                <th>Parent Token ID</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of selectedExecutionDetail.tokens">
+                <td><code class="font-monospace text-warning">{{ t.id }}</code></td>
+                <td><code>{{ t.currentNodeId }}</code></td>
+                <td>
+                  <c-badge [color]="t.status === 'active' ? 'success' : (t.status === 'waiting' ? 'info' : 'secondary')" shape="rounded-pill">
+                    {{ t.status | uppercase }}
+                  </c-badge>
+                </td>
+                <td><code class="text-muted">{{ t.parentTokenId || '-' }}</code></td>
+                <td class="small">{{ t.updatedAt | date:'medium' }}</td>
+              </tr>
+              <tr *ngIf="selectedExecutionDetail.tokens.length === 0">
+                <td colspan="5" class="text-center py-3 text-muted">
+                  No BPMN tokens recorded for this execution.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 5: DIAGRAM SNAPSHOT WITH REFRESH BUTTON -->
+      <div *ngIf="activeDetailTab === 'diagram'">
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-dark rounded border border-secondary text-light">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold">BPMN Diagram (v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }})</span>
+            <span class="badge bg-info text-dark">Active Tokens Highlighted</span>
+          </div>
+          <button cButton color="secondary" variant="outline" size="sm" (click)="refreshDiagram()" title="Refresh Diagram and Execution State">
+            <svg cIcon name="cil-reload" class="me-1"></svg> Refresh Diagram
+          </button>
+        </div>
+        <div style="height: 540px; width: 100%; position: relative;" class="border rounded bg-dark">
+          <app-bpmn-designer
+            #executionBpmnDesigner
+            [payload]="getExecutionSnapshotPayload()"
+            [readonly]="true">
+          </app-bpmn-designer>
+        </div>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer class="bg-dark border-secondary">
+    <button (click)="closeExecutionDetail()" cButton color="secondary">
+      Close
+    </button>
+  </c-modal-footer>
+</c-modal>

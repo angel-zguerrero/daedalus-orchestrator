@@ -5,6 +5,13 @@
 @import '@bpmn-io/element-template-chooser/dist/element-template-chooser.css';
 @import 'bpmn-js-bpmnlint/dist/assets/css/bpmn-js-bpmnlint.css';
 
+/* Hide "No Issues" badge from bpmnlint overlay */
+.bjsl-button,
+.bjsl-button-success,
+.bjsl-button-inactive {
+  display: none !important;
+}
+
 :host {
   display: flex;
   flex-direction: column;
@@ -20,145 +27,177 @@
   height: 100%;
   flex: 1;
   min-height: 500px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
-  background-color: #12141a;
+  background-color: #1a1e24;
 
   .bpmn-designer-container {
     display: flex;
     flex-direction: row;
     width: 100%;
+    height: 100%;
     flex: 1;
-    min-height: 350px;
+    min-height: 450px;
     border: none;
     border-radius: 0;
     overflow: hidden;
     position: relative;
     background-color: #ffffff;
 
-  .djs-palette {
-    .entry[data-action="create.subprocess-expanded"],
-    .entry[data-action="create.data-object"],
-    .entry[data-action="create.data-store"],
-    .entry[data-action="create.participant-expanded"],
-    .entry[data-action="create.group"] {
+    .djs-palette {
+      .entry[data-action="create.subprocess-expanded"],
+      .entry[data-action="create.data-object"],
+      .entry[data-action="create.data-store"],
+      .entry[data-action="create.participant-expanded"],
+      .entry[data-action="create.group"] {
+        display: none !important;
+      }
+    }
+
+    .bjs-powered-by {
       display: none !important;
     }
-  }
 
-  .bjs-powered-by {
-    display: none !important;
-  }
+    .bpmn-canvas {
+      flex: 1 1 0%;
+      min-width: 0;
+      height: 100%;
+      width: 100%;
+      min-height: 450px;
+      position: relative;
+      background-color: #ffffff;
 
-  .bpmn-canvas {
-    flex: 1;
-    height: 100%;
-    width: 100%;
-    position: relative;
-    background-color: #f8f9fa;
-  }
+      .bpmn-zoom-overlay {
+        position: absolute;
+        top: 20px;
+        left: 145px;
+        z-index: 1000;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(15, 23, 42, 0.92);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        padding: 4px 6px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 
-  .bpmn-properties-panel {
-    width: 380px;
-    height: 100%;
-    border-left: 1px solid rgba(0, 0, 0, 0.1);
-    background-color: #212631;
-    overflow-y: auto;
-    color: #e0e0e0;
+        .overlay-divider {
+          width: 1px;
+          height: 18px;
+          background-color: rgba(255, 255, 255, 0.2);
+          margin: 0 4px;
+        }
 
-    /* Hide Unsupported Groups & Entries */
-    [data-group-id*="historyTimeToLive"],
-    [data-group-id*="historyCleanUp"],
-    [data-group-id*="history"],
-    [data-group-id*="tasklist"],
-    [data-group-id*="taskList"],
-    [data-group-id*="candidateStarter"],
-    [data-group-id*="externalTask"],
-    [data-group-id*="jobExecution"],
-    [data-group-id*="jobConfiguration"],
-    [data-group-id*="executionListeners"],
-    [data-group-id*="extensionProperties"],
-    [data-group-id*="async"],
-    [data-group-id*="asynchronous"],
-    [data-group-id*="initiator"],
-    [data-entry-id*="historyTimeToLive"],
-    [data-entry-id*="isStartableInTasklist"],
-    [data-entry-id*="candidateStarter"],
-    [data-entry-id*="externalTask"],
-    [data-entry-id*="jobPriority"],
-    [data-entry-id*="executionListeners"],
-    [data-entry-id*="extensionProperties"],
-    [data-entry-id*="isExecutable"],
-    [data-entry-id*="executable"],
-    [data-entry-id*="initiator"],
-    [data-entry-id*="asyncBefore"],
-    [data-entry-id*="asyncAfter"],
-    [data-entry-id*="async"] {
-      display: none !important;
-    }
-  }
+        .symbol-icon {
+          font-size: 1.1rem;
+          line-height: 1;
+          display: inline-block;
+        }
 
-  .bpmn-zoom-overlay {
-    position: absolute;
-    bottom: 24px;
-    left: 24px;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(15, 23, 42, 0.88);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 4px 6px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+        .zoom-btn {
+          background: transparent;
+          border: none;
+          color: #f8fafc;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.8rem;
+          font-weight: 600;
+          transition: all 0.15s ease-in-out;
 
-    .overlay-divider {
-      width: 1px;
-      height: 18px;
-      background-color: rgba(255, 255, 255, 0.2);
-      margin: 0 4px;
+          &:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+            color: #38bdf8;
+          }
+
+          &:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+          }
+
+          &.text-btn {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+        }
+      }
     }
 
-    .symbol-icon {
-      font-size: 1.1rem;
-      line-height: 1;
-      display: inline-block;
-    }
-
-    .zoom-btn {
-      background: transparent;
-      border: none;
-      color: #f8fafc;
+    .bpmn-properties-panel {
+      flex: 0 0 380px;
+      width: 380px;
+      height: 100%;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 600;
-      transition: all 0.15s ease-in-out;
+      flex-direction: column;
+      border-left: 1px solid rgba(255, 255, 255, 0.15);
+      background-color: #212631;
+      overflow-y: auto;
+      color: #e0e0e0;
 
-      &:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.15);
-        color: #38bdf8;
+      .bio-properties-panel {
+        width: 100%;
+        height: 100%;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
       }
 
-      &:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
+      /* Hide Unsupported Groups & Entries */
+      [data-group-id*="historyTimeToLive"],
+      [data-group-id*="historyCleanUp"],
+      [data-group-id*="history"],
+      [data-group-id*="tasklist"],
+      [data-group-id*="taskList"],
+      [data-group-id*="candidateStarter"],
+      [data-group-id*="externalTask"],
+      [data-group-id*="jobExecution"],
+      [data-group-id*="jobConfiguration"],
+      [data-group-id*="executionListeners"],
+      [data-group-id*="extensionProperties"],
+      [data-group-id*="async"],
+      [data-group-id*="asynchronous"],
+      [data-group-id*="initiator"],
+      [data-entry-id*="historyTimeToLive"],
+      [data-entry-id*="isStartableInTasklist"],
+      [data-entry-id*="candidateStarter"],
+      [data-entry-id*="externalTask"],
+      [data-entry-id*="jobPriority"],
+      [data-entry-id*="executionListeners"],
+      [data-entry-id*="extensionProperties"],
+      [data-entry-id*="isExecutable"],
+      [data-entry-id*="executable"],
+      [data-entry-id*="initiator"],
+      [data-entry-id*="asyncBefore"],
+      [data-entry-id*="asyncAfter"],
+      [data-entry-id*="async"] {
+        display: none !important;
       }
+    }
 
-      &.text-btn {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
+    .bpmn-element-inspector {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      width: 360px;
+      max-width: calc(100% - 30px);
+      z-index: 1050;
+      background-color: #212631;
+      border-color: rgba(255, 255, 255, 0.15) !important;
     }
   }
 
   &.is-readonly {
+    .bpmn-zoom-overlay {
+      left: 20px !important;
+    }
+
     .bpmn-properties-panel {
       display: none !important;
     }
@@ -168,10 +207,10 @@
       flex: 1 1 100% !important;
     }
   }
-}
 
 /* Comprehensive Dark-Mode Styling & Contrast Overrides for Properties Panel */
 .bio-properties-panel {
+  --bio-properties-panel-bg: #212631;
   --bio-surface: #212631 !important;
   --bio-surface-overlay: #212631 !important;
   --bio-surface-subtle: #2a303d !important;
@@ -186,12 +225,6 @@
   background-color: #212631 !important;
   color: #f8fafc !important;
 
-  *,
-  div,
-  span,
-  label,
-  p,
-  section,
   .bio-properties-panel-group,
   .bio-properties-panel-group-entries,
   .bio-properties-panel-entry,
@@ -205,11 +238,6 @@
   .bio-properties-panel-group-header {
     background-color: #2a303d !important;
     color: #ffffff !important;
-
-    * {
-      background-color: #2a303d !important;
-      color: #ffffff !important;
-    }
   }
 
   .bio-properties-panel-label {
@@ -236,6 +264,12 @@
     color: #ffffff !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     border-radius: 4px !important;
+    padding: 6px 10px !important;
+
+    &:focus {
+      border-color: #38bdf8 !important;
+      outline: none !important;
+    }
 
     option {
       background-color: #181b22 !important;
