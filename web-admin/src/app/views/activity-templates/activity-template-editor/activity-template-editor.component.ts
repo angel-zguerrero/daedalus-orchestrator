@@ -445,9 +445,30 @@ export class ActivityTemplateEditorComponent implements OnInit {
     this.validateTemplate();
   }
 
+  private normalizeTemplateProperties(parsed: any): boolean {
+    if (!parsed || !Array.isArray(parsed.properties)) return false;
+    let modified = false;
+    parsed.properties.forEach((p: any) => {
+      const bName = (p.binding?.name || '').trim();
+      if (bName === 'resultVariable' || bName === 'camunda:resultVariable') {
+        if (p.binding?.type !== 'property' || p.binding?.name !== 'camunda:resultVariable') {
+          p.binding = {
+            type: 'property',
+            name: 'camunda:resultVariable'
+          };
+          modified = true;
+        }
+      }
+    });
+    return modified;
+  }
+
   parsePreviewGroups(): void {
     try {
       const parsed = JSON.parse(this.payloadJson);
+      if (this.normalizeTemplateProperties(parsed)) {
+        this.payloadJson = JSON.stringify(parsed, null, 2);
+      }
       const groupsDef: { id: string; label: string }[] = Array.isArray(parsed.groups)
         ? parsed.groups
         : [];
@@ -502,6 +523,7 @@ export class ActivityTemplateEditorComponent implements OnInit {
       const parsed = JSON.parse(this.payloadJson);
       if (Array.isArray(parsed.properties) && parsed.properties[prop.index]) {
         parsed.properties[prop.index].value = newValue;
+        this.normalizeTemplateProperties(parsed);
         this.payloadJson = JSON.stringify(parsed, null, 2);
         prop.value = newValue;
         this.validateTemplate();
@@ -515,6 +537,8 @@ export class ActivityTemplateEditorComponent implements OnInit {
       if (Array.isArray(parsed.properties) && parsed.properties[prop.index]) {
         const nextEditable = !prop.editable;
         parsed.properties[prop.index].editable = nextEditable;
+        parsed.properties[prop.index].value = prop.value;
+        this.normalizeTemplateProperties(parsed);
         this.payloadJson = JSON.stringify(parsed, null, 2);
         prop.editable = nextEditable;
         this.validateTemplate();
@@ -586,6 +610,7 @@ export class ActivityTemplateEditorComponent implements OnInit {
       parsed.id = code;
       parsed.name = name;
       parsed.category = { id: activityFamily, name: `Family: ${activityFamily}` };
+      this.normalizeTemplateProperties(parsed);
       finalPayloadStr = JSON.stringify(parsed, null, 2);
       this.payloadJson = finalPayloadStr;
     } catch {}
