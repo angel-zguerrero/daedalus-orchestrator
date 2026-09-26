@@ -68,7 +68,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   @ViewChild('canvasRef', { static: true }) private canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('propertiesRef', { static: true }) private propertiesRef!: ElementRef<HTMLDivElement>;
   @ViewChild('fileInputRef') private fileInputRef?: ElementRef<HTMLInputElement>;
-  @ViewChild('errorsSectionRef') private errorsSectionRef?: ElementRef<HTMLDivElement>;
+  @ViewChild(DesignErrorsConsoleComponent) private errorsConsoleComp?: DesignErrorsConsoleComponent;
 
   @Input() payload: string = '';
   @Input() readonly: boolean = false;
@@ -81,9 +81,15 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   public hasLintErrors: boolean = false;
   public selectedElementInfo: any = null;
 
+  public toggleErrorsConsole(): void {
+    if (this.errorsConsoleComp) {
+      this.errorsConsoleComp.toggleCollapse();
+    }
+  }
+
   public scrollToErrorsSection(): void {
-    if (this.errorsSectionRef && this.errorsSectionRef.nativeElement) {
-      this.errorsSectionRef.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (this.errorsConsoleComp && this.errorsConsoleComp.isCollapsed) {
+      this.errorsConsoleComp.isCollapsed = false;
     }
   }
 
