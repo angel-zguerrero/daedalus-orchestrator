@@ -292,7 +292,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				allTokens, _ := tokenRepo.GetTokensByExecutionID(execution.ID, now)
 				arrivedCount := 0
 				for _, t := range allTokens {
-					if t.CurrentNodeID == currentNode.ID {
+					if t.CurrentNodeID == currentNode.ID && (t.Status == models.ExecutionTokenStatusWaiting || t.ID == token.ID) {
 						arrivedCount++
 					}
 				}
@@ -313,6 +313,14 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 						Str("gatewayID", currentNode.ID).
 						Msg("⏳ Parallel Join Gateway: Waiting for remaining branches to arrive")
 					goto SaveExecutionState
+				}
+
+				// All incoming parallel branches arrived: complete all waiting tokens at this gateway
+				for i := range allTokens {
+					if allTokens[i].CurrentNodeID == currentNode.ID && allTokens[i].ID != token.ID && allTokens[i].Status != models.ExecutionTokenStatusCancelled {
+						allTokens[i].Status = models.ExecutionTokenStatusCompleted
+						tokenRepo.UpdateExecutionToken(&allTokens[i], now)
+					}
 				}
 
 				token.Status = models.ExecutionTokenStatusCompleted
@@ -1164,6 +1172,14 @@ CheckExecutionCompletion:
 			execution.Status = models.WorkflowExecutionStatusCompleted
 			execution.CompletedAt = &now
 			execution.Output = execution.StateData
+
+			// Ensure all remaining tokens are cleanly marked completed so none remain in 'waiting'
+			for i := range allTokens {
+				if allTokens[i].Status == models.ExecutionTokenStatusWaiting {
+					allTokens[i].Status = models.ExecutionTokenStatusCompleted
+					tokenRepo.UpdateExecutionToken(&allTokens[i], now)
+				}
+			}
 		}
 	}
 

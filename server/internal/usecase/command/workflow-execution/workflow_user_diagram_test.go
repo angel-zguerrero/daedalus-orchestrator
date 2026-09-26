@@ -115,7 +115,7 @@ const userDiagramBPMN = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmn:process>
 </bpmn:definitions>`
 
-func runWorkflowExecutionTest(t *testing.T, defID string, input map[string]interface{}) (map[string]bool, *models.WorkflowExecution) {
+func runWorkflowExecutionTest(t *testing.T, defID string, input map[string]interface{}) (map[string]bool, *models.WorkflowExecution, []models.ExecutionToken) {
 	store := newTestPebbleStore(t)
 	uow := db.NewUnitOfWork(store, nil)
 	now := time.Now()
@@ -230,14 +230,25 @@ func runWorkflowExecutionTest(t *testing.T, defID string, input map[string]inter
 	require.NoError(t, err)
 	finalExec, _ := execRepo.GetWorkflowExecutionByID(exec.ID, now)
 
-	return executedActivities, finalExec
+	tokenRepo, err := db.NewExecutionTokenRepository(execUow, idFactory, "default", "default")
+	require.NoError(t, err)
+	tokens, err := tokenRepo.GetTokensByExecutionID(exec.ID, now)
+	require.NoError(t, err)
+
+	return executedActivities, finalExec, tokens
 }
 
 func TestWorkflow_UserDiagram_NameAngel(t *testing.T) {
-	executed, finalExec := runWorkflowExecutionTest(t, "def_angel", map[string]interface{}{"name": "angel"})
+	executed, finalExec, tokens := runWorkflowExecutionTest(t, "def_angel", map[string]interface{}{"name": "angel"})
 
 	t.Logf("Final execution status: %s, error: %s", finalExec.Status, finalExec.Error)
 	assert.Equal(t, models.WorkflowExecutionStatusCompleted, finalExec.Status)
+
+	assert.NotEmpty(t, tokens, "Workflow should have recorded execution tokens")
+	for _, tok := range tokens {
+		assert.NotEqual(t, models.ExecutionTokenStatusWaiting, tok.Status, "Token %s at %s must not remain in waiting status", tok.ID, tok.CurrentNodeID)
+		assert.Equal(t, models.ExecutionTokenStatusCompleted, tok.Status, "Token %s at %s must be completed", tok.ID, tok.CurrentNodeID)
+	}
 
 	assert.True(t, executed["Activity_1pxklqa"], "Proceso Pesado must be executed")
 	assert.True(t, executed["Activity_0wfmm60"], "Leguear must be executed")
@@ -249,10 +260,16 @@ func TestWorkflow_UserDiagram_NameAngel(t *testing.T) {
 }
 
 func TestWorkflow_UserDiagram_NameReina(t *testing.T) {
-	executed, finalExec := runWorkflowExecutionTest(t, "def_reina", map[string]interface{}{"name": "reina"})
+	executed, finalExec, tokens := runWorkflowExecutionTest(t, "def_reina", map[string]interface{}{"name": "reina"})
 
 	t.Logf("Final execution status: %s, error: %s", finalExec.Status, finalExec.Error)
 	assert.Equal(t, models.WorkflowExecutionStatusCompleted, finalExec.Status)
+
+	assert.NotEmpty(t, tokens, "Workflow should have recorded execution tokens")
+	for _, tok := range tokens {
+		assert.NotEqual(t, models.ExecutionTokenStatusWaiting, tok.Status, "Token %s at %s must not remain in waiting status", tok.ID, tok.CurrentNodeID)
+		assert.Equal(t, models.ExecutionTokenStatusCompleted, tok.Status, "Token %s at %s must be completed", tok.ID, tok.CurrentNodeID)
+	}
 
 	assert.True(t, executed["Activity_0kpgn1l"], "Proceso Ligero must be executed")
 	assert.True(t, executed["Activity_0wfmm60"], "Leguear must be executed")
@@ -261,4 +278,65 @@ func TestWorkflow_UserDiagram_NameReina(t *testing.T) {
 	assert.False(t, executed["Activity_1pxklqa"], "Proceso Pesado must NOT be executed")
 	assert.False(t, executed["Activity_1ewq0xm"], "Saludar por REdus must NOT be executed")
 	assert.False(t, executed["Activity_1a0x9p7"], "Saludar por http def must NOT be executed")
+}
+
+func TestGetWorkflowExecution_WaitingTokenSelfHealing(t *testing.T) {
+	store := newTestPebbleStore(t)
+	uow := db.NewUnitOfWork(store, nil)
+	now := time.Now()
+	idFactory := &db.DeterministicIDGeneratorFactory{}
+
+	execRepo, err := db.NewWorkflowExecutionRepository(uow, idFactory, "default", "default")
+	require.NoError(t, err)
+
+	tokenRepo, err := db.NewExecutionTokenRepository(uow, idFactory, "default", "default")
+	require.NoError(t, err)
+
+	execID := "exec_self_heal_01"
+	execution := &models.WorkflowExecution{
+		ID:                   execID,
+		WorkflowDefinitionID: "def_test",
+		VNamespace:           "default",
+		Status:               models.WorkflowExecutionStatusCompleted,
+		CreatedAt:            now,
+		UpdatedAt:            now,
+	}
+	_, err = execRepo.CreateWorkflowExecution(execution, now)
+	require.NoError(t, err)
+
+	tokenID := "tok_waiting_01"
+	token := &models.ExecutionToken{
+		ID:                  tokenID,
+		WorkflowExecutionID: execID,
+		CurrentNodeID:       "Gateway_join",
+		Status:              models.ExecutionTokenStatusWaiting,
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	_, err = tokenRepo.CreateExecutionToken(token, now)
+	require.NoError(t, err)
+	require.NoError(t, uow.Commit())
+
+	// Run GetWorkflowExecutionCommand
+	getUow := db.NewUnitOfWork(store, nil)
+	getCmd := &workflowExecCommand.GetWorkflowExecutionCommand{
+		ID:  execID,
+		CF:  "default",
+		CFS: "default",
+	}
+	res := getCmd.Execute(getUow, now)
+	require.Empty(t, res.Error)
+	require.NoError(t, getUow.Commit())
+
+	detail := res.Result.(workflowExecCommand.WorkflowExecutionDetail)
+	require.Len(t, detail.Tokens, 1)
+	assert.Equal(t, models.ExecutionTokenStatusCompleted, detail.Tokens[0].Status, "Returned token status must be self-healed to completed")
+
+	// Verify persistence in DB
+	checkUow := db.NewUnitOfWork(store, nil)
+	checkRepo, err := db.NewExecutionTokenRepository(checkUow, idFactory, "default", "default")
+	require.NoError(t, err)
+	storedTok, err := checkRepo.GetExecutionTokenByID(tokenID, now)
+	require.NoError(t, err)
+	assert.Equal(t, models.ExecutionTokenStatusCompleted, storedTok.Status, "Persisted token status must be updated to completed")
 }
