@@ -96,7 +96,7 @@ export class ActivityTemplateEditorComponent implements OnInit {
   // Activity Family Autocomplete
   activityFamilyCtrl = new FormControl('default', Validators.required);
   filteredActivityFamilies!: Observable<string[]>;
-  knownFamilies: string[] = ['default', 'cache', 'http', 'logging', 'messaging', 'database'];
+  knownFamilies: string[] = ['default', 'cache', 'http', 'logging', 'messaging', 'database', 'scripting'];
 
   // VNamespace Autocomplete
   vnamespaceCtrl = new FormControl('default');

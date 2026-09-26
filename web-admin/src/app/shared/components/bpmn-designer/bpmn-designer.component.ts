@@ -148,6 +148,19 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     if (bo.formKey || (bo.$attrs && bo.$attrs['camunda:formKey'])) {
       attrs.push({ key: 'Form Key', value: bo.formKey || bo.$attrs['camunda:formKey'], category: 'Form' });
     }
+    if (bo.scriptFormat || (bo.$attrs && bo.$attrs['camunda:scriptFormat'])) {
+      attrs.push({ key: 'Script Format', value: bo.scriptFormat || bo.$attrs['camunda:scriptFormat'], category: 'Script' });
+    }
+    if (bo.script) {
+      attrs.push({ key: 'Script Code', value: bo.script, category: 'Script' });
+    }
+    if (bo.resultVariable || (bo.$attrs && (bo.$attrs['camunda:resultVariable'] || bo.$attrs['resultVariable']))) {
+      attrs.push({
+        key: 'Output Result Variable',
+        value: bo.resultVariable || bo.$attrs['camunda:resultVariable'] || bo.$attrs['resultVariable'],
+        category: 'Outputs'
+      });
+    }
 
     // Sequence Flow details
     if (bo.sourceRef) {
@@ -345,8 +358,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             const entries = origGetContextPadEntries(element);
             const elementType = element && element.type ? element.type.toLowerCase() : '';
             const isGateway = elementType.includes('gateway');
+            const isTask = elementType.includes('task');
             const isFlow = elementType.includes('flow') || elementType.includes('sequence') || elementType.includes('association');
-            if (!isGateway && !isFlow) {
+            if (!isGateway && !isTask && !isFlow) {
               delete entries['replace'];
             }
             return entries;
@@ -362,14 +376,43 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           const origGetEntries = replaceMenuProvider.getEntries.bind(replaceMenuProvider);
           replaceMenuProvider.getEntries = function(element: any) {
             const entries = origGetEntries(element);
+            const elementType = element && element.type ? element.type.toLowerCase() : '';
+            const isTaskElement = elementType.includes('task');
+
             if (Array.isArray(entries)) {
               return entries.filter((e: any) => {
                 const id = (e.id || e.actionName || '').toLowerCase();
                 const label = (e.label || e.name || '').toLowerCase();
-                return !id.includes('complex') && !id.includes('event-based') &&
-                       !label.includes('complex') && !label.includes('event-based');
+                if (id.includes('complex') || id.includes('event-based') ||
+                    label.includes('complex') || label.includes('event-based')) {
+                  return false;
+                }
+                if (isTaskElement) {
+                  return id.startsWith('apply-template') ||
+                         id.includes('template') ||
+                         id.includes('connector') ||
+                         id === 'replace-with-task' ||
+                         id === 'replace-with-script-task' ||
+                         id === 'replace-with-service-task';
+                }
+                return true;
               });
             } else if (entries && typeof entries === 'object') {
+              if (isTaskElement) {
+                Object.keys(entries).forEach((k) => {
+                  const lowerK = k.toLowerCase();
+                  const isAllowed = lowerK.startsWith('apply-template') ||
+                                    lowerK.includes('template') ||
+                                    lowerK.includes('connector') ||
+                                    lowerK === 'replace-with-task' ||
+                                    lowerK === 'replace-with-script-task' ||
+                                    lowerK === 'replace-with-service-task';
+                  if (!isAllowed) {
+                    delete entries[k];
+                  }
+                });
+                return entries;
+              }
               delete entries['replace-with-complex-gateway'];
               delete entries['replace-with-event-based-gateway'];
               return entries;
@@ -548,6 +591,89 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               id,
               `Implicit Split Error: ${displayName} (${type}) has multiple outgoing sequence flows without a Gateway. Use an explicit Gateway (e.g. Parallel or Exclusive Gateway) to split execution paths.`
             );
+          }
+
+          // 1b. Script Task / JavaScript Connector Validation:
+          const bo = el.businessObject || {};
+          const tplAttr = (bo.modelerTemplate || bo.$attrs?.['camunda:modelerTemplate'] || '').toLowerCase();
+          let extPropsMap: Record<string, string> = {};
+          if (bo.extensionElements && Array.isArray(bo.extensionElements.values)) {
+            bo.extensionElements.values.forEach((ext: any) => {
+              const extType = (ext.$type || '').toLowerCase();
+              if (extType.includes('properties') && Array.isArray(ext.values)) {
+                ext.values.forEach((p: any) => {
+                  if (p && p.name) {
+                    extPropsMap[String(p.name).trim()] = String(p.value || '').trim();
+                  }
+                });
+              }
+            });
+          }
+
+          const isScriptTask =
+            type === 'ScriptTask' ||
+            tplAttr.includes('scripttask') ||
+            extPropsMap['script'] !== undefined ||
+            extPropsMap['scriptFormat'] !== undefined;
+
+          if (isScriptTask) {
+            const rawFormat = (
+              bo.scriptFormat ||
+              bo.$attrs?.['camunda:scriptFormat'] ||
+              bo.$attrs?.['scriptFormat'] ||
+              extPropsMap['scriptFormat'] ||
+              (type === 'ScriptTask' ? '' : 'javascript')
+            ).trim().toLowerCase();
+
+            const validJsFormats = ['javascript', 'java script', 'js', 'ecmascript'];
+            if (!rawFormat || !validJsFormats.includes(rawFormat)) {
+              addElementError(
+                id,
+                `Script Task ${displayName}: Script Format must be 'JavaScript' ('javascript'). Currently only JavaScript is supported.`
+              );
+            }
+
+            const rawScriptBody = (
+              bo.script ||
+              bo.$attrs?.['camunda:script'] ||
+              extPropsMap['script'] ||
+              extPropsMap['scriptBody'] ||
+              ''
+            ).trim();
+
+            const strippedComments = rawScriptBody
+              .replace(/\/\*[\s\S]*?\*\//g, '')
+              .replace(/\/\/.*$/gm, '')
+              .trim();
+
+            if (!strippedComments) {
+              addElementError(
+                id,
+                `Script Task ${displayName}: Script code cannot be empty.`
+              );
+            } else if (!/\breturn\b\s*[^;\s}]+/.test(strippedComments)) {
+              addElementError(
+                id,
+                `Script Task ${displayName}: A 'return <value>;' statement is mandatory in the JavaScript code.`
+              );
+            }
+
+            const rawResultVar = (
+              bo.resultVariable ||
+              bo.$attrs?.['camunda:resultVariable'] ||
+              bo.$attrs?.['resultVariable'] ||
+              extPropsMap['resultVariable'] ||
+              extPropsMap['camunda:resultVariable'] ||
+              extPropsMap['outputVariable'] ||
+              ''
+            ).trim();
+
+            if (!rawResultVar) {
+              addElementError(
+                id,
+                `Script Task ${displayName}: Output Result Variable Name (resultVariable) is required to map the script return value.`
+              );
+            }
           }
 
           // 2. Gateway & Split Divergence checks:
@@ -976,9 +1102,6 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'async',
       'async before',
       'async after',
-      'script format',
-      'script body',
-      'script language',
       'condition script'
     ];
 
@@ -1002,9 +1125,6 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'async',
       'asyncbefore',
       'asyncafter',
-      'scriptformat',
-      'scriptbody',
-      'scriptlanguage',
       'conditionscript'
     ];
 
@@ -1046,6 +1166,56 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           if (val === 'script' || txt.includes('script')) {
             opt.remove();
           }
+        });
+      });
+
+      // Enhance native ScriptTask scriptFormat inputs into a dropdown constrained to 'javascript' ("JavaScript")
+      const scriptFormatInputs = parent.querySelectorAll('[data-entry-id*="scriptFormat"] input, input[name*="scriptFormat"]');
+      scriptFormatInputs.forEach((inpEl) => {
+        const input = inpEl as HTMLInputElement;
+        if (!input || input.dataset['jsEnhanced']) return;
+        input.dataset['jsEnhanced'] = 'true';
+        input.style.display = 'none';
+
+        const select = document.createElement('select');
+        select.className = 'bio-properties-panel-input bio-properties-panel-select';
+        select.style.width = '100%';
+        select.style.backgroundColor = '#181b22';
+        select.style.color = '#ffffff';
+        select.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        select.style.borderRadius = '4px';
+        select.style.padding = '6px 8px';
+        select.style.marginTop = '4px';
+
+        const jsOpt = document.createElement('option');
+        jsOpt.value = 'javascript';
+        jsOpt.textContent = 'JavaScript';
+        jsOpt.selected = true;
+        select.appendChild(jsOpt);
+
+        input.parentNode?.insertBefore(select, input.nextSibling);
+
+        if (!input.value || input.value.toLowerCase() !== 'javascript') {
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+          if (nativeSetter) {
+            nativeSetter.call(input, 'javascript');
+          } else {
+            input.value = 'javascript';
+          }
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        select.addEventListener('change', () => {
+          const chosen = select.value || 'javascript';
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+          if (nativeSetter) {
+            nativeSetter.call(input, chosen);
+          } else {
+            input.value = chosen;
+          }
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
         });
       });
     };

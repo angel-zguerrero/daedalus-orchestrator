@@ -116,7 +116,7 @@ export class ActivityTemplatesComponent implements OnInit, OnChanges {
   activityFamilyFilterCtrl = new FormControl('');
   filteredFilterActivityFamilies!: Observable<string[]>;
   selectedActivityFamilyFilter: string = '';
-  knownFamilies: string[] = ['default', 'cache', 'http', 'logging', 'messaging', 'database'];
+  knownFamilies: string[] = ['default', 'cache', 'http', 'logging', 'messaging', 'database', 'scripting'];
 
   // VNamespace Autocomplete (for tenant scope, same as Workflows)
   vnamespaceCtrl = new FormControl('default');

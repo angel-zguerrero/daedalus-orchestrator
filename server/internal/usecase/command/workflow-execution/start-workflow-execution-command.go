@@ -98,6 +98,11 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		}
 	}
 
+	if err := bpmn.ValidateScriptTasks(bpmnModel); err != nil {
+		commandResult.Error = fmt.Sprintf("invalid script task configuration: %s", err.Error())
+		return *commandResult
+	}
+
 	vns := cmd.VNamespace
 	if vns == "" {
 		vns = def.VNamespace
