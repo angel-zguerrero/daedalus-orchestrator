@@ -88,9 +88,15 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 		return *commandResult
 	}
 
-	if token.Status != models.ExecutionTokenStatusActive {
+	if token.Status != models.ExecutionTokenStatusActive && token.Status != models.ExecutionTokenStatusWaiting {
 		commandResult.Result = execution
 		return *commandResult
+	}
+
+	wasWaitingToken := token.Status == models.ExecutionTokenStatusWaiting
+	if token.Status == models.ExecutionTokenStatusWaiting {
+		token.Status = models.ExecutionTokenStatusActive
+		tokenRepo.UpdateExecutionToken(token, now)
 	}
 
 	def, err := defRepo.GetWorkflowDefinitionByID(execution.WorkflowDefinitionID, now)
@@ -311,6 +317,14 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 				token.Status = models.ExecutionTokenStatusCompleted
 				tokenRepo.UpdateExecutionToken(token, now)
+
+				// Complete all other branch tokens that were waiting at this join gateway
+				for _, t := range allTokens {
+					if t.CurrentNodeID == currentNode.ID && (t.Status == models.ExecutionTokenStatusWaiting || t.Status == models.ExecutionTokenStatusActive) {
+						t.Status = models.ExecutionTokenStatusCompleted
+						tokenRepo.UpdateExecutionToken(&t, now)
+					}
+				}
 
 				log.Info().
 					Str("executionID", execution.ID).
@@ -914,6 +928,209 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			// Stop advancing this token until job completes
 			goto SaveExecutionState
 
+		case bpmn.ElementIntermediateCatchEvent, bpmn.ElementIntermediateThrowEvent, bpmn.ElementBoundaryEvent:
+			rawDuration := currentNode.Properties["timeDuration"]
+			rawDate := currentNode.Properties["timeDate"]
+			rawCycle := currentNode.Properties["timeCycle"]
+
+			if rawDuration == "" && rawDate == "" && rawCycle == "" {
+				// Untyped intermediate event: pass through to outgoing flow
+				outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
+				if len(outgoing) > 0 {
+					token.CurrentNodeID = outgoing[0].TargetRef
+					tokenRepo.UpdateExecutionToken(token, now)
+					continue
+				} else {
+					token.Status = models.ExecutionTokenStatusCompleted
+					tokenRepo.UpdateExecutionToken(token, now)
+					goto CheckExecutionCompletion
+				}
+			}
+
+			// If token was already put into waiting state for this timer, its scheduled time has elapsed
+			if wasWaitingToken {
+				wasWaitingToken = false
+				log.Info().
+					Str("executionID", execution.ID).
+					Str("tokenID", token.ID).
+					Str("nodeID", currentNode.ID).
+					Msg("✅ Scheduled timer elapsed! Token resuming node and advancing to next flow target")
+
+				outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
+				if len(outgoing) > 0 {
+					token.CurrentNodeID = outgoing[0].TargetRef
+					token.Status = models.ExecutionTokenStatusActive
+					tokenRepo.UpdateExecutionToken(token, now)
+					continue
+				} else {
+					token.Status = models.ExecutionTokenStatusCompleted
+					tokenRepo.UpdateExecutionToken(token, now)
+					goto CheckExecutionCompletion
+				}
+			}
+
+			// Evaluate ${...} expressions if present in timer values
+			evaluatedDurationStr := rawDuration
+			if strings.Contains(rawDuration, "${") {
+				if res, err := bpmn.EvaluateStringResolvable(rawDuration, execution.StateData, dbResolver); err == nil && res != nil {
+					evaluatedDurationStr = fmt.Sprintf("%v", res)
+				}
+			}
+
+			evaluatedDateStr := rawDate
+			if strings.Contains(rawDate, "${") {
+				if res, err := bpmn.EvaluateStringResolvable(rawDate, execution.StateData, dbResolver); err == nil && res != nil {
+					evaluatedDateStr = fmt.Sprintf("%v", res)
+				}
+			}
+
+			var targetRunAt time.Time
+			var calcErr error
+
+			if strings.TrimSpace(evaluatedDurationStr) != "" {
+				dur, err := bpmn.ParseHumanDuration(evaluatedDurationStr)
+				if err != nil {
+					calcErr = fmt.Errorf("failed to parse timer duration '%s' for node %s (%s): %w", evaluatedDurationStr, currentNode.ID, currentNode.Name, err)
+				} else {
+					targetRunAt = now.Add(dur)
+				}
+			} else if strings.TrimSpace(evaluatedDateStr) != "" {
+				parsedDate, err := bpmn.ParseDateTime(evaluatedDateStr)
+				if err != nil {
+					calcErr = fmt.Errorf("failed to parse timer date '%s' for node %s (%s): %w", evaluatedDateStr, currentNode.ID, currentNode.Name, err)
+				} else {
+					targetRunAt = parsedDate
+				}
+			}
+
+			if calcErr != nil {
+				log.Error().Err(calcErr).Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg("❌ Timer calculation error")
+				token.Status = models.ExecutionTokenStatusCancelled
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				execution.Status = models.WorkflowExecutionStatusFailed
+				execution.Error = calcErr.Error()
+				execution.CompletedAt = &now
+				execRepo.UpdateWorkflowExecution(execution, now)
+
+				commandResult.Error = calcErr.Error()
+				commandResult.Result = execution
+				return *commandResult
+			}
+
+			// Check if timer target run time is in the future
+			if now.Before(targetRunAt) {
+				// Put token in waiting state
+				token.Status = models.ExecutionTokenStatusWaiting
+				tokenRepo.UpdateExecutionToken(token, now)
+
+				// Find or resolve workflow execution queue
+				allQs, _ := queueRepo.GetQueuesByWorkflowDefinitionID(def.ID, now)
+				var execQ *models.Queue
+				for i := range allQs {
+					if allQs[i].Type == models.WorkflowExecutionQueue {
+						execQ = &allQs[i]
+						break
+					}
+				}
+
+				if execQ == nil {
+					execCode := fmt.Sprintf("wf-exec-%s", def.Code)
+					if qByCode, _ := queueRepo.GetQueueByCode(execCode, execution.VNamespace, now); qByCode != nil {
+						execQ = qByCode
+					} else if qByCodeDef, _ := queueRepo.GetQueueByCode(execCode, "default", now); qByCodeDef != nil {
+						execQ = qByCodeDef
+					}
+				}
+
+				if execQ != nil && (execQ.Type != models.WorkflowExecutionQueue || execQ.WorkflowDefinitionID != def.ID) {
+					execQ.Type = models.WorkflowExecutionQueue
+					execQ.WorkflowDefinitionID = def.ID
+					queueRepo.UpdateQueue(execQ, now)
+				}
+
+				if execQ == nil {
+					errMsg := fmt.Sprintf("workflow execution queue not found for definition %s", def.ID)
+					log.Error().Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg(errMsg)
+					token.Status = models.ExecutionTokenStatusCancelled
+					tokenRepo.UpdateExecutionToken(token, now)
+
+					execution.Status = models.WorkflowExecutionStatusFailed
+					execution.Error = errMsg
+					execution.CompletedAt = &now
+					execRepo.UpdateWorkflowExecution(execution, now)
+
+					commandResult.Error = errMsg
+					commandResult.Result = execution
+					return *commandResult
+				}
+
+				// Create a One-Off ScheduledJob to resume execution when targetRunAt arrives
+				payloadBytes, _ := json.Marshal(map[string]interface{}{
+					"executionId": execution.ID,
+					"tokenId":     token.ID,
+				})
+
+				scheduledJobRepo, errSJ := db.NewScheduledJobRepository(uow, idFactory, cmd.CF, cmd.CFS)
+				if errSJ != nil {
+					commandResult.Error = errSJ.Error()
+					return *commandResult
+				}
+
+				schedJobID := fmt.Sprintf("timer_%s_%s_%d", execution.ID, token.ID, targetRunAt.Unix())
+				scheduledJob := models.ScheduledJob{
+					ID:          schedJobID,
+					Code:        schedJobID,
+					TenantID:    execution.VNamespace,
+					VNamespace:  execution.VNamespace,
+					TargetType:  string(models.ScheduledJobTargetQueue),
+					TargetID:    execQ.ID,
+					Type:        models.ScheduledJobOneOff,
+					State:       models.ScheduledJobIdle,
+					NextRunAt:   targetRunAt,
+					Content:     string(payloadBytes),
+					ContentType: "application/json",
+					CreatedAt:   now,
+					UpdatedAt:   now,
+				}
+
+				_, errCreateSJ := scheduledJobRepo.CreateScheduledJob(&scheduledJob, now)
+				if errCreateSJ != nil {
+					log.Warn().Err(errCreateSJ).Str("executionID", execution.ID).Str("scheduledJobID", schedJobID).Msg("Scheduled job creation notice")
+				}
+
+				log.Info().
+					Str("executionID", execution.ID).
+					Str("tokenID", token.ID).
+					Str("nodeID", currentNode.ID).
+					Str("nodeName", currentNode.Name).
+					Time("targetRunAt", targetRunAt).
+					Str("scheduledJobID", schedJobID).
+					Msg("⏱️ Timer scheduled via queue ScheduledJob. Token put into waiting state")
+
+				goto SaveExecutionState
+			}
+
+			// Timer has expired / due (now >= targetRunAt)
+			log.Info().
+				Str("executionID", execution.ID).
+				Str("tokenID", token.ID).
+				Str("nodeID", currentNode.ID).
+				Time("targetRunAt", targetRunAt).
+				Msg("✅ Timer elapsed! Token resolving node and advancing to next flow target")
+
+			outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
+			if len(outgoing) > 0 {
+				token.CurrentNodeID = outgoing[0].TargetRef
+				token.Status = models.ExecutionTokenStatusActive
+				tokenRepo.UpdateExecutionToken(token, now)
+				continue
+			} else {
+				token.Status = models.ExecutionTokenStatusCompleted
+				tokenRepo.UpdateExecutionToken(token, now)
+				goto CheckExecutionCompletion
+			}
+
 		case bpmn.ElementEndEvent:
 			token.Status = models.ExecutionTokenStatusCompleted
 			tokenRepo.UpdateExecutionToken(token, now)
@@ -935,8 +1152,15 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 CheckExecutionCompletion:
 	{
-		activeTokens, _ := tokenRepo.GetActiveTokensByExecutionID(execution.ID, now)
-		if len(activeTokens) == 0 {
+		allTokens, _ := tokenRepo.GetTokensByExecutionID(execution.ID, now)
+		hasUnfinishedTokens := false
+		for _, t := range allTokens {
+			if t.Status == models.ExecutionTokenStatusActive || t.Status == models.ExecutionTokenStatusWaiting {
+				hasUnfinishedTokens = true
+				break
+			}
+		}
+		if !hasUnfinishedTokens {
 			execution.Status = models.WorkflowExecutionStatusCompleted
 			execution.CompletedAt = &now
 			execution.Output = execution.StateData

@@ -10,16 +10,19 @@ import (
 type ElementType string
 
 const (
-	ElementStartEvent       ElementType = "startEvent"
-	ElementEndEvent         ElementType = "endEvent"
-	ElementServiceTask      ElementType = "serviceTask"
-	ElementUserTask         ElementType = "userTask"
-	ElementTask             ElementType = "task"
-	ElementScriptTask       ElementType = "scriptTask"
-	ElementExclusiveGateway ElementType = "exclusiveGateway"
-	ElementParallelGateway  ElementType = "parallelGateway"
-	ElementInclusiveGateway ElementType = "inclusiveGateway"
-	ElementSequenceFlow     ElementType = "sequenceFlow"
+	ElementStartEvent             ElementType = "startEvent"
+	ElementEndEvent               ElementType = "endEvent"
+	ElementIntermediateCatchEvent ElementType = "intermediateCatchEvent"
+	ElementIntermediateThrowEvent ElementType = "intermediateThrowEvent"
+	ElementBoundaryEvent          ElementType = "boundaryEvent"
+	ElementServiceTask            ElementType = "serviceTask"
+	ElementUserTask               ElementType = "userTask"
+	ElementTask                   ElementType = "task"
+	ElementScriptTask             ElementType = "scriptTask"
+	ElementExclusiveGateway       ElementType = "exclusiveGateway"
+	ElementParallelGateway        ElementType = "parallelGateway"
+	ElementInclusiveGateway       ElementType = "inclusiveGateway"
+	ElementSequenceFlow           ElementType = "sequenceFlow"
 )
 
 type FormFieldConstraint struct {
@@ -116,9 +119,13 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 	var currentFlow *SequenceFlow
 	var currentElement string
 	var inConditionExpression bool
+	var inTimeDuration bool
+	var inTimeDate bool
+	var inTimeCycle bool
 	var conditionBuf strings.Builder
 	var inScriptElement bool
 	var scriptBuf strings.Builder
+	var timeBuf strings.Builder
 
 	for {
 		tok, err := decoder.Token()
@@ -135,7 +142,7 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 			currentElement = local
 
 			switch ElementType(local) {
-			case ElementStartEvent, ElementEndEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
+			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				id := getAttr(t.Attr, "id")
 				name := getAttr(t.Attr, "name")
 				defaultFlow := getAttr(t.Attr, "default")
@@ -262,6 +269,18 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 			case "conditionExpression":
 				inConditionExpression = true
 				conditionBuf.Reset()
+
+			case "timeDuration":
+				inTimeDuration = true
+				timeBuf.Reset()
+
+			case "timeDate":
+				inTimeDate = true
+				timeBuf.Reset()
+
+			case "timeCycle":
+				inTimeCycle = true
+				timeBuf.Reset()
 			}
 
 		case xml.CharData:
@@ -269,6 +288,8 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 				conditionBuf.Write(t)
 			} else if inScriptElement {
 				scriptBuf.Write(t)
+			} else if inTimeDuration || inTimeDate || inTimeCycle {
+				timeBuf.Write(t)
 			} else if currentNode != nil && (currentElement == "incoming" || currentElement == "outgoing") {
 				val := strings.TrimSpace(string(t))
 				if val != "" {
@@ -298,8 +319,29 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 				}
 			}
 
+			if inTimeDuration && local == "timeDuration" {
+				inTimeDuration = false
+				if currentNode != nil {
+					currentNode.Properties["timeDuration"] = strings.TrimSpace(timeBuf.String())
+				}
+			}
+
+			if inTimeDate && local == "timeDate" {
+				inTimeDate = false
+				if currentNode != nil {
+					currentNode.Properties["timeDate"] = strings.TrimSpace(timeBuf.String())
+				}
+			}
+
+			if inTimeCycle && local == "timeCycle" {
+				inTimeCycle = false
+				if currentNode != nil {
+					currentNode.Properties["timeCycle"] = strings.TrimSpace(timeBuf.String())
+				}
+			}
+
 			switch ElementType(local) {
-			case ElementStartEvent, ElementEndEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
+			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				currentNode = nil
 				currentFormField = nil
 			case "formField":

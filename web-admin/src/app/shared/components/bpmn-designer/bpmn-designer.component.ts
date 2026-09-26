@@ -97,6 +97,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
     const rawType = (element.type || bo.$type || '').replace(/^bpmn:/, '');
     let cleanType = rawType;
+    const eventDefs = bo.eventDefinitions || [];
+    const isTimerEvent = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
+
     switch (rawType) {
       case 'ServiceTask': cleanType = 'Service Task'; break;
       case 'UserTask': cleanType = 'User Task'; break;
@@ -109,10 +112,11 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       case 'InclusiveGateway': cleanType = 'Inclusive Gateway (OR)'; break;
       case 'ComplexGateway': cleanType = 'Complex Gateway'; break;
       case 'EventBasedGateway': cleanType = 'Event-Based Gateway'; break;
-      case 'StartEvent': cleanType = 'Start Event'; break;
+      case 'StartEvent': cleanType = isTimerEvent ? 'Timer Start Event' : 'Start Event'; break;
       case 'EndEvent': cleanType = 'End Event'; break;
-      case 'IntermediateCatchEvent': cleanType = 'Intermediate Catch Event'; break;
+      case 'IntermediateCatchEvent': cleanType = isTimerEvent ? 'Timer Intermediate Catch Event' : 'Intermediate Catch Event'; break;
       case 'IntermediateThrowEvent': cleanType = 'Intermediate Throw Event'; break;
+      case 'BoundaryEvent': cleanType = isTimerEvent ? 'Timer Boundary Event' : 'Boundary Event'; break;
       case 'SequenceFlow': cleanType = 'Sequence Flow'; break;
     }
 
@@ -128,6 +132,23 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       documentation: docText,
       attributes: []
     };
+
+    // Timer Properties
+    if (isTimerEvent) {
+      eventDefs.forEach((ed: any) => {
+        if ((ed.$type || '').includes('TimerEventDefinition')) {
+          if (ed.timeDuration && ed.timeDuration.body) {
+            attrs.push({ key: 'Timer Duration', value: ed.timeDuration.body, category: 'Timer Configuration' });
+          }
+          if (ed.timeDate && ed.timeDate.body) {
+            attrs.push({ key: 'Timer Date', value: ed.timeDate.body, category: 'Timer Configuration' });
+          }
+          if (ed.timeCycle && ed.timeCycle.body) {
+            attrs.push({ key: 'Timer Cycle', value: ed.timeCycle.body, category: 'Timer Configuration' });
+          }
+        }
+      });
+    }
 
     // Core Properties
     if (bo.topic || (bo.$attrs && bo.$attrs['camunda:topic'])) {
@@ -360,7 +381,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             const isGateway = elementType.includes('gateway');
             const isTask = elementType.includes('task');
             const isFlow = elementType.includes('flow') || elementType.includes('sequence') || elementType.includes('association');
-            if (!isGateway && !isTask && !isFlow) {
+            const isEvent = elementType.includes('event') || elementType.includes('intermediate') || elementType.includes('catch');
+            if (!isGateway && !isTask && !isFlow && !isEvent) {
               delete entries['replace'];
             }
             return entries;
@@ -372,53 +394,77 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
       try {
         const replaceMenuProvider = this.bpmnModeler.get('replaceMenuProvider');
-        if (replaceMenuProvider && replaceMenuProvider.getEntries) {
-          const origGetEntries = replaceMenuProvider.getEntries.bind(replaceMenuProvider);
-          replaceMenuProvider.getEntries = function(element: any) {
-            const entries = origGetEntries(element);
-            const elementType = element && element.type ? element.type.toLowerCase() : '';
+        if (replaceMenuProvider) {
+          const filterEntries = (entries: any, target: any) => {
+            if (!entries) return entries;
+            const targetElement = Array.isArray(target) ? target[0] : target;
+            const bo = targetElement?.businessObject || targetElement || {};
+            const elementType = (targetElement?.type || bo.$type || '').toLowerCase();
+            const isIntermediate = elementType.includes('intermediate');
             const isTaskElement = elementType.includes('task');
 
-            if (Array.isArray(entries)) {
-              return entries.filter((e: any) => {
-                const id = (e.id || e.actionName || '').toLowerCase();
-                const label = (e.label || e.name || '').toLowerCase();
-                if (id.includes('complex') || id.includes('event-based') ||
-                    label.includes('complex') || label.includes('event-based')) {
+            const isAllowedEntry = (e: any, key?: string) => {
+              const k = (key || e?.id || e?.actionName || '').toLowerCase();
+              const label = (e?.label || e?.name || '').toLowerCase();
+              const targetType = (e?.target?.type || '').toLowerCase();
+              const eventDef = (e?.target?.eventDefinitionType || '').toLowerCase();
+
+              // 1. Gateways: filter out complex and event-based gateways
+              if (k.includes('complex') || k.includes('event-based') ||
+                  label.includes('complex') || label.includes('event-based')) {
+                return false;
+              }
+
+              // 2. Intermediates: if target element is an intermediate event, or entry relates to an intermediate event, ONLY allow Timer
+              if (isIntermediate || k.includes('intermediate') || label.includes('intermediate') || targetType.includes('intermediate')) {
+                const isTimer = k.includes('timer') || label.includes('timer') || eventDef.includes('timer');
+                if (!isTimer) {
                   return false;
                 }
-                if (isTaskElement) {
-                  return id.startsWith('apply-template') ||
-                         id.includes('template') ||
-                         id.includes('connector') ||
-                         id === 'replace-with-task' ||
-                         id === 'replace-with-script-task' ||
-                         id === 'replace-with-service-task';
-                }
-                return true;
-              });
-            } else if (entries && typeof entries === 'object') {
-              if (isTaskElement) {
-                Object.keys(entries).forEach((k) => {
-                  const lowerK = k.toLowerCase();
-                  const isAllowed = lowerK.startsWith('apply-template') ||
-                                    lowerK.includes('template') ||
-                                    lowerK.includes('connector') ||
-                                    lowerK === 'replace-with-task' ||
-                                    lowerK === 'replace-with-script-task' ||
-                                    lowerK === 'replace-with-service-task';
-                  if (!isAllowed) {
-                    delete entries[k];
-                  }
-                });
-                return entries;
               }
-              delete entries['replace-with-complex-gateway'];
-              delete entries['replace-with-event-based-gateway'];
-              return entries;
+
+              // 3. Tasks: allow templates, connectors, replace-with-task, replace-with-script-task, replace-with-service-task
+              if (isTaskElement) {
+                return k.startsWith('apply-template') ||
+                       k.includes('template') ||
+                       k.includes('connector') ||
+                       k === 'replace-with-task' ||
+                       k === 'replace-with-script-task' ||
+                       k === 'replace-with-service-task';
+              }
+
+              return true;
+            };
+
+            if (Array.isArray(entries)) {
+              return entries.filter((e: any) => isAllowedEntry(e));
+            } else if (typeof entries === 'object') {
+              const filtered: any = {};
+              for (const [k, v] of Object.entries(entries)) {
+                if (isAllowedEntry(v, k)) {
+                  filtered[k] = v;
+                }
+              }
+              return filtered;
             }
             return entries;
           };
+
+          if (replaceMenuProvider.getPopupMenuEntries) {
+            const origGetPopupMenuEntries = replaceMenuProvider.getPopupMenuEntries.bind(replaceMenuProvider);
+            replaceMenuProvider.getPopupMenuEntries = function(target: any) {
+              const entries = origGetPopupMenuEntries(target);
+              return filterEntries(entries, target);
+            };
+          }
+
+          if (replaceMenuProvider.getEntries) {
+            const origGetEntries = replaceMenuProvider.getEntries.bind(replaceMenuProvider);
+            replaceMenuProvider.getEntries = function(element: any) {
+              const entries = origGetEntries(element);
+              return filterEntries(entries, element);
+            };
+          }
         }
       } catch (e) {
         console.warn('Replace menu provider override notice:', e);
@@ -870,13 +916,16 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     }
   }
 
-  public highlightElements(markers: Array<{ id: string; type: 'active' | 'error' }>): void {
+  public highlightElements(markers: Array<{ id: string; type: 'active' | 'error' | 'waiting' | 'completed' }>): void {
     if (!this.bpmnModeler) return;
     try {
       const canvas = this.bpmnModeler.get('canvas');
       if (!canvas) return;
       markers.forEach(m => {
-        const cssClass = m.type === 'active' ? 'highlight-active' : 'highlight-error';
+        let cssClass = 'highlight-active';
+        if (m.type === 'error') cssClass = 'highlight-error';
+        if (m.type === 'waiting') cssClass = 'highlight-waiting';
+        if (m.type === 'completed') cssClass = 'highlight-completed';
         canvas.addMarker(m.id, cssClass);
       });
     } catch (e) {
@@ -894,10 +943,30 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         if (el && el.id) {
           canvas.removeMarker(el.id, 'highlight-active');
           canvas.removeMarker(el.id, 'highlight-error');
+          canvas.removeMarker(el.id, 'highlight-waiting');
+          canvas.removeMarker(el.id, 'highlight-completed');
         }
       });
     } catch (e) {
       console.warn('Failed to clear markers:', e);
+    }
+  }
+
+  public getEndEventIds(): string[] {
+    if (!this.bpmnModeler) return [];
+    try {
+      const elementRegistry = this.bpmnModeler.get('elementRegistry');
+      if (!elementRegistry) return [];
+      const endEvents: string[] = [];
+      elementRegistry.getAll().forEach((el: any) => {
+        const typeStr = (el?.type || el?.businessObject?.$type || '').toLowerCase();
+        if (typeStr.includes('endevent') && el.id && !el.id.includes('_plane')) {
+          endEvents.push(el.id);
+        }
+      });
+      return endEvents;
+    } catch {
+      return [];
     }
   }
 
@@ -1129,6 +1198,17 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     ];
 
     const hideUnsupportedGroups = () => {
+      let isCurrentElementTimer = false;
+      try {
+        const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
+        const selectedEl = selection[0];
+        const bo = selectedEl?.businessObject || {};
+        const eventDefs = bo.eventDefinitions || [];
+        isCurrentElementTimer = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
+      } catch {
+        // ignore selection check error
+      }
+
       const groupEls = parent.querySelectorAll('.bio-properties-panel-group, [data-group-id]');
       groupEls.forEach((groupEl) => {
         const groupId = (groupEl.getAttribute('data-group-id') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -1138,7 +1218,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwanted = UNWANTED_IDS.some(id => groupId.includes(id)) ||
                            UNWANTED_GROUPS.some(name => headerText.includes(name));
 
-        if (isUnwanted) {
+        const isInputOutputGroup = groupId.includes('input') || groupId.includes('output') ||
+                                   headerText.includes('input') || headerText.includes('output');
+
+        if (isUnwanted || (isCurrentElementTimer && isInputOutputGroup)) {
           (groupEl as HTMLElement).style.display = 'none';
         }
       });
@@ -1152,7 +1235,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwantedEntry = UNWANTED_IDS.some(id => entryId.includes(id)) ||
                                 UNWANTED_GROUPS.some(name => labelText.includes(name));
 
-        if (isUnwantedEntry) {
+        const isInputOutputEntry = entryId.includes('input') || entryId.includes('output') ||
+                                    labelText.includes('input parameter') || labelText.includes('output parameter');
+
+        if (isUnwantedEntry || (isCurrentElementTimer && isInputOutputEntry)) {
           (entryEl as HTMLElement).style.display = 'none';
         }
       });
@@ -1218,10 +1304,273 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           input.dispatchEvent(new Event('change', { bubbles: true }));
         });
       });
+
+      // Filter Timer Event Definition Type options: ONLY allow Date and Duration (remove Cycle)
+      const allSelects = parent.querySelectorAll('select');
+      allSelects.forEach((selectEl) => {
+        const select = selectEl as HTMLSelectElement;
+        const entryEl = select.closest('.bio-properties-panel-entry, [data-entry-id]');
+        const entryId = (entryEl?.getAttribute('data-entry-id') || '').toLowerCase();
+        const labelEl = entryEl?.querySelector('label, .bio-properties-panel-label');
+        const labelTxt = (labelEl?.textContent || '').toLowerCase();
+
+        if (entryId.includes('timer') || labelTxt.includes('timer') || entryId.includes('time-') || labelTxt.includes('type')) {
+          let removedCycle = false;
+          Array.from(select.options).forEach((opt) => {
+            const val = (opt.value || '').toLowerCase();
+            const txt = (opt.textContent || '').toLowerCase();
+            if (val.includes('cycle') || txt.includes('cycle')) {
+              opt.remove();
+              removedCycle = true;
+            }
+          });
+
+          if (removedCycle && select.options.length > 0) {
+            const currentVal = (select.value || '').toLowerCase();
+            if (!currentVal || currentVal.includes('cycle')) {
+              select.selectedIndex = 0;
+              select.dispatchEvent(new Event('input', { bubbles: true }));
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        }
+      });
+    };
+
+    const getIsoDateString = (dtValue: string, tzName: string): string => {
+      if (!dtValue) return '';
+      const cleanDt = dtValue.length === 16 ? `${dtValue}:00` : dtValue;
+      if (tzName === 'UTC') {
+        return `${cleanDt}Z`;
+      }
+      try {
+        const dateObj = new Date(cleanDt);
+        if (isNaN(dateObj.getTime())) return cleanDt;
+
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: tzName,
+          timeZoneName: 'longOffset'
+        }).formatToParts(dateObj);
+
+        const tzPart = parts.find(p => p.type === 'timeZoneName')?.value;
+        let offset = 'Z';
+        if (tzPart && tzPart !== 'GMT' && tzPart !== 'UTC') {
+          offset = tzPart.replace(/^(GMT|UTC)/, '');
+        }
+        return `${cleanDt}${offset}`;
+      } catch {
+        return `${cleanDt}Z`;
+      }
+    };
+
+    const enhanceTimerEntries = () => {
+      let isTimerElement = false;
+      try {
+        const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
+        const selectedEl = selection[0];
+        const bo = selectedEl?.businessObject || {};
+        const eventDefs = bo.eventDefinitions || [];
+        isTimerElement = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
+      } catch {
+        // ignore
+      }
+
+      if (!isTimerElement) return;
+
+      const timerTypeSelect = parent.querySelector(
+        '[data-entry-id*="timer"] select, [data-entry-id*="time-"] select, select[name*="timer"]'
+      ) as HTMLSelectElement | null;
+
+      const selectedType = (timerTypeSelect?.value || '').toLowerCase();
+      const isDate = selectedType.includes('date') || selectedType === 'timedate';
+      const isDuration = selectedType.includes('duration') || selectedType === 'timeduration' || (!isDate && selectedType !== '');
+
+      const timerValueEntries = parent.querySelectorAll(
+        '[data-entry-id*="timer"] input, [data-entry-id*="timer"] textarea, [data-entry-id*="time"] input, [data-entry-id*="time"] textarea, [data-entry-id*="value"] input, [data-entry-id*="value"] textarea'
+      );
+
+      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+      timerValueEntries.forEach((rawInputEl) => {
+        const rawInput = rawInputEl as HTMLInputElement | HTMLTextAreaElement;
+        if (rawInput.tagName === 'SELECT') return;
+
+        const entryEl = rawInput.closest('.bio-properties-panel-entry, [data-entry-id]');
+        if (!entryEl) return;
+        const entryId = (entryEl.getAttribute('data-entry-id') || '').toLowerCase();
+        const labelEl = entryEl.querySelector('label, .bio-properties-panel-label');
+        const labelTxt = (labelEl?.textContent || '').toLowerCase();
+
+        const isTimerValueEntry = entryId.includes('timereventdefinition') ||
+                                   entryId.includes('timerdefinition') ||
+                                   entryId.includes('timedate') ||
+                                   entryId.includes('timeduration') ||
+                                   labelTxt.includes('timer definition') ||
+                                   labelTxt.includes('date') ||
+                                   labelTxt.includes('duration') ||
+                                   labelTxt.includes('value');
+
+        if (!isTimerValueEntry) return;
+
+        if (isDuration) {
+          const existingDatePicker = entryEl.querySelector('.timer-date-picker-container');
+          if (existingDatePicker) existingDatePicker.remove();
+
+          rawInput.placeholder = 'e.g. 5m, 10 minutes, 2 hours, 1 day (or PT5M)';
+
+          if (!entryEl.querySelector('.timer-duration-help')) {
+            const helpDiv = document.createElement('div');
+            helpDiv.className = 'timer-duration-help';
+            helpDiv.style.fontSize = '11px';
+            helpDiv.style.color = '#888';
+            helpDiv.style.marginTop = '4px';
+            helpDiv.textContent = 'Supports relative human format: "5m", "10 minutes", "2h", "1 day".';
+            rawInput.parentNode?.insertBefore(helpDiv, rawInput.nextSibling);
+          }
+        } else {
+          const existingHelp = entryEl.querySelector('.timer-duration-help');
+          if (existingHelp) existingHelp.remove();
+
+          let datePickerContainer = entryEl.querySelector('.timer-date-picker-container') as HTMLDivElement;
+
+          if (!datePickerContainer) {
+            datePickerContainer = document.createElement('div');
+            datePickerContainer.className = 'timer-date-picker-container';
+            datePickerContainer.style.marginTop = '8px';
+            datePickerContainer.style.padding = '8px';
+            datePickerContainer.style.backgroundColor = '#181b22';
+            datePickerContainer.style.borderRadius = '4px';
+            datePickerContainer.style.border = '1px solid rgba(255, 255, 255, 0.15)';
+
+            const dtLabel = document.createElement('label');
+            dtLabel.className = 'bio-properties-panel-label';
+            dtLabel.style.fontSize = '11px';
+            dtLabel.style.marginBottom = '2px';
+            dtLabel.style.display = 'block';
+            dtLabel.style.color = '#ccc';
+            dtLabel.textContent = 'Date & Time (Calendar):';
+
+            const dtInput = document.createElement('input');
+            dtInput.type = 'datetime-local';
+            dtInput.className = 'bio-properties-panel-input timer-datetime-input';
+            dtInput.style.width = '100%';
+            dtInput.style.backgroundColor = '#0e1017';
+            dtInput.style.color = '#ffffff';
+            dtInput.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+            dtInput.style.borderRadius = '4px';
+            dtInput.style.padding = '5px 8px';
+            dtInput.style.boxSizing = 'border-box';
+            dtInput.style.fontSize = '12px';
+
+            const tzLabel = document.createElement('label');
+            tzLabel.className = 'bio-properties-panel-label';
+            tzLabel.style.fontSize = '11px';
+            tzLabel.style.marginTop = '6px';
+            tzLabel.style.marginBottom = '2px';
+            tzLabel.style.display = 'block';
+            tzLabel.style.color = '#ccc';
+            tzLabel.textContent = 'Timezone:';
+
+            const tzSelect = document.createElement('select');
+            tzSelect.className = 'bio-properties-panel-input bio-properties-panel-select timer-tz-select';
+            tzSelect.style.width = '100%';
+            tzSelect.style.backgroundColor = '#0e1017';
+            tzSelect.style.color = '#ffffff';
+            tzSelect.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+            tzSelect.style.borderRadius = '4px';
+            tzSelect.style.padding = '5px 8px';
+            tzSelect.style.fontSize = '12px';
+
+            const timezones = [
+              browserTz,
+              'UTC',
+              'America/Santiago',
+              'America/New_York',
+              'America/Chicago',
+              'America/Denver',
+              'America/Los_Angeles',
+              'America/Sao_Paulo',
+              'America/Buenos_Aires',
+              'America/Bogota',
+              'America/Lima',
+              'America/Mexico_City',
+              'Europe/London',
+              'Europe/Paris',
+              'Europe/Berlin',
+              'Europe/Madrid',
+              'Asia/Dubai',
+              'Asia/Kolkata',
+              'Asia/Singapore',
+              'Asia/Tokyo',
+              'Australia/Sydney'
+            ];
+
+            const uniqueTzs = Array.from(new Set(timezones));
+            uniqueTzs.forEach((tz) => {
+              const opt = document.createElement('option');
+              opt.value = tz;
+              opt.textContent = tz === browserTz ? `${tz} (Browser Local)` : tz;
+              if (tz === browserTz) opt.selected = true;
+              tzSelect.appendChild(opt);
+            });
+
+            const previewDiv = document.createElement('div');
+            previewDiv.className = 'timer-iso-preview';
+            previewDiv.style.fontSize = '11px';
+            previewDiv.style.color = '#4fc3f7';
+            previewDiv.style.marginTop = '6px';
+            previewDiv.innerHTML = 'ISO Format: <span class="iso-val" style="font-family:monospace;">--</span>';
+
+            datePickerContainer.appendChild(dtLabel);
+            datePickerContainer.appendChild(dtInput);
+            datePickerContainer.appendChild(tzLabel);
+            datePickerContainer.appendChild(tzSelect);
+            datePickerContainer.appendChild(previewDiv);
+
+            rawInput.parentNode?.insertBefore(datePickerContainer, rawInput.nextSibling);
+
+            const updateRawInputFromPicker = () => {
+              if (!dtInput.value) return;
+              const isoVal = getIsoDateString(dtInput.value, tzSelect.value);
+              const isoSpan = previewDiv.querySelector('.iso-val');
+              if (isoSpan) isoSpan.textContent = isoVal;
+
+              const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
+                                   Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+              if (nativeSetter) {
+                nativeSetter.call(rawInput, isoVal);
+              } else {
+                rawInput.value = isoVal;
+              }
+              rawInput.dispatchEvent(new Event('input', { bubbles: true }));
+              rawInput.dispatchEvent(new Event('change', { bubbles: true }));
+            };
+
+            dtInput.addEventListener('change', updateRawInputFromPicker);
+            dtInput.addEventListener('input', updateRawInputFromPicker);
+            tzSelect.addEventListener('change', updateRawInputFromPicker);
+
+            if (rawInput.value && rawInput.value.length >= 16 && rawInput.value.includes('T')) {
+              dtInput.value = rawInput.value.substring(0, 16);
+              updateRawInputFromPicker();
+            } else {
+              const now = new Date();
+              const year = now.getFullYear();
+              const month = String(now.getMonth() + 1).padStart(2, '0');
+              const day = String(now.getDate()).padStart(2, '0');
+              const hours = String(now.getHours()).padStart(2, '0');
+              const minutes = String(now.getMinutes()).padStart(2, '0');
+              dtInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+              updateRawInputFromPicker();
+            }
+          }
+        }
+      });
     };
 
     const enhanceConstraintEntries = () => {
       hideUnsupportedGroups();
+      enhanceTimerEntries();
 
       // Enforce read-only state on any burned/frozen properties of custom Activity Templates
       const allPropInputs = parent.querySelectorAll(
