@@ -197,17 +197,21 @@ export class WorkflowExecutionsComponent implements OnInit {
             createdAt: rawExec.createdAt || rawExec.CreatedAt || '',
             updatedAt: rawExec.updatedAt || rawExec.UpdatedAt || ''
           },
-          tokens: rawTokens.map((t: any) => ({
-            id: t.id || t.ID || '',
-            workflowExecutionId: t.workflowExecutionId || t.WorkflowExecutionID || '',
-            workflowDefinitionId: t.workflowDefinitionId || t.WorkflowDefinitionID || '',
-            vnamespace: t.vnamespace || t.VNamespace || '',
-            currentNodeId: t.currentNodeId || t.CurrentNodeID || '',
-            status: (t.status || t.Status || 'active').toLowerCase(),
-            parentTokenId: t.parentTokenId || t.ParentTokenID || '',
-            createdAt: t.createdAt || t.CreatedAt || '',
-            updatedAt: t.updatedAt || t.UpdatedAt || ''
-          })),
+          tokens: rawTokens.map((t: any) => {
+            const tokenStatus = (t.status || t.Status || 'active').toLowerCase();
+            const execStatus = (rawExec.status || rawExec.Status || '').toLowerCase();
+            return {
+              id: t.id || t.ID || '',
+              workflowExecutionId: t.workflowExecutionId || t.WorkflowExecutionID || '',
+              workflowDefinitionId: t.workflowDefinitionId || t.WorkflowDefinitionID || '',
+              vnamespace: t.vnamespace || t.VNamespace || '',
+              currentNodeId: t.currentNodeId || t.CurrentNodeID || '',
+              status: (execStatus === 'completed' && tokenStatus === 'waiting') ? 'completed' : tokenStatus,
+              parentTokenId: t.parentTokenId || t.ParentTokenID || '',
+              createdAt: t.createdAt || t.CreatedAt || '',
+              updatedAt: t.updatedAt || t.UpdatedAt || ''
+            };
+          }),
           jobs: rawJobs.map((j: any) => ({
             id: j.id || j.ID || '',
             workflowExecutionId: j.workflowExecutionId || j.WorkflowExecutionID || '',

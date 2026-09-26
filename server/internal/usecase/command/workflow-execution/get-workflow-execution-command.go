@@ -54,6 +54,14 @@ func (cmd *GetWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.Tim
 	var tokens []models.ExecutionToken
 	if tokenRepo != nil {
 		tokens, _ = tokenRepo.GetTokensByExecutionID(cmd.ID, now)
+		if exec.Status == models.WorkflowExecutionStatusCompleted {
+			for i := range tokens {
+				if tokens[i].Status == models.ExecutionTokenStatusWaiting {
+					tokens[i].Status = models.ExecutionTokenStatusCompleted
+					tokenRepo.UpdateExecutionToken(&tokens[i], now)
+				}
+			}
+		}
 	}
 
 	var jobs []models.WorkflowJob
