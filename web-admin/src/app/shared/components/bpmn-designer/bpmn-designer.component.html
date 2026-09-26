@@ -1,4 +1,4 @@
-<div class="bpmn-designer-wrapper" [class.is-readonly]="readonly">
+<div #wrapperRef class="bpmn-designer-wrapper" [class.is-readonly]="readonly">
   <div class="bpmn-designer-container">
     <div #canvasRef class="bpmn-canvas">
       <!-- Floating Canvas Controls Overlay (Undo, Redo, Zoom In, Zoom Out, Fit, Upload, Download) -->
@@ -122,7 +122,8 @@
     <app-design-errors-console
       [errors]="currentLintErrors"
       mode="table-row"
-      title="Workflow Design Errors">
+      title="Workflow Design Errors"
+      (collapsedChange)="onConsoleCollapseChange()">
     </app-design-errors-console>
   </div>
 </div>
