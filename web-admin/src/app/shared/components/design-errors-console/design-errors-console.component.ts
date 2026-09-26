@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -12,10 +12,12 @@ export class DesignErrorsConsoleComponent {
   @Input() errors: string[] = [];
   @Input() mode: 'bottom-bar' | 'table-row' = 'bottom-bar';
   @Input() title: string = 'Workflow Design Errors';
+  @Output() collapsedChange = new EventEmitter<boolean>();
 
   public isCollapsed: boolean = false;
 
   public toggleCollapse(): void {
     this.isCollapsed = !this.isCollapsed;
+    this.collapsedChange.emit(this.isCollapsed);
   }
 }

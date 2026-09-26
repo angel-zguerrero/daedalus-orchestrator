@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, HostListener } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -49,7 +49,7 @@ import { ComponentWithUnsavedChanges } from '../guards/workflow-unsaved.guard';
     BpmnDesignerComponent
   ]
 })
-export class WorkflowEditorComponent implements OnInit, ComponentWithUnsavedChanges {
+export class WorkflowEditorComponent implements OnInit, OnDestroy, ComponentWithUnsavedChanges {
   isEditing: boolean = false;
   workflowId: string = '';
   scope: 'global' | 'tenant' = 'global';
@@ -108,6 +108,8 @@ export class WorkflowEditorComponent implements OnInit, ComponentWithUnsavedChan
   }
 
   ngOnInit(): void {
+    document.body.classList.add('workflow-editor-active');
+
     this.route.queryParams.subscribe(queryParams => {
       if (queryParams['tenantCode']) {
         this.tenantCode = queryParams['tenantCode'];
@@ -132,6 +134,10 @@ export class WorkflowEditorComponent implements OnInit, ComponentWithUnsavedChan
         }, 150);
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    document.body.classList.remove('workflow-editor-active');
   }
 
   @HostListener('window:beforeunload', ['$event'])

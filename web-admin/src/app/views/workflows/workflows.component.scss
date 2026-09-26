@@ -252,9 +252,12 @@ pre {
 }
 
 .doc-studio-header {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
   background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
   border-bottom: 1px solid #334155 !important;
-  z-index: 10;
+  z-index: 1020;
   min-height: 64px;
 }
 
@@ -282,6 +285,7 @@ pre {
 }
 
 .doc-settings-panel {
+  flex-shrink: 0;
   background-color: #1e293b !important;
   border-bottom: 1px solid #334155 !important;
   animation: slideDown 0.2s ease-out;
@@ -299,10 +303,11 @@ pre {
 }
 
 .doc-studio-body {
-  flex: 1;
+  flex: 1 1 0%;
   display: flex;
   flex-direction: column;
-  height: calc(100% - 64px);
+  height: auto;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
   position: relative;
@@ -310,8 +315,10 @@ pre {
 
   app-bpmn-designer {
     display: flex;
-    flex: 1;
+    flex: 1 1 0%;
     height: 100%;
+    min-height: 0;
     width: 100%;
+    overflow: hidden;
   }
 }
