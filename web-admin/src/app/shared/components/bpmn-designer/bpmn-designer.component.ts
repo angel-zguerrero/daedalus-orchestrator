@@ -261,10 +261,40 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     this.selectedElementInfo = info;
   }
 
+
+
   private bpmnModeler!: any;
   private isInitialized = false;
   private lastEmittedXml: string = '';
   private constraintObserver?: MutationObserver;
+  private userTaskModeMap = new Map<string, 'form' | 'properties'>();
+  private isUpdatingPropertiesDom = false;
+
+  public isUserTaskSelected = false;
+  public currentUserTaskMode: 'form' | 'properties' = 'form';
+  private selectedUserTaskId = '';
+
+  public setUserTaskMode(mode: 'form' | 'properties'): void {
+    this.currentUserTaskMode = mode;
+    if (this.selectedUserTaskId) {
+      this.userTaskModeMap.set(this.selectedUserTaskId, mode);
+      const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
+      const selectedEl = selection[0];
+      if (selectedEl && selectedEl.businessObject) {
+        selectedEl.businessObject.$attrs = selectedEl.businessObject.$attrs || {};
+        selectedEl.businessObject.$attrs['custom:userTaskMode'] = mode;
+      }
+    }
+    const parent = this.propertiesRef?.nativeElement;
+    if (parent) {
+      setTimeout(() => {
+        const eventBus = this.bpmnModeler?.get('eventBus');
+        if (eventBus) {
+          eventBus.fire('selection.changed', { newSelection: this.bpmnModeler.get('selection').get() });
+        }
+      }, 30);
+    }
+  }
 
   private customElementTemplates: any[] = [];
   private customTemplatesCursor: string = '';
@@ -423,14 +453,12 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
                 }
               }
 
-              // 3. Tasks: allow templates, connectors, replace-with-task, replace-with-script-task, replace-with-service-task
+              // 3. Tasks: ONLY allow Task (bpmn:Task), Receive Task (bpmn:ReceiveTask), User Task (bpmn:UserTask)
               if (isTaskElement) {
-                return k.startsWith('apply-template') ||
-                       k.includes('template') ||
-                       k.includes('connector') ||
-                       k === 'replace-with-task' ||
-                       k === 'replace-with-script-task' ||
-                       k === 'replace-with-service-task';
+                const isTask = k === 'replace-with-task' || (label === 'task' && !label.includes('user') && !label.includes('receive')) || targetType === 'bpmn:task';
+                const isReceiveTask = k === 'replace-with-receive-task' || label.includes('receive') || targetType === 'bpmn:receivetask';
+                const isUserTask = k === 'replace-with-user-task' || label.includes('user') || targetType === 'bpmn:usertask';
+                return isTask || isReceiveTask || isUserTask;
               }
 
               return true;
@@ -656,11 +684,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             });
           }
 
-          const isScriptTask =
-            type === 'ScriptTask' ||
-            tplAttr.includes('scripttask') ||
-            extPropsMap['script'] !== undefined ||
-            extPropsMap['scriptFormat'] !== undefined;
+          const isScriptTask = type === 'ScriptTask';
 
           if (isScriptTask) {
             const rawFormat = (
@@ -1160,7 +1184,6 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'job execution',
       'job configuration',
       'execution listeners',
-      'extension properties',
       'executable',
       'isexecutable',
       'start indicator',
@@ -1171,7 +1194,18 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'async',
       'async before',
       'async after',
-      'condition script'
+      'condition script',
+      'inputs',
+      'outputs',
+      'input parameters',
+      'output parameters',
+      'input/output',
+      'input output',
+      'inputs & outputs',
+      'assignment',
+      'task assignment',
+      'user assignment',
+      'implementation'
     ];
 
     const UNWANTED_IDS = [
@@ -1183,7 +1217,6 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'jobexecution',
       'jobconfiguration',
       'executionlisteners',
-      'extensionproperties',
       'isexecutable',
       'executable',
       'startindicator',
@@ -1194,23 +1227,54 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'async',
       'asyncbefore',
       'asyncafter',
-      'conditionscript'
+      'conditionscript',
+      'inputs',
+      'outputs',
+      'inputparameters',
+      'outputparameters',
+      'inputoutput',
+      'assignment',
+      'taskassignment',
+      'userassignment',
+      'implementation'
     ];
 
     const hideUnsupportedGroups = () => {
+      let selectedEl: any = null;
+      let selectedType = '';
       let isCurrentElementTimer = false;
       try {
         const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
-        const selectedEl = selection[0];
+        selectedEl = selection[0];
         const bo = selectedEl?.businessObject || {};
+        selectedType = (selectedEl?.type || bo.$type || '').replace(/^bpmn:/, '');
         const eventDefs = bo.eventDefinitions || [];
         isCurrentElementTimer = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
       } catch {
         // ignore selection check error
       }
 
+      if (selectedType === 'UserTask' && selectedEl) {
+        this.isUserTaskSelected = true;
+        this.selectedUserTaskId = selectedEl.id;
+        const currentMode = this.userTaskModeMap.get(selectedEl.id) ||
+                            selectedEl.businessObject?.$attrs?.['custom:userTaskMode'] ||
+                            'form';
+        this.currentUserTaskMode = currentMode as 'form' | 'properties';
+        if (!this.userTaskModeMap.has(selectedEl.id)) {
+          this.userTaskModeMap.set(selectedEl.id, currentMode as 'form' | 'properties');
+        }
+      } else {
+        this.isUserTaskSelected = false;
+        this.selectedUserTaskId = '';
+      }
+
+      const userTaskMode = this.currentUserTaskMode;
+
       const groupEls = parent.querySelectorAll('.bio-properties-panel-group, [data-group-id]');
       groupEls.forEach((groupEl) => {
+        (groupEl as HTMLElement).style.display = '';
+
         const groupId = (groupEl.getAttribute('data-group-id') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const headerEl = groupEl.querySelector('.bio-properties-panel-group-header-title, .bio-properties-panel-group-title, h3, h4, .group-title, .bio-properties-panel-group-header');
         const headerText = (headerEl?.textContent || '').toLowerCase().trim();
@@ -1218,16 +1282,98 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwanted = UNWANTED_IDS.some(id => groupId.includes(id)) ||
                            UNWANTED_GROUPS.some(name => headerText.includes(name));
 
-        const isInputOutputGroup = groupId.includes('input') || groupId.includes('output') ||
-                                   headerText.includes('input') || headerText.includes('output');
+        const isGeneralGroup = groupId === 'general' || groupId === 'groupgeneral' || headerText === 'general';
+        const isDocGroup = groupId === 'documentation' || groupId === 'groupdocumentation' || headerText === 'documentation';
 
-        if (isUnwanted || (isCurrentElementTimer && isInputOutputGroup)) {
-          (groupEl as HTMLElement).style.display = 'none';
+        const isFormGroup = (groupId.includes('form') || headerText.includes('form') || headerText.includes('formulario')) &&
+                            !groupId.includes('transform') && !headerText.includes('transform');
+
+        const isExtensionPropsGroup = (
+          groupId.includes('extension') ||
+          groupId.includes('camundaproperty') ||
+          groupId.includes('extensionproperties') ||
+          headerText.includes('extension properties') ||
+          headerText.includes('propiedades de extensión') ||
+          (headerText.includes('properties') && !headerText.includes('input') && !headerText.includes('output') && !headerText.includes('assignment') && !headerText.includes('implementation'))
+        );
+
+        const isTemplateGroup = groupId.includes('template') || headerText.includes('template') || headerText.includes('plantilla');
+
+        const isAssignmentGroup = groupId.includes('assign') || headerText.includes('assign') || headerText.includes('candidat');
+        const isInputOutputGroup = groupId.includes('input') || groupId.includes('output') || headerText.includes('input') || headerText.includes('output');
+        const isImplementationGroup = groupId.includes('implement') || headerText.includes('implement') || groupId.includes('delegate') || headerText.includes('delegate');
+        const isTasklistGroup = groupId.includes('tasklist') || headerText.includes('tasklist') || headerText.includes('task list');
+        const isListenerGroup = groupId.includes('listener') || headerText.includes('listener');
+        const isAsyncGroup = groupId.includes('async') || headerText.includes('async');
+        const isJobGroup = groupId.includes('job') || headerText.includes('job');
+        const isHistoryGroup = groupId.includes('history') || headerText.includes('history');
+        const isExternalGroup = groupId.includes('external') || headerText.includes('external');
+
+        const isBlacklisted = isUnwanted || isAssignmentGroup || isInputOutputGroup || isImplementationGroup ||
+                              isTasklistGroup || isListenerGroup || isAsyncGroup || isJobGroup ||
+                              isHistoryGroup || isExternalGroup;
+
+        let hideGroup = false;
+
+        if (selectedType === 'ReceiveTask') {
+          // Receive Tasks MUST show ONLY General, Documentation, and Extension Properties (Properties List)
+          if (!isBlacklisted && !isFormGroup && (isGeneralGroup || isDocGroup || isExtensionPropsGroup || isTemplateGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (selectedType === 'UserTask') {
+          // User Tasks MUST show ONLY General, Documentation, Forms, and Extension Properties
+          if (!isBlacklisted && (isGeneralGroup || isDocGroup || isFormGroup || isExtensionPropsGroup || isTemplateGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (selectedType === 'Task') {
+          // Standard Tasks MUST show General, Documentation, and Template Chooser / Template Properties
+          if (!isBlacklisted && !isFormGroup && (isGeneralGroup || isDocGroup || isTemplateGroup || isExtensionPropsGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (selectedType === 'StartEvent') {
+          if (!isBlacklisted && !isExtensionPropsGroup && (isGeneralGroup || isDocGroup || isFormGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (isBlacklisted) {
+          hideGroup = true;
+        }
+
+        (groupEl as HTMLElement).style.display = hideGroup ? 'none' : '';
+      });
+
+      // Enhance Extension Properties entry labels: rename "Value" to "Metadata" for Extension Properties entries
+      const valueLabels = parent.querySelectorAll(
+        '[data-entry-id*="extension-properties"] [data-entry-id*="value"] label, [data-entry-id*="camunda-property"] [data-entry-id*="value"] label, [data-entry-id$="-value"] label, .bio-properties-panel-entry[data-entry-id*="value"] label'
+      );
+      valueLabels.forEach((lbl) => {
+        const text = (lbl.textContent || '').trim().toLowerCase();
+        if (text === 'value' || text === 'valor') {
+          lbl.textContent = 'Metadata';
+        }
+      });
+
+      const valueInputs = parent.querySelectorAll(
+        '[data-entry-id*="extension-properties"] [data-entry-id*="value"] input, [data-entry-id*="extension-properties"] [data-entry-id*="value"] textarea, [data-entry-id$="-value"] input, [data-entry-id$="-value"] textarea, .bio-properties-panel-entry[data-entry-id*="value"] input, .bio-properties-panel-entry[data-entry-id*="value"] textarea'
+      );
+      valueInputs.forEach((inpEl) => {
+        const input = inpEl as HTMLInputElement | HTMLTextAreaElement;
+        if (input.placeholder === 'Value' || input.placeholder === 'Valor' || !input.placeholder) {
+          input.placeholder = 'e.g. JSON, string or metadata object';
         }
       });
 
       const entryEls = parent.querySelectorAll('.bio-properties-panel-entry, [data-entry-id]');
       entryEls.forEach((entryEl) => {
+        (entryEl as HTMLElement).style.display = '';
+
         const entryId = (entryEl.getAttribute('data-entry-id') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const labelEl = entryEl.querySelector('label, .bio-properties-panel-label');
         const labelText = (labelEl?.textContent || '').toLowerCase().trim();
@@ -1235,10 +1381,18 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwantedEntry = UNWANTED_IDS.some(id => entryId.includes(id)) ||
                                 UNWANTED_GROUPS.some(name => labelText.includes(name));
 
-        const isInputOutputEntry = entryId.includes('input') || entryId.includes('output') ||
-                                    labelText.includes('input parameter') || labelText.includes('output parameter');
+        const isBlacklistedEntry = isUnwantedEntry || (
+          entryId.includes('assignee') || entryId.includes('candidate') || entryId.includes('implementation') ||
+          entryId.includes('delegate') || entryId.includes('external') || entryId.includes('topic') ||
+          entryId.includes('tasklist') || entryId.includes('input') || entryId.includes('output') ||
+          entryId.includes('async') || entryId.includes('jobpriority') || entryId.includes('listener') ||
+          labelText.includes('assignee') || labelText.includes('candidate') || labelText.includes('implementation') ||
+          labelText.includes('delegate') || labelText.includes('external') || labelText.includes('tasklist') ||
+          labelText.includes('input') || labelText.includes('output') || labelText.includes('async') ||
+          labelText.includes('listener')
+        );
 
-        if (isUnwantedEntry || (isCurrentElementTimer && isInputOutputEntry)) {
+        if (isBlacklistedEntry) {
           (entryEl as HTMLElement).style.display = 'none';
         }
       });
@@ -1282,26 +1436,12 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         input.parentNode?.insertBefore(select, input.nextSibling);
 
         if (!input.value || input.value.toLowerCase() !== 'javascript') {
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          if (nativeSetter) {
-            nativeSetter.call(input, 'javascript');
-          } else {
-            input.value = 'javascript';
-          }
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          this.setNativeInputValue(input, 'javascript', true);
         }
 
         select.addEventListener('change', () => {
           const chosen = select.value || 'javascript';
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          if (nativeSetter) {
-            nativeSetter.call(input, chosen);
-          } else {
-            input.value = chosen;
-          }
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          this.setNativeInputValue(input, chosen, true);
         });
       });
 
@@ -1329,8 +1469,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             const currentVal = (select.value || '').toLowerCase();
             if (!currentVal || currentVal.includes('cycle')) {
               select.selectedIndex = 0;
-              select.dispatchEvent(new Event('input', { bubbles: true }));
-              select.dispatchEvent(new Event('change', { bubbles: true }));
+              this.safeDispatchEvent(select, 'input');
+              this.safeDispatchEvent(select, 'change');
             }
           }
         }
@@ -1535,15 +1675,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               const isoSpan = previewDiv.querySelector('.iso-val');
               if (isoSpan) isoSpan.textContent = isoVal;
 
-              const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
-                                   Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-              if (nativeSetter) {
-                nativeSetter.call(rawInput, isoVal);
-              } else {
-                rawInput.value = isoVal;
-              }
-              rawInput.dispatchEvent(new Event('input', { bubbles: true }));
-              rawInput.dispatchEvent(new Event('change', { bubbles: true }));
+              this.setNativeInputValue(rawInput, isoVal, true);
             };
 
             dtInput.addEventListener('change', updateRawInputFromPicker);
@@ -1625,17 +1757,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
                   if (frozenInfo.value !== undefined && frozenInfo.value !== null && frozenInfo.value !== '') {
                     const strVal = String(frozenInfo.value);
                     if (inp.type === 'checkbox') {
-                      const shouldCheck = strVal.toLowerCase() === 'true';
-                      if (inp.checked !== shouldCheck) {
-                        inp.checked = shouldCheck;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        inp.dispatchEvent(new Event('change', { bubbles: true }));
-                      }
+                      inp.checked = strVal.toLowerCase() === 'true';
                     } else {
                       if (!inp.value || inp.value !== strVal) {
                         inp.value = strVal;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        inp.dispatchEvent(new Event('change', { bubbles: true }));
                       }
                     }
                   }
@@ -1728,32 +1853,79 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
         select.addEventListener('change', () => {
           const chosen = select.value;
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          if (nativeSetter) {
-            nativeSetter.call(input, chosen);
-          } else {
-            input.value = chosen;
-          }
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          this.setNativeInputValue(input, chosen, true);
           updateConfigPlaceholder(chosen);
         });
       });
     };
 
     this.constraintObserver = new MutationObserver(() => {
-      enhanceConstraintEntries();
+      if (this.isUpdatingPropertiesDom) return;
+      try {
+        this.isUpdatingPropertiesDom = true;
+        enhanceConstraintEntries();
+      } finally {
+        this.isUpdatingPropertiesDom = false;
+      }
     });
 
     this.constraintObserver.observe(parent, { childList: true, subtree: true });
     setTimeout(enhanceConstraintEntries, 100);
   }
 
+  private safeDispatchEvent(element: Element | null, eventName: string): void {
+    if (!element) return;
+    try {
+      element.dispatchEvent(new Event(eventName, { bubbles: true }));
+    } catch {
+      // ignore event dispatch error in Preact/DOM
+    }
+  }
+
+  private setNativeInputValue(input: HTMLInputElement | HTMLTextAreaElement | null, val: string, triggerEvents: boolean = false): void {
+    if (!input) return;
+    try {
+      const proto = input instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement?.prototype
+        : window.HTMLInputElement?.prototype;
+      if (proto) {
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+        if (descriptor && descriptor.set) {
+          descriptor.set.call(input, val);
+        } else {
+          input.value = val;
+        }
+      } else {
+        input.value = val;
+      }
+    } catch {
+      try {
+        input.value = val;
+      } catch {
+        // ignore direct property assignment error
+      }
+    }
+    if (triggerEvents) {
+      this.safeDispatchEvent(input, 'input');
+      this.safeDispatchEvent(input, 'change');
+    }
+  }
+
   private registerFrozenProperties(keys: (string | undefined)[], obj: any): void {
-    if (!obj || !Array.isArray(obj.properties)) return;
+    if (!obj || typeof obj !== 'object') return;
+    if (!Array.isArray(obj.properties)) {
+      obj.properties = [];
+    }
     const propMap = new Map<string, FrozenPropertyInfo>();
 
     obj.properties.forEach((p: any) => {
+      if (!p || typeof p !== 'object') return;
+      if (!p.binding || typeof p.binding !== 'object') {
+        p.binding = { type: 'property', name: p.name || p.label || 'customProp' };
+      } else if (!p.binding.type) {
+        p.binding.type = 'property';
+      }
+
       const bName = (p.binding?.name || '').trim();
       if (bName === 'resultVariable' || bName === 'camunda:resultVariable') {
         p.binding = {
@@ -1810,6 +1982,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           if (!decoded) return;
           try {
             const obj = JSON.parse(decoded);
+            if (!obj || typeof obj !== 'object') return;
             const tplId = item.code || obj.id || item.id;
             obj.id = tplId;
             obj.name = item.name || obj.name;
@@ -1821,6 +1994,19 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               id: item.activityFamily || 'custom',
               name: `Family: ${item.activityFamily || 'default'} (${item.scope === 'global' ? 'Global' : 'Tenant'})`
             };
+
+            if (!Array.isArray(obj.properties)) {
+              obj.properties = [];
+            }
+            obj.properties.forEach((p: any) => {
+              if (p && typeof p === 'object') {
+                if (!p.binding || typeof p.binding !== 'object') {
+                  p.binding = { type: 'property', name: p.name || p.label || 'customProp' };
+                } else if (!p.binding.type) {
+                  p.binding.type = 'property';
+                }
+              }
+            });
 
             this.registerFrozenProperties(
               [tplId, item.code, item.id, obj.id, item.parentTemplateId, item.rootActivity],

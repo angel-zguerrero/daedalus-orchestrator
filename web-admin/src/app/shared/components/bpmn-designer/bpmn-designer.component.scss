@@ -130,13 +130,26 @@
       }
     }
 
-    .bpmn-properties-panel {
+    .bpmn-properties-panel-wrapper {
       flex: 0 0 380px;
       width: 380px;
       height: 100%;
       display: flex;
       flex-direction: column;
       border-left: 1px solid rgba(255, 255, 255, 0.15);
+      background-color: #212631;
+
+      .user-task-mode-bar {
+        flex-shrink: 0;
+      }
+    }
+
+    .bpmn-properties-panel {
+      flex: 1 1 auto;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
       background-color: #212631;
       overflow-y: auto;
       color: #e0e0e0;

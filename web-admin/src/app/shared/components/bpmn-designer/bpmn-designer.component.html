@@ -84,7 +84,9 @@
     </div>
 
     <!-- Properties Panel Container for element configuration -->
-    <div #propertiesRef class="bpmn-properties-panel" [hidden]="readonly"></div>
+    <div class="bpmn-properties-panel-wrapper" [hidden]="readonly">
+      <div #propertiesRef class="bpmn-properties-panel"></div>
+    </div>
 
     <!-- Read-Only Element Inspector Overlay -->
     <div class="bpmn-element-inspector border rounded shadow" *ngIf="readonly && selectedElementInfo">
