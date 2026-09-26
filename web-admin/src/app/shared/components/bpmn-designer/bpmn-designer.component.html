@@ -1,4 +1,4 @@
-<div class="bpmn-designer-wrapper" [class.is-readonly]="readonly">
+<div #wrapperRef class="bpmn-designer-wrapper" [class.is-readonly]="readonly">
   <div class="bpmn-designer-container">
     <div #canvasRef class="bpmn-canvas">
       <!-- Floating Canvas Controls Overlay (Undo, Redo, Zoom In, Zoom Out, Fit, Upload, Download) -->
@@ -71,7 +71,7 @@
         <!-- Design Errors Warning Button in Toolbar -->
         <ng-container *ngIf="!readonly && hasLintErrors">
           <div class="overlay-divider"></div>
-          <button type="button" class="zoom-btn text-danger fw-bold d-flex align-items-center gap-1" (click)="toggleErrorsConsole()" title="Toggle Workflow Design Errors Console">
+          <button type="button" class="zoom-btn text-danger fw-bold d-flex align-items-center gap-1" (click)="scrollToErrorsSection()" title="View Workflow Design Errors">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-danger">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
               <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -81,15 +81,6 @@
           </button>
         </ng-container>
       </div>
-
-      <!-- Design Errors Console Docked Overlay at bottom of Canvas -->
-      <app-design-errors-console
-        #errorsConsoleComp
-        *ngIf="!readonly && hasLintErrors"
-        [errors]="currentLintErrors"
-        mode="bottom-bar"
-        title="Workflow Design Errors">
-      </app-design-errors-console>
     </div>
 
     <!-- Properties Panel Container for element configuration -->
@@ -126,5 +117,15 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Dedicated section below the designer for Workflow Design Errors -->
+  <div #errorsSectionRef class="bpmn-designer-errors-section" *ngIf="!readonly && hasLintErrors">
+    <app-design-errors-console
+      [errors]="currentLintErrors"
+      mode="table-row"
+      title="Workflow Design Errors"
+      (collapsedChange)="onConsoleCollapseChange()">
+    </app-design-errors-console>
   </div>
 </div>

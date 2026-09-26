@@ -1,10 +1,48 @@
+::ng-deep body.workflow-editor-active {
+  overflow: hidden !important;
+
+  .wrapper {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  .wrapper > app-default-header {
+    margin-bottom: 0.35rem !important;
+  }
+
+  .wrapper > .body {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: calc(100vh - 85px) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .wrapper > .body > c-container {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    max-width: 100% !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .wrapper > app-default-footer {
+    display: none !important;
+  }
+}
+
 :host {
   display: flex;
   flex-direction: column;
   flex: 1 1 0%;
   width: 100%;
-  height: calc(100vh - 130px);
-  min-height: 500px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -22,11 +60,9 @@
 }
 
 .doc-studio-header {
-  flex: 0 0 auto;
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 1020;
+  position: relative;
+  z-index: 10;
   min-height: 60px;
 }
 
@@ -52,7 +88,7 @@
   flex-direction: column;
   flex: 1 1 0%;
   width: 100%;
-  height: calc(100% - 60px);
+  height: auto;
   min-height: 0;
   overflow: hidden;
   position: relative;

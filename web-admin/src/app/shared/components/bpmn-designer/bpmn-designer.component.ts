@@ -65,9 +65,11 @@ export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
   encapsulation: ViewEncapsulation.None
 })
 export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestroy {
+  @ViewChild('wrapperRef') private wrapperRef?: ElementRef<HTMLDivElement>;
   @ViewChild('canvasRef', { static: true }) private canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('propertiesRef', { static: true }) private propertiesRef!: ElementRef<HTMLDivElement>;
   @ViewChild('fileInputRef') private fileInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('errorsSectionRef') private errorsSectionRef?: ElementRef<HTMLDivElement>;
   @ViewChild(DesignErrorsConsoleComponent) private errorsConsoleComp?: DesignErrorsConsoleComponent;
 
   @Input() payload: string = '';
@@ -81,16 +83,50 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
   public hasLintErrors: boolean = false;
   public selectedElementInfo: any = null;
 
-  public toggleErrorsConsole(): void {
-    if (this.errorsConsoleComp) {
-      this.errorsConsoleComp.toggleCollapse();
-    }
-  }
-
   public scrollToErrorsSection(): void {
     if (this.errorsConsoleComp && this.errorsConsoleComp.isCollapsed) {
       this.errorsConsoleComp.isCollapsed = false;
     }
+    setTimeout(() => {
+      // Ensure all outer containers and window stay locked at top = 0 so the top header never moves
+      const hostEl = this.canvasRef?.nativeElement;
+      if (hostEl) {
+        const studioPage = hostEl.closest('.doc-studio-page') as HTMLElement | null;
+        if (studioPage) {
+          studioPage.scrollTop = 0;
+        }
+        const studioContainer = hostEl.closest('.doc-studio-container') as HTMLElement | null;
+        if (studioContainer) {
+          studioContainer.scrollTop = 0;
+        }
+      }
+      try {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      } catch {
+        // ignore
+      }
+      try {
+        this.bpmnModeler?.get('canvas')?.resized();
+      } catch {
+        // ignore
+      }
+      if (this.errorsSectionRef?.nativeElement) {
+        const consoleBody = this.errorsSectionRef.nativeElement.querySelector('.console-body');
+        if (consoleBody) {
+          consoleBody.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    }, 0);
+  }
+
+  public onConsoleCollapseChange(): void {
+    setTimeout(() => {
+      try {
+        this.bpmnModeler?.get('canvas')?.resized();
+      } catch {
+        // ignore
+      }
+    }, 0);
   }
 
   public inspectElement(element: any): void {
@@ -918,6 +954,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         badgeEl.className = 'bpmn-lint-badge-overlay';
         badgeEl.setAttribute('data-tooltip', messages.join('\n\n'));
         badgeEl.innerHTML = `<span class="badge-icon">!</span><span class="badge-count">${messages.length}</span>`;
+        badgeEl.addEventListener('click', (evt) => {
+          evt.stopPropagation();
+          this.scrollToErrorsSection();
+        });
 
         overlays.add(elementId, 'lint-badge-overlay', {
           position: {
