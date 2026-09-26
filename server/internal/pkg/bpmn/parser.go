@@ -123,6 +123,8 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 	var inTimeDate bool
 	var inTimeCycle bool
 	var conditionBuf strings.Builder
+	var inScriptElement bool
+	var scriptBuf strings.Builder
 	var timeBuf strings.Builder
 
 	for {
@@ -166,6 +168,24 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 				}
 				if template := getAttr(t.Attr, "zeebe:modelerTemplate"); template != "" {
 					node.Properties["modelerTemplate"] = template
+				}
+				if scriptFormat := getAttr(t.Attr, "scriptFormat"); scriptFormat != "" {
+					node.Properties["scriptFormat"] = scriptFormat
+				}
+				if resultVar := getAttr(t.Attr, "resultVariable"); resultVar != "" {
+					node.Properties["resultVariable"] = resultVar
+				}
+				if scriptAttr := getAttr(t.Attr, "script"); scriptAttr != "" {
+					node.Properties["script"] = scriptAttr
+				}
+
+			case "script":
+				if currentNode != nil {
+					inScriptElement = true
+					scriptBuf.Reset()
+					if sf := getAttr(t.Attr, "scriptFormat"); sf != "" && currentNode.Properties["scriptFormat"] == "" {
+						currentNode.Properties["scriptFormat"] = sf
+					}
 				}
 
 			case "taskDefinition":
@@ -266,6 +286,8 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 		case xml.CharData:
 			if inConditionExpression {
 				conditionBuf.Write(t)
+			} else if inScriptElement {
+				scriptBuf.Write(t)
 			} else if inTimeDuration || inTimeDate || inTimeCycle {
 				timeBuf.Write(t)
 			} else if currentNode != nil && (currentElement == "incoming" || currentElement == "outgoing") {
@@ -285,6 +307,15 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 				inConditionExpression = false
 				if currentFlow != nil {
 					currentFlow.Condition = strings.TrimSpace(conditionBuf.String())
+				}
+			}
+			if inScriptElement && local == "script" {
+				inScriptElement = false
+				if currentNode != nil {
+					body := strings.TrimSpace(scriptBuf.String())
+					if body != "" {
+						currentNode.Properties["script"] = body
+					}
 				}
 			}
 

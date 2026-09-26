@@ -282,7 +282,7 @@
             formControlName="parentTemplateId"
             class="bg-dark text-light border-secondary"
             (change)="onParentSelectionChange(identityForm.get('parentTemplateId')?.value)">
-            <optgroup label="Built-in Native Connectors (Redis, HTTP, Logs)">
+            <optgroup label="Built-in Native Connectors (Redis, HTTP, JavaScript / Script, Logs)">
               <option *ngFor="let b of builtinOptions" [value]="b.id">
                 {{ b.name }} ({{ b.id }})
               </option>

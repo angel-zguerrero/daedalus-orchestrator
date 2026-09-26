@@ -177,3 +177,100 @@ func ValidateFormInput(fields []*FormField, input map[string]interface{}) error 
 
 	return nil
 }
+
+var (
+	blockCommentRegex = regexp.MustCompile(`(?s)/\*.*?\*/`)
+	lineCommentRegex  = regexp.MustCompile(`(?m)//.*$`)
+	returnValRegex    = regexp.MustCompile(`\breturn\b\s*[^;\s}]+`)
+)
+
+// IsSupportedScriptFormat returns true if the script format is JavaScript.
+func IsSupportedScriptFormat(format string) bool {
+	f := strings.ToLower(strings.TrimSpace(format))
+	switch f {
+	case "javascript", "java script", "js", "ecmascript":
+		return true
+	default:
+		return false
+	}
+}
+
+// HasMandatoryReturnStatement strips comments and checks if the script contains a return statement with an expression.
+func HasMandatoryReturnStatement(script string) bool {
+	cleaned := blockCommentRegex.ReplaceAllString(script, "")
+	cleaned = lineCommentRegex.ReplaceAllString(cleaned, "")
+	cleaned = strings.TrimSpace(cleaned)
+	if cleaned == "" {
+		return false
+	}
+	return returnValRegex.MatchString(cleaned)
+}
+
+// ValidateScriptConfig validates that a script task uses the 'javascript' format, has a non-empty script body
+// with a mandatory return statement, and defines a resultVariable to map the return value.
+func ValidateScriptConfig(nodeLabel, scriptFormat, scriptBody, resultVariable string) error {
+	if !IsSupportedScriptFormat(scriptFormat) {
+		return fmt.Errorf("script task %s: unsupported or missing scriptFormat %q (only 'javascript' is supported)", nodeLabel, scriptFormat)
+	}
+	if strings.TrimSpace(scriptBody) == "" {
+		return fmt.Errorf("script task %s: script body is required", nodeLabel)
+	}
+	if !HasMandatoryReturnStatement(scriptBody) {
+		return fmt.Errorf("script task %s: a 'return <value>;' statement is mandatory in the script", nodeLabel)
+	}
+	if strings.TrimSpace(resultVariable) == "" {
+		return fmt.Errorf("script task %s: output resultVariable is required to map the script return value", nodeLabel)
+	}
+	return nil
+}
+
+// ValidateScriptTasks validates all ScriptTask nodes (or tasks configured with ScriptTask template/properties) in a BPMNModel.
+func ValidateScriptTasks(model *BPMNModel) error {
+	if model == nil {
+		return nil
+	}
+	for _, node := range model.Nodes {
+		if node == nil {
+			continue
+		}
+		tpl := strings.ToLower(strings.TrimSpace(node.Properties["modelerTemplate"]))
+		hasScriptProp := strings.TrimSpace(node.Properties["script"]) != "" || strings.TrimSpace(node.Properties["scriptBody"]) != ""
+		isScriptNode := node.Type == ElementScriptTask || strings.Contains(tpl, "scripttask") || hasScriptProp
+		if !isScriptNode {
+			continue
+		}
+
+		// If the node uses a custom ActivityTemplate (not built-in ScriptTask and no inline script),
+		// full validation will occur after template inheritance resolution in AdvanceTokenCommand / ScriptExecutor.
+		if tpl != "" && !strings.Contains(tpl, "scripttask") && !hasScriptProp && node.Type != ElementScriptTask {
+			continue
+		}
+
+		format := strings.TrimSpace(node.Properties["scriptFormat"])
+		if format == "" && strings.Contains(tpl, "scripttask") {
+			format = "javascript"
+		}
+		body := strings.TrimSpace(node.Properties["script"])
+		if body == "" {
+			body = strings.TrimSpace(node.Properties["scriptBody"])
+		}
+		resultVar := strings.TrimSpace(node.Properties["resultVariable"])
+		if resultVar == "" {
+			resultVar = strings.TrimSpace(node.Properties["camunda:resultVariable"])
+		}
+		if resultVar == "" {
+			resultVar = strings.TrimSpace(node.Properties["outputVariable"])
+		}
+
+		label := node.ID
+		if node.Name != "" {
+			label = fmt.Sprintf("%q (%s)", node.Name, node.ID)
+		}
+
+		if err := ValidateScriptConfig(label, format, body, resultVar); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+

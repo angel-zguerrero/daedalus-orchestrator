@@ -162,7 +162,9 @@ func NormalizeBuiltinActivityType(activityType string) string {
 		return "io.camunda.connectors.Redis.v1"
 	case "io.camunda.connectors.logtask.v1", "logtask", "log":
 		return "io.camunda.connectors.LogTask.v1"
-	case "task", "servicetask", "service-task", "scripttask", "script-task", "usertask", "user-task", "sendtask", "send-task", "receivetask", "receive-task", "manualtask", "manual-task", "businessruletask", "business-rule-task":
+	case "io.camunda.connectors.scripttask.v1", "scripttask", "script-task", "javascript", "js", "script":
+		return "io.camunda.connectors.ScriptTask.v1"
+	case "task", "servicetask", "service-task", "usertask", "user-task", "sendtask", "send-task", "receivetask", "receive-task", "manualtask", "manual-task", "businessruletask", "business-rule-task":
 		return "task"
 	default:
 		return ""
@@ -206,6 +208,9 @@ func InferBaseActivityTypeFromPayload(payload []byte) string {
 			propNames[name] = true
 		}
 	}
+	if propNames["script"] || propNames["scriptbody"] || propNames["scriptformat"] {
+		return "io.camunda.connectors.ScriptTask.v1"
+	}
 	if propNames["connectionstring"] || propNames["command"] || propNames["key"] {
 		return "io.camunda.connectors.Redis.v1"
 	}
@@ -233,6 +238,9 @@ func InferBaseActivityTypeFromMap(input map[string]interface{}) string {
 			}
 		}
 	}
+	if propNames["script"] || propNames["scriptbody"] || propNames["scriptformat"] {
+		return "io.camunda.connectors.ScriptTask.v1"
+	}
 	if propNames["connectionstring"] || (propNames["command"] && propNames["key"]) {
 		return "io.camunda.connectors.Redis.v1"
 	}
@@ -250,6 +258,7 @@ var builtinDefaultPropertyValues = map[string]string{
 	"method":              "GET",
 	"authentication.type": "noAuth",
 	"level":               "INFO",
+	"scriptFormat":        "javascript",
 }
 
 // MergeActivityTemplateHierarchy merges properties across a multi-level template inheritance chain (ordered from root parent to leaf child,

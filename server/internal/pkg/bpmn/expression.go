@@ -173,6 +173,46 @@ func EvaluateStringResolvable(input string, state map[string]interface{}, resolv
 	return result, nil
 }
 
+// EvaluateScriptStringResolvable resolves ${config...}/${secret...} and known state variables while preserving
+// unknown ${localJsVar} expressions so JavaScript template literals work natively at runtime.
+func EvaluateScriptStringResolvable(input string, state map[string]interface{}, resolver EnvResolver) (interface{}, error) {
+	var firstErr error
+	var hasError bool
+
+	result := exprRegex.ReplaceAllStringFunc(input, func(match string) string {
+		if hasError {
+			return match
+		}
+		exprInner := strings.TrimSpace(match[2 : len(match)-1])
+		if matches := configSecretRegex.FindStringSubmatch(exprInner); len(matches) == 5 {
+			if resolver == nil {
+				hasError = true
+				firstErr = fmt.Errorf("environment resolver is required to resolve %q", exprInner)
+				return match
+			}
+			val, err := resolver.ResolveEnvVar(matches[1], matches[2], matches[3], matches[4])
+			if err != nil {
+				hasError = true
+				firstErr = err
+				return match
+			}
+			return val
+		}
+		if state != nil {
+			if val := ResolveVariablePath(exprInner, state); val != nil {
+				return fmt.Sprintf("%v", val)
+			}
+		}
+		// Preserve ${...} for local JS template literals
+		return match
+	})
+
+	if hasError {
+		return nil, firstErr
+	}
+	return result, nil
+}
+
 // EvaluateObjectResolvable recursively traverses data structures and resolves expressions using state & optional resolver.
 func EvaluateObjectResolvable(val interface{}, state map[string]interface{}, resolver EnvResolver) (interface{}, error) {
 	if val == nil {
@@ -196,6 +236,16 @@ func EvaluateObjectResolvable(val interface{}, state map[string]interface{}, res
 					evaluatedKey = str
 				}
 			}
+			if (evaluatedKey == "script" || evaluatedKey == "scriptBody") && child != nil {
+				if childStr, ok := child.(string); ok {
+					childRes, err := EvaluateScriptStringResolvable(childStr, state, resolver)
+					if err != nil {
+						return nil, err
+					}
+					evaluatedMap[evaluatedKey] = childRes
+					continue
+				}
+			}
 			childRes, err := EvaluateObjectResolvable(child, state, resolver)
 			if err != nil {
 				return nil, err
@@ -216,6 +266,14 @@ func EvaluateObjectResolvable(val interface{}, state map[string]interface{}, res
 				if str, ok := evalKeyStr.(string); ok {
 					evaluatedKey = str
 				}
+			}
+			if evaluatedKey == "script" || evaluatedKey == "scriptBody" {
+				childRes, err := EvaluateScriptStringResolvable(childStr, state, resolver)
+				if err != nil {
+					return nil, err
+				}
+				evaluatedMap[evaluatedKey] = childRes
+				continue
 			}
 			childRes, err := EvaluateObjectResolvable(childStr, state, resolver)
 			if err != nil {

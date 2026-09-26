@@ -61,6 +61,7 @@ func (r *Registry) RegisterDefaults() {
 	httpExec := &HTTPExecutor{}
 	redisExec := &RedisExecutor{}
 	logExec := &LogExecutor{}
+	scriptExec := &ScriptExecutor{}
 
 	// HTTP-based services (HTTP REST)
 	r.executors["io.camunda.connectors.httpjson.v1"] = httpExec
@@ -75,6 +76,13 @@ func (r *Registry) RegisterDefaults() {
 	r.executors["io.camunda:connector-redis"] = redisExec
 	r.executors["redis"] = redisExec
 
+	// JavaScript Script Task
+	r.executors["io.camunda.connectors.scripttask.v1"] = scriptExec
+	r.executors["scripttask"] = scriptExec
+	r.executors["script-task"] = scriptExec
+	r.executors["javascript"] = scriptExec
+	r.executors["script"] = scriptExec
+
 	// Log / Debug & Standard BPMN Task Elements
 	r.executors["io.camunda.connectors.logtask.v1"] = logExec
 	r.executors["logtask"] = logExec
@@ -82,8 +90,6 @@ func (r *Registry) RegisterDefaults() {
 	r.executors["task"] = logExec
 	r.executors["servicetask"] = logExec
 	r.executors["service-task"] = logExec
-	r.executors["scripttask"] = logExec
-	r.executors["script-task"] = logExec
 	r.executors["usertask"] = logExec
 	r.executors["user-task"] = logExec
 	r.executors["sendtask"] = logExec

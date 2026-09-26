@@ -466,5 +466,82 @@
         }
       }
     ]
+  },
+  {
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema/resources/schema.json",
+    "name": "JavaScript Script Task",
+    "id": "io.camunda.connectors.ScriptTask.v1",
+    "description": "Execute isolated JavaScript code on the server and map its mandatory return value to an output workflow variable",
+    "documentationRef": "https://docs.camunda.io/docs/components/modeler/bpmn/script-tasks/",
+    "category": {
+      "id": "connectors",
+      "name": "Camunda Connectors"
+    },
+    "appliesTo": [
+      "bpmn:Task",
+      "bpmn:ServiceTask",
+      "bpmn:ScriptTask",
+      "bpmn:Activity"
+    ],
+    "elementType": {
+      "value": "bpmn:ScriptTask"
+    },
+    "groups": [
+      {
+        "id": "scriptConfig",
+        "label": "Script Configuration"
+      },
+      {
+        "id": "responseMapping",
+        "label": "Output Mapping"
+      }
+    ],
+    "properties": [
+      {
+        "label": "Script Format",
+        "type": "Dropdown",
+        "value": "javascript",
+        "group": "scriptConfig",
+        "choices": [
+          {
+            "name": "JavaScript",
+            "value": "javascript"
+          }
+        ],
+        "binding": {
+          "type": "camunda:property",
+          "name": "scriptFormat"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "JavaScript Code (return required)",
+        "type": "String",
+        "multiline": true,
+        "value": "// Write your JavaScript code here.\n// A 'return' statement is mandatory.\nreturn { processed: true };",
+        "group": "scriptConfig",
+        "binding": {
+          "type": "camunda:property",
+          "name": "script"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      },
+      {
+        "label": "Output Result Variable Name",
+        "type": "String",
+        "group": "responseMapping",
+        "binding": {
+          "type": "property",
+          "name": "camunda:resultVariable"
+        },
+        "constraints": {
+          "notEmpty": true
+        }
+      }
+    ]
   }
 ]

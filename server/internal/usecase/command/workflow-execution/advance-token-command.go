@@ -767,6 +767,48 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				jobInputPayload = evaluatedMap
 			}
 
+			if currentNode.Type == bpmn.ElementScriptTask ||
+				strings.EqualFold(actType, "scriptTask") ||
+				strings.EqualFold(actType, "io.camunda.connectors.ScriptTask.v1") ||
+				jobInputPayload["script"] != nil {
+				actType = "io.camunda.connectors.ScriptTask.v1"
+				scriptFormat, _ := jobInputPayload["scriptFormat"].(string)
+				if strings.TrimSpace(scriptFormat) == "" && currentNode.Type != bpmn.ElementScriptTask {
+					scriptFormat = "javascript"
+					jobInputPayload["scriptFormat"] = "javascript"
+				}
+				scriptBody, _ := jobInputPayload["script"].(string)
+				if strings.TrimSpace(scriptBody) == "" {
+					scriptBody, _ = jobInputPayload["scriptBody"].(string)
+				}
+				resultVar := ""
+				for _, rk := range []string{"resultVariable", "camunda:resultVariable", "outputVariable"} {
+					if rv, ok := jobInputPayload[rk].(string); ok && strings.TrimSpace(rv) != "" {
+						resultVar = strings.TrimSpace(rv)
+						break
+					}
+				}
+				nodeLabel := currentNode.ID
+				if currentNode.Name != "" {
+					nodeLabel = fmt.Sprintf("%q (%s)", currentNode.Name, currentNode.ID)
+				}
+				if err := bpmn.ValidateScriptConfig(nodeLabel, scriptFormat, scriptBody, resultVar); err != nil {
+					errMsg := err.Error()
+					log.Error().Err(err).Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg("❌ ScriptTask validation failed")
+					token.Status = models.ExecutionTokenStatusCancelled
+					tokenRepo.UpdateExecutionToken(token, now)
+
+					execution.Status = models.WorkflowExecutionStatusFailed
+					execution.Error = errMsg
+					execution.CompletedAt = &now
+					execRepo.UpdateWorkflowExecution(execution, now)
+
+					commandResult.Error = errMsg
+					commandResult.Result = execution
+					return *commandResult
+				}
+			}
+
 			job := &models.WorkflowJob{
 				ID:                   jobID,
 				WorkflowExecutionID: execution.ID,
