@@ -77,18 +77,7 @@ func main() {
 			log.Fatalf("💥 Fatal error asserting tenant: %v", err)
 		}
 
-		// 2. Upsert exchange
-		_, err = sdk.AssertExchange(ctx, daedalus.AssertExchangeInput{
-			TenantCode: company.Code,
-			Code:       "email-events",
-			Name:       "Email Events",
-			Type:       "topic",
-		})
-		if err != nil {
-			log.Fatalf("💥 Fatal error asserting exchange: %v", err)
-		}
-
-		// 3. Upsert queues
+		// 2. Upsert queues
 		queueInputs := []daedalus.AssertQueueInput{
 			{
 				TenantCode: company.Code, Code: "email-transactional", Name: "Email Transactional", Type: "standard", State: "active", VNamespace: "default", MaxAttempts: 3, PriorityType: "normal",
@@ -106,25 +95,6 @@ func main() {
 				log.Fatalf("💥 Fatal error asserting queue %s: %v", qi.Code, err)
 			}
 		}
-
-		// 4. Bindings
-		bindingInputs := []daedalus.AssertBindingInput{
-			{
-				TenantCode: company.Code, Code: "transactional", ExchangeCode: "email-events", QueueCode: "email-transactional", Pattern: "transactional.*", VNamespace: "default", BindingType: "classic",
-			},
-			{
-				TenantCode: company.Code, Code: "marketing", ExchangeCode: "email-events", QueueCode: "email-marketing", Pattern: "marketing.*", VNamespace: "default", BindingType: "classic",
-			},
-			{
-				TenantCode: company.Code, Code: "report", ExchangeCode: "email-events", QueueCode: "email-report", Pattern: "report.*", VNamespace: "default", BindingType: "classic",
-			},
-		}
-
-		for _, bi := range bindingInputs {
-			if _, err := sdk.AssertBinding(ctx, bi); err != nil {
-				log.Fatalf("💥 Fatal error asserting binding %s: %v", bi.Code, err)
-			}
-		}
 	}
 
 	// ===== PUBLISH: Black Friday Email Surge =====
@@ -134,7 +104,7 @@ func main() {
 	// Tienda A (Big): 50K transactional + 10K marketing
 	log.Println("🛍️  Tienda A: 50K confirmations + 10K Black Friday promos")
 
-	publishBatch(ctx, sdk, 50000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 50000, func(i int) daedalus.EnqueueMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("tienda-a-trans-%d", i),
 			CompanyID: "tienda-a",
@@ -146,17 +116,16 @@ func main() {
 			Timestamp: time.Now().UnixMilli(),
 			Size:      5000,
 		})
-		return daedalus.PublishMessageInput{
-			TenantCode:                     "tienda-a",
-			ExchangeCode:                   "email-events",
-			RoutingKeyOrPatternOrQueueCode: "transactional.order-confirmation",
-			Content:                        payload,
-			VNamespace:                     "default",
-			ContentType:                    "application/json",
+		return daedalus.EnqueueMessageInput{
+			TenantCode:  "tienda-a",
+			QueueCode:   "email-transactional",
+			Content:     payload,
+			VNamespace:  "default",
+			ContentType: "application/json",
 		}
 	})
 
-	publishBatch(ctx, sdk, 10000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 10000, func(i int) daedalus.EnqueueMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("tienda-a-mkt-%d", i),
 			CompanyID: "tienda-a",
@@ -168,20 +137,19 @@ func main() {
 			Timestamp: time.Now().UnixMilli(),
 			Size:      50000,
 		})
-		return daedalus.PublishMessageInput{
-			TenantCode:                     "tienda-a",
-			ExchangeCode:                   "email-events",
-			RoutingKeyOrPatternOrQueueCode: "marketing.black-friday",
-			Content:                        payload,
-			VNamespace:                     "default",
-			ContentType:                    "application/json",
+		return daedalus.EnqueueMessageInput{
+			TenantCode:  "tienda-a",
+			QueueCode:   "email-marketing",
+			Content:     payload,
+			VNamespace:  "default",
+			ContentType: "application/json",
 		}
 	})
 
 	// Tienda B (Small): 50K transactional + 10K marketing (ISOLATED)
 	log.Println("🏪 Tienda B: 50K confirmations + 10K promos (ISOLATED from A)")
 
-	publishBatch(ctx, sdk, 50000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 50000, func(i int) daedalus.EnqueueMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("tienda-b-trans-%d", i),
 			CompanyID: "tienda-b",
@@ -193,17 +161,16 @@ func main() {
 			Timestamp: time.Now().UnixMilli(),
 			Size:      5000,
 		})
-		return daedalus.PublishMessageInput{
-			TenantCode:                     "tienda-b",
-			ExchangeCode:                   "email-events",
-			RoutingKeyOrPatternOrQueueCode: "transactional.order-confirmation",
-			Content:                        payload,
-			VNamespace:                     "default",
-			ContentType:                    "application/json",
+		return daedalus.EnqueueMessageInput{
+			TenantCode:  "tienda-b",
+			QueueCode:   "email-transactional",
+			Content:     payload,
+			VNamespace:  "default",
+			ContentType: "application/json",
 		}
 	})
 
-	publishBatch(ctx, sdk, 10000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 10000, func(i int) daedalus.EnqueueMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("tienda-b-mkt-%d", i),
 			CompanyID: "tienda-b",
@@ -215,20 +182,19 @@ func main() {
 			Timestamp: time.Now().UnixMilli(),
 			Size:      30000,
 		})
-		return daedalus.PublishMessageInput{
-			TenantCode:                     "tienda-b",
-			ExchangeCode:                   "email-events",
-			RoutingKeyOrPatternOrQueueCode: "marketing.black-friday-small",
-			Content:                        payload,
-			VNamespace:                     "default",
-			ContentType:                    "application/json",
+		return daedalus.EnqueueMessageInput{
+			TenantCode:  "tienda-b",
+			QueueCode:   "email-marketing",
+			Content:     payload,
+			VNamespace:  "default",
+			ContentType: "application/json",
 		}
 	})
 
 	// Banco C: OTPs (ISOLATED)
 	log.Println("🏦 Banco C: 50K OTP emails (ISOLATED)")
 
-	publishBatch(ctx, sdk, 50000, func(i int) daedalus.PublishMessageInput {
+	publishBatch(ctx, sdk, 50000, func(i int) daedalus.EnqueueMessageInput {
 		payload, _ := json.Marshal(EmailMessage{
 			MessageID: fmt.Sprintf("banco-c-otp-%d", i),
 			CompanyID: "banco-c",
@@ -240,13 +206,12 @@ func main() {
 			Timestamp: time.Now().UnixMilli(),
 			Size:      2000,
 		})
-		return daedalus.PublishMessageInput{
-			TenantCode:                     "banco-c",
-			ExchangeCode:                   "email-events",
-			RoutingKeyOrPatternOrQueueCode: "transactional.otp",
-			Content:                        payload,
-			VNamespace:                     "default",
-			ContentType:                    "application/json",
+		return daedalus.EnqueueMessageInput{
+			TenantCode:  "banco-c",
+			QueueCode:   "email-transactional",
+			Content:     payload,
+			VNamespace:  "default",
+			ContentType: "application/json",
 		}
 	})
 
@@ -367,7 +332,7 @@ func main() {
 	<-ctx.Done()
 }
 
-func publishBatch(ctx context.Context, sdk *daedalus.DaedalusSDK, total int, createMessage func(int) daedalus.PublishMessageInput) {
+func publishBatch(ctx context.Context, sdk *daedalus.DaedalusSDK, total int, createMessage func(int) daedalus.EnqueueMessageInput) {
 	for offset := 0; offset < total; offset += BatchSize {
 		count := BatchSize
 		if total-offset < BatchSize {
@@ -382,7 +347,7 @@ func publishBatch(ctx context.Context, sdk *daedalus.DaedalusSDK, total int, cre
 			go func(i int) {
 				defer wg.Done()
 				input := createMessage(i)
-				_, err := sdk.PublishMessage(ctx, input)
+				_, err := sdk.EnqueueMessage(ctx, input)
 				if err != nil {
 					errCh <- err
 				}
@@ -392,9 +357,9 @@ func publishBatch(ctx context.Context, sdk *daedalus.DaedalusSDK, total int, cre
 		close(errCh)
 
 		for err := range errCh {
-			log.Printf("❌ Publish error: %v", err)
+			log.Printf("❌ Enqueue error: %v", err)
 		}
 
-		log.Printf("Published %d/%d", offset+count, total)
+		log.Printf("Enqueued %d/%d", offset+count, total)
 	}
 }

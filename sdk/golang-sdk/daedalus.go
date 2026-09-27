@@ -16,8 +16,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	authpb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/auth"
-	bindingpb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/binding"
-	exchangepb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/exchange"
 	jobworkerpb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/jobworker"
 	queuepb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/queue"
 	scheduledjobpb "github.com/angel-zguerrero/daedalus-orchestrator/sdk/golang-sdk/proto/scheduledjob"
@@ -28,31 +26,19 @@ import (
 type DaedalusSDK struct {
 	config Config
 
-	conn            *grpc.ClientConn
-	authClient      authpb.AuthServiceClient
-	jobWorkerClient jobworkerpb.JobWorkerServiceClient
-	tenantClient    tenantpb.TenantServiceClient
-	exchangeClient  exchangepb.ExchangeServiceClient
+	conn               *grpc.ClientConn
+	authClient         authpb.AuthServiceClient
+	jobWorkerClient    jobworkerpb.JobWorkerServiceClient
+	tenantClient       tenantpb.TenantServiceClient
 	queueClient        queuepb.QueueServiceClient
-	bindingClient      bindingpb.BindingServiceClient
 	scheduledJobClient scheduledjobpb.ScheduledJobServiceClient
 
 	token string
 	mu    sync.RWMutex
 
-	publishStream   exchangepb.ExchangeService_PublishStreamClient
-	publishPending  map[string]*pendingPublish
-	publishStreamMu sync.Mutex
-
 	enqueueStream   queuepb.QueueService_EnqueueStreamClient
 	enqueuePending  map[string]*pendingEnqueue
 	enqueueStreamMu sync.Mutex
-}
-
-type pendingPublish struct {
-	resolve chan PublishResult
-	reject  chan error
-	timer   *time.Timer
 }
 
 type pendingEnqueue struct {
@@ -65,7 +51,6 @@ type pendingEnqueue struct {
 func NewDaedalusSDK(config Config) *DaedalusSDK {
 	return &DaedalusSDK{
 		config:         config,
-		publishPending: make(map[string]*pendingPublish),
 		enqueuePending: make(map[string]*pendingEnqueue),
 	}
 }
@@ -145,9 +130,7 @@ func (sdk *DaedalusSDK) connectOnce(ctx context.Context) error {
 	sdk.authClient = authpb.NewAuthServiceClient(conn)
 	sdk.jobWorkerClient = jobworkerpb.NewJobWorkerServiceClient(conn)
 	sdk.tenantClient = tenantpb.NewTenantServiceClient(conn)
-	sdk.exchangeClient = exchangepb.NewExchangeServiceClient(conn)
 	sdk.queueClient = queuepb.NewQueueServiceClient(conn)
-	sdk.bindingClient = bindingpb.NewBindingServiceClient(conn)
 	sdk.scheduledJobClient = scheduledjobpb.NewScheduledJobServiceClient(conn)
 
 	// Perform initial login
@@ -161,13 +144,6 @@ func (sdk *DaedalusSDK) connectOnce(ctx context.Context) error {
 
 // Disconnect closes all gRPC connections.
 func (sdk *DaedalusSDK) Disconnect() error {
-	sdk.publishStreamMu.Lock()
-	if sdk.publishStream != nil {
-		sdk.publishStream.CloseSend()
-		sdk.publishStream = nil
-	}
-	sdk.publishStreamMu.Unlock()
-
 	sdk.enqueueStreamMu.Lock()
 	if sdk.enqueueStream != nil {
 		sdk.enqueueStream.CloseSend()
@@ -260,24 +236,6 @@ func (sdk *DaedalusSDK) AssertTenant(ctx context.Context, input AssertTenantInpu
 		return nil, fmt.Errorf("assert tenant failed: %w", err)
 	}
 	log.Printf("✅ Tenant asserted: %s", input.Code)
-	return resp.Result, nil
-}
-
-// AssertExchange upserts an exchange in the orchestrator.
-func (sdk *DaedalusSDK) AssertExchange(ctx context.Context, input AssertExchangeInput) (*exchangepb.Exchange, error) {
-	resp, err := sdk.exchangeClient.CreateExchange(sdk.authCtx(ctx), &exchangepb.CreateExchangeRequest{
-		TenantCode: input.TenantCode,
-		Code:       input.Code,
-		Name:       input.Name,
-		Type:       input.Type,
-		Vnamespace: input.VNamespace,
-		Headers:    input.Headers,
-	})
-	if err != nil {
-		log.Printf("❌ Failed to assert exchange: %v", err)
-		return nil, fmt.Errorf("assert exchange failed: %w", err)
-	}
-	log.Printf("✅ Exchange asserted: %s", input.Code)
 	return resp.Result, nil
 }
 
@@ -380,103 +338,32 @@ func (sdk *DaedalusSDK) BulkAssertQueues(ctx context.Context, input BulkAssertQu
 	return resp.Result, nil
 }
 
-// AssertBinding upserts a binding in the orchestrator.
-func (sdk *DaedalusSDK) AssertBinding(ctx context.Context, input AssertBindingInput) (*bindingpb.Binding, error) {
-	bindingType := input.BindingType
-	if bindingType == "" {
-		bindingType = "classic"
-	}
-
-	resp, err := sdk.bindingClient.CreateBinding(sdk.authCtx(ctx), &bindingpb.CreateBindingRequest{
-		TenantCode:            input.TenantCode,
-		Code:                  input.Code,
-		ExchangeCode:          input.ExchangeCode,
-		QueueCode:             input.QueueCode,
-		TargetExchangeCode:    input.TargetExchangeCode,
-		AlternateExchangeCode: input.AlternateExchangeCode,
-		Vnamespace:            input.VNamespace,
-		RoutingKey:            input.RoutingKey,
-		Pattern:               input.Pattern,
-		XMatch:                input.XMatch,
-		BindingType:           bindingType,
-		TargetExchangeType:    input.TargetExchangeType,
-		Headers:               input.Headers,
-	})
-	if err != nil {
-		log.Printf("❌ Failed to assert binding: %v", err)
-		return nil, fmt.Errorf("assert binding failed: %w", err)
-	}
-	log.Printf("✅ Binding asserted: %s", input.Code)
-	return resp.Result, nil
-}
-
-// BulkAssertBindings upserts multiple bindings in the orchestrator in a single batch.
-func (sdk *DaedalusSDK) BulkAssertBindings(ctx context.Context, input BulkAssertBindingsInput) ([]*bindingpb.Binding, error) {
-	items := make([]*bindingpb.CreateBindingItem, len(input.Bindings))
-	for i, b := range input.Bindings {
-		bindingType := b.BindingType
-		if bindingType == "" {
-			bindingType = "classic"
-		}
-		items[i] = &bindingpb.CreateBindingItem{
-			Code:                  b.Code,
-			ExchangeCode:          b.ExchangeCode,
-			QueueCode:             b.QueueCode,
-			TargetExchangeCode:    b.TargetExchangeCode,
-			AlternateExchangeCode: b.AlternateExchangeCode,
-			Vnamespace:            b.VNamespace,
-			RoutingKey:            b.RoutingKey,
-			Pattern:               b.Pattern,
-			XMatch:                b.XMatch,
-			BindingType:           bindingType,
-			TargetExchangeType:    b.TargetExchangeType,
-			Headers:               b.Headers,
-		}
-	}
-
-	req := &bindingpb.BulkCreateBindingRequest{
-		TenantCode: input.TenantCode,
-		Bindings:   items,
-	}
-
-	resp, err := sdk.bindingClient.BulkCreateBinding(sdk.authCtx(ctx), req)
-	if err != nil {
-		log.Printf("❌ Failed to bulk assert bindings: %v", err)
-		return nil, fmt.Errorf("bulk assert bindings failed: %w", err)
-	}
-
-	log.Printf("✅ Bulk Bindings asserted: %d", len(input.Bindings))
-	return resp.Results, nil
-}
-
 func convertProtoScheduledJobToSDK(pbJob *scheduledjobpb.ScheduledJob) *ScheduledJob {
 	if pbJob == nil {
 		return nil
 	}
 	return &ScheduledJob{
-		ID:                             pbJob.Id,
-		Code:                           pbJob.Code,
-		TenantID:                       pbJob.TenantId,
-		TargetType:                     pbJob.TargetType,
-		TargetID:                       pbJob.TargetId,
-		TargetCode:                     pbJob.TargetCode,
-		RoutingKeyOrPatternOrQueueCode: pbJob.RoutingKeyOrPatternOrQueueCode,
-		VNamespace:                     pbJob.Vnamespace,
-		Content:                        pbJob.Content,
-		ContentType:                    pbJob.ContentType,
-		Headers:                        pbJob.Headers,
-		Handler:                        pbJob.Handler,
-		Parameters:                     pbJob.Parameters,
-		Priority:                       pbJob.Priority,
-		State:                          pbJob.State,
-		Type:                           pbJob.Type,
-		Every:                          pbJob.Every,
-		CronExpression:                 pbJob.CronExpression,
-		RunAt:                          pbJob.RunAt,
-		RunAfter:                       pbJob.RunAfter,
-		NextRunAt:                      pbJob.NextRunAt,
-		CreatedAt:                      pbJob.CreatedAt,
-		UpdatedAt:                      pbJob.UpdatedAt,
+		ID:             pbJob.Id,
+		Code:           pbJob.Code,
+		TenantID:       pbJob.TenantId,
+		QueueID:        pbJob.QueueId,
+		QueueCode:      pbJob.QueueCode,
+		VNamespace:     pbJob.Vnamespace,
+		Content:        pbJob.Content,
+		ContentType:    pbJob.ContentType,
+		Headers:        pbJob.Headers,
+		Handler:        pbJob.Handler,
+		Parameters:     pbJob.Parameters,
+		Priority:       pbJob.Priority,
+		State:          pbJob.State,
+		Type:           pbJob.Type,
+		Every:          pbJob.Every,
+		CronExpression: pbJob.CronExpression,
+		RunAt:          pbJob.RunAt,
+		RunAfter:       pbJob.RunAfter,
+		NextRunAt:      pbJob.NextRunAt,
+		CreatedAt:      pbJob.CreatedAt,
+		UpdatedAt:      pbJob.UpdatedAt,
 	}
 }
 
@@ -495,8 +382,7 @@ func (sdk *DaedalusSDK) CreateOneOffScheduledJob(ctx context.Context, input Crea
 	resp, err := sdk.scheduledJobClient.CreateOneOffScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.CreateOneOffScheduledJobRequest{
 		Code:        input.Code,
 		TenantCode:  input.TenantCode,
-		TargetType:  input.TargetType,
-		TargetCode:  input.TargetCode,
+		QueueCode:   input.QueueCode,
 		Vnamespace:  input.VNamespace,
 		Content:     string(input.Content),
 		ContentType: contentType,
@@ -526,8 +412,7 @@ func (sdk *DaedalusSDK) CreateRecurringScheduledJob(ctx context.Context, input C
 	resp, err := sdk.scheduledJobClient.CreateRecurringScheduledJob(sdk.authCtx(ctx), &scheduledjobpb.CreateRecurringScheduledJobRequest{
 		Code:           input.Code,
 		TenantCode:     input.TenantCode,
-		TargetType:     input.TargetType,
-		TargetCode:     input.TargetCode,
+		QueueCode:      input.QueueCode,
 		Vnamespace:     input.VNamespace,
 		Content:        string(input.Content),
 		ContentType:    contentType,
@@ -650,59 +535,6 @@ func (sdk *DaedalusSDK) ensureEnqueueStream(ctx context.Context) error {
 	return nil
 }
 
-// ensurePublishStream makes sure the bidirectional publish stream is established.
-func (sdk *DaedalusSDK) ensurePublishStream(ctx context.Context) error {
-	sdk.publishStreamMu.Lock()
-	defer sdk.publishStreamMu.Unlock()
-
-	if sdk.publishStream != nil {
-		return nil
-	}
-
-	stream, err := sdk.exchangeClient.PublishStream(sdk.authCtx(context.Background()))
-	if err != nil {
-		return err
-	}
-	sdk.publishStream = stream
-
-	go func() {
-		for {
-			resp, err := stream.Recv()
-			if err != nil {
-				log.Printf("PublishStream error: %v", err)
-				sdk.publishStreamMu.Lock()
-				sdk.publishStream = nil
-				sdk.publishStreamMu.Unlock()
-				return
-			}
-
-			sdk.mu.Lock()
-			pending, ok := sdk.publishPending[resp.ClientMessageId]
-			if ok {
-				if pending.timer != nil {
-					pending.timer.Stop()
-				}
-				delete(sdk.publishPending, resp.ClientMessageId)
-			}
-			sdk.mu.Unlock()
-
-			if ok {
-				if !resp.Confirmed {
-					pending.reject <- fmt.Errorf("publish failed: %s", resp.Error)
-				} else {
-					pending.resolve <- PublishResult{
-						ClientMessageID: resp.ClientMessageId,
-						Confirmed:       true,
-						QueueMessages:   resp.QueueMessages,
-					}
-				}
-			}
-		}
-	}()
-
-	return nil
-}
-
 // EnqueueMessage enqueues a message directly into a queue.
 // Returns the result of the enqueue operation.
 func (sdk *DaedalusSDK) EnqueueMessage(ctx context.Context, input EnqueueMessageInput) (EnqueueResult, error) {
@@ -790,100 +622,6 @@ func (sdk *DaedalusSDK) EnqueueMessage(ctx context.Context, input EnqueueMessage
 		return res, nil
 	case err := <-reject:
 		return EnqueueResult{}, err
-	}
-}
-
-// PublishMessage publishes a message through an exchange.
-// Returns the result of the publish operation.
-func (sdk *DaedalusSDK) PublishMessage(ctx context.Context, input PublishMessageInput) (PublishResult, error) {
-	if err := sdk.ensurePublishStream(ctx); err != nil {
-		return PublishResult{}, fmt.Errorf("failed to ensure publish stream: %w", err)
-	}
-
-	clientMessageID := uuid.New().String()
-	waitForConfirmation := true
-	timeoutMs := 5000
-
-	if input.Options != nil {
-		waitForConfirmation = input.Options.WaitForConfirmation
-		if input.Options.TimeoutMs > 0 {
-			timeoutMs = input.Options.TimeoutMs
-		}
-	}
-
-	contentType := input.ContentType
-	if contentType == "" {
-		contentType = "text/plain"
-	}
-
-	req := &exchangepb.PublishStreamRequest{
-		ClientMessageId:                clientMessageID,
-		TenantCode:                     input.TenantCode,
-		ExchangeCode:                   input.ExchangeCode,
-		RoutingKeyOrPatternOrQueueCode: input.RoutingKeyOrPatternOrQueueCode,
-		Vnamespace:                     input.VNamespace,
-		Message: &exchangepb.QueueMessage{
-			MessageId:   input.MessageID,
-			Handler:     input.Handler,
-			Priority:    input.Priority,
-			Parameters:  input.Parameters,
-			Headers:     input.Headers,
-			ContentType: contentType,
-			Content:     input.Content,
-		},
-	}
-
-	if !waitForConfirmation {
-		sdk.publishStreamMu.Lock()
-		err := sdk.publishStream.Send(req)
-		sdk.publishStreamMu.Unlock()
-		if err != nil {
-			return PublishResult{}, err
-		}
-		return PublishResult{ClientMessageID: clientMessageID, Confirmed: false}, nil
-	}
-
-	resolve := make(chan PublishResult, 1)
-	reject := make(chan error, 1)
-
-	timer := time.AfterFunc(time.Duration(timeoutMs)*time.Millisecond, func() {
-		sdk.mu.Lock()
-		delete(sdk.publishPending, clientMessageID)
-		sdk.mu.Unlock()
-		reject <- fmt.Errorf("publish confirmation timeout after %dms", timeoutMs)
-	})
-
-	sdk.mu.Lock()
-	sdk.publishPending[clientMessageID] = &pendingPublish{
-		resolve: resolve,
-		reject:  reject,
-		timer:   timer,
-	}
-	sdk.mu.Unlock()
-
-	sdk.publishStreamMu.Lock()
-	err := sdk.publishStream.Send(req)
-	sdk.publishStreamMu.Unlock()
-
-	if err != nil {
-		timer.Stop()
-		sdk.mu.Lock()
-		delete(sdk.publishPending, clientMessageID)
-		sdk.mu.Unlock()
-		return PublishResult{}, err
-	}
-
-	select {
-	case <-ctx.Done():
-		timer.Stop()
-		sdk.mu.Lock()
-		delete(sdk.publishPending, clientMessageID)
-		sdk.mu.Unlock()
-		return PublishResult{}, ctx.Err()
-	case res := <-resolve:
-		return res, nil
-	case err := <-reject:
-		return PublishResult{}, err
 	}
 }
 

@@ -53,8 +53,6 @@ export class TenantSummary extends jspb.Message {
     setTenantid(value: string): TenantSummary;
     getCode(): string;
     setCode(value: string): TenantSummary;
-    getExchangescount(): number;
-    setExchangescount(value: number): TenantSummary;
     getQueuescount(): number;
     setQueuescount(value: number): TenantSummary;
     getMessagescount(): number;
@@ -79,7 +77,6 @@ export namespace TenantSummary {
         id: string,
         tenantid: string,
         code: string,
-        exchangescount: number,
         queuescount: number,
         messagescount: number,
         createdat: string,
@@ -280,12 +277,8 @@ export class Tenant extends jspb.Message {
     setCreatedat(value: string): Tenant;
     getUpdatedat(): string;
     setUpdatedat(value: string): Tenant;
-    getExchangescount(): number;
-    setExchangescount(value: number): Tenant;
     getQueuescount(): number;
     setQueuescount(value: number): Tenant;
-    getBindingscount(): number;
-    setBindingscount(value: number): Tenant;
     getMessagescount(): number;
     setMessagescount(value: number): Tenant;
 
@@ -308,9 +301,7 @@ export namespace Tenant {
         status: string,
         createdat: string,
         updatedat: string,
-        exchangescount: number,
         queuescount: number,
-        bindingscount: number,
         messagescount: number,
     }
 }

@@ -17,53 +17,37 @@ import (
 )
 
 type ScheduledJobBO struct {
-	Config     *common.ServerConfing
-	QueueBO    *QueueBO
-	ExchangeBO *ExchangeBO
+	Config  *common.ServerConfing
+	QueueBO *QueueBO
 }
 
 func NewScheduledJobBO(config *common.ServerConfing) *ScheduledJobBO {
 	return &ScheduledJobBO{
-		Config:     config,
-		QueueBO:    NewQueueBO(config),
-		ExchangeBO: NewExchangeBO(config),
+		Config:  config,
+		QueueBO: NewQueueBO(config),
 	}
 }
 
-func (bo *ScheduledJobBO) resolveTarget(
+func (bo *ScheduledJobBO) resolveTargetQueue(
 	ctx context.Context,
-	targetType string,
-	targetCode string,
+	queueCode string,
 	vnamespace string,
 	cf, cfs string,
 	tenant *models.TenantInMaster,
 	tenantNode *dragonboat.RaftNode,
-) (targetID string, resolvedTargetCode string, routingKey string, err error) {
-	if targetType == string(models.ScheduledJobTargetQueue) {
-		q, err := bo.QueueBO.GetQueue(ctx, targetCode, vnamespace, false, cf, cfs, tenant, tenantNode)
-		if err != nil {
-			return "", "", "", fmt.Errorf("failed to resolve queue target %s: %w", targetCode, err)
-		}
-		return q.ID, q.Code, q.Code, nil
+) (*models.Queue, error) {
+	q, err := bo.QueueBO.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs, tenant, tenantNode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve queue target %s: %w", queueCode, err)
 	}
-
-	if targetType == string(models.ScheduledJobTargetExchange) {
-		ex, err := bo.ExchangeBO.GetExchange(ctx, targetCode, vnamespace, cf, cfs, tenant, tenantNode)
-		if err != nil {
-			return "", "", "", fmt.Errorf("failed to resolve exchange target %s: %w", targetCode, err)
-		}
-		return ex.ID, ex.Code, targetCode, nil
-	}
-
-	return "", "", "", fmt.Errorf("invalid targetType: %s. Must be 'queue' or 'exchange'", targetType)
+	return &q, nil
 }
 
 func (bo *ScheduledJobBO) CreateOneOffScheduledJob(
 	ctx context.Context,
 	code string,
 	tenantCode string,
-	targetType string,
-	targetCode string,
+	queueCode string,
 	vnamespace string,
 	content string,
 	contentType string,
@@ -81,7 +65,7 @@ func (bo *ScheduledJobBO) CreateOneOffScheduledJob(
 		return models.ScheduledJob{}, errors.New("cannot create scheduled job when tenant is pending for deletion")
 	}
 
-	targetID, resTargetCode, routingKey, err := bo.resolveTarget(ctx, targetType, targetCode, vnamespace, cf, cfs, tenant, tenantNode)
+	targetQueue, err := bo.resolveTargetQueue(ctx, queueCode, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return models.ScheduledJob{}, err
 	}
@@ -104,27 +88,25 @@ func (bo *ScheduledJobBO) CreateOneOffScheduledJob(
 	}
 
 	job := models.ScheduledJob{
-		ID:                             uuid.New().String(),
-		Code:                           code,
-		TenantID:                       tenant.ID,
-		TargetType:                     targetType,
-		TargetID:                       targetID,
-		TargetCode:                     resTargetCode,
-		RoutingKeyOrPatternOrQueueCode: routingKey,
-		VNamespace:                     vnamespace,
-		Content:                        content,
-		ContentType:                    contentType,
-		Headers:                        headers,
-		Handler:                        handler,
-		Parameters:                     parameters,
-		Priority:                       priority,
-		State:                          models.ScheduledJobIdle,
-		Type:                           models.ScheduledJobOneOff,
-		RunAt:                          runAt,
-		RunAfter:                       runAfter,
-		NextRunAt:                      nextRunAt,
-		CreatedAt:                      now,
-		UpdatedAt:                      now,
+		ID:          uuid.New().String(),
+		Code:        code,
+		TenantID:    tenant.ID,
+		QueueID:     targetQueue.ID,
+		QueueCode:   targetQueue.Code,
+		VNamespace:  vnamespace,
+		Content:     content,
+		ContentType: contentType,
+		Headers:     headers,
+		Handler:     handler,
+		Parameters:  parameters,
+		Priority:    priority,
+		State:       models.ScheduledJobIdle,
+		Type:        models.ScheduledJobOneOff,
+		RunAt:       runAt,
+		RunAfter:    runAfter,
+		NextRunAt:   nextRunAt,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	cmd := &scheduled_job_command.CreateScheduledJobCommand{
@@ -152,8 +134,7 @@ func (bo *ScheduledJobBO) CreateRecurringScheduledJob(
 	ctx context.Context,
 	code string,
 	tenantCode string,
-	targetType string,
-	targetCode string,
+	queueCode string,
 	vnamespace string,
 	content string,
 	contentType string,
@@ -171,7 +152,7 @@ func (bo *ScheduledJobBO) CreateRecurringScheduledJob(
 		return models.ScheduledJob{}, errors.New("cannot create scheduled job when tenant is pending for deletion")
 	}
 
-	targetID, resTargetCode, routingKey, err := bo.resolveTarget(ctx, targetType, targetCode, vnamespace, cf, cfs, tenant, tenantNode)
+	targetQueue, err := bo.resolveTargetQueue(ctx, queueCode, vnamespace, cf, cfs, tenant, tenantNode)
 	if err != nil {
 		return models.ScheduledJob{}, err
 	}
@@ -194,27 +175,25 @@ func (bo *ScheduledJobBO) CreateRecurringScheduledJob(
 	}
 
 	job := models.ScheduledJob{
-		ID:                             uuid.New().String(),
-		Code:                           code,
-		TenantID:                       tenant.ID,
-		TargetType:                     targetType,
-		TargetID:                       targetID,
-		TargetCode:                     resTargetCode,
-		RoutingKeyOrPatternOrQueueCode: routingKey,
-		VNamespace:                     vnamespace,
-		Content:                        content,
-		ContentType:                    contentType,
-		Headers:                        headers,
-		Handler:                        handler,
-		Parameters:                     parameters,
-		Priority:                       priority,
-		State:                          models.ScheduledJobIdle,
-		Type:                           models.ScheduledJobRecurring,
-		Every:                          every,
-		CronExpression:                 cronExpr,
-		NextRunAt:                      nextRunAt,
-		CreatedAt:                      now,
-		UpdatedAt:                      now,
+		ID:             uuid.New().String(),
+		Code:           code,
+		TenantID:       tenant.ID,
+		QueueID:        targetQueue.ID,
+		QueueCode:      targetQueue.Code,
+		VNamespace:     vnamespace,
+		Content:        content,
+		ContentType:    contentType,
+		Headers:        headers,
+		Handler:        handler,
+		Parameters:     parameters,
+		Priority:       priority,
+		State:          models.ScheduledJobIdle,
+		Type:           models.ScheduledJobRecurring,
+		Every:          every,
+		CronExpression: cronExpr,
+		NextRunAt:      nextRunAt,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	cmd := &scheduled_job_command.CreateScheduledJobCommand{

@@ -690,11 +690,10 @@ proto.tenant.TenantSummary.toObject = function(includeInstance, msg) {
     id: jspb.Message.getFieldWithDefault(msg, 1, ""),
     tenantid: jspb.Message.getFieldWithDefault(msg, 2, ""),
     code: jspb.Message.getFieldWithDefault(msg, 3, ""),
-    exchangescount: jspb.Message.getFieldWithDefault(msg, 4, 0),
-    queuescount: jspb.Message.getFieldWithDefault(msg, 5, 0),
-    messagescount: jspb.Message.getFieldWithDefault(msg, 6, 0),
-    createdat: jspb.Message.getFieldWithDefault(msg, 7, ""),
-    updatedat: jspb.Message.getFieldWithDefault(msg, 8, "")
+    queuescount: jspb.Message.getFieldWithDefault(msg, 4, 0),
+    messagescount: jspb.Message.getFieldWithDefault(msg, 5, 0),
+    createdat: jspb.Message.getFieldWithDefault(msg, 6, ""),
+    updatedat: jspb.Message.getFieldWithDefault(msg, 7, "")
   };
 
   if (includeInstance) {
@@ -745,21 +744,17 @@ proto.tenant.TenantSummary.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 4:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setExchangescount(value);
+      msg.setQueuescount(value);
       break;
     case 5:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setQueuescount(value);
-      break;
-    case 6:
-      var value = /** @type {number} */ (reader.readInt32());
       msg.setMessagescount(value);
       break;
-    case 7:
+    case 6:
       var value = /** @type {string} */ (reader.readString());
       msg.setCreatedat(value);
       break;
-    case 8:
+    case 7:
       var value = /** @type {string} */ (reader.readString());
       msg.setUpdatedat(value);
       break;
@@ -813,38 +808,31 @@ proto.tenant.TenantSummary.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getExchangescount();
+  f = message.getQueuescount();
   if (f !== 0) {
     writer.writeInt32(
       4,
       f
     );
   }
-  f = message.getQueuescount();
+  f = message.getMessagescount();
   if (f !== 0) {
     writer.writeInt32(
       5,
       f
     );
   }
-  f = message.getMessagescount();
-  if (f !== 0) {
-    writer.writeInt32(
-      6,
-      f
-    );
-  }
   f = message.getCreatedat();
   if (f.length > 0) {
     writer.writeString(
-      7,
+      6,
       f
     );
   }
   f = message.getUpdatedat();
   if (f.length > 0) {
     writer.writeString(
-      8,
+      7,
       f
     );
   }
@@ -906,10 +894,10 @@ proto.tenant.TenantSummary.prototype.setCode = function(value) {
 
 
 /**
- * optional int32 ExchangesCount = 4;
+ * optional int32 QueuesCount = 4;
  * @return {number}
  */
-proto.tenant.TenantSummary.prototype.getExchangescount = function() {
+proto.tenant.TenantSummary.prototype.getQueuescount = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 4, 0));
 };
 
@@ -918,16 +906,16 @@ proto.tenant.TenantSummary.prototype.getExchangescount = function() {
  * @param {number} value
  * @return {!proto.tenant.TenantSummary} returns this
  */
-proto.tenant.TenantSummary.prototype.setExchangescount = function(value) {
+proto.tenant.TenantSummary.prototype.setQueuescount = function(value) {
   return jspb.Message.setProto3IntField(this, 4, value);
 };
 
 
 /**
- * optional int32 QueuesCount = 5;
+ * optional int32 MessagesCount = 5;
  * @return {number}
  */
-proto.tenant.TenantSummary.prototype.getQueuescount = function() {
+proto.tenant.TenantSummary.prototype.getMessagescount = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 5, 0));
 };
 
@@ -936,35 +924,17 @@ proto.tenant.TenantSummary.prototype.getQueuescount = function() {
  * @param {number} value
  * @return {!proto.tenant.TenantSummary} returns this
  */
-proto.tenant.TenantSummary.prototype.setQueuescount = function(value) {
+proto.tenant.TenantSummary.prototype.setMessagescount = function(value) {
   return jspb.Message.setProto3IntField(this, 5, value);
 };
 
 
 /**
- * optional int32 MessagesCount = 6;
- * @return {number}
- */
-proto.tenant.TenantSummary.prototype.getMessagescount = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 6, 0));
-};
-
-
-/**
- * @param {number} value
- * @return {!proto.tenant.TenantSummary} returns this
- */
-proto.tenant.TenantSummary.prototype.setMessagescount = function(value) {
-  return jspb.Message.setProto3IntField(this, 6, value);
-};
-
-
-/**
- * optional string CreatedAt = 7;
+ * optional string CreatedAt = 6;
  * @return {string}
  */
 proto.tenant.TenantSummary.prototype.getCreatedat = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 7, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 6, ""));
 };
 
 
@@ -973,16 +943,16 @@ proto.tenant.TenantSummary.prototype.getCreatedat = function() {
  * @return {!proto.tenant.TenantSummary} returns this
  */
 proto.tenant.TenantSummary.prototype.setCreatedat = function(value) {
-  return jspb.Message.setProto3StringField(this, 7, value);
+  return jspb.Message.setProto3StringField(this, 6, value);
 };
 
 
 /**
- * optional string UpdatedAt = 8;
+ * optional string UpdatedAt = 7;
  * @return {string}
  */
 proto.tenant.TenantSummary.prototype.getUpdatedat = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 8, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 7, ""));
 };
 
 
@@ -991,7 +961,7 @@ proto.tenant.TenantSummary.prototype.getUpdatedat = function() {
  * @return {!proto.tenant.TenantSummary} returns this
  */
 proto.tenant.TenantSummary.prototype.setUpdatedat = function(value) {
-  return jspb.Message.setProto3StringField(this, 8, value);
+  return jspb.Message.setProto3StringField(this, 7, value);
 };
 
 
@@ -2294,10 +2264,8 @@ proto.tenant.Tenant.toObject = function(includeInstance, msg) {
     status: jspb.Message.getFieldWithDefault(msg, 5, ""),
     createdat: jspb.Message.getFieldWithDefault(msg, 6, ""),
     updatedat: jspb.Message.getFieldWithDefault(msg, 7, ""),
-    exchangescount: jspb.Message.getFieldWithDefault(msg, 8, 0),
-    queuescount: jspb.Message.getFieldWithDefault(msg, 9, 0),
-    bindingscount: jspb.Message.getFieldWithDefault(msg, 10, 0),
-    messagescount: jspb.Message.getFieldWithDefault(msg, 11, 0)
+    queuescount: jspb.Message.getFieldWithDefault(msg, 8, 0),
+    messagescount: jspb.Message.getFieldWithDefault(msg, 9, 0)
   };
 
   if (includeInstance) {
@@ -2364,17 +2332,9 @@ proto.tenant.Tenant.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 8:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setExchangescount(value);
-      break;
-    case 9:
-      var value = /** @type {number} */ (reader.readInt32());
       msg.setQueuescount(value);
       break;
-    case 10:
-      var value = /** @type {number} */ (reader.readInt32());
-      msg.setBindingscount(value);
-      break;
-    case 11:
+    case 9:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMessagescount(value);
       break;
@@ -2456,31 +2416,17 @@ proto.tenant.Tenant.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getExchangescount();
+  f = message.getQueuescount();
   if (f !== 0) {
     writer.writeInt32(
       8,
       f
     );
   }
-  f = message.getQueuescount();
-  if (f !== 0) {
-    writer.writeInt32(
-      9,
-      f
-    );
-  }
-  f = message.getBindingscount();
-  if (f !== 0) {
-    writer.writeInt32(
-      10,
-      f
-    );
-  }
   f = message.getMessagescount();
   if (f !== 0) {
     writer.writeInt32(
-      11,
+      9,
       f
     );
   }
@@ -2614,10 +2560,10 @@ proto.tenant.Tenant.prototype.setUpdatedat = function(value) {
 
 
 /**
- * optional int32 ExchangesCount = 8;
+ * optional int32 QueuesCount = 8;
  * @return {number}
  */
-proto.tenant.Tenant.prototype.getExchangescount = function() {
+proto.tenant.Tenant.prototype.getQueuescount = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 8, 0));
 };
 
@@ -2626,16 +2572,16 @@ proto.tenant.Tenant.prototype.getExchangescount = function() {
  * @param {number} value
  * @return {!proto.tenant.Tenant} returns this
  */
-proto.tenant.Tenant.prototype.setExchangescount = function(value) {
+proto.tenant.Tenant.prototype.setQueuescount = function(value) {
   return jspb.Message.setProto3IntField(this, 8, value);
 };
 
 
 /**
- * optional int32 QueuesCount = 9;
+ * optional int32 MessagesCount = 9;
  * @return {number}
  */
-proto.tenant.Tenant.prototype.getQueuescount = function() {
+proto.tenant.Tenant.prototype.getMessagescount = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 9, 0));
 };
 
@@ -2644,44 +2590,8 @@ proto.tenant.Tenant.prototype.getQueuescount = function() {
  * @param {number} value
  * @return {!proto.tenant.Tenant} returns this
  */
-proto.tenant.Tenant.prototype.setQueuescount = function(value) {
-  return jspb.Message.setProto3IntField(this, 9, value);
-};
-
-
-/**
- * optional int32 BindingsCount = 10;
- * @return {number}
- */
-proto.tenant.Tenant.prototype.getBindingscount = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 10, 0));
-};
-
-
-/**
- * @param {number} value
- * @return {!proto.tenant.Tenant} returns this
- */
-proto.tenant.Tenant.prototype.setBindingscount = function(value) {
-  return jspb.Message.setProto3IntField(this, 10, value);
-};
-
-
-/**
- * optional int32 MessagesCount = 11;
- * @return {number}
- */
-proto.tenant.Tenant.prototype.getMessagescount = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 11, 0));
-};
-
-
-/**
- * @param {number} value
- * @return {!proto.tenant.Tenant} returns this
- */
 proto.tenant.Tenant.prototype.setMessagescount = function(value) {
-  return jspb.Message.setProto3IntField(this, 11, value);
+  return jspb.Message.setProto3IntField(this, 9, value);
 };
 
 

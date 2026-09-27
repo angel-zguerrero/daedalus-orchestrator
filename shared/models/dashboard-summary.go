@@ -10,11 +10,9 @@ const DashboardSummaryID = "global"
 type DashboardSummary struct {
 	ID string `orm:"primary-key"`
 
-	TenantsCount   int
-	ExchangesCount int
-	QueuesCount    int
-	BindingsCount  int
-	MessagesCount  int
+	TenantsCount  int
+	QueuesCount   int
+	MessagesCount int
 
 	UpdatedAt time.Time
 }

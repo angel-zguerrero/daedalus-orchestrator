@@ -25,11 +25,10 @@ message TenantSummary {
   string ID = 1;
   string TenantId = 2;
   string Code = 3;
-  int32 ExchangesCount = 4;
-  int32 QueuesCount = 5;
-  int32 MessagesCount = 6;
-  string CreatedAt = 7;
-  string UpdatedAt = 8;
+  int32 QueuesCount = 4;
+  int32 MessagesCount = 5;
+  string CreatedAt = 6;
+  string UpdatedAt = 7;
 }
 
 message TenantSummaryResponse {
@@ -76,10 +75,8 @@ message Tenant {
   string Status = 5;
   string CreatedAt = 6;
   string UpdatedAt = 7;
-  int32 ExchangesCount = 8;
-  int32 QueuesCount = 9;
-  int32 BindingsCount = 10;
-  int32 MessagesCount = 11;
+  int32 QueuesCount = 8;
+  int32 MessagesCount = 9;
 }
 
 message FindResult {

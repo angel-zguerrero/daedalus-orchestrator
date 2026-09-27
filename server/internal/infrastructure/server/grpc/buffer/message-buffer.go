@@ -11,7 +11,6 @@ import (
 	"time"
 
 	configPkg "deadalus-orch/server/internal/pkg/config"
-	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"
 	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	"github.com/rs/zerolog"
@@ -20,28 +19,6 @@ import (
 // BufferedItem is the interface that any buffered item must implement
 type BufferedItem interface {
 	GetGroupKey() string // for grouping by (TenantNode+CF+CFS)
-}
-
-// PublishBufferedMessage for PublishStream
-type PublishBufferedMessage struct {
-	ClientMessageID string
-	ExchangeCode    string
-	RoutingKey      string
-	VNamespace      string
-	Message         models.QueueMessage
-	CF              string
-	CFS             string
-	Tenant          *models.TenantInMaster
-	TenantNode      *dragonboat.RaftNode
-	ResponseChan    chan PublishConfirmation
-	SendChan        chan<- *pbExchange.PublishStreamResponse
-}
-
-func (p PublishBufferedMessage) GetGroupKey() string {
-	if p.TenantNode == nil {
-		return p.CF + "-" + p.CFS
-	}
-	return strconv.FormatUint(p.TenantNode.ShardID, 10) + "-" + strconv.FormatUint(p.TenantNode.ReplicaID, 10) + "-" + p.CF + "-" + p.CFS
 }
 
 // EnqueueBufferedMessage for EnqueueStream
@@ -63,11 +40,6 @@ func (e EnqueueBufferedMessage) GetGroupKey() string {
 		return e.CF + "-" + e.CFS
 	}
 	return strconv.FormatUint(e.TenantNode.ShardID, 10) + "-" + strconv.FormatUint(e.TenantNode.ReplicaID, 10) + "-" + e.CF + "-" + e.CFS
-}
-
-type PublishConfirmation struct {
-	QueueMessages map[string]string
-	Error         error
 }
 
 type EnqueueConfirmation struct {

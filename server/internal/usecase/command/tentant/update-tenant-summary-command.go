@@ -53,9 +53,7 @@ func (cmd *UpdateTenantSummaryInMasterCommand) Execute(uow *db.UnitOfWork, now t
 		}
 
 		// Update the tenant with the summary counters
-		tenant.ExchangesCount = summary.ExchangesCount
 		tenant.QueuesCount = summary.QueuesCount
-		tenant.BindingsCount = summary.BindingsCount
 		tenant.MessagesCount = summary.MessagesCount
 
 		// Self-healing: if the summary says we have messages but the master node thinks we don't,

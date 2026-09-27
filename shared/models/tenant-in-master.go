@@ -18,11 +18,9 @@ type TenantInMaster struct {
 	ShardId           int
 	ColumnFamilyIndex int
 
-	ExchangesCount int
-	QueuesCount    int
-	BindingsCount  int
-	MessagesCount  int
-	HasMessages    bool
+	QueuesCount   int
+	MessagesCount int
+	HasMessages   bool
 
 	Status TenantInMasterStatus
 

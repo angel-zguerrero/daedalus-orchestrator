@@ -56,7 +56,7 @@ func (r *TenantSummaryRepository) PaginateTenantUpdatedAtFrom(lastUpdatedAt time
 
 // UpdateCounters allows updating multiple counters in a single operation
 // Positive values increase counters, negative values decrease them
-func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange, exchangesChange, queuesChange, bindingsChange int, now time.Time) error {
+func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange, queuesChange int, now time.Time) error {
 	summary, err := r.GetTenantSummaryById(tenantId, now)
 	if err != nil {
 		return err
@@ -65,11 +65,9 @@ func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange
 	if summary == nil {
 		// If tenant doesn't exist, create new record
 		newSummary := &models.TenantSummary{
-			ID:             tenantId,
-			MessagesCount:  max(0, messagesChange),
-			ExchangesCount: max(0, exchangesChange),
-			QueuesCount:    max(0, queuesChange),
-			BindingsCount:  max(0, bindingsChange),
+			ID:            tenantId,
+			MessagesCount: max(0, messagesChange),
+			QueuesCount:   max(0, queuesChange),
 		}
 		_, err = r.CreateTenantSummary(newSummary, now)
 		return err
@@ -77,9 +75,7 @@ func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange
 
 	// Update existing counts (ensure they don't go below 0)
 	summary.MessagesCount = max(0, summary.MessagesCount+messagesChange)
-	summary.ExchangesCount = max(0, summary.ExchangesCount+exchangesChange)
 	summary.QueuesCount = max(0, summary.QueuesCount+queuesChange)
-	summary.BindingsCount = max(0, summary.BindingsCount+bindingsChange)
 
 	_, err = r.UpdateTenantSummary(summary, now)
 	return err
