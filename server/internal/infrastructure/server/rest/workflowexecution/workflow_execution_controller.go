@@ -134,6 +134,71 @@ func (ctrl *WorkflowExecutionController) CompleteGlobalJobHandler(c *gin.Context
 	c.JSON(http.StatusOK, res)
 }
 
+func (ctrl *WorkflowExecutionController) SubmitEventInputHandler(c *gin.Context) {
+	var rawBody map[string]interface{}
+	if err := c.ShouldBindJSON(&rawBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	waitingEventID := c.Param("waitingEventId")
+	if waitingEventID == "" {
+		waitingEventID = c.Param("id")
+	}
+	if waitingEventID == "" {
+		if wid, ok := rawBody["waitingEventId"].(string); ok {
+			waitingEventID = wid
+		} else if wid, ok := rawBody["waiting_event_id"].(string); ok {
+			waitingEventID = wid
+		}
+	}
+	if waitingEventID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "waiting_event_id is required"})
+		return
+	}
+
+	payload := make(map[string]interface{})
+	if nestedPayload, ok := rawBody["payload"].(map[string]interface{}); ok {
+		payload = nestedPayload
+	} else {
+		for k, v := range rawBody {
+			if k != "waitingEventId" && k != "waiting_event_id" {
+				payload[k] = v
+			}
+		}
+	}
+
+	exec, err := ctrl.WorkflowExecutionBO.CompleteWaitEvent(
+		c.Request.Context(),
+		models.WorkflowScopeGlobal,
+		waitingEventID,
+		payload,
+		"", "", nil,
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, exec)
+}
+
+func (ctrl *WorkflowExecutionController) GetGlobalWaitingEventsHandler(c *gin.Context) {
+	executionID := c.Param("id")
+	events, err := ctrl.WorkflowExecutionBO.GetWaitingEvents(
+		c.Request.Context(),
+		models.WorkflowScopeGlobal,
+		executionID,
+		"", "", nil,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, events)
+}
+
 // --- TENANT HANDLERS ---
 
 func (ctrl *WorkflowExecutionController) StartTenantExecutionHandler(c *gin.Context) {
@@ -210,3 +275,73 @@ func (ctrl *WorkflowExecutionController) ListTenantExecutionsHandler(c *gin.Cont
 
 	c.JSON(http.StatusOK, res)
 }
+
+func (ctrl *WorkflowExecutionController) SubmitTenantEventInputHandler(c *gin.Context) {
+	_, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+
+	var rawBody map[string]interface{}
+	if err := c.ShouldBindJSON(&rawBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	waitingEventID := c.Param("waitingEventId")
+	if waitingEventID == "" {
+		waitingEventID = c.Param("id")
+	}
+	if waitingEventID == "" {
+		if wid, ok := rawBody["waitingEventId"].(string); ok {
+			waitingEventID = wid
+		} else if wid, ok := rawBody["waiting_event_id"].(string); ok {
+			waitingEventID = wid
+		}
+	}
+	if waitingEventID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "waiting_event_id is required"})
+		return
+	}
+
+	payload := make(map[string]interface{})
+	if nestedPayload, ok := rawBody["payload"].(map[string]interface{}); ok {
+		payload = nestedPayload
+	} else {
+		for k, v := range rawBody {
+			if k != "waitingEventId" && k != "waiting_event_id" {
+				payload[k] = v
+			}
+		}
+	}
+
+	exec, err := ctrl.WorkflowExecutionBO.CompleteWaitEvent(
+		c.Request.Context(),
+		models.WorkflowScopeTenant,
+		waitingEventID,
+		payload,
+		cf, cfs, tenantNode,
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, exec)
+}
+
+func (ctrl *WorkflowExecutionController) GetTenantWaitingEventsHandler(c *gin.Context) {
+	_, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
+	executionID := c.Param("id")
+
+	events, err := ctrl.WorkflowExecutionBO.GetWaitingEvents(
+		c.Request.Context(),
+		models.WorkflowScopeTenant,
+		executionID,
+		cf, cfs, tenantNode,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, events)
+}
+

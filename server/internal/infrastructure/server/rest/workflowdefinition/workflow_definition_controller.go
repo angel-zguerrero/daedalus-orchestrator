@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	bo "deadalus-orch/server/internal/usecase/business-logic"
@@ -88,7 +89,11 @@ func (ctrl *WorkflowDefinitionController) CreateGlobalWorkflowHandler(c *gin.Con
 		"", "", nil,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -165,7 +170,11 @@ func (ctrl *WorkflowDefinitionController) UpdateGlobalWorkflowHandler(c *gin.Con
 		"", "", nil,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -261,7 +270,11 @@ func (ctrl *WorkflowDefinitionController) CreateTenantWorkflowHandler(c *gin.Con
 		cf, cfs, tenantNode,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -342,7 +355,11 @@ func (ctrl *WorkflowDefinitionController) UpdateTenantWorkflowHandler(c *gin.Con
 		cf, cfs, tenantNode,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 

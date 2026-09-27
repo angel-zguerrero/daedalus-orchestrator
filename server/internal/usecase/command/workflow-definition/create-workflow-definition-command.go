@@ -3,6 +3,7 @@ package workflow_definition
 import (
 	"encoding/gob"
 	"fmt"
+	"strings"
 	"time"
 
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -35,6 +36,17 @@ func (cmd *CreateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 	if cmd.WorkflowDefinition.Code == "" {
 		commandResult.Error = "Code is required"
 		return *commandResult
+	}
+
+	if len(cmd.WorkflowDefinition.Payload) > 0 {
+		fmtStr := strings.ToLower(strings.TrimSpace(string(cmd.WorkflowDefinition.PayloadFormat)))
+		isBPMN := fmtStr == "bpmn" || fmtStr == "xml" || strings.HasPrefix(strings.TrimSpace(string(cmd.WorkflowDefinition.Payload)), "<")
+		if isBPMN {
+			if err := bpmn.ValidateDiagramFormFields(cmd.WorkflowDefinition.Payload); err != nil {
+				commandResult.Error = fmt.Sprintf("invalid workflow diagram: %s", err.Error())
+				return *commandResult
+			}
+		}
 	}
 
 	idFactory := &db.DeterministicIDGeneratorFactory{}
