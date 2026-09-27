@@ -479,9 +479,7 @@
     },
     "appliesTo": [
       "bpmn:Task",
-      "bpmn:ServiceTask",
-      "bpmn:ScriptTask",
-      "bpmn:Activity"
+      "bpmn:ScriptTask"
     ],
     "elementType": {
       "value": "bpmn:ScriptTask"

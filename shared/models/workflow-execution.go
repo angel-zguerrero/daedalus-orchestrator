@@ -30,6 +30,9 @@ type WorkflowExecution struct {
 	CompletedAt               *time.Time              `json:"completedAt,omitempty"`
 	CreatedAt                 time.Time               `json:"createdAt"`
 	UpdatedAt                 time.Time               `json:"updatedAt"`
+
+	// Virtual fields returned in command results for metrics tracking
+	EnqueuedGauges []QueueGauges `orm:"virtual" json:"enqueuedGauges,omitempty"`
 }
 
 func (WorkflowExecution) TableName() string {

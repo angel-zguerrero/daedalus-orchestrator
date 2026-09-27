@@ -70,6 +70,69 @@ func ResolveVariablePath(path string, state map[string]interface{}) interface{} 
 	return current
 }
 
+// ResolveVariablePathWithExists evaluates a dot-notated/indexed path against a state map,
+// returning the resolved value and whether the target path actually exists.
+func ResolveVariablePathWithExists(path string, state map[string]interface{}) (interface{}, bool) {
+	path = strings.TrimSpace(path)
+	if path == "" || state == nil {
+		return nil, false
+	}
+
+	tokens := parsePathTokens(path)
+	var current interface{} = state
+
+	for _, token := range tokens {
+		if current == nil {
+			return nil, false
+		}
+
+		switch curr := current.(type) {
+		case map[string]interface{}:
+			val, ok := curr[token.key]
+			if !ok {
+				return nil, false
+			}
+			current = val
+		case map[string]string:
+			val, ok := curr[token.key]
+			if !ok {
+				return nil, false
+			}
+			current = val
+		default:
+			return nil, false
+		}
+
+		if token.hasIndex && current != nil {
+			idx := token.index
+			switch arr := current.(type) {
+			case []interface{}:
+				if idx >= 0 && idx < len(arr) {
+					current = arr[idx]
+				} else {
+					return nil, false
+				}
+			case []string:
+				if idx >= 0 && idx < len(arr) {
+					current = arr[idx]
+				} else {
+					return nil, false
+				}
+			case []map[string]interface{}:
+				if idx >= 0 && idx < len(arr) {
+					current = arr[idx]
+				} else {
+					return nil, false
+				}
+			default:
+				return nil, false
+			}
+		}
+	}
+
+	return current, true
+}
+
 type pathToken struct {
 	key      string
 	hasIndex bool

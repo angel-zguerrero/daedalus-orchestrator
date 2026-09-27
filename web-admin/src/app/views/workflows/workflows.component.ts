@@ -472,6 +472,14 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       const lintResult = this.bpmnDesigner.runLintValidation();
       hasDesignErrors = lintResult.hasErrors;
       designErrorMessages = lintResult.errors;
+
+      // Validate diagram form fields - do not allow saving if form fields have missing IDs
+      const formValidation = BpmnFormParserUtil.validateDiagramFormFields(xml || '');
+      if (!formValidation.isValid) {
+        this.errorMessage = `Cannot save workflow diagram: ${formValidation.errors.join(' ')}`;
+        this.showAlert = true;
+        return;
+      }
     }
 
     const val = this.workflowForm.getRawValue();
@@ -787,7 +795,15 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     exec$.subscribe({
       next: (res: any) => {
         this.executing = false;
-        this.executionResult = res?.Result || res?.result || res;
+        const raw = res?.Result || res?.result || res;
+        this.executionResult = raw ? {
+          ...raw,
+          id: raw.id || raw.ID || raw.executionKey || raw.ExecutionKey || '',
+          executionKey: raw.executionKey || raw.ExecutionKey || raw.id || raw.ID || '',
+          workflowDefinitionId: raw.workflowDefinitionId || raw.WorkflowDefinitionID || this.executingWorkflow?.id || '',
+          status: raw.status || raw.Status || 'running',
+          startedAt: raw.startedAt || raw.StartedAt || raw.createdAt || raw.CreatedAt || ''
+        } : null;
         this.lastExecutedWorkflow = this.executingWorkflow;
         this.showExecuteModal = false;
         this.showExecutionSuccessModal = true;

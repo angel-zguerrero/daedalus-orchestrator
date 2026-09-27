@@ -17,7 +17,8 @@ import BpmnModeler from 'bpmn-js/lib/Modeler';
 import BpmnNavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
 import {
   BpmnPropertiesPanelModule,
-  BpmnPropertiesProviderModule
+  BpmnPropertiesProviderModule,
+  CamundaPlatformPropertiesProviderModule
 } from 'bpmn-js-properties-panel';
 import {
   ElementTemplatesCoreModule,
@@ -303,10 +304,13 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     this.selectedElementInfo = info;
   }
 
+
+
   private bpmnModeler!: any;
   private isInitialized = false;
   private lastEmittedXml: string = '';
   private constraintObserver?: MutationObserver;
+  private isUpdatingPropertiesDom = false;
 
   private customElementTemplates: any[] = [];
   private customTemplatesCursor: string = '';
@@ -376,10 +380,12 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         additionalModules: [
           BpmnPropertiesPanelModule,
           BpmnPropertiesProviderModule,
+          CamundaPlatformPropertiesProviderModule,
           ElementTemplatesCoreModule,
           ElementTemplatesPropertiesProviderModule,
           ElementTemplateChooserModule,
-          lintModule
+          lintModule,
+          this.createPropertiesFilterModule()
         ],
         moddleExtensions: {
           camunda: camundaModdleDescriptor
@@ -394,6 +400,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       }
 
       this.bpmnModeler = new BpmnModeler(modelerConfig);
+      (window as any).bpmnModeler = this.bpmnModeler;
 
       try {
         const paletteProvider = this.bpmnModeler.get('paletteProvider');
@@ -465,14 +472,12 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
                 }
               }
 
-              // 3. Tasks: allow templates, connectors, replace-with-task, replace-with-script-task, replace-with-service-task
+              // 3. Tasks: ONLY allow Task (bpmn:Task), Receive Task (bpmn:ReceiveTask), User Task (bpmn:UserTask)
               if (isTaskElement) {
-                return k.startsWith('apply-template') ||
-                       k.includes('template') ||
-                       k.includes('connector') ||
-                       k === 'replace-with-task' ||
-                       k === 'replace-with-script-task' ||
-                       k === 'replace-with-service-task';
+                const isTask = k === 'replace-with-task' || (label === 'task' && !label.includes('user') && !label.includes('receive')) || targetType === 'bpmn:task';
+                const isReceiveTask = k === 'replace-with-receive-task' || label.includes('receive') || targetType === 'bpmn:receivetask';
+                const isUserTask = k === 'replace-with-user-task' || label.includes('user') || targetType === 'bpmn:usertask';
+                return isTask || isReceiveTask || isUserTask;
               }
 
               return true;
@@ -505,6 +510,19 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             replaceMenuProvider.getEntries = function(element: any) {
               const entries = origGetEntries(element);
               return filterEntries(entries, element);
+            };
+          }
+
+          if (replaceMenuProvider.getPopupMenuHeaderEntries) {
+            const origGetPopupMenuHeaderEntries = replaceMenuProvider.getPopupMenuHeaderEntries.bind(replaceMenuProvider);
+            replaceMenuProvider.getPopupMenuHeaderEntries = function(target: any) {
+              const targetElement = Array.isArray(target) ? target[0] : target;
+              const bo = targetElement?.businessObject || targetElement || {};
+              const elementType = (targetElement?.type || bo.$type || '').toLowerCase();
+              if (elementType.includes('task')) {
+                return {};
+              }
+              return origGetPopupMenuHeaderEntries(target);
             };
           }
         }
@@ -546,9 +564,13 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           eventBus.on('commandStack.changed', () => {
             this.emitCurrentXml();
             this.runLintValidation();
+            this.cleanupInvalidTemplatesOnSelectedElements();
           });
           eventBus.on('import.done', () => {
             setTimeout(() => this.runLintValidation(), 150);
+          });
+          eventBus.on('selection.changed', () => {
+            this.cleanupInvalidTemplatesOnSelectedElements();
           });
         }
         eventBus.on('element.click', (event: any) => {
@@ -629,7 +651,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           const rawType = el.type || '';
           const type = rawType.replace(/^bpmn:/, '');
           const id = el.id || '';
-          const rawName = (el.businessObject?.name || '').trim();
+          const bo = el.businessObject || {};
+          const rawName = (bo.name || '').trim();
           const displayName = rawName ? `'${rawName}' (${id})` : `'${id}'`;
 
           // Check if element is a connection / edge (SequenceFlow, Association, MessageFlow, etc.)
@@ -681,8 +704,35 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             );
           }
 
-          // 1b. Script Task / JavaScript Connector Validation:
-          const bo = el.businessObject || {};
+          // 1b. Form Data & Form Fields Validation:
+          if (bo.extensionElements && Array.isArray(bo.extensionElements.values)) {
+            bo.extensionElements.values.forEach((ext: any) => {
+              const extType = (ext.$type || '').toLowerCase();
+              if (extType.includes('formdata') && Array.isArray(ext.fields)) {
+                const seenFieldIds = new Set<string>();
+                ext.fields.forEach((f: any, idx: number) => {
+                  const fieldId = (f?.id || '').trim();
+                  const fieldLabel = (f?.label || '').trim();
+                  const fieldDesc = fieldLabel ? `'${fieldLabel}' (field #${idx + 1})` : `field #${idx + 1}`;
+                  if (!fieldId) {
+                    addElementError(
+                      id,
+                      `Form Field Error: Element ${displayName} contains a form field (${fieldDesc}) without an ID. All form fields must define a valid ID.`
+                    );
+                  } else if (seenFieldIds.has(fieldId)) {
+                    addElementError(
+                      id,
+                      `Form Field Error: Element ${displayName} has duplicate form field ID '${fieldId}'.`
+                    );
+                  } else {
+                    seenFieldIds.add(fieldId);
+                  }
+                });
+              }
+            });
+          }
+
+          // 1c. Script Task / JavaScript Connector Validation:
           const tplAttr = (bo.modelerTemplate || bo.$attrs?.['camunda:modelerTemplate'] || '').toLowerCase();
           let extPropsMap: Record<string, string> = {};
           if (bo.extensionElements && Array.isArray(bo.extensionElements.values)) {
@@ -698,11 +748,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             });
           }
 
-          const isScriptTask =
-            type === 'ScriptTask' ||
-            tplAttr.includes('scripttask') ||
-            extPropsMap['script'] !== undefined ||
-            extPropsMap['scriptFormat'] !== undefined;
+          const isScriptTask = type === 'ScriptTask';
 
           if (isScriptTask) {
             const rawFormat = (
@@ -892,19 +938,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       console.warn('Lint validation notice:', e);
     }
 
-    const prevHasErrors = this.hasLintErrors;
     this.currentLintErrors = errors;
     this.hasLintErrors = errors.length > 0;
     this.updateCanvasOverlays(elementErrorMap);
-    if (prevHasErrors !== this.hasLintErrors) {
-      setTimeout(() => {
-        try {
-          this.bpmnModeler?.get('canvas')?.resized();
-        } catch {
-          // ignore
-        }
-      }, 0);
-    }
     const result = { hasErrors: this.hasLintErrors, errors: this.currentLintErrors };
     this.designErrorsChange.emit(result);
     return result;
@@ -1177,6 +1213,172 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
     URL.revokeObjectURL(url);
   }
 
+  private createPropertiesFilterModule(): any {
+    const self = this;
+    return {
+      __init__: ['propertiesFilterProvider'],
+      propertiesFilterProvider: ['type', class PropertiesFilterProvider {
+        static $inject = ['propertiesPanel'];
+        constructor(propertiesPanel: any) {
+          propertiesPanel.registerProvider(100, this);
+        }
+        getGroups(element: any) {
+          return (groups: any[]) => {
+            if (!element) return groups;
+            return self.filterPropertiesPanelGroups(element, groups);
+          };
+        }
+      }]
+    };
+  }
+
+  private filterPropertiesPanelGroups(element: any, groups: any[]): any[] {
+    if (!groups || !Array.isArray(groups)) return groups;
+
+    const bo = element?.businessObject || element || {};
+    const rawType = (element?.type || bo.$type || '').replace(/^bpmn:/, '');
+
+    const UNWANTED_GROUPS = [
+      'userassignment', 'assignment', 'tasklist', 'candidatestarter', 'startinitiator',
+      'externaltask', 'jobexecution', 'jobconfiguration', 'executionlistener', 'tasklistener',
+      'listener', 'asynchronouscontinuation', 'asynchronouscontinuations', 'async',
+      'historycleanup', 'fieldinjection', 'processvariables', 'inmapping', 'outmapping'
+    ];
+
+    const isUnwantedGroup = (groupId: string, groupLabel: string) => {
+      const id = groupId.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const label = groupLabel.toLowerCase().trim();
+      return UNWANTED_GROUPS.some(u => id.includes(u) || label.includes(u));
+    };
+
+    const isGeneral = (id: string, label: string) => id === 'general' || label === 'general';
+    const isDoc = (id: string, label: string) => id === 'documentation' || label === 'documentation';
+    const isForm = (id: string, label: string) => {
+      const cleanId = id.replace(/platform/gi, '').replace(/transform/gi, '');
+      const cleanLabel = label.replace(/platform/gi, '').replace(/transform/gi, '');
+      return cleanId.includes('form') || cleanLabel.includes('form') || cleanLabel.includes('formulario');
+    };
+    const isExtensionProps = (id: string, label: string) =>
+      id === 'camundaplatform__extensionproperties' ||
+      id.includes('extensionprop') ||
+      label.includes('extension properties') ||
+      label.includes('propiedades de extensión') ||
+      (label.includes('properties') && !label.includes('custom') && !label.includes('input') && !label.includes('output'));
+    const isTemplate = (id: string, label: string) =>
+      id.startsWith('elementtemplates__') || id.includes('template') || label.includes('plantilla') || label.includes('template');
+
+    let filtered: any[] = [];
+    if (rawType === 'Task') {
+      // 1) Tasks Estándar (bpmn:Task):
+      // Muestran: General, Documentation, el selector de Plantillas (Element Template Chooser) y sus propiedades asociadas.
+      // Ocultan: Forms y todos los grupos no deseados (User Assignment, Inputs/Outputs, Implementation, Tasklist, Listeners, Async).
+      filtered = groups.filter(g => {
+        const gId = (g.id || '').toLowerCase();
+        const gLabel = (typeof g.label === 'string' ? g.label : '').toLowerCase();
+        if (isUnwantedGroup(gId, gLabel)) return false;
+        if (isForm(gId, gLabel)) return false;
+        if (gId === 'camundaplatform__extensionproperties') return false;
+        if (gId.includes('implementation') ||
+            (gId.includes('input') && !gId.startsWith('elementtemplates__')) ||
+            (gId.includes('output') && !gId.startsWith('elementtemplates__'))) {
+          return false;
+        }
+
+        if (isGeneral(gId, gLabel) || isDoc(gId, gLabel) || isTemplate(gId, gLabel)) {
+          return true;
+        }
+        if (gId.startsWith('elementtemplates__')) {
+          return true;
+        }
+        return false;
+      });
+    } else if (rawType === 'UserTask') {
+      // 2) User Tasks (bpmn:UserTask):
+      // Muestran: General, Documentation, Forms (Form Builder) y Extension properties (etiquetadas como Name y Metadata).
+      // Ocultan: Selector de Plantillas y todos los grupos no deseados.
+      filtered = groups.filter(g => {
+        const gId = (g.id || '').toLowerCase();
+        const gLabel = (typeof g.label === 'string' ? g.label : '').toLowerCase();
+        if (isTemplate(gId, gLabel)) return false;
+        if (isUnwantedGroup(gId, gLabel)) return false;
+        if (gId.includes('implementation') || gId.includes('input') || gId.includes('output')) return false;
+
+        return isGeneral(gId, gLabel) || isDoc(gId, gLabel) || isForm(gId, gLabel) || isExtensionProps(gId, gLabel);
+      });
+    } else if (rawType === 'ReceiveTask') {
+      // 3) Receive Tasks (bpmn:ReceiveTask):
+      // Muestran: Únicamente General, Documentation y Extension properties (etiquetadas como Name y Metadata).
+      // Ocultan: Forms, selector de Plantillas y todos los grupos no deseados.
+      filtered = groups.filter(g => {
+        const gId = (g.id || '').toLowerCase();
+        const gLabel = (typeof g.label === 'string' ? g.label : '').toLowerCase();
+        if (isTemplate(gId, gLabel)) return false;
+        if (isForm(gId, gLabel)) return false;
+        if (isUnwantedGroup(gId, gLabel)) return false;
+        if (gId.includes('implementation') || gId.includes('input') || gId.includes('output')) return false;
+
+        return isGeneral(gId, gLabel) || isDoc(gId, gLabel) || isExtensionProps(gId, gLabel);
+      });
+    } else {
+      // Default for other BPMN elements (StartEvent, EndEvent, Gateways, IntermediateCatchEvent, SequenceFlow, etc.)
+      filtered = groups.filter(g => {
+        const gId = (g.id || '').toLowerCase();
+        const gLabel = (typeof g.label === 'string' ? g.label : '').toLowerCase();
+        if (isUnwantedGroup(gId, gLabel)) return false;
+        if (rawType === 'StartEvent') {
+          if (gId === 'camundaplatform__extensionproperties') return false;
+          return isGeneral(gId, gLabel) || isDoc(gId, gLabel) || isForm(gId, gLabel);
+        }
+        return true;
+      });
+    }
+
+    const seenGroupIds = new Set<string>();
+    return filtered.filter(g => {
+      if (!g || !g.id) return false;
+      if (seenGroupIds.has(g.id)) return false;
+      seenGroupIds.add(g.id);
+      return true;
+    });
+  }
+
+  private cleanupInvalidTemplatesOnSelectedElements(): void {
+    if (!this.bpmnModeler) return;
+    try {
+      const selection = this.bpmnModeler.get('selection');
+      const modeling = this.bpmnModeler.get('modeling');
+      const selected = selection?.get?.() || [];
+      if (!selected || !selected.length) return;
+
+      selected.forEach((element: any) => {
+        const bo = element.businessObject;
+        if (!bo) return;
+        const type = (element.type || bo.$type || '').replace(/^bpmn:/, '');
+        // Only bpmn:Task can have element templates. If morphed to UserTask or ReceiveTask, strip template
+        if (type === 'UserTask' || type === 'ReceiveTask') {
+          const hasTemplate = bo.modelerTemplate ||
+                              bo.modelerTemplateVersion ||
+                              bo.$attrs?.['camunda:modelerTemplate'] ||
+                              bo.$attrs?.['camunda:modelerTemplateVersion'];
+          if (hasTemplate) {
+            modeling.updateProperties(element, {
+              'camunda:modelerTemplate': undefined,
+              'camunda:modelerTemplateVersion': undefined
+            });
+            delete bo.modelerTemplate;
+            delete bo.modelerTemplateVersion;
+            if (bo.$attrs) {
+              delete bo.$attrs['camunda:modelerTemplate'];
+              delete bo.$attrs['camunda:modelerTemplateVersion'];
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('cleanupInvalidTemplates notice:', e);
+    }
+  }
+
   private setupPropertiesPanelConstraintEnhancer(): void {
     const parent = this.propertiesRef?.nativeElement;
     if (!parent) return;
@@ -1216,7 +1418,6 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'job execution',
       'job configuration',
       'execution listeners',
-      'extension properties',
       'executable',
       'isexecutable',
       'start indicator',
@@ -1227,7 +1428,18 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'async',
       'async before',
       'async after',
-      'condition script'
+      'condition script',
+      'inputs',
+      'outputs',
+      'input parameters',
+      'output parameters',
+      'input/output',
+      'input output',
+      'inputs & outputs',
+      'assignment',
+      'task assignment',
+      'user assignment',
+      'implementation'
     ];
 
     const UNWANTED_IDS = [
@@ -1239,7 +1451,6 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'jobexecution',
       'jobconfiguration',
       'executionlisteners',
-      'extensionproperties',
       'isexecutable',
       'executable',
       'startindicator',
@@ -1250,15 +1461,27 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
       'async',
       'asyncbefore',
       'asyncafter',
-      'conditionscript'
+      'conditionscript',
+      'inputs',
+      'outputs',
+      'inputparameters',
+      'outputparameters',
+      'inputoutput',
+      'assignment',
+      'taskassignment',
+      'userassignment',
+      'implementation'
     ];
 
     const hideUnsupportedGroups = () => {
+      let selectedEl: any = null;
+      let selectedType = '';
       let isCurrentElementTimer = false;
       try {
         const selection = this.bpmnModeler?.get('selection')?.get?.() || [];
-        const selectedEl = selection[0];
+        selectedEl = selection[0];
         const bo = selectedEl?.businessObject || {};
+        selectedType = (selectedEl?.type || bo.$type || '').replace(/^bpmn:/, '');
         const eventDefs = bo.eventDefinitions || [];
         isCurrentElementTimer = eventDefs.some((ed: any) => (ed.$type || '').includes('TimerEventDefinition'));
       } catch {
@@ -1274,11 +1497,107 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwanted = UNWANTED_IDS.some(id => groupId.includes(id)) ||
                            UNWANTED_GROUPS.some(name => headerText.includes(name));
 
-        const isInputOutputGroup = groupId.includes('input') || groupId.includes('output') ||
-                                   headerText.includes('input') || headerText.includes('output');
+        const isGeneralGroup = groupId === 'general' || groupId === 'groupgeneral' || headerText === 'general';
+        const isDocGroup = groupId === 'documentation' || groupId === 'groupdocumentation' || headerText === 'documentation';
 
-        if (isUnwanted || (isCurrentElementTimer && isInputOutputGroup)) {
-          (groupEl as HTMLElement).style.display = 'none';
+        const isFormGroup = (
+          groupId.replace(/platform/gi, '').replace(/transform/gi, '').includes('form') ||
+          headerText.replace(/platform/gi, '').replace(/transform/gi, '').includes('form') ||
+          headerText.includes('formulario')
+        );
+
+        const isExtensionPropsGroup = (
+          groupId.includes('extension') ||
+          groupId.includes('camundaproperty') ||
+          groupId.includes('extensionproperties') ||
+          headerText.includes('extension properties') ||
+          headerText.includes('propiedades de extensión') ||
+          (headerText.includes('properties') && !headerText.includes('input') && !headerText.includes('output') && !headerText.includes('assignment') && !headerText.includes('implementation'))
+        );
+
+        const isTemplateGroup = groupId.includes('template') || headerText.includes('template') || headerText.includes('plantilla');
+
+        const isAssignmentGroup = groupId.includes('assign') || headerText.includes('assign') || headerText.includes('candidat');
+        const isInputOutputGroup = groupId.includes('input') || groupId.includes('output') || headerText.includes('input') || headerText.includes('output');
+        const isImplementationGroup = groupId.includes('implement') || headerText.includes('implement') || groupId.includes('delegate') || headerText.includes('delegate');
+        const isTasklistGroup = groupId.includes('tasklist') || headerText.includes('tasklist') || headerText.includes('task list');
+        const isListenerGroup = groupId.includes('listener') || headerText.includes('listener');
+        const isAsyncGroup = groupId.includes('async') || headerText.includes('async');
+        const isJobGroup = groupId.includes('job') || headerText.includes('job');
+        const isHistoryGroup = groupId.includes('history') || headerText.includes('history');
+        const isExternalGroup = groupId.includes('external') || headerText.includes('external');
+
+        const isBlacklisted = isUnwanted || isAssignmentGroup || isInputOutputGroup || isImplementationGroup ||
+                              isTasklistGroup || isListenerGroup || isAsyncGroup || isJobGroup ||
+                              isHistoryGroup || isExternalGroup;
+
+        let hideGroup = false;
+
+        if (selectedType === 'ReceiveTask') {
+          // Receive Tasks MUST show ONLY General, Documentation, and Extension Properties (Properties List)
+          // Hide: Forms, Selector de plantillas, and all unwanted groups
+          if (!isBlacklisted && !isFormGroup && !isTemplateGroup && (isGeneralGroup || isDocGroup || isExtensionPropsGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (selectedType === 'UserTask') {
+          // User Tasks MUST show ONLY General, Documentation, Forms, and Extension Properties
+          // Hide: Selector de plantillas and all unwanted groups
+          if (!isBlacklisted && !isTemplateGroup && (isGeneralGroup || isDocGroup || isFormGroup || isExtensionPropsGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (selectedType === 'Task') {
+          // Standard Tasks MUST show General, Documentation, and Template Chooser / Template Properties
+          // Hide: Forms, Extension Properties, and all unwanted groups
+          if (!isBlacklisted && !isFormGroup && !isExtensionPropsGroup && (isGeneralGroup || isDocGroup || isTemplateGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (selectedType === 'StartEvent') {
+          if (!isBlacklisted && !isExtensionPropsGroup && (isGeneralGroup || isDocGroup || isFormGroup)) {
+            hideGroup = false;
+          } else {
+            hideGroup = true;
+          }
+        } else if (isBlacklisted) {
+          hideGroup = true;
+        }
+
+        const targetDisplay = hideGroup ? 'none' : '';
+        if ((groupEl as HTMLElement).style.display !== targetDisplay) {
+          (groupEl as HTMLElement).style.display = targetDisplay;
+        }
+      });
+
+      // Enhance Extension Properties entry labels: rename "Value" to "Metadata" for Extension Properties entries
+      const extPropsContainer = parent.querySelector('[data-group-id*="ExtensionProperties"], [data-group-id*="extensionproperties"]');
+      if (extPropsContainer) {
+        const valLabels = extPropsContainer.querySelectorAll('[data-entry-id$="-value"] label, [data-entry-id*="-value"] label');
+        valLabels.forEach((lbl) => {
+          if (lbl.textContent !== 'Metadata') {
+            lbl.textContent = 'Metadata';
+          }
+        });
+        const valInputs = extPropsContainer.querySelectorAll('[data-entry-id$="-value"] input, [data-entry-id$="-value"] textarea');
+        valInputs.forEach((inpEl) => {
+          const input = inpEl as HTMLInputElement | HTMLTextAreaElement;
+          const placeholder = 'e.g. JSON, string or metadata object';
+          if (input.placeholder !== placeholder) {
+            input.placeholder = placeholder;
+          }
+        });
+      }
+
+      const genericExtValLabels = parent.querySelectorAll(
+        '[data-entry-id*="extensionproperty-"][data-entry-id$="-value"] label, [data-entry-id*="extensionProperty-"][data-entry-id$="-value"] label'
+      );
+      genericExtValLabels.forEach((lbl) => {
+        if (lbl.textContent !== 'Metadata') {
+          lbl.textContent = 'Metadata';
         }
       });
 
@@ -1291,11 +1610,20 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         const isUnwantedEntry = UNWANTED_IDS.some(id => entryId.includes(id)) ||
                                 UNWANTED_GROUPS.some(name => labelText.includes(name));
 
-        const isInputOutputEntry = entryId.includes('input') || entryId.includes('output') ||
-                                    labelText.includes('input parameter') || labelText.includes('output parameter');
+        const isBlacklistedEntry = isUnwantedEntry || (
+          entryId.includes('assignee') || entryId.includes('candidate') || entryId.includes('implementation') ||
+          entryId.includes('delegate') || entryId.includes('external') || entryId.includes('topic') ||
+          entryId.includes('tasklist') || entryId.includes('input') || entryId.includes('output') ||
+          entryId.includes('async') || entryId.includes('jobpriority') || entryId.includes('listener') ||
+          labelText.includes('assignee') || labelText.includes('candidate') || labelText.includes('implementation') ||
+          labelText.includes('delegate') || labelText.includes('external') || labelText.includes('tasklist') ||
+          labelText.includes('input') || labelText.includes('output') || labelText.includes('async') ||
+          labelText.includes('listener')
+        );
 
-        if (isUnwantedEntry || (isCurrentElementTimer && isInputOutputEntry)) {
-          (entryEl as HTMLElement).style.display = 'none';
+        const targetDisplay = isBlacklistedEntry ? 'none' : '';
+        if ((entryEl as HTMLElement).style.display !== targetDisplay) {
+          (entryEl as HTMLElement).style.display = targetDisplay;
         }
       });
 
@@ -1338,26 +1666,12 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
         input.parentNode?.insertBefore(select, input.nextSibling);
 
         if (!input.value || input.value.toLowerCase() !== 'javascript') {
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          if (nativeSetter) {
-            nativeSetter.call(input, 'javascript');
-          } else {
-            input.value = 'javascript';
-          }
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          this.setNativeInputValue(input, 'javascript', true);
         }
 
         select.addEventListener('change', () => {
           const chosen = select.value || 'javascript';
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          if (nativeSetter) {
-            nativeSetter.call(input, chosen);
-          } else {
-            input.value = chosen;
-          }
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          this.setNativeInputValue(input, chosen, true);
         });
       });
 
@@ -1385,8 +1699,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             const currentVal = (select.value || '').toLowerCase();
             if (!currentVal || currentVal.includes('cycle')) {
               select.selectedIndex = 0;
-              select.dispatchEvent(new Event('input', { bubbles: true }));
-              select.dispatchEvent(new Event('change', { bubbles: true }));
+              this.safeDispatchEvent(select, 'input');
+              this.safeDispatchEvent(select, 'change');
             }
           }
         }
@@ -1591,15 +1905,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               const isoSpan = previewDiv.querySelector('.iso-val');
               if (isoSpan) isoSpan.textContent = isoVal;
 
-              const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
-                                   Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-              if (nativeSetter) {
-                nativeSetter.call(rawInput, isoVal);
-              } else {
-                rawInput.value = isoVal;
-              }
-              rawInput.dispatchEvent(new Event('input', { bubbles: true }));
-              rawInput.dispatchEvent(new Event('change', { bubbles: true }));
+              this.setNativeInputValue(rawInput, isoVal, true);
             };
 
             dtInput.addEventListener('change', updateRawInputFromPicker);
@@ -1608,7 +1914,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
             if (rawInput.value && rawInput.value.length >= 16 && rawInput.value.includes('T')) {
               dtInput.value = rawInput.value.substring(0, 16);
-              updateRawInputFromPicker();
+              const isoVal = getIsoDateString(dtInput.value, tzSelect.value);
+              const isoSpan = previewDiv.querySelector('.iso-val');
+              if (isoSpan) isoSpan.textContent = isoVal;
             } else {
               const now = new Date();
               const year = now.getFullYear();
@@ -1617,7 +1925,9 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               const hours = String(now.getHours()).padStart(2, '0');
               const minutes = String(now.getMinutes()).padStart(2, '0');
               dtInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
-              updateRawInputFromPicker();
+              const isoVal = getIsoDateString(dtInput.value, tzSelect.value);
+              const isoSpan = previewDiv.querySelector('.iso-val');
+              if (isoSpan) isoSpan.textContent = isoVal;
             }
           }
         }
@@ -1681,17 +1991,10 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
                   if (frozenInfo.value !== undefined && frozenInfo.value !== null && frozenInfo.value !== '') {
                     const strVal = String(frozenInfo.value);
                     if (inp.type === 'checkbox') {
-                      const shouldCheck = strVal.toLowerCase() === 'true';
-                      if (inp.checked !== shouldCheck) {
-                        inp.checked = shouldCheck;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        inp.dispatchEvent(new Event('change', { bubbles: true }));
-                      }
+                      inp.checked = strVal.toLowerCase() === 'true';
                     } else {
                       if (!inp.value || inp.value !== strVal) {
                         inp.value = strVal;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        inp.dispatchEvent(new Event('change', { bubbles: true }));
                       }
                     }
                   }
@@ -1784,32 +2087,79 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
         select.addEventListener('change', () => {
           const chosen = select.value;
-          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          if (nativeSetter) {
-            nativeSetter.call(input, chosen);
-          } else {
-            input.value = chosen;
-          }
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          this.setNativeInputValue(input, chosen, true);
           updateConfigPlaceholder(chosen);
         });
       });
     };
 
     this.constraintObserver = new MutationObserver(() => {
-      enhanceConstraintEntries();
+      if (this.isUpdatingPropertiesDom) return;
+      try {
+        this.isUpdatingPropertiesDom = true;
+        enhanceConstraintEntries();
+      } finally {
+        this.isUpdatingPropertiesDom = false;
+      }
     });
 
     this.constraintObserver.observe(parent, { childList: true, subtree: true });
     setTimeout(enhanceConstraintEntries, 100);
   }
 
+  private safeDispatchEvent(element: Element | null, eventName: string): void {
+    if (!element) return;
+    try {
+      element.dispatchEvent(new Event(eventName, { bubbles: true }));
+    } catch {
+      // ignore event dispatch error in Preact/DOM
+    }
+  }
+
+  private setNativeInputValue(input: HTMLInputElement | HTMLTextAreaElement | null, val: string, triggerEvents: boolean = false): void {
+    if (!input) return;
+    try {
+      const proto = input instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement?.prototype
+        : window.HTMLInputElement?.prototype;
+      if (proto) {
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+        if (descriptor && descriptor.set) {
+          descriptor.set.call(input, val);
+        } else {
+          input.value = val;
+        }
+      } else {
+        input.value = val;
+      }
+    } catch {
+      try {
+        input.value = val;
+      } catch {
+        // ignore direct property assignment error
+      }
+    }
+    if (triggerEvents) {
+      this.safeDispatchEvent(input, 'input');
+      this.safeDispatchEvent(input, 'change');
+    }
+  }
+
   private registerFrozenProperties(keys: (string | undefined)[], obj: any): void {
-    if (!obj || !Array.isArray(obj.properties)) return;
+    if (!obj || typeof obj !== 'object') return;
+    if (!Array.isArray(obj.properties)) {
+      obj.properties = [];
+    }
     const propMap = new Map<string, FrozenPropertyInfo>();
 
     obj.properties.forEach((p: any) => {
+      if (!p || typeof p !== 'object') return;
+      if (!p.binding || typeof p.binding !== 'object') {
+        p.binding = { type: 'property', name: p.name || p.label || 'customProp' };
+      } else if (!p.binding.type) {
+        p.binding.type = 'property';
+      }
+
       const bName = (p.binding?.name || '').trim();
       if (bName === 'resultVariable' || bName === 'camunda:resultVariable') {
         p.binding = {
@@ -1866,6 +2216,7 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           if (!decoded) return;
           try {
             const obj = JSON.parse(decoded);
+            if (!obj || typeof obj !== 'object') return;
             const tplId = item.code || obj.id || item.id;
             obj.id = tplId;
             obj.name = item.name || obj.name;
@@ -1877,6 +2228,19 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
               id: item.activityFamily || 'custom',
               name: `Family: ${item.activityFamily || 'default'} (${item.scope === 'global' ? 'Global' : 'Tenant'})`
             };
+
+            if (!Array.isArray(obj.properties)) {
+              obj.properties = [];
+            }
+            obj.properties.forEach((p: any) => {
+              if (p && typeof p === 'object') {
+                if (!p.binding || typeof p.binding !== 'object') {
+                  p.binding = { type: 'property', name: p.name || p.label || 'customProp' };
+                } else if (!p.binding.type) {
+                  p.binding.type = 'property';
+                }
+              }
+            });
 
             this.registerFrozenProperties(
               [tplId, item.code, item.id, obj.id, item.parentTemplateId, item.rootActivity],
