@@ -12,16 +12,16 @@ const (
 )
 
 type ExecutionToken struct {
-	ID                   string                 `orm:"primary-key" json:"id"`
-	WorkflowExecutionID string                 `json:"workflowExecutionId"`
-	WorkflowDefinitionID string                 `json:"workflowDefinitionId"`
-	VNamespace           string                 `json:"vnamespace"`
-	CurrentNodeID        string                 `json:"currentNodeId"`
-	Status               ExecutionTokenStatus   `json:"status"`
-	ScopeVariables       map[string]interface{} `json:"scopeVariables,omitempty"`
-	ParentTokenID        string                 `json:"parentTokenId,omitempty"`
-	CreatedAt            time.Time              `json:"createdAt"`
-	UpdatedAt            time.Time              `json:"updatedAt"`
+	ID                   string                 `orm:"primary-key"`
+	WorkflowExecutionID string
+	WorkflowDefinitionID string
+	VNamespace           string
+	CurrentNodeID        string
+	Status               ExecutionTokenStatus
+	ScopeVariables       map[string]interface{}
+	ParentTokenID        string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 func (ExecutionToken) TableName() string {
