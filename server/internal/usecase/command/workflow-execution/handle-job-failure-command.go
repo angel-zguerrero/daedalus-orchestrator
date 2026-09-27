@@ -3,6 +3,7 @@ package workflow_execution
 import (
 	"encoding/gob"
 	"fmt"
+	"strings"
 	"time"
 
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -72,7 +73,15 @@ func (cmd *HandleJobFailureCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 
 	jobRepo.UpdateWorkflowJob(job, now)
 
-	if job.Retries >= job.MaxRetries {
+	isFatalError := strings.Contains(cmd.ErrorMsg, "no native executor found") ||
+		strings.Contains(cmd.ErrorMsg, "unsupported") ||
+		strings.Contains(cmd.ErrorMsg, "not found in model")
+
+	if job.Retries >= job.MaxRetries || isFatalError {
+		job.Status = models.WorkflowJobStatusFailed
+		job.CompletedAt = &now
+		jobRepo.UpdateWorkflowJob(job, now)
+
 		compCmd := &CompleteJobCommand{
 			JobID:      cmd.JobID,
 			WorkerID:   cmd.WorkerID,

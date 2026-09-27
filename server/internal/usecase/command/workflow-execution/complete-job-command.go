@@ -80,6 +80,7 @@ func (cmd *CompleteJobCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 	if cmd.Error != "" {
 		job.Status = models.WorkflowJobStatusFailed
 		job.Error = cmd.Error
+		job.CompletedAt = &now
 	} else {
 		job.Status = models.WorkflowJobStatusCompleted
 		job.Output = cmd.OutputData
@@ -135,17 +136,15 @@ func (cmd *CompleteJobCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 			token.Status = models.ExecutionTokenStatusCancelled
 			tokenRepo.UpdateExecutionToken(token, now)
 
-			// Update WorkflowExecution status to FAILED if no active tokens remain
-			activeTokens, _ := tokenRepo.GetActiveTokensByExecutionID(job.WorkflowExecutionID, now)
-			if len(activeTokens) == 0 {
-				execRepo, err := db.NewWorkflowExecutionRepository(uow, idFactory, cmd.CF, cmd.CFS)
-				if err == nil {
-					execution, err := execRepo.GetWorkflowExecutionByID(job.WorkflowExecutionID, now)
-					if err == nil && execution != nil {
-						execution.Status = models.WorkflowExecutionStatusFailed
-						execution.Error = cmd.Error
-						execRepo.UpdateWorkflowExecution(execution, now)
-					}
+			// Update WorkflowExecution status to FAILED
+			execRepo, err := db.NewWorkflowExecutionRepository(uow, idFactory, cmd.CF, cmd.CFS)
+			if err == nil {
+				execution, err := execRepo.GetWorkflowExecutionByID(job.WorkflowExecutionID, now)
+				if err == nil && execution != nil {
+					execution.Status = models.WorkflowExecutionStatusFailed
+					execution.Error = cmd.Error
+					execution.CompletedAt = &now
+					execRepo.UpdateWorkflowExecution(execution, now)
 				}
 			}
 		}
