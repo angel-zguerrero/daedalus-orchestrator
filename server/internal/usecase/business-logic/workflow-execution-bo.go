@@ -3,6 +3,7 @@ package business_logic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"deadalus-orch/server/internal/infrastructure/db"
@@ -260,3 +261,109 @@ func (bo *WorkflowExecutionBO) ListExecutions(
 	}
 	return &res, nil
 }
+
+func (bo *WorkflowExecutionBO) CompleteWaitEvent(
+	ctx context.Context,
+	scope models.WorkflowScope,
+	waitingEventID string,
+	payload map[string]interface{},
+	cf, cfs string,
+	tenantNode *dragonboat.RaftNode,
+) (*models.WorkflowExecution, error) {
+	node, targetCF, targetCFS, err := bo.resolveRaftNode(scope, tenantNode)
+	if err != nil {
+		return nil, err
+	}
+	if scope == models.WorkflowScopeTenant {
+		targetCF = cf
+		targetCFS = cfs
+	}
+
+	timeout := config.GlobalConfiguration.ApiRaftTimeout
+
+	// 1. Fetch WaitingEvent to validate incoming payload strictly before resuming
+	getEvtCmd := &workflow_execution_command.GetWaitingEventCommand{
+		ID:  waitingEventID,
+		CF:  targetCF,
+		CFS: targetCFS,
+	}
+	evt, err := dragonboat.ExecuteRepositoryQuery[models.WaitingEvent](
+		node,
+		ctx,
+		getEvtCmd,
+		timeout,
+		bo.Config.Logger,
+		"get waiting event for validation",
+	)
+	if err != nil {
+		return nil, err
+	}
+	if evt.ID == "" {
+		return nil, fmt.Errorf("waiting event not found: %s", waitingEventID)
+	}
+
+	// 2. Strict Server-Side Validation against ExpectedInput
+	if err := ValidateEventInput(evt.ExpectedInput, payload); err != nil {
+		return nil, err
+	}
+
+	// 3. Propose Resume command via Raft consensus
+	resumeCmd := &workflow_execution_command.ResumeWaitEventCommand{
+		WaitingEventID: waitingEventID,
+		Payload:        payload,
+		CF:             targetCF,
+		CFS:            targetCFS,
+	}
+
+	res, err := dragonboat.ExecuteRepositoryCommand[models.WorkflowExecution](
+		node,
+		ctx,
+		resumeCmd,
+		timeout,
+		bo.Config.Logger,
+		"resume wait state execution",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
+func (bo *WorkflowExecutionBO) GetWaitingEvents(
+	ctx context.Context,
+	scope models.WorkflowScope,
+	executionID string,
+	cf, cfs string,
+	tenantNode *dragonboat.RaftNode,
+) ([]models.WaitingEvent, error) {
+	node, targetCF, targetCFS, err := bo.resolveRaftNode(scope, tenantNode)
+	if err != nil {
+		return nil, err
+	}
+	if scope == models.WorkflowScopeTenant {
+		targetCF = cf
+		targetCFS = cfs
+	}
+
+	cmd := &workflow_execution_command.GetWaitingEventCommand{
+		ExecutionID: executionID,
+		CF:          targetCF,
+		CFS:         targetCFS,
+	}
+
+	timeout := config.GlobalConfiguration.ApiRaftTimeout
+	events, err := dragonboat.ExecuteRepositoryQuery[[]models.WaitingEvent](
+		node,
+		ctx,
+		cmd,
+		timeout,
+		bo.Config.Logger,
+		"get waiting events by execution",
+	)
+	if err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+

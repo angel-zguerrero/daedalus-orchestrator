@@ -87,10 +87,49 @@ export interface WorkflowJob {
   updatedAt?: string;
 }
 
+export interface WaitingEventFormField {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  defaultValue?: any;
+  required?: boolean;
+  values?: Array<{ id: string; name: string }>;
+  constraints?: Array<{ name: string; config: string }>;
+}
+
+export interface WaitingEventExpectedInput {
+  nodeId?: string;
+  nodeName?: string;
+  nodeType?: string;
+  schema?: string;
+  activityId?: string;
+  activityName?: string;
+  type?: string;
+  fields?: WaitingEventFormField[];
+  extensionProperties?: Record<string, string>;
+  hasFormFields?: boolean;
+  hasExtensionProperties?: boolean;
+  [key: string]: any;
+}
+
+export interface WaitingEvent {
+  id: string;
+  workflowDefinitionId: string;
+  workflowExecutionId: string;
+  executionTokenId: string;
+  eventId: string;
+  type: 'USER_INPUT' | 'SYSTEM_MESSAGE' | string;
+  expectedInput?: WaitingEventExpectedInput | any;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WorkflowExecutionDetail {
   execution: WorkflowExecution;
   tokens: ExecutionToken[];
   jobs: WorkflowJob[];
+  waitingEvents?: WaitingEvent[];
 }
 
 @Injectable({
@@ -231,5 +270,22 @@ export class WorkflowsService {
 
   getTenantExecutionDetail(tenantCode: string, id: string): Observable<WorkflowExecutionDetail> {
     return this.http.get<WorkflowExecutionDetail>(`${this.tenantUrl}/${tenantCode}/workflow-executions/${id}`);
+  }
+
+  // --- WAITING EVENTS API ---
+  getGlobalWaitingEvents(executionId: string): Observable<any> {
+    return this.http.get(`${this.globalUrl}/executions/${executionId}/waiting-events`);
+  }
+
+  completeGlobalWaitEvent(waitingEventId: string, payload: any): Observable<any> {
+    return this.http.post(`${this.globalUrl}/waiting-events/${waitingEventId}/submit`, { payload });
+  }
+
+  getTenantWaitingEvents(tenantCode: string, executionId: string): Observable<any> {
+    return this.http.get(`${this.tenantUrl}/${tenantCode}/workflow-executions/${executionId}/waiting-events`);
+  }
+
+  completeTenantWaitEvent(tenantCode: string, waitingEventId: string, payload: any): Observable<any> {
+    return this.http.post(`${this.tenantUrl}/${tenantCode}/workflows/waiting-events/${waitingEventId}/submit`, { payload });
   }
 }

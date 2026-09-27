@@ -17,6 +17,10 @@ const (
 	ElementBoundaryEvent          ElementType = "boundaryEvent"
 	ElementServiceTask            ElementType = "serviceTask"
 	ElementUserTask               ElementType = "userTask"
+	ElementReceiveTask            ElementType = "receiveTask"
+	ElementSendTask               ElementType = "sendTask"
+	ElementBusinessRuleTask       ElementType = "businessRuleTask"
+	ElementManualTask             ElementType = "manualTask"
 	ElementTask                   ElementType = "task"
 	ElementScriptTask             ElementType = "scriptTask"
 	ElementExclusiveGateway       ElementType = "exclusiveGateway"
@@ -45,14 +49,15 @@ type FormField struct {
 }
 
 type BPMNNode struct {
-	ID            string            `json:"id"`
-	Name          string            `json:"name"`
-	Type          ElementType       `json:"type"`
-	DefaultFlowID string            `json:"defaultFlowId,omitempty"`
-	Incoming      []string          `json:"incoming"`
-	Outgoing      []string          `json:"outgoing"`
-	Properties    map[string]string `json:"properties,omitempty"`
-	FormFields    []*FormField      `json:"formFields,omitempty"`
+	ID                  string            `json:"id"`
+	Name                string            `json:"name"`
+	Type                ElementType       `json:"type"`
+	DefaultFlowID       string            `json:"defaultFlowId,omitempty"`
+	Incoming            []string          `json:"incoming"`
+	Outgoing            []string          `json:"outgoing"`
+	Properties          map[string]string `json:"properties,omitempty"`
+	ExtensionProperties map[string]string `json:"extensionProperties,omitempty"`
+	FormFields          []*FormField      `json:"formFields,omitempty"`
 }
 
 type SequenceFlow struct {
@@ -140,24 +145,30 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 		case xml.StartElement:
 			local := stripPrefix(t.Name.Local)
 			currentElement = local
+			elemType := normalizeElementType(local)
 
-			switch ElementType(local) {
-			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
+			switch elemType {
+			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementReceiveTask, ElementSendTask, ElementBusinessRuleTask, ElementManualTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				id := getAttr(t.Attr, "id")
 				name := getAttr(t.Attr, "name")
 				defaultFlow := getAttr(t.Attr, "default")
 				node := &BPMNNode{
 					ID:            id,
 					Name:          name,
-					Type:          ElementType(local),
+					Type:          elemType,
 					DefaultFlowID: defaultFlow,
-					Properties:    make(map[string]string),
+					Properties:          make(map[string]string),
+					ExtensionProperties: make(map[string]string),
 				}
 				model.Nodes[id] = node
 				currentNode = node
 
 				if node.Type == ElementStartEvent && model.StartNodeID == "" {
 					model.StartNodeID = id
+				}
+
+				if msgRef := getAttr(t.Attr, "messageRef"); msgRef != "" {
+					node.Properties["messageRef"] = msgRef
 				}
 
 				if template := getAttr(t.Attr, "modelerTemplate"); template != "" {
@@ -206,6 +217,10 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 					pValue := getAttr(t.Attr, "value")
 					if pName != "" {
 						currentNode.Properties[pName] = pValue
+						if currentNode.ExtensionProperties == nil {
+							currentNode.ExtensionProperties = make(map[string]string)
+						}
+						currentNode.ExtensionProperties[pName] = pValue
 					}
 				}
 			case "formField":
@@ -353,8 +368,9 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 				}
 			}
 
-			switch ElementType(local) {
-			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
+			elemType := normalizeElementType(local)
+			switch elemType {
+			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementReceiveTask, ElementSendTask, ElementBusinessRuleTask, ElementManualTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				currentNode = nil
 				currentFormField = nil
 			case "formField":
@@ -382,6 +398,47 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 	return model, nil
 }
 
+func normalizeElementType(name string) ElementType {
+	switch strings.ToLower(name) {
+	case "startevent":
+		return ElementStartEvent
+	case "endevent":
+		return ElementEndEvent
+	case "intermediatecatchevent":
+		return ElementIntermediateCatchEvent
+	case "intermediatethrowevent":
+		return ElementIntermediateThrowEvent
+	case "boundaryevent":
+		return ElementBoundaryEvent
+	case "servicetask":
+		return ElementServiceTask
+	case "usertask":
+		return ElementUserTask
+	case "receivetask":
+		return ElementReceiveTask
+	case "sendtask":
+		return ElementSendTask
+	case "businessruletask":
+		return ElementBusinessRuleTask
+	case "manualtask":
+		return ElementManualTask
+	case "task":
+		return ElementTask
+	case "scripttask":
+		return ElementScriptTask
+	case "exclusivegateway":
+		return ElementExclusiveGateway
+	case "parallelgateway":
+		return ElementParallelGateway
+	case "inclusivegateway":
+		return ElementInclusiveGateway
+	case "sequenceflow":
+		return ElementSequenceFlow
+	default:
+		return ElementType(name)
+	}
+}
+
 func stripPrefix(name string) string {
 	if idx := strings.Index(name, ":"); idx != -1 {
 		return name[idx+1:]
@@ -406,3 +463,126 @@ func contains(slice []string, val string) bool {
 	}
 	return false
 }
+
+func isReservedProperty(name string) bool {
+	switch name {
+	case "messageRef", "modelerTemplate", "modeler:template", "zeebe:modelerTemplate",
+		"scriptFormat", "resultVariable", "camunda:resultVariable", "outputVariable",
+		"script", "scriptBody", "taskType", "timeDuration", "timeDate", "timeCycle",
+		"expectedKeys":
+		return true
+	default:
+		return false
+	}
+}
+
+// BuildExpectedInputFromNode constructs a structured ExpectedInput map from a BPMNNode's configuration.
+func BuildExpectedInputFromNode(node *BPMNNode) map[string]interface{} {
+	if node == nil {
+		return map[string]interface{}{
+			"fields":                 []interface{}{},
+			"extensionProperties":    map[string]string{},
+			"hasFormFields":          false,
+			"hasExtensionProperties": false,
+		}
+	}
+
+	result := map[string]interface{}{
+		"nodeId":   node.ID,
+		"nodeName": node.Name,
+		"nodeType": string(node.Type),
+	}
+
+	for k, v := range node.Properties {
+		result[k] = v
+	}
+
+	// Extract clean extension properties
+	extProps := make(map[string]string)
+	if node.ExtensionProperties != nil {
+		for k, v := range node.ExtensionProperties {
+			extProps[k] = v
+		}
+	}
+	for k, v := range node.Properties {
+		if !isReservedProperty(k) {
+			if _, exists := extProps[k]; !exists {
+				extProps[k] = v
+			}
+		}
+	}
+	result["extensionProperties"] = extProps
+	result["hasExtensionProperties"] = len(extProps) > 0
+
+	var fields []map[string]interface{}
+	if len(node.FormFields) > 0 {
+		fields = make([]map[string]interface{}, 0, len(node.FormFields))
+		for _, f := range node.FormFields {
+			isRequired := false
+			for _, c := range f.Constraints {
+				if strings.EqualFold(c.Name, "required") {
+					isRequired = true
+					break
+				}
+			}
+
+			fieldMap := map[string]interface{}{
+				"id":           f.ID,
+				"name":         f.ID,
+				"label":        f.Label,
+				"type":         f.Type,
+				"defaultValue": f.DefaultValue,
+				"required":     isRequired,
+			}
+			if fieldMap["label"] == "" {
+				fieldMap["label"] = f.ID
+			}
+
+			if len(f.Values) > 0 {
+				vals := make([]map[string]string, 0, len(f.Values))
+				for _, v := range f.Values {
+					vals = append(vals, map[string]string{
+						"id":   v.ID,
+						"name": v.Name,
+					})
+				}
+				fieldMap["values"] = vals
+			}
+
+			if len(f.Constraints) > 0 {
+				cons := make([]map[string]string, 0, len(f.Constraints))
+				for _, c := range f.Constraints {
+					cons = append(cons, map[string]string{
+						"name":   c.Name,
+						"config": c.Config,
+					})
+				}
+				fieldMap["constraints"] = cons
+			}
+
+			fields = append(fields, fieldMap)
+		}
+	} else if expectedKeysStr, ok := node.Properties["expectedKeys"]; ok && strings.TrimSpace(expectedKeysStr) != "" {
+		keys := strings.Split(expectedKeysStr, ",")
+		fields = make([]map[string]interface{}, 0, len(keys))
+		for _, k := range keys {
+			cleanKey := strings.TrimSpace(k)
+			if cleanKey != "" {
+				fields = append(fields, map[string]interface{}{
+					"id":       cleanKey,
+					"name":     cleanKey,
+					"label":    cleanKey,
+					"type":     "string",
+					"required": true,
+				})
+			}
+		}
+	} else {
+		fields = []map[string]interface{}{}
+	}
+
+	result["fields"] = fields
+	result["hasFormFields"] = len(fields) > 0
+	return result
+}
+

@@ -14,6 +14,15 @@ func EvaluateConditionWithResolver(condition string, state map[string]interface{
 		return true, nil
 	}
 
+	// Clean wrapper like ${...} or #{...} when wrapping the whole expression
+	if (strings.HasPrefix(condition, "${") && strings.HasSuffix(condition, "}")) ||
+		(strings.HasPrefix(condition, "#{") && strings.HasSuffix(condition, "}")) {
+		inner := strings.TrimSpace(condition[2 : len(condition)-1])
+		if !configSecretRegex.MatchString(inner) {
+			condition = inner
+		}
+	}
+
 	if resolver != nil && strings.Contains(condition, "${") {
 		evalRes, err := EvaluateStringResolvable(condition, state, resolver)
 		if err != nil {
@@ -22,11 +31,6 @@ func EvaluateConditionWithResolver(condition string, state map[string]interface{
 		if evalStr, ok := evalRes.(string); ok {
 			condition = evalStr
 		}
-	}
-
-	// Clean wrapper like ${...}
-	if strings.HasPrefix(condition, "${") && strings.HasSuffix(condition, "}") {
-		condition = strings.TrimSpace(condition[2 : len(condition)-1])
 	}
 
 	if condition == "" || condition == "true" {

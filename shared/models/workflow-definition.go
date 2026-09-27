@@ -27,23 +27,23 @@ const (
 )
 
 type WorkflowDefinition struct {
-	ID                  string                `orm:"primary-key" json:"id"`
-	Code                string                `orm:"unique-compound:0" json:"code"`
-	VNamespace          string                `orm:"unique-compound:0" json:"vnamespace"`
-	Name                string                `json:"name"`
-	Description         string                `orm:"data-only" json:"description"`
-	Version             int32                 `json:"version"`
-	OnVersionChange     VersionChangePolicy   `orm:"data-only" json:"onVersionChange"`
-	Payload             []byte                `json:"payload"`
-	PayloadFormat       WorkflowPayloadFormat `json:"payloadFormat"`
-	MaxDurationSeconds  int32                 `json:"maxDurationSeconds"`
-	IsActive            bool                  `json:"isActive"`
-	Scope               WorkflowScope         `json:"scope"`
-	TenantID            string                `json:"tenantId"`
-	HasDesignErrors     bool                  `orm:"data-only" json:"hasDesignErrors"`
-	DesignErrorMessages []string              `orm:"data-only" json:"designErrorMessages,omitempty"`
-	CreatedAt           time.Time             `json:"createdAt"`
-	UpdatedAt           time.Time             `json:"updatedAt"`
+	ID                  string              `orm:"primary-key"`
+	Code                string              `orm:"unique-compound:0"`
+	VNamespace          string              `orm:"unique-compound:0"`
+	Name                string
+	Description         string              `orm:"data-only"`
+	Version             int32
+	OnVersionChange     VersionChangePolicy `orm:"data-only"`
+	Payload             []byte
+	PayloadFormat       WorkflowPayloadFormat
+	MaxDurationSeconds  int32
+	IsActive            bool
+	Scope               WorkflowScope
+	TenantID            string
+	HasDesignErrors     bool     `orm:"data-only"`
+	DesignErrorMessages []string `orm:"data-only"`
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 func (WorkflowDefinition) TableName() string {
