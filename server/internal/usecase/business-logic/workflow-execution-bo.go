@@ -10,6 +10,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"deadalus-orch/server/internal/pkg/config"
+	tenant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	workflow_execution_command "deadalus-orch/server/internal/usecase/command/workflow-execution"
 	"deadalus-orch/shared/models"
 
@@ -34,6 +35,28 @@ func (bo *WorkflowExecutionBO) resolveRaftNode(scope models.WorkflowScope, tenan
 		return nil, "", "", errors.New("tenant node is required for tenant scope")
 	}
 	return tenantNode, "", "", nil
+}
+
+func (bo *WorkflowExecutionBO) resolveTenantCode(ctx context.Context, scope models.WorkflowScope, cfs string) string {
+	if scope == models.WorkflowScopeGlobal || cfs == "" {
+		return "global"
+	}
+
+	findTenantCommand := &tenant_command.FindTenantCommand{
+		TenantID: cfs,
+	}
+	res, err := dragonboat.ExecuteRepositoryQuery[models.TenantInMaster](
+		bo.Config.MasterNode,
+		ctx,
+		findTenantCommand,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		bo.Config.Logger,
+		"find tenant for metrics",
+	)
+	if err == nil && res.Code != "" {
+		return res.Code
+	}
+	return cfs
 }
 
 func (bo *WorkflowExecutionBO) StartExecution(
@@ -88,6 +111,14 @@ func (bo *WorkflowExecutionBO) StartExecution(
 		return models.WorkflowExecution{}, err
 	}
 
+	if bo.Config.MetricsCollector != nil && len(created.EnqueuedGauges) > 0 {
+		effectiveTenantCode := bo.resolveTenantCode(ctx, scope, targetCFS)
+		for _, gauge := range created.EnqueuedGauges {
+			bo.Config.MetricsCollector.RecordPublish(effectiveTenantCode, gauge.QueueCode, gauge.VNamespace, 1)
+			bo.Config.MetricsCollector.UpdateGauges(effectiveTenantCode, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
+		}
+	}
+
 	return created, nil
 }
 
@@ -128,6 +159,14 @@ func (bo *WorkflowExecutionBO) AdvanceToken(
 	)
 	if err != nil {
 		return models.WorkflowExecution{}, err
+	}
+
+	if bo.Config.MetricsCollector != nil && len(updated.EnqueuedGauges) > 0 {
+		effectiveTenantCode := bo.resolveTenantCode(ctx, scope, targetCFS)
+		for _, gauge := range updated.EnqueuedGauges {
+			bo.Config.MetricsCollector.RecordPublish(effectiveTenantCode, gauge.QueueCode, gauge.VNamespace, 1)
+			bo.Config.MetricsCollector.UpdateGauges(effectiveTenantCode, gauge.QueueCode, gauge.VNamespace, gauge.Pending, gauge.InProcess)
+		}
 	}
 
 	return updated, nil

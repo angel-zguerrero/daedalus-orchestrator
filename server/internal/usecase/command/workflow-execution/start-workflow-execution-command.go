@@ -17,6 +17,9 @@ import (
 
 func init() {
 	gob.Register(StartWorkflowExecutionCommand{})
+	gob.Register(models.WorkflowExecution{})
+	gob.Register(models.QueueGauges{})
+	gob.Register([]models.QueueGauges{})
 }
 
 type StartWorkflowExecutionCommand struct {
@@ -260,6 +263,17 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 	if enqueueRes.Error != "" {
 		commandResult.Error = fmt.Sprintf("failed to enqueue execution token message: %s", enqueueRes.Error)
 		return *commandResult
+	}
+
+	if enqResult, ok := enqueueRes.Result.(queue.EnqueueResult); ok && len(enqResult.Gauges) > 0 {
+		execution.EnqueuedGauges = append(execution.EnqueuedGauges, enqResult.Gauges...)
+	} else {
+		execution.EnqueuedGauges = append(execution.EnqueuedGauges, models.QueueGauges{
+			QueueCode:  execQ.Code,
+			VNamespace: execQ.VNamespace,
+			Pending:    uint64(execQ.MessagesCount),
+			InProcess:  uint64(execQ.CurrentDeliveringMessages),
+		})
 	}
 
 	commandResult.Result = execution

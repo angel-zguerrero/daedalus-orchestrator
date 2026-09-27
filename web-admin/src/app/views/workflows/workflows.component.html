@@ -545,7 +545,7 @@
         </ng-template>
         <ng-template cTemplateId="accordionBodyTemplate">
           <div class="accordion-body p-3">
-            <app-queue-detail [queue]="q" [tenantCode]="tenantCode" [isWorkflowQueue]="true"></app-queue-detail>
+            <app-queue-detail [queue]="q" [tenantCode]="tenantCode || (scope === 'global' ? 'global' : '')" [isWorkflowQueue]="true"></app-queue-detail>
           </div>
         </ng-template>
       </c-accordion-item>

@@ -83,8 +83,10 @@ export class QueueDetailComponent implements OnInit, OnChanges {
   loadMetrics(): void {
     if (!this.queue) return;
     const queueCode = this.queue.Code || this.queue.code;
-    const vnamespace = this.queue.VNamespace || this.queue.vnamespace || '';
+    const vnamespace = this.queue.VNamespace || this.queue.vnamespace || 'default';
     if (!queueCode) return;
+
+    const effectiveTenantCode = this.tenantCode || (this.isWorkflowQueue ? 'global' : '');
 
     this.metricsLoading = true;
     const endTime = Math.floor(Date.now() / 1000);
@@ -165,12 +167,12 @@ export class QueueDetailComponent implements OnInit, OnChanges {
       this.metricsLoading = false;
     };
 
-    if (!this.tenantCode) {
+    if (!effectiveTenantCode) {
       buildEmptyMetrics();
       return;
     }
 
-    this.tsdbMetricsService.getTSDBMetrics(this.tenantCode, queueCode, vnamespace, 5, startTime, endTime).subscribe({
+    this.tsdbMetricsService.getTSDBMetrics(effectiveTenantCode, queueCode, vnamespace, 5, startTime, endTime).subscribe({
       next: (result: any) => {
         if (!result || !result.datapoints || result.datapoints.length === 0) {
           buildEmptyMetrics();

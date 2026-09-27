@@ -115,17 +115,31 @@ func flushedBucketsToModels(flushed []metrics.FlushedBucket, resolution int) []m
 // metric buckets via an FSM write command. If no shard is found for the tenant,
 // the buckets are silently discarded (this can happen during tenant migration).
 func (app *Application) writeMetricsBucketsToShard(tenantCode string, buckets []models.MetricsBucket, outboxEventID string) {
-	tenantNode, ok := app.TenantNodesDictionary[tenantCode]
-	if !ok || tenantNode == nil {
-		log.Debug().
-			Str("tenant", tenantCode).
-			Int("buckets", len(buckets)).
-			Msg("⚠️  No shard found for tenant metrics, discarding")
+	var targetNode *dragonboat.RaftNode
+	var isRelay bool
+
+	if tenantCode == "global" || tenantCode == "" || tenantCode == "system" {
+		targetNode = app.MasterNode
+		isRelay = true
+	} else {
+		var ok bool
+		targetNode, ok = app.TenantNodesDictionary[tenantCode]
+		if !ok || targetNode == nil {
+			log.Debug().
+				Str("tenant", tenantCode).
+				Int("buckets", len(buckets)).
+				Msg("⚠️  No shard found for tenant metrics, discarding")
+			return
+		}
+	}
+
+	if targetNode == nil {
 		return
 	}
 
 	cmd := metrics_command.SaveMetricsBucketsCommand{
 		Buckets:       buckets,
+		IsRelay:       isRelay,
 		OutboxEventID: outboxEventID,
 		// No dynamic CF/CFS needed as it defaults to AdminFC/AdminFCSector
 	}
@@ -134,7 +148,7 @@ func (app *Application) writeMetricsBucketsToShard(tenantCode string, buckets []
 	defer cancel()
 
 	_, err := dragonboat.ExecuteRepositoryCommand[int](
-		tenantNode,
+		targetNode,
 		ctx,
 		&cmd,
 		10*time.Second,

@@ -21,19 +21,33 @@ func NewTSDBMetricsBO(Config *common.ServerConfing) *TSDBMetricsBO {
 }
 
 func (bo *TSDBMetricsBO) QueryMetrics(ctx context.Context, tenantCode, queueCode, vnamespace string, resolution int, startTime, endTime int64) (models.MetricsQueryResult, error) {
-	// Need to query the node where the tenant data lives
-	tenantBO := NewTenantBO(bo.Config)
-	tenant, tenantNode, _, err := tenantBO.GetTenant(ctx, tenantCode)
-	if err != nil {
-		return models.MetricsQueryResult{}, fmt.Errorf("failed to get tenant %s: %w", tenantCode, err)
+	if vnamespace == "" {
+		vnamespace = "default"
 	}
 
-	if tenantNode == nil {
-		return models.MetricsQueryResult{}, fmt.Errorf("no node found for tenant %s", tenantCode)
+	var targetNode *dragonboat.RaftNode
+	var effectiveTenantCode string
+
+	if tenantCode == "global" || tenantCode == "" || tenantCode == "system" {
+		targetNode = bo.Config.MasterNode
+		effectiveTenantCode = "global"
+	} else {
+		// Need to query the node where the tenant data lives
+		tenantBO := NewTenantBO(bo.Config)
+		tenant, tenantNode, _, err := tenantBO.GetTenant(ctx, tenantCode)
+		if err != nil {
+			return models.MetricsQueryResult{}, fmt.Errorf("failed to get tenant %s: %w", tenantCode, err)
+		}
+
+		if tenantNode == nil {
+			return models.MetricsQueryResult{}, fmt.Errorf("no node found for tenant %s", tenantCode)
+		}
+		targetNode = tenantNode
+		effectiveTenantCode = tenant.Code
 	}
 
 	cmd := &metrics_command.QueryMetricsRangeCommand{
-		TenantCode: tenant.Code,
+		TenantCode: effectiveTenantCode,
 		QueueCode:  queueCode,
 		VNamespace: vnamespace,
 		Resolution: resolution,
@@ -48,7 +62,7 @@ func (bo *TSDBMetricsBO) QueryMetrics(ctx context.Context, tenantCode, queueCode
 	}
 
 	result, err := dragonboat.ExecuteRepositoryQuery[models.MetricsQueryResult](
-		tenantNode,
+		targetNode,
 		ctx,
 		cmd,
 		config.GlobalConfiguration.ApiRaftTimeout,

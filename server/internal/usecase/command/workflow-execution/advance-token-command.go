@@ -19,6 +19,9 @@ import (
 
 func init() {
 	gob.Register(AdvanceTokenCommand{})
+	gob.Register(models.WorkflowExecution{})
+	gob.Register(models.QueueGauges{})
+	gob.Register([]models.QueueGauges{})
 }
 
 type AdvanceTokenCommand struct {
@@ -430,7 +433,17 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 							CF:  cmd.CF,
 							CFS: cmd.CFS,
 						}
-						enqueueCmd.Execute(uow, now)
+						enqRes := enqueueCmd.Execute(uow, now)
+						if enqResult, ok := enqRes.Result.(queue.EnqueueResult); ok && len(enqResult.Gauges) > 0 {
+							execution.EnqueuedGauges = append(execution.EnqueuedGauges, enqResult.Gauges...)
+						} else {
+							execution.EnqueuedGauges = append(execution.EnqueuedGauges, models.QueueGauges{
+								QueueCode:  execQ.Code,
+								VNamespace: execQ.VNamespace,
+								Pending:    uint64(execQ.MessagesCount),
+								InProcess:  uint64(execQ.CurrentDeliveringMessages),
+							})
+						}
 					}
 				}
 				goto SaveExecutionState
@@ -596,7 +609,17 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 							CF:  cmd.CF,
 							CFS: cmd.CFS,
 						}
-						enqueueCmd.Execute(uow, now)
+						enqRes := enqueueCmd.Execute(uow, now)
+						if enqResult, ok := enqRes.Result.(queue.EnqueueResult); ok && len(enqResult.Gauges) > 0 {
+							execution.EnqueuedGauges = append(execution.EnqueuedGauges, enqResult.Gauges...)
+						} else {
+							execution.EnqueuedGauges = append(execution.EnqueuedGauges, models.QueueGauges{
+								QueueCode:  execQ.Code,
+								VNamespace: execQ.VNamespace,
+								Pending:    uint64(execQ.MessagesCount),
+								InProcess:  uint64(execQ.CurrentDeliveringMessages),
+							})
+						}
 					}
 				}
 				goto SaveExecutionState
@@ -987,6 +1010,17 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					currentNode.ID, currentNode.Name, actType,
 					job, errMsg, now,
 				)
+			}
+
+			if enqResult, ok := enqRes.Result.(queue.EnqueueResult); ok && len(enqResult.Gauges) > 0 {
+				execution.EnqueuedGauges = append(execution.EnqueuedGauges, enqResult.Gauges...)
+			} else {
+				execution.EnqueuedGauges = append(execution.EnqueuedGauges, models.QueueGauges{
+					QueueCode:  actQ.Code,
+					VNamespace: actQ.VNamespace,
+					Pending:    uint64(actQ.MessagesCount),
+					InProcess:  uint64(actQ.CurrentDeliveringMessages),
+				})
 			}
 
 			// Stop advancing this token until job completes
