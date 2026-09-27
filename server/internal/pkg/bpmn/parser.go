@@ -224,21 +224,34 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 					}
 				}
 			case "formField":
+				fID := strings.TrimSpace(getAttr(t.Attr, "id"))
+				if fID == "" {
+					nodeDesc := "unknown element"
+					if currentNode != nil {
+						if currentNode.Name != "" {
+							nodeDesc = fmt.Sprintf("%q (%s)", currentNode.Name, currentNode.ID)
+						} else if currentNode.ID != "" {
+							nodeDesc = currentNode.ID
+						}
+					}
+					fLabel := strings.TrimSpace(getAttr(t.Attr, "label"))
+					if fLabel != "" {
+						return nil, fmt.Errorf("form field %q in element %s is missing required 'id'", fLabel, nodeDesc)
+					}
+					return nil, fmt.Errorf("form field in element %s is missing required 'id'", nodeDesc)
+				}
 				if currentNode != nil {
-					fID := getAttr(t.Attr, "id")
 					fLabel := getAttr(t.Attr, "label")
 					fType := getAttr(t.Attr, "type")
 					fDef := getAttr(t.Attr, "defaultValue")
-					if fID != "" {
-						field := &FormField{
-							ID:           fID,
-							Label:        fLabel,
-							Type:         fType,
-							DefaultValue: fDef,
-						}
-						currentNode.FormFields = append(currentNode.FormFields, field)
-						currentFormField = field
+					field := &FormField{
+						ID:           fID,
+						Label:        fLabel,
+						Type:         fType,
+						DefaultValue: fDef,
 					}
+					currentNode.FormFields = append(currentNode.FormFields, field)
+					currentFormField = field
 				}
 			case "value":
 				if currentFormField != nil {

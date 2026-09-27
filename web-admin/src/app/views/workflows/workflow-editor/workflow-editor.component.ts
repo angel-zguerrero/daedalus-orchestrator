@@ -21,6 +21,7 @@ import { IconDirective } from '@coreui/icons-angular';
 import { WorkflowsService, WorkflowDefinition } from '../services/workflows.service';
 import { VNamespacesService } from '../../tenants/tenant-management/services/vnamespaces.service';
 import { ErrorUtil } from '../../../shared/utils/error.util';
+import { BpmnFormParserUtil } from '../../../shared/utils/bpmn-form-parser.util';
 import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../../shared/components/bpmn-designer/bpmn-designer.component';
 import { DesignErrorsConsoleComponent } from '../../../shared/components/design-errors-console/design-errors-console.component';
 import { ComponentWithUnsavedChanges } from '../guards/workflow-unsaved.guard';
@@ -298,6 +299,15 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy, ComponentWith
       const lintResult = this.bpmnDesigner.runLintValidation();
       hasDesignErrors = lintResult.hasErrors;
       designErrorMessages = lintResult.errors;
+
+      // Validate diagram form fields - do not allow saving if form fields have missing IDs
+      const formValidation = BpmnFormParserUtil.validateDiagramFormFields(xml || '');
+      if (!formValidation.isValid) {
+        this.errorMessage = `Cannot save workflow diagram: ${formValidation.errors.join(' ')}`;
+        this.showAlert = true;
+        this.saving = false;
+        return;
+      }
     }
 
     const val = this.workflowForm.getRawValue();

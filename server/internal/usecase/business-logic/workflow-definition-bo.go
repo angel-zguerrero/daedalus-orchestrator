@@ -10,6 +10,7 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/infrastructure/dragonboat"
 	"deadalus-orch/server/internal/infrastructure/server/common"
+	"deadalus-orch/server/internal/pkg/bpmn"
 	"deadalus-orch/server/internal/pkg/config"
 	workflow_definition_command "deadalus-orch/server/internal/usecase/command/workflow-definition"
 	"deadalus-orch/shared/models"
@@ -37,6 +38,15 @@ func (bo *WorkflowDefinitionBO) resolveRaftNode(scope models.WorkflowScope, tena
 	return tenantNode, "", "", nil
 }
 
+func isBPMNPayload(payload []byte, format models.WorkflowPayloadFormat) bool {
+	f := strings.ToLower(strings.TrimSpace(string(format)))
+	if f == "bpmn" || f == "xml" {
+		return true
+	}
+	trimmed := strings.TrimSpace(string(payload))
+	return strings.HasPrefix(trimmed, "<")
+}
+
 func (bo *WorkflowDefinitionBO) CreateWorkflow(
 	ctx context.Context,
 	scope models.WorkflowScope,
@@ -58,6 +68,12 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 
 	if code == "" && name == "" {
 		return models.WorkflowDefinition{}, errors.New("workflow name or code is required")
+	}
+
+	if len(payload) > 0 && isBPMNPayload(payload, payloadFormat) {
+		if err := bpmn.ValidateDiagramFormFields(payload); err != nil {
+			return models.WorkflowDefinition{}, fmt.Errorf("invalid workflow diagram: %w", err)
+		}
 	}
 
 	if code == "" {
@@ -188,6 +204,12 @@ func (bo *WorkflowDefinitionBO) UpdateWorkflow(
 	if scope == models.WorkflowScopeTenant {
 		targetCF = cf
 		targetCFS = cfs
+	}
+
+	if len(payload) > 0 && isBPMNPayload(payload, payloadFormat) {
+		if err := bpmn.ValidateDiagramFormFields(payload); err != nil {
+			return models.WorkflowDefinition{}, fmt.Errorf("invalid workflow diagram: %w", err)
+		}
 	}
 
 	wf := models.WorkflowDefinition{

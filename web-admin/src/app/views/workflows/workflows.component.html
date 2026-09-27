@@ -742,13 +742,14 @@
         <h6 class="text-success mb-0 font-weight-bold">
           <svg cIcon name="cil-check" class="me-1"></svg> Execution Started
         </h6>
-        <span class="badge bg-success px-2 py-1">{{ (executionResult.status || 'running') | uppercase }}</span>
+        <span class="badge bg-success px-2 py-1">{{ (executionResult?.status || executionResult?.Status || 'running') | uppercase }}</span>
       </div>
       <div class="small font-monospace text-muted">
-        <div class="mb-1"><strong>Execution ID:</strong> <code class="text-info">{{ executionResult.id }}</code></div>
-        <div class="mb-1"><strong>Workflow ID:</strong> <code>{{ executionResult.workflowDefinitionId || lastExecutedWorkflow?.id }}</code></div>
+        <div class="mb-1"><strong>Execution ID:</strong> <code class="text-info">{{ executionResult?.id || executionResult?.ID || executionResult?.executionKey || executionResult?.ExecutionKey }}</code></div>
+        <div class="mb-1" *ngIf="(executionResult?.executionKey || executionResult?.ExecutionKey) && (executionResult?.executionKey || executionResult?.ExecutionKey) !== (executionResult?.id || executionResult?.ID)"><strong>Execution Key:</strong> <code class="text-secondary">{{ executionResult?.executionKey || executionResult?.ExecutionKey }}</code></div>
+        <div class="mb-1"><strong>Workflow ID:</strong> <code>{{ executionResult?.workflowDefinitionId || executionResult?.WorkflowDefinitionID || lastExecutedWorkflow?.id }}</code></div>
         <div class="mb-1" *ngIf="lastExecutedWorkflow?.name"><strong>Workflow Name:</strong> {{ lastExecutedWorkflow?.name }}</div>
-        <div><strong>Started At:</strong> {{ executionResult.startedAt || executionResult.createdAt || 'Just now' }}</div>
+        <div><strong>Started At:</strong> {{ executionResult?.startedAt || executionResult?.StartedAt || executionResult?.createdAt || executionResult?.CreatedAt || 'Just now' }}</div>
       </div>
     </div>
   </c-modal-body>
