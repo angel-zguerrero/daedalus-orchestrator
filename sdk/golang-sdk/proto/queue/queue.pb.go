@@ -24,9 +24,11 @@ const (
 type QueueType int32
 
 const (
-	QueueType_STANDARD    QueueType = 0
-	QueueType_DELAYED     QueueType = 1
-	QueueType_DEAD_LETTER QueueType = 2
+	QueueType_STANDARD           QueueType = 0
+	QueueType_DELAYED            QueueType = 1
+	QueueType_DEAD_LETTER        QueueType = 2
+	QueueType_WORKFLOW_EXECUTION QueueType = 3
+	QueueType_WORKFLOW_ACTIVITY  QueueType = 4
 )
 
 // Enum value maps for QueueType.
@@ -35,11 +37,15 @@ var (
 		0: "STANDARD",
 		1: "DELAYED",
 		2: "DEAD_LETTER",
+		3: "WORKFLOW_EXECUTION",
+		4: "WORKFLOW_ACTIVITY",
 	}
 	QueueType_value = map[string]int32{
-		"STANDARD":    0,
-		"DELAYED":     1,
-		"DEAD_LETTER": 2,
+		"STANDARD":           0,
+		"DELAYED":            1,
+		"DEAD_LETTER":        2,
+		"WORKFLOW_EXECUTION": 3,
+		"WORKFLOW_ACTIVITY":  4,
 	}
 )
 
@@ -89,6 +95,7 @@ type CreateQueueRequest struct {
 	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,15,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
 	MaxQueueSize                          int32                  `protobuf:"varint,16,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
 	MaxDeliveringMessages                 int32                  `protobuf:"varint,17,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
+	WorkflowDefinitionID                  string                 `protobuf:"bytes,18,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
 	unknownFields                         protoimpl.UnknownFields
 	sizeCache                             protoimpl.SizeCache
 }
@@ -242,6 +249,13 @@ func (x *CreateQueueRequest) GetMaxDeliveringMessages() int32 {
 	return 0
 }
 
+func (x *CreateQueueRequest) GetWorkflowDefinitionID() string {
+	if x != nil {
+		return x.WorkflowDefinitionID
+	}
+	return ""
+}
+
 type CreateQueueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
@@ -364,6 +378,7 @@ type CreateQueueItem struct {
 	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,14,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
 	MaxQueueSize                          int32                  `protobuf:"varint,15,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
 	MaxDeliveringMessages                 int32                  `protobuf:"varint,16,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
+	WorkflowDefinitionID                  string                 `protobuf:"bytes,17,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
 	unknownFields                         protoimpl.UnknownFields
 	sizeCache                             protoimpl.SizeCache
 }
@@ -508,6 +523,13 @@ func (x *CreateQueueItem) GetMaxDeliveringMessages() int32 {
 		return x.MaxDeliveringMessages
 	}
 	return 0
+}
+
+func (x *CreateQueueItem) GetWorkflowDefinitionID() string {
+	if x != nil {
+		return x.WorkflowDefinitionID
+	}
+	return ""
 }
 
 type BulkCreateQueueResponse struct {
@@ -787,6 +809,7 @@ type Queue struct {
 	NodeSchedulerQueueSupervisionState    string                 `protobuf:"bytes,25,opt,name=nodeSchedulerQueueSupervisionState,proto3" json:"nodeSchedulerQueueSupervisionState,omitempty"`
 	MaxDeliveringMessages                 int32                  `protobuf:"varint,26,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
 	CurrentDeliveringMessages             int32                  `protobuf:"varint,27,opt,name=currentDeliveringMessages,proto3" json:"currentDeliveringMessages,omitempty"`
+	WorkflowDefinitionID                  string                 `protobuf:"bytes,28,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
 	unknownFields                         protoimpl.UnknownFields
 	sizeCache                             protoimpl.SizeCache
 }
@@ -1008,6 +1031,13 @@ func (x *Queue) GetCurrentDeliveringMessages() int32 {
 		return x.CurrentDeliveringMessages
 	}
 	return 0
+}
+
+func (x *Queue) GetWorkflowDefinitionID() string {
+	if x != nil {
+		return x.WorkflowDefinitionID
+	}
+	return ""
 }
 
 type QueueFindResult struct {
@@ -1574,7 +1604,7 @@ var File_queue_proto protoreflect.FileDescriptor
 
 const file_queue_proto_rawDesc = "" +
 	"\n" +
-	"\vqueue.proto\x12\x05queue\"\xba\a\n" +
+	"\vqueue.proto\x12\x05queue\"\xee\a\n" +
 	"\x12CreateQueueRequest\x12\x1e\n" +
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
@@ -1597,7 +1627,8 @@ const file_queue_proto_rawDesc = "" +
 	"\x14deadLetterExchangeId\x18\x0e \x01(\tR\x14deadLetterExchangeId\x12T\n" +
 	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0f \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12\"\n" +
 	"\fmaxQueueSize\x18\x10 \x01(\x05R\fmaxQueueSize\x124\n" +
-	"\x15maxDeliveringMessages\x18\x11 \x01(\x05R\x15maxDeliveringMessages\x1aL\n" +
+	"\x15maxDeliveringMessages\x18\x11 \x01(\x05R\x15maxDeliveringMessages\x122\n" +
+	"\x14workflowDefinitionID\x18\x12 \x01(\tR\x14workflowDefinitionID\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1611,7 +1642,7 @@ const file_queue_proto_rawDesc = "" +
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
 	"tenantCode\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\x91\a\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xc5\a\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1631,7 +1662,8 @@ const file_queue_proto_rawDesc = "" +
 	"\x14deadLetterExchangeId\x18\r \x01(\tR\x14deadLetterExchangeId\x12T\n" +
 	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0e \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12\"\n" +
 	"\fmaxQueueSize\x18\x0f \x01(\x05R\fmaxQueueSize\x124\n" +
-	"\x15maxDeliveringMessages\x18\x10 \x01(\x05R\x15maxDeliveringMessages\x1aL\n" +
+	"\x15maxDeliveringMessages\x18\x10 \x01(\x05R\x15maxDeliveringMessages\x122\n" +
+	"\x14workflowDefinitionID\x18\x11 \x01(\tR\x14workflowDefinitionID\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1662,7 +1694,7 @@ const file_queue_proto_rawDesc = "" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
 	"vnamespace\x12&\n" +
-	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\xee\v\n" +
+	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\xa2\f\n" +
 	"\x05Queue\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -1693,7 +1725,8 @@ const file_queue_proto_rawDesc = "" +
 	"\x1bnodeSchedulerSupervisorName\x18\x18 \x01(\tR\x1bnodeSchedulerSupervisorName\x12N\n" +
 	"\"nodeSchedulerQueueSupervisionState\x18\x19 \x01(\tR\"nodeSchedulerQueueSupervisionState\x124\n" +
 	"\x15maxDeliveringMessages\x18\x1a \x01(\x05R\x15maxDeliveringMessages\x12<\n" +
-	"\x19currentDeliveringMessages\x18\x1b \x01(\x05R\x19currentDeliveringMessages\x1aL\n" +
+	"\x19currentDeliveringMessages\x18\x1b \x01(\x05R\x19currentDeliveringMessages\x122\n" +
+	"\x14workflowDefinitionID\x18\x1c \x01(\tR\x14workflowDefinitionID\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aE\n" +
@@ -1776,11 +1809,13 @@ const file_queue_proto_rawDesc = "" +
 	"\x0fclientMessageId\x18\x01 \x01(\tR\x0fclientMessageId\x12\x1c\n" +
 	"\tconfirmed\x18\x02 \x01(\bR\tconfirmed\x12\x1c\n" +
 	"\tmessageId\x18\x03 \x01(\tR\tmessageId\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05error*7\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error*f\n" +
 	"\tQueueType\x12\f\n" +
 	"\bSTANDARD\x10\x00\x12\v\n" +
 	"\aDELAYED\x10\x01\x12\x0f\n" +
-	"\vDEAD_LETTER\x10\x022\x88\x04\n" +
+	"\vDEAD_LETTER\x10\x02\x12\x16\n" +
+	"\x12WORKFLOW_EXECUTION\x10\x03\x12\x15\n" +
+	"\x11WORKFLOW_ACTIVITY\x10\x042\x88\x04\n" +
 	"\fQueueService\x12D\n" +
 	"\vCreateQueue\x12\x19.queue.CreateQueueRequest\x1a\x1a.queue.CreateQueueResponse\x12P\n" +
 	"\x0fBulkCreateQueue\x12\x1d.queue.BulkCreateQueueRequest\x1a\x1e.queue.BulkCreateQueueResponse\x12;\n" +

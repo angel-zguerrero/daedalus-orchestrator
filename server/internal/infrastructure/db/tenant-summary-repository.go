@@ -56,7 +56,12 @@ func (r *TenantSummaryRepository) PaginateTenantUpdatedAtFrom(lastUpdatedAt time
 
 // UpdateCounters allows updating multiple counters in a single operation
 // Positive values increase counters, negative values decrease them
-func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange, exchangesChange, queuesChange, bindingsChange int, now time.Time) error {
+func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange, exchangesChange, queuesChange, bindingsChange int, now time.Time, workflowsChange ...int) error {
+	wfChange := 0
+	if len(workflowsChange) > 0 {
+		wfChange = workflowsChange[0]
+	}
+
 	summary, err := r.GetTenantSummaryById(tenantId, now)
 	if err != nil {
 		return err
@@ -66,6 +71,7 @@ func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange
 		// If tenant doesn't exist, create new record
 		newSummary := &models.TenantSummary{
 			ID:             tenantId,
+			WorkflowsCount: max(0, wfChange),
 			MessagesCount:  max(0, messagesChange),
 			ExchangesCount: max(0, exchangesChange),
 			QueuesCount:    max(0, queuesChange),
@@ -76,6 +82,7 @@ func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange
 	}
 
 	// Update existing counts (ensure they don't go below 0)
+	summary.WorkflowsCount = max(0, summary.WorkflowsCount+wfChange)
 	summary.MessagesCount = max(0, summary.MessagesCount+messagesChange)
 	summary.ExchangesCount = max(0, summary.ExchangesCount+exchangesChange)
 	summary.QueuesCount = max(0, summary.QueuesCount+queuesChange)
@@ -83,6 +90,11 @@ func (r *TenantSummaryRepository) UpdateCounters(tenantId string, messagesChange
 
 	_, err = r.UpdateTenantSummary(summary, now)
 	return err
+}
+
+// UpdateWorkflowCounter updates only the workflow counter for a tenant
+func (r *TenantSummaryRepository) UpdateWorkflowCounter(tenantId string, workflowsChange int, now time.Time) error {
+	return r.UpdateCounters(tenantId, 0, 0, 0, 0, now, workflowsChange)
 }
 
 // Helper function to get the maximum of two integers

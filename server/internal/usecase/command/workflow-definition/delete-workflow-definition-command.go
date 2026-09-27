@@ -59,6 +59,14 @@ func (cmd *DeleteWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 		return *commandResult
 	}
 
+	// Update tenant summary with workflow counter
+	if cmd.CFS != "" && cmd.CFS != db.AdminFCSector {
+		tenantSummaryRepo, errSummary := db.NewTenantSummaryRepository(uow, idFactory)
+		if errSummary == nil {
+			_ = tenantSummaryRepo.UpdateWorkflowCounter(cmd.CFS, -1, now)
+		}
+	}
+
 	commandResult.Result = true
 	return *commandResult
 }

@@ -52,6 +52,7 @@
             <th>Shard ID</th>
             <th>Column Family Index</th>
             <th>Status</th>
+            <th>Workflows Count</th>
             <th>Exchanges Count</th>
             <th>Queues Count</th>
             <th>Bindings Count</th>
@@ -75,6 +76,7 @@
                 {{ tenant.Status }}
               </c-badge>
             </td>
+            <td>{{ tenant.WorkflowsCount }}</td>
             <td>{{ tenant.ExchangesCount }}</td>
             <td>{{ tenant.QueuesCount }}</td>
             <td>{{ tenant.BindingsCount }}</td>
@@ -352,6 +354,11 @@
           <label class="form-label fw-bold">Updated At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedTenant?.UpdatedAt || selectedTenant?.updatedAt) | date:'full' }}</div>
           <div class="form-text">Last modification timestamp</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Workflows Count</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.WorkflowsCount || '0' }}</div>
+          <div class="form-text">Total number of workflows</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Exchanges Count</label>

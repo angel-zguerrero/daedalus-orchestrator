@@ -133,6 +133,17 @@
         <!-- Metrics cards (Moved below charts and made smaller) -->
         <div *ngIf="dashboardSummary && !dashboardLoading" class="row mt-4">
 
+          <!-- Workflows -->
+          <div class="col">
+            <div class="card border-info h-100">
+              <div class="card-body text-center py-2">
+                <svg cIcon name="cil-transfer" size="xl" class="text-info mb-1"></svg>
+                <h5 class="card-title text-info mb-1">{{ dashboardSummary.WorkflowsCount || 0 }}</h5>
+                <p class="card-text text-muted small mb-0">Workflows</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Tenants -->
           <div class="col">
             <div class="card border-primary h-100">
@@ -168,10 +179,10 @@
 
           <!-- Bindings -->
           <div class="col">
-            <div class="card border-info h-100">
+            <div class="card border-secondary h-100">
               <div class="card-body text-center py-2">
-                <svg cIcon name="cil-link" size="xl" class="text-info mb-1"></svg>
-                <h5 class="card-title text-info mb-1">{{ dashboardSummary.BindingsCount || 0 }}</h5>
+                <svg cIcon name="cil-link" size="xl" class="text-secondary mb-1"></svg>
+                <h5 class="card-title text-secondary mb-1">{{ dashboardSummary.BindingsCount || 0 }}</h5>
                 <p class="card-text text-muted small mb-0">Bindings</p>
               </div>
             </div>
