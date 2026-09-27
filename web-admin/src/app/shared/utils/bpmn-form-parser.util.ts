@@ -193,4 +193,95 @@ export class BpmnFormParserUtil {
       return [];
     }
   }
+
+  /**
+   * Validates all form fields in any <camunda:formData> element across the BPMN diagram.
+   * Returns validation result indicating whether all form fields have valid non-empty IDs.
+   */
+  public static validateDiagramFormFields(xmlString: string): { isValid: boolean; errors: string[] } {
+    if (!xmlString || typeof xmlString !== 'string' || !xmlString.trim()) {
+      return { isValid: true, errors: [] };
+    }
+
+    let rawXml = xmlString.trim();
+
+    // If payload is base64 encoded string, attempt decoding
+    if (!rawXml.startsWith('<')) {
+      try {
+        const decoded = atob(rawXml);
+        if (decoded.trim().startsWith('<')) {
+          rawXml = decoded.trim();
+        }
+      } catch {
+        // Not base64
+      }
+    }
+
+    // Handle JSON stringified XML (e.g. "\"<?xml...\"")
+    if (rawXml.startsWith('"') && rawXml.endsWith('"')) {
+      try {
+        const unescaped = JSON.parse(rawXml);
+        if (typeof unescaped === 'string' && unescaped.trim().startsWith('<')) {
+          rawXml = unescaped.trim();
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const errors: string[] = [];
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawXml, 'text/xml');
+
+      const parserError = doc.querySelector('parsererror');
+      if (parserError) {
+        errors.push(`XML parse error: ${parserError.textContent}`);
+        return { isValid: false, errors };
+      }
+
+      const allElements = doc.getElementsByTagName('*');
+      for (let i = 0; i < allElements.length; i++) {
+        const el = allElements[i];
+        if (el.localName === 'formData') {
+          // Find ancestor node with an id
+          let parentNode: Element | null = el.parentElement;
+          while (parentNode && (!parentNode.getAttribute('id') || parentNode.localName === 'extensionElements')) {
+            parentNode = parentNode.parentElement;
+          }
+          const parentId = parentNode?.getAttribute('id') || 'unknown';
+          const parentName = parentNode?.getAttribute('name') || '';
+          const parentDesc = parentName ? `'${parentName}' (${parentId})` : `'${parentId}'`;
+
+          const seenFieldIds = new Set<string>();
+          const fieldChildren = el.getElementsByTagName('*');
+          for (let j = 0; j < fieldChildren.length; j++) {
+            const fieldEl = fieldChildren[j];
+            if (fieldEl.localName !== 'formField') {
+              continue;
+            }
+
+            const rawId = fieldEl.getAttribute('id');
+            const fieldId = (rawId || '').trim();
+            const label = fieldEl.getAttribute('label') || '';
+            const fieldDesc = label ? `'${label}' (field #${j + 1})` : `field #${j + 1}`;
+
+            if (!fieldId) {
+              errors.push(`Element ${parentDesc}: form field (${fieldDesc}) is missing a required 'id'. Every form field must define an ID.`);
+            } else if (seenFieldIds.has(fieldId)) {
+              errors.push(`Element ${parentDesc}: duplicate form field id '${fieldId}'.`);
+            } else {
+              seenFieldIds.add(fieldId);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      errors.push(`Error validating BPMN form fields: ${err?.message || err}`);
+    }
+
+    return { isValid: errors.length === 0, errors };
+  }
 }
+

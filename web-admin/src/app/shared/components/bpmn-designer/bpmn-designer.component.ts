@@ -681,7 +681,35 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             );
           }
 
-          // 1b. Script Task / JavaScript Connector Validation:
+          // 1b. Form Data & Form Fields Validation:
+          if (bo.extensionElements && Array.isArray(bo.extensionElements.values)) {
+            bo.extensionElements.values.forEach((ext: any) => {
+              const extType = (ext.$type || '').toLowerCase();
+              if (extType.includes('formdata') && Array.isArray(ext.fields)) {
+                const seenFieldIds = new Set<string>();
+                ext.fields.forEach((f: any, idx: number) => {
+                  const fieldId = (f?.id || '').trim();
+                  const fieldLabel = (f?.label || '').trim();
+                  const fieldDesc = fieldLabel ? `'${fieldLabel}' (field #${idx + 1})` : `field #${idx + 1}`;
+                  if (!fieldId) {
+                    addElementError(
+                      id,
+                      `Form Field Error: Element ${displayName} contains a form field (${fieldDesc}) without an ID. All form fields must define a valid ID.`
+                    );
+                  } else if (seenFieldIds.has(fieldId)) {
+                    addElementError(
+                      id,
+                      `Form Field Error: Element ${displayName} has duplicate form field ID '${fieldId}'.`
+                    );
+                  } else {
+                    seenFieldIds.add(fieldId);
+                  }
+                });
+              }
+            });
+          }
+
+          // 1c. Script Task / JavaScript Connector Validation:
           const bo = el.businessObject || {};
           const tplAttr = (bo.modelerTemplate || bo.$attrs?.['camunda:modelerTemplate'] || '').toLowerCase();
           let extPropsMap: Record<string, string> = {};

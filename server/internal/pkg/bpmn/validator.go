@@ -1,7 +1,9 @@
 package bpmn
 
 import (
+	"encoding/xml"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -271,6 +273,118 @@ func ValidateScriptTasks(model *BPMNModel) error {
 			return err
 		}
 	}
+	return nil
+}
+
+type elementContext struct {
+	tag  string
+	id   string
+	name string
+}
+
+// ValidateDiagramFormFields parses a BPMN XML payload and verifies that all form fields
+// defined within any formData extensions have a valid, non-empty ID. It also checks that
+// form field IDs are unique within each BPMN element.
+func ValidateDiagramFormFields(xmlData []byte) error {
+	if len(xmlData) == 0 {
+		return nil
+	}
+
+	decoder := xml.NewDecoder(strings.NewReader(string(xmlData)))
+	var elementStack []elementContext
+	seenFieldIDs := make(map[string]map[string]bool)
+
+	for {
+		tok, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error decoding BPMN XML: %w", err)
+		}
+
+		switch t := tok.(type) {
+		case xml.StartElement:
+			local := stripPrefix(t.Name.Local)
+			if local != "definitions" && local != "extensionElements" &&
+				local != "formData" && local != "formField" &&
+				local != "validation" && local != "constraint" &&
+				local != "value" && local != "properties" &&
+				local != "property" {
+				elemID := getAttr(t.Attr, "id")
+				elemName := getAttr(t.Attr, "name")
+				if elemID != "" {
+					elementStack = append(elementStack, elementContext{
+						tag:  local,
+						id:   elemID,
+						name: elemName,
+					})
+				}
+			}
+
+			if local == "formField" {
+				var currentElem elementContext
+				if len(elementStack) > 0 {
+					currentElem = elementStack[len(elementStack)-1]
+				}
+				nodeDesc := currentElem.id
+				if currentElem.name != "" {
+					nodeDesc = fmt.Sprintf("%q (%s)", currentElem.name, currentElem.id)
+				}
+				if nodeDesc == "" {
+					nodeDesc = "unknown element"
+				}
+
+				fID := strings.TrimSpace(getAttr(t.Attr, "id"))
+				if fID == "" {
+					fLabel := strings.TrimSpace(getAttr(t.Attr, "label"))
+					if fLabel != "" {
+						return fmt.Errorf("form field %q in element %s is missing required 'id'", fLabel, nodeDesc)
+					}
+					return fmt.Errorf("form field in element %s is missing required 'id'", nodeDesc)
+				}
+
+				if seenFieldIDs[currentElem.id] == nil {
+					seenFieldIDs[currentElem.id] = make(map[string]bool)
+				}
+				if seenFieldIDs[currentElem.id][fID] {
+					return fmt.Errorf("duplicate form field id %q in element %s", fID, nodeDesc)
+				}
+				seenFieldIDs[currentElem.id][fID] = true
+			}
+
+		case xml.EndElement:
+			local := stripPrefix(t.Name.Local)
+			if len(elementStack) > 0 && elementStack[len(elementStack)-1].tag == local {
+				elementStack = elementStack[:len(elementStack)-1]
+			}
+		}
+	}
+
+	return nil
+}
+
+// ValidateDiagram runs comprehensive validation on a BPMN diagram payload:
+// 1. Verifies all form fields have valid IDs and uniqueness per element.
+// 2. Parses the BPMN model and verifies script task configurations.
+func ValidateDiagram(xmlData []byte) error {
+	if len(xmlData) == 0 {
+		return nil
+	}
+
+	if err := ValidateDiagramFormFields(xmlData); err != nil {
+		return err
+	}
+
+	model, err := ParseBPMN(xmlData)
+	if err != nil {
+		return err
+	}
+
+	if err := ValidateScriptTasks(model); err != nil {
+		return err
+	}
+
 	return nil
 }
 

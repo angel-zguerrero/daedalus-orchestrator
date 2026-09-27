@@ -472,6 +472,14 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       const lintResult = this.bpmnDesigner.runLintValidation();
       hasDesignErrors = lintResult.hasErrors;
       designErrorMessages = lintResult.errors;
+
+      // Validate diagram form fields - do not allow saving if form fields have missing IDs
+      const formValidation = BpmnFormParserUtil.validateDiagramFormFields(xml || '');
+      if (!formValidation.isValid) {
+        this.errorMessage = `Cannot save workflow diagram: ${formValidation.errors.join(' ')}`;
+        this.showAlert = true;
+        return;
+      }
     }
 
     const val = this.workflowForm.getRawValue();
