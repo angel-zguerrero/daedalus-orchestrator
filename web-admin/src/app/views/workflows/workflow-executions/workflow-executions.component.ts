@@ -351,6 +351,14 @@ export class WorkflowExecutionsComponent implements OnInit {
           }
         }
       });
+    } else if (execStatus === 'failed' || execStatus === 'terminated') {
+      // Highlight failed/cancelled token positions if workflow execution failed
+      const tokens = this.selectedExecutionDetail.tokens || [];
+      tokens.forEach(t => {
+        if (t.currentNodeId && (t.status === 'cancelled' || t.status === 'failed')) {
+          markers.push({ id: t.currentNodeId, type: 'error' });
+        }
+      });
     }
 
     const jobs = this.selectedExecutionDetail.jobs || [];

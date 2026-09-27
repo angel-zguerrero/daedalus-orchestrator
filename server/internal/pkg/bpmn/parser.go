@@ -17,6 +17,10 @@ const (
 	ElementBoundaryEvent          ElementType = "boundaryEvent"
 	ElementServiceTask            ElementType = "serviceTask"
 	ElementUserTask               ElementType = "userTask"
+	ElementReceiveTask            ElementType = "receiveTask"
+	ElementSendTask               ElementType = "sendTask"
+	ElementBusinessRuleTask       ElementType = "businessRuleTask"
+	ElementManualTask             ElementType = "manualTask"
 	ElementTask                   ElementType = "task"
 	ElementScriptTask             ElementType = "scriptTask"
 	ElementExclusiveGateway       ElementType = "exclusiveGateway"
@@ -140,16 +144,17 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 		case xml.StartElement:
 			local := stripPrefix(t.Name.Local)
 			currentElement = local
+			elemType := normalizeElementType(local)
 
-			switch ElementType(local) {
-			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
+			switch elemType {
+			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementReceiveTask, ElementSendTask, ElementBusinessRuleTask, ElementManualTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				id := getAttr(t.Attr, "id")
 				name := getAttr(t.Attr, "name")
 				defaultFlow := getAttr(t.Attr, "default")
 				node := &BPMNNode{
 					ID:            id,
 					Name:          name,
-					Type:          ElementType(local),
+					Type:          elemType,
 					DefaultFlowID: defaultFlow,
 					Properties:    make(map[string]string),
 				}
@@ -158,6 +163,10 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 
 				if node.Type == ElementStartEvent && model.StartNodeID == "" {
 					model.StartNodeID = id
+				}
+
+				if msgRef := getAttr(t.Attr, "messageRef"); msgRef != "" {
+					node.Properties["messageRef"] = msgRef
 				}
 
 				if template := getAttr(t.Attr, "modelerTemplate"); template != "" {
@@ -340,8 +349,9 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 				}
 			}
 
-			switch ElementType(local) {
-			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
+			elemType := normalizeElementType(local)
+			switch elemType {
+			case ElementStartEvent, ElementEndEvent, ElementIntermediateCatchEvent, ElementIntermediateThrowEvent, ElementBoundaryEvent, ElementServiceTask, ElementUserTask, ElementReceiveTask, ElementSendTask, ElementBusinessRuleTask, ElementManualTask, ElementTask, ElementScriptTask, ElementExclusiveGateway, ElementParallelGateway, ElementInclusiveGateway:
 				currentNode = nil
 				currentFormField = nil
 			case "formField":
@@ -367,6 +377,47 @@ func ParseBPMN(xmlData []byte) (*BPMNModel, error) {
 	}
 
 	return model, nil
+}
+
+func normalizeElementType(name string) ElementType {
+	switch strings.ToLower(name) {
+	case "startevent":
+		return ElementStartEvent
+	case "endevent":
+		return ElementEndEvent
+	case "intermediatecatchevent":
+		return ElementIntermediateCatchEvent
+	case "intermediatethrowevent":
+		return ElementIntermediateThrowEvent
+	case "boundaryevent":
+		return ElementBoundaryEvent
+	case "servicetask":
+		return ElementServiceTask
+	case "usertask":
+		return ElementUserTask
+	case "receivetask":
+		return ElementReceiveTask
+	case "sendtask":
+		return ElementSendTask
+	case "businessruletask":
+		return ElementBusinessRuleTask
+	case "manualtask":
+		return ElementManualTask
+	case "task":
+		return ElementTask
+	case "scripttask":
+		return ElementScriptTask
+	case "exclusivegateway":
+		return ElementExclusiveGateway
+	case "parallelgateway":
+		return ElementParallelGateway
+	case "inclusivegateway":
+		return ElementInclusiveGateway
+	case "sequenceflow":
+		return ElementSequenceFlow
+	default:
+		return ElementType(name)
+	}
 }
 
 func stripPrefix(name string) string {

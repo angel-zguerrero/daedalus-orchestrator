@@ -36,13 +36,13 @@ func TestAdvanceTokenCommand_ExpressionEvaluation(t *testing.T) {
     <bpmn:startEvent id="Start_1">
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Task_HTTP" name="Call HTTP Endpoint">
+    <bpmn:task id="Task_HTTP" name="Call HTTP Endpoint">
       <bpmn:extensionElements>
         <camunda:property name="url" value="https://${host}/api/v1/users/${userId}" />
         <camunda:property name="greeting" value="Hello ${user.firstName} ${user.lastName}!" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1</bpmn:incoming>
-    </bpmn:serviceTask>
+    </bpmn:task>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Task_HTTP" />
   </bpmn:process>
 </bpmn:definitions>`
@@ -244,7 +244,7 @@ func TestAdvanceTokenCommand_ConfigAndSecretEvaluation(t *testing.T) {
     <bpmn:startEvent id="Start_1">
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Task_Secret" name="Call External Service">
+    <bpmn:task id="Task_Secret" name="Call External Service">
       <bpmn:extensionElements>
         <camunda:property name="globalHost" value="${config.global['global_cfg']['SERVER_HOST']}" />
         <camunda:property name="globalKey" value="${secret.global['global_sec']['API_KEY']}" />
@@ -252,7 +252,7 @@ func TestAdvanceTokenCommand_ConfigAndSecretEvaluation(t *testing.T) {
         <camunda:property name="tenantPass" value="${secret.tenant['Tenant Secret Group Name']['DB_PASS']}" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1</bpmn:incoming>
-    </bpmn:serviceTask>
+    </bpmn:task>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Task_Secret" />
   </bpmn:process>
 </bpmn:definitions>`

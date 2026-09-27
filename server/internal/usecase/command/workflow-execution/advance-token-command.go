@@ -108,8 +108,14 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 	// 3. Parse BPMN Model
 	bpmnModel, err := bpmn.ParseBPMN(def.Payload)
 	if err != nil {
-		commandResult.Error = fmt.Sprintf("failed to parse BPMN: %s", err.Error())
-		return *commandResult
+		errMsg := fmt.Sprintf("failed to parse BPMN: %s", err.Error())
+		log.Error().Str("executionID", execution.ID).Msg(errMsg)
+		return cmd.failExecutionAndActivity(
+			execRepo, tokenRepo, jobRepo,
+			execution, token,
+			token.CurrentNodeID, token.CurrentNodeID, "unknown",
+			nil, errMsg, now,
+		)
 	}
 
 	// 4. Merge OutputData if provided
@@ -135,8 +141,18 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 	for step := 0; step < maxSteps; step++ {
 		currentNode := bpmnModel.GetNode(token.CurrentNodeID)
 		if currentNode == nil {
-			commandResult.Error = fmt.Sprintf("node not found in model: %s", token.CurrentNodeID)
-			return *commandResult
+			errMsg := fmt.Sprintf("node not found in model: %s", token.CurrentNodeID)
+			log.Error().
+				Str("executionID", execution.ID).
+				Str("tokenID", token.ID).
+				Str("nodeID", token.CurrentNodeID).
+				Msg("❌ Node not found in model")
+			return cmd.failExecutionAndActivity(
+				execRepo, tokenRepo, jobRepo,
+				execution, token,
+				token.CurrentNodeID, token.CurrentNodeID, "unknown",
+				nil, errMsg, now,
+			)
 		}
 
 		switch currentNode.Type {
@@ -178,17 +194,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 							Str("flowID", flow.ID).
 							Msg("❌ Gateway error: outgoing flow without condition is not marked as default flow")
 
-						token.Status = models.ExecutionTokenStatusCancelled
-						tokenRepo.UpdateExecutionToken(token, now)
-
-						execution.Status = models.WorkflowExecutionStatusFailed
-						execution.Error = errMsg
-						execution.CompletedAt = &now
-						execRepo.UpdateWorkflowExecution(execution, now)
-
-						commandResult.Error = errMsg
-						commandResult.Result = execution
-						return *commandResult
+						return cmd.failExecutionAndActivity(
+							execRepo, tokenRepo, jobRepo,
+							execution, token,
+							currentNode.ID, currentNode.Name, string(currentNode.Type),
+							nil, errMsg, now,
+						)
 					}
 				}
 			}
@@ -249,17 +260,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					Str("gatewayName", currentNode.Name).
 					Msg("❌ Exclusive Gateway evaluation failed: no condition met and no default flow available")
 
-				token.Status = models.ExecutionTokenStatusCancelled
-				tokenRepo.UpdateExecutionToken(token, now)
-
-				execution.Status = models.WorkflowExecutionStatusFailed
-				execution.Error = errMsg
-				execution.CompletedAt = &now
-				execRepo.UpdateWorkflowExecution(execution, now)
-
-				commandResult.Error = errMsg
-				commandResult.Result = execution
-				return *commandResult
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, string(currentNode.Type),
+					nil, errMsg, now,
+				)
 			}
 
 			log.Info().
@@ -464,17 +470,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 							Str("flowID", flow.ID).
 							Msg("❌ Gateway error: outgoing flow without condition is not marked as default flow")
 
-						token.Status = models.ExecutionTokenStatusCancelled
-						tokenRepo.UpdateExecutionToken(token, now)
-
-						execution.Status = models.WorkflowExecutionStatusFailed
-						execution.Error = errMsg
-						execution.CompletedAt = &now
-						execRepo.UpdateWorkflowExecution(execution, now)
-
-						commandResult.Error = errMsg
-						commandResult.Result = execution
-						return *commandResult
+						return cmd.failExecutionAndActivity(
+							execRepo, tokenRepo, jobRepo,
+							execution, token,
+							currentNode.ID, currentNode.Name, string(currentNode.Type),
+							nil, errMsg, now,
+						)
 					}
 				}
 			}
@@ -532,17 +533,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					Str("gatewayName", currentNode.Name).
 					Msg("❌ Inclusive Gateway evaluation failed: no condition met and no default flow available")
 
-				token.Status = models.ExecutionTokenStatusCancelled
-				tokenRepo.UpdateExecutionToken(token, now)
-
-				execution.Status = models.WorkflowExecutionStatusFailed
-				execution.Error = errMsg
-				execution.CompletedAt = &now
-				execRepo.UpdateWorkflowExecution(execution, now)
-
-				commandResult.Error = errMsg
-				commandResult.Result = execution
-				return *commandResult
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, string(currentNode.Type),
+					nil, errMsg, now,
+				)
 			}
 
 			log.Info().
@@ -606,7 +602,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				goto SaveExecutionState
 			}
 
-		case bpmn.ElementServiceTask, bpmn.ElementUserTask, bpmn.ElementTask, bpmn.ElementScriptTask:
+		case bpmn.ElementUserTask, bpmn.ElementTask, bpmn.ElementReceiveTask, bpmn.ElementScriptTask:
 			// Check if a job for this token & activity already exists or has completed
 			existingJobs, _ := jobRepo.GetJobsByExecutionID(execution.ID, now)
 			var completedJob *models.WorkflowJob
@@ -759,17 +755,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					Str("nodeID", currentNode.ID).
 					Msg("❌ Expression evaluation failed for node")
 
-				token.Status = models.ExecutionTokenStatusCancelled
-				tokenRepo.UpdateExecutionToken(token, now)
-
-				execution.Status = models.WorkflowExecutionStatusFailed
-				execution.Error = errMsg
-				execution.CompletedAt = &now
-				execRepo.UpdateWorkflowExecution(execution, now)
-
-				commandResult.Error = errMsg
-				commandResult.Result = execution
-				return *commandResult
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, actType,
+					nil, errMsg, now,
+				)
 			}
 			if evaluatedMap, ok := evaluatedPayload.(map[string]interface{}); ok {
 				jobInputPayload = evaluatedMap
@@ -803,17 +794,13 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				if err := bpmn.ValidateScriptConfig(nodeLabel, scriptFormat, scriptBody, resultVar); err != nil {
 					errMsg := err.Error()
 					log.Error().Err(err).Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg("❌ ScriptTask validation failed")
-					token.Status = models.ExecutionTokenStatusCancelled
-					tokenRepo.UpdateExecutionToken(token, now)
 
-					execution.Status = models.WorkflowExecutionStatusFailed
-					execution.Error = errMsg
-					execution.CompletedAt = &now
-					execRepo.UpdateWorkflowExecution(execution, now)
-
-					commandResult.Error = errMsg
-					commandResult.Result = execution
-					return *commandResult
+					return cmd.failExecutionAndActivity(
+						execRepo, tokenRepo, jobRepo,
+						execution, token,
+						currentNode.ID, currentNode.Name, actType,
+						nil, errMsg, now,
+					)
 				}
 			}
 
@@ -835,8 +822,13 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				UpdatedAt:            now,
 			}
 			if _, err := jobRepo.CreateWorkflowJob(job, now); err != nil {
-				commandResult.Error = fmt.Sprintf("failed to create workflow job: %v", err)
-				return *commandResult
+				errMsg := fmt.Sprintf("failed to create workflow job: %v", err)
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, actType,
+					nil, errMsg, now,
+				)
 			}
 
 			token.Status = models.ExecutionTokenStatusWaiting
@@ -865,17 +857,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			if actQ == nil {
 				errMsg := fmt.Sprintf("activity queue not found for workflow definition %s (%s)", def.ID, def.Code)
 				log.Error().Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg(errMsg)
-				token.Status = models.ExecutionTokenStatusCancelled
-				tokenRepo.UpdateExecutionToken(token, now)
-
-				execution.Status = models.WorkflowExecutionStatusFailed
-				execution.Error = errMsg
-				execution.CompletedAt = &now
-				execRepo.UpdateWorkflowExecution(execution, now)
-
-				commandResult.Error = errMsg
-				commandResult.Result = execution
-				return *commandResult
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, actType,
+					job, errMsg, now,
+				)
 			}
 
 			if actQ.Type != models.WorkflowActivityQueue || actQ.WorkflowDefinitionID != def.ID {
@@ -920,17 +907,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			if enqRes.Error != "" {
 				errMsg := fmt.Sprintf("failed to enqueue activity job message: %s", enqRes.Error)
 				log.Error().Err(fmt.Errorf("%s", enqRes.Error)).Str("executionID", execution.ID).Str("jobID", job.ID).Msg(errMsg)
-				token.Status = models.ExecutionTokenStatusCancelled
-				tokenRepo.UpdateExecutionToken(token, now)
-
-				execution.Status = models.WorkflowExecutionStatusFailed
-				execution.Error = errMsg
-				execution.CompletedAt = &now
-				execRepo.UpdateWorkflowExecution(execution, now)
-
-				commandResult.Error = errMsg
-				commandResult.Result = execution
-				return *commandResult
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, actType,
+					job, errMsg, now,
+				)
 			}
 
 			// Stop advancing this token until job completes
@@ -1013,17 +995,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 			if calcErr != nil {
 				log.Error().Err(calcErr).Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg("❌ Timer calculation error")
-				token.Status = models.ExecutionTokenStatusCancelled
-				tokenRepo.UpdateExecutionToken(token, now)
-
-				execution.Status = models.WorkflowExecutionStatusFailed
-				execution.Error = calcErr.Error()
-				execution.CompletedAt = &now
-				execRepo.UpdateWorkflowExecution(execution, now)
-
-				commandResult.Error = calcErr.Error()
-				commandResult.Result = execution
-				return *commandResult
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, string(currentNode.Type),
+					nil, calcErr.Error(), now,
+				)
 			}
 
 			// Check if timer target run time is in the future
@@ -1060,17 +1037,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				if execQ == nil {
 					errMsg := fmt.Sprintf("workflow execution queue not found for definition %s", def.ID)
 					log.Error().Str("executionID", execution.ID).Str("nodeID", currentNode.ID).Msg(errMsg)
-					token.Status = models.ExecutionTokenStatusCancelled
-					tokenRepo.UpdateExecutionToken(token, now)
-
-					execution.Status = models.WorkflowExecutionStatusFailed
-					execution.Error = errMsg
-					execution.CompletedAt = &now
-					execRepo.UpdateWorkflowExecution(execution, now)
-
-					commandResult.Error = errMsg
-					commandResult.Result = execution
-					return *commandResult
+					return cmd.failExecutionAndActivity(
+						execRepo, tokenRepo, jobRepo,
+						execution, token,
+						currentNode.ID, currentNode.Name, string(currentNode.Type),
+						nil, errMsg, now,
+					)
 				}
 
 				// Create a One-Off ScheduledJob to resume execution when targetRunAt arrives
@@ -1145,17 +1117,31 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			goto CheckExecutionCompletion
 
 		default:
-			// Fallback: move along outgoing flow if available
-			outgoing := bpmnModel.GetOutgoingFlows(currentNode.ID)
-			if len(outgoing) > 0 {
-				token.CurrentNodeID = outgoing[0].TargetRef
-				tokenRepo.UpdateExecutionToken(token, now)
-			} else {
-				token.Status = models.ExecutionTokenStatusCompleted
-				tokenRepo.UpdateExecutionToken(token, now)
-				goto CheckExecutionCompletion
-			}
+			errMsg := fmt.Sprintf("unsupported or unrecognized element type %q for node %s (%s)", currentNode.Type, currentNode.ID, currentNode.Name)
+			log.Error().
+				Str("executionID", execution.ID).
+				Str("nodeID", currentNode.ID).
+				Str("type", string(currentNode.Type)).
+				Msg("❌ Unsupported element type")
+
+			return cmd.failExecutionAndActivity(
+				execRepo, tokenRepo, jobRepo,
+				execution, token,
+				currentNode.ID, currentNode.Name, string(currentNode.Type),
+				nil, errMsg, now,
+			)
 		}
+	}
+
+	if token.Status == models.ExecutionTokenStatusActive {
+		errMsg := fmt.Sprintf("execution step limit exceeded (max %d steps) at node %s", maxSteps, token.CurrentNodeID)
+		log.Error().Str("executionID", execution.ID).Str("nodeID", token.CurrentNodeID).Msg(errMsg)
+		return cmd.failExecutionAndActivity(
+			execRepo, tokenRepo, jobRepo,
+			execution, token,
+			token.CurrentNodeID, token.CurrentNodeID, "task",
+			nil, errMsg, now,
+		)
 	}
 
 CheckExecutionCompletion:
@@ -1187,4 +1173,80 @@ SaveExecutionState:
 	execRepo.UpdateWorkflowExecution(execution, now)
 	commandResult.Result = execution
 	return *commandResult
+}
+
+func (cmd *AdvanceTokenCommand) failExecutionAndActivity(
+	execRepo *db.WorkflowExecutionRepository,
+	tokenRepo *db.ExecutionTokenRepository,
+	jobRepo *db.WorkflowJobRepository,
+	execution *models.WorkflowExecution,
+	token *models.ExecutionToken,
+	activityID, activityName, activityType string,
+	existingJob *models.WorkflowJob,
+	errMsg string,
+	now time.Time,
+) command.CommandResult {
+	if existingJob != nil && jobRepo != nil {
+		existingJob.Status = models.WorkflowJobStatusFailed
+		existingJob.Error = errMsg
+		existingJob.CompletedAt = &now
+		existingJob.UpdatedAt = now
+		jobRepo.UpdateWorkflowJob(existingJob, now)
+	} else if activityID != "" && jobRepo != nil && token != nil && execution != nil {
+		// Check if a job already exists for this activity & token
+		existingJobs, _ := jobRepo.GetJobsByExecutionID(execution.ID, now)
+		var found *models.WorkflowJob
+		for i := range existingJobs {
+			if existingJobs[i].ExecutionTokenID == token.ID && existingJobs[i].ActivityID == activityID {
+				found = &existingJobs[i]
+				break
+			}
+		}
+		if found != nil {
+			found.Status = models.WorkflowJobStatusFailed
+			found.Error = errMsg
+			found.CompletedAt = &now
+			found.UpdatedAt = now
+			jobRepo.UpdateWorkflowJob(found, now)
+		} else {
+			jobID := strings.ReplaceAll(uuid.New().String(), "-", "")
+			if activityType == "" {
+				activityType = "task"
+			}
+			failedJob := &models.WorkflowJob{
+				ID:                   jobID,
+				WorkflowExecutionID: execution.ID,
+				ExecutionTokenID:     token.ID,
+				WorkflowDefinitionID: execution.WorkflowDefinitionID,
+				VNamespace:           execution.VNamespace,
+				ActivityID:           activityID,
+				ActivityName:         activityName,
+				ActivityType:         activityType,
+				Status:               models.WorkflowJobStatusFailed,
+				Error:                errMsg,
+				CreatedAt:            now,
+				UpdatedAt:            now,
+				CompletedAt:          &now,
+			}
+			jobRepo.CreateWorkflowJob(failedJob, now)
+		}
+	}
+
+	if token != nil && tokenRepo != nil {
+		token.Status = models.ExecutionTokenStatusCancelled
+		tokenRepo.UpdateExecutionToken(token, now)
+	}
+
+	if execution != nil && execRepo != nil {
+		execution.Status = models.WorkflowExecutionStatusFailed
+		execution.Error = errMsg
+		execution.CompletedAt = &now
+		execution.UpdatedAt = now
+		execRepo.UpdateWorkflowExecution(execution, now)
+	}
+
+	return command.CommandResult{
+		Error:  errMsg,
+		Result: execution,
+	}
 }
