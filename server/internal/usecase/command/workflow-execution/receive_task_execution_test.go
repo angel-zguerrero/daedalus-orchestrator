@@ -124,13 +124,38 @@ func TestReceiveTaskWorkflowExecution_AdvancesCleanlyLikeUserTask(t *testing.T) 
 			}
 		}
 
-		// 2. Find and complete any pending jobs
+		// 2. Find and resume any active waiting events
+		waitUow := db.NewUnitOfWork(store, nil)
+		waitRepo, err := db.NewWaitingEventRepository(waitUow, idFactory, "default", "default")
+		require.NoError(t, err)
+		waitingEvents, _ := waitRepo.GetWaitingEventsByExecutionID(exec.ID, now)
+
+		progressMade := false
+		for _, w := range waitingEvents {
+			executedActivities[w.EventID] = true
+			t.Logf("Resuming wait event for activity: %s of type %s", w.EventID, w.Type)
+
+			resumeCmd := &workflowExecCommand.ResumeWaitEventCommand{
+				WaitingEventID: w.ID,
+				Payload: map[string]interface{}{
+					"status": "SUCCESS",
+				},
+				CF:  "default",
+				CFS: "default",
+			}
+			rUow := db.NewUnitOfWork(store, nil)
+			resRes := resumeCmd.Execute(rUow, now)
+			require.Empty(t, resRes.Error)
+			require.NoError(t, rUow.Commit())
+			progressMade = true
+		}
+
+		// 3. Find and complete any pending jobs
 		jobUow := db.NewUnitOfWork(store, nil)
 		jobRepo, err := db.NewWorkflowJobRepository(jobUow, idFactory, "default", "default")
 		require.NoError(t, err)
 		jobs, _ := jobRepo.GetJobsByExecutionID(exec.ID, now)
 
-		progressMade := false
 		for idx := range jobs {
 			j := &jobs[idx]
 			if j.Status == models.WorkflowJobStatusPending {

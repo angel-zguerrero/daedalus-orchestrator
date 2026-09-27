@@ -602,7 +602,81 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				goto SaveExecutionState
 			}
 
-		case bpmn.ElementUserTask, bpmn.ElementTask, bpmn.ElementReceiveTask, bpmn.ElementScriptTask:
+		case bpmn.ElementUserTask, bpmn.ElementReceiveTask:
+			waitingEventRepo, err := db.NewWaitingEventRepository(uow, idFactory, cmd.CF, cmd.CFS)
+			if err != nil {
+				errMsg := fmt.Sprintf("failed to init waiting event repository: %v", err)
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, string(currentNode.Type),
+					nil, errMsg, now,
+				)
+			}
+
+			// Check if an active waiting event already exists for this token and node
+			existingWaitingEvents, _ := waitingEventRepo.GetWaitingEventsByExecutionID(execution.ID, now)
+			var activeWaitingEvent *models.WaitingEvent
+			for i := range existingWaitingEvents {
+				if existingWaitingEvents[i].ExecutionTokenID == token.ID && existingWaitingEvents[i].EventID == currentNode.ID {
+					activeWaitingEvent = &existingWaitingEvents[i]
+					break
+				}
+			}
+
+			if activeWaitingEvent != nil {
+				// Already suspended in a wait state awaiting external intervention
+				token.Status = models.ExecutionTokenStatusWaiting
+				tokenRepo.UpdateExecutionToken(token, now)
+				goto SaveExecutionState
+			}
+
+			// 1. Persist current token state in the database
+			token.Status = models.ExecutionTokenStatusWaiting
+			token.UpdatedAt = now
+			tokenRepo.UpdateExecutionToken(token, now)
+
+			// Determine wait state type
+			waitType := models.WaitingEventTypeUserInput
+			if currentNode.Type == bpmn.ElementReceiveTask {
+				waitType = models.WaitingEventTypeSystemMessage
+			}
+
+			// 2. Create a record in waiting_events detailing expected keys/form fields
+			expectedInput := bpmn.BuildExpectedInputFromNode(currentNode)
+			waitingEventID := strings.ReplaceAll(uuid.New().String(), "-", "")
+			waitingEvent := &models.WaitingEvent{
+				ID:                   waitingEventID,
+				WorkflowDefinitionID: def.ID,
+				WorkflowExecutionID: execution.ID,
+				ExecutionTokenID:     token.ID,
+				EventID:              currentNode.ID,
+				Type:                 waitType,
+				ExpectedInput:        expectedInput,
+				CreatedAt:            now,
+				UpdatedAt:            now,
+			}
+			if _, err := waitingEventRepo.CreateWaitingEvent(waitingEvent, now); err != nil {
+				errMsg := fmt.Sprintf("failed to create waiting event: %v", err)
+				return cmd.failExecutionAndActivity(
+					execRepo, tokenRepo, jobRepo,
+					execution, token,
+					currentNode.ID, currentNode.Name, string(currentNode.Type),
+					nil, errMsg, now,
+				)
+			}
+
+			log.Info().
+				Str("executionID", execution.ID).
+				Str("tokenID", token.ID).
+				Str("nodeID", currentNode.ID).
+				Str("type", string(waitType)).
+				Msg("⏸️ Wait state reached: token paused, waiting_event record created")
+
+			// 3. Terminate active worker/thread (stop execution to free up resources)
+			goto SaveExecutionState
+
+		case bpmn.ElementTask, bpmn.ElementScriptTask:
 			// Check if a job for this token & activity already exists or has completed
 			existingJobs, _ := jobRepo.GetJobsByExecutionID(execution.ID, now)
 			var completedJob *models.WorkflowJob

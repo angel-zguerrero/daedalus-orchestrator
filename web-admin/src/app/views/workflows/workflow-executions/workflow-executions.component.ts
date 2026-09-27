@@ -10,10 +10,11 @@ import {
   AlertComponent,
   SpinnerComponent,
   BadgeComponent,
-  ModalModule
+  ModalModule,
+  FormModule
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
-import { WorkflowsService, WorkflowDefinition, WorkflowExecution, WorkflowExecutionDetail } from '../services/workflows.service';
+import { WorkflowsService, WorkflowDefinition, WorkflowExecution, WorkflowExecutionDetail, WaitingEvent, WaitingEventFormField } from '../services/workflows.service';
 import { ErrorUtil } from '../../../shared/utils/error.util';
 import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../../shared/components/bpmn-designer/bpmn-designer.component';
 
@@ -34,6 +35,7 @@ import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../../shared/compone
     SpinnerComponent,
     BadgeComponent,
     ModalModule,
+    FormModule,
     IconDirective,
     BpmnDesignerComponent
   ]
@@ -57,7 +59,16 @@ export class WorkflowExecutionsComponent implements OnInit {
   selectedExecutionId: string = '';
   loadingExecutionDetail: boolean = false;
   executionDetailError: string = '';
-  activeDetailTab: 'overview' | 'payloads' | 'activities' | 'tokens' | 'diagram' = 'overview';
+  activeDetailTab: 'overview' | 'payloads' | 'activities' | 'tokens' | 'waitingEvents' | 'diagram' = 'overview';
+
+  waitingEvents: WaitingEvent[] = [];
+  eventFormData: Record<string, Record<string, any>> = {};
+  eventRawJson: Record<string, string> = {};
+  eventFormMode: Record<string, 'form' | 'json'> = {};
+  submittingWaitEvent: Record<string, boolean> = {};
+  waitEventErrors: Record<string, string> = {};
+  waitEventSuccess: Record<string, string> = {};
+  fieldValidationErrors: Record<string, Record<string, string>> = {};
 
   @ViewChild('executionBpmnDesigner') executionBpmnDesigner?: BpmnDesignerComponent;
 
@@ -231,8 +242,21 @@ export class WorkflowExecutionsComponent implements OnInit {
             timeoutSeconds: j.timeoutSeconds || j.TimeoutSeconds || 300,
             createdAt: j.createdAt || j.CreatedAt || '',
             updatedAt: j.updatedAt || j.UpdatedAt || ''
+          })),
+          waitingEvents: (detailObj?.waitingEvents || detailObj?.WaitingEvents || []).map((evt: any) => ({
+            id: evt.id || evt.ID || '',
+            workflowDefinitionId: evt.workflowDefinitionId || evt.WorkflowDefinitionID || '',
+            workflowExecutionId: evt.workflowExecutionId || evt.WorkflowExecutionID || '',
+            executionTokenId: evt.executionTokenId || evt.ExecutionTokenID || '',
+            eventId: evt.eventId || evt.EventID || '',
+            type: evt.type || evt.Type || 'USER_INPUT',
+            expectedInput: evt.expectedInput || evt.ExpectedInput || null,
+            createdAt: evt.createdAt || evt.CreatedAt || '',
+            updatedAt: evt.updatedAt || evt.UpdatedAt || ''
           }))
         };
+        this.waitingEvents = this.selectedExecutionDetail.waitingEvents || [];
+        this.initWaitEventForms();
         this.loadingExecutionDetail = false;
 
         if (this.activeDetailTab === 'diagram') {
@@ -250,6 +274,14 @@ export class WorkflowExecutionsComponent implements OnInit {
     this.showExecutionDetailModal = false;
     this.selectedExecutionDetail = null;
     this.selectedExecutionId = '';
+    this.waitingEvents = [];
+    this.eventFormData = {};
+    this.eventRawJson = {};
+    this.eventFormMode = {};
+    this.submittingWaitEvent = {};
+    this.waitEventErrors = {};
+    this.waitEventSuccess = {};
+    this.fieldValidationErrors = {};
   }
 
   refreshDiagram(): void {
@@ -282,11 +314,363 @@ export class WorkflowExecutionsComponent implements OnInit {
     return JSON.stringify(data, null, 2);
   }
 
-  selectDetailTab(tab: 'overview' | 'payloads' | 'activities' | 'tokens' | 'diagram'): void {
+  selectDetailTab(tab: 'overview' | 'payloads' | 'activities' | 'tokens' | 'waitingEvents' | 'diagram'): void {
     this.activeDetailTab = tab;
     if (tab === 'diagram') {
       setTimeout(() => this.highlightExecutionDiagram(), 250);
     }
+  }
+
+  initWaitEventForms(): void {
+    for (const evt of this.waitingEvents) {
+      if (!this.eventFormData[evt.id]) {
+        this.eventFormData[evt.id] = {};
+      }
+      if (!this.fieldValidationErrors[evt.id]) {
+        this.fieldValidationErrors[evt.id] = {};
+      }
+
+      const fields = this.getEventFields(evt);
+      if (fields && fields.length > 0) {
+        for (const f of fields) {
+          if (this.eventFormData[evt.id][f.id] === undefined) {
+            if (f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') {
+              if (f.type === 'boolean' || f.type === 'bool') {
+                this.eventFormData[evt.id][f.id] = f.defaultValue === 'true' || f.defaultValue === true;
+              } else if (f.type === 'long' || f.type === 'int' || f.type === 'integer' || f.type === 'double' || f.type === 'number') {
+                const num = Number(f.defaultValue);
+                this.eventFormData[evt.id][f.id] = isNaN(num) ? f.defaultValue : num;
+              } else {
+                this.eventFormData[evt.id][f.id] = f.defaultValue;
+              }
+            } else if (f.type === 'boolean' || f.type === 'bool') {
+              this.eventFormData[evt.id][f.id] = false;
+            } else if (f.type === 'enum' && f.values && f.values.length > 0) {
+              this.eventFormData[evt.id][f.id] = f.values[0].id;
+            } else {
+              this.eventFormData[evt.id][f.id] = '';
+            }
+          }
+        }
+      }
+
+      // Pre-populate JSON combined from form fields + extension properties (with nested objects for dot-notation keys)
+      this.eventRawJson[evt.id] = this.generateCombinedJsonPayload(evt);
+
+      // Business Rule:
+      // If at least one extension property exists, show JSON view!
+      // If only a form exists (form fields exist and NO extension properties), show Form view with validations!
+      // If neither, show JSON view.
+      if (this.hasExtensionProperties(evt)) {
+        this.eventFormMode[evt.id] = 'json';
+      } else if (this.hasFormFields(evt)) {
+        this.eventFormMode[evt.id] = 'form';
+      } else {
+        this.eventFormMode[evt.id] = 'json';
+      }
+    }
+  }
+
+  getEventFields(evt: WaitingEvent): WaitingEventFormField[] {
+    if (!evt || !evt.expectedInput) return [];
+    const fields = evt.expectedInput.fields || evt.expectedInput.Fields;
+    return Array.isArray(fields) ? fields : [];
+  }
+
+  hasFormFields(evt: WaitingEvent): boolean {
+    return this.getEventFields(evt).length > 0;
+  }
+
+  hasExtensionProperties(evt: WaitingEvent): boolean {
+    if (!evt || !evt.expectedInput) return false;
+    const exp = evt.expectedInput;
+    if (exp.hasExtensionProperties === true) return true;
+    const ext = this.getExtensionProperties(evt);
+    return Object.keys(ext).length > 0;
+  }
+
+  getExtensionProperties(evt: WaitingEvent): Record<string, string> {
+    if (!evt || !evt.expectedInput) return {};
+    const exp = evt.expectedInput;
+    const res: Record<string, string> = {};
+
+    if (exp.extensionProperties && typeof exp.extensionProperties === 'object') {
+      for (const [k, v] of Object.entries(exp.extensionProperties)) {
+        res[k] = typeof v === 'string' ? v : String(v || '');
+      }
+    }
+
+    const reserved = new Set([
+      'nodeId', 'nodeName', 'nodeType', 'fields', 'schema', 'type',
+      'activityId', 'activityName', 'expectedKeys', 'messageRef',
+      'modelerTemplate', 'scriptFormat', 'resultVariable', 'script',
+      'taskType', 'timeDuration', 'timeDate', 'timeCycle',
+      'extensionProperties', 'hasFormFields', 'hasExtensionProperties'
+    ]);
+
+    for (const [k, v] of Object.entries(exp)) {
+      if (!reserved.has(k) && typeof v !== 'object') {
+        if (!(k in res)) {
+          res[k] = typeof v === 'string' ? v : String(v || '');
+        }
+      }
+    }
+
+    return res;
+  }
+
+  setNestedProperty(obj: Record<string, any>, path: string, value: any): void {
+    const parts = path.split('.');
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!current[part] || typeof current[part] !== 'object' || Array.isArray(current[part])) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    current[parts[parts.length - 1]] = value;
+  }
+
+  generateCombinedJsonPayload(evt: WaitingEvent): string {
+    const combined: Record<string, any> = {};
+
+    // 1. Add form fields
+    const fields = this.getEventFields(evt);
+    for (const f of fields) {
+      let defaultVal: any = '';
+      if (f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') {
+        if (f.type === 'boolean' || f.type === 'bool') {
+          defaultVal = f.defaultValue === 'true' || f.defaultValue === true;
+        } else if (f.type === 'long' || f.type === 'int' || f.type === 'integer' || f.type === 'double' || f.type === 'number') {
+          const num = Number(f.defaultValue);
+          defaultVal = isNaN(num) ? f.defaultValue : num;
+        } else {
+          defaultVal = f.defaultValue;
+        }
+      } else if (f.type === 'boolean' || f.type === 'bool') {
+        defaultVal = false;
+      } else if (f.type === 'long' || f.type === 'int' || f.type === 'integer' || f.type === 'double' || f.type === 'number') {
+        defaultVal = 0;
+      }
+
+      if (this.eventFormData[evt.id] && this.eventFormData[evt.id][f.id] !== undefined) {
+        defaultVal = this.eventFormData[evt.id][f.id];
+      }
+
+      this.setNestedProperty(combined, f.id, defaultVal);
+    }
+
+    // 2. Add extension properties with dot-notation support (keys only, template empty values)
+    const extProps = this.getExtensionProperties(evt);
+    for (const k of Object.keys(extProps)) {
+      this.setNestedProperty(combined, k, '');
+    }
+
+    return JSON.stringify(combined, null, 2);
+  }
+
+  getExtensionPropertyList(evt: WaitingEvent): Array<{ key: string; value: string }> {
+    const extProps = this.getExtensionProperties(evt);
+    return Object.entries(extProps).map(([key, value]) => ({ key, value }));
+  }
+
+  resolveVariablePathInObject(path: string, obj: any): any {
+    if (!obj || typeof obj !== 'object') return undefined;
+    if (path in obj) return obj[path];
+    const parts = path.split('.');
+    let curr = obj;
+    for (const p of parts) {
+      if (curr === null || curr === undefined || typeof curr !== 'object') return undefined;
+      curr = curr[p];
+    }
+    return curr;
+  }
+
+  setEventFormMode(evtId: string, mode: 'form' | 'json'): void {
+    const evt = this.waitingEvents.find(e => e.id === evtId);
+    if (evt) {
+      if (mode === 'json' && this.eventFormMode[evtId] === 'form') {
+        this.eventRawJson[evtId] = this.generateCombinedJsonPayload(evt);
+      } else if (mode === 'form' && this.eventFormMode[evtId] === 'json') {
+        try {
+          const parsed = JSON.parse(this.eventRawJson[evtId] || '{}');
+          const fields = this.getEventFields(evt);
+          for (const f of fields) {
+            const val = this.resolveVariablePathInObject(f.id, parsed);
+            if (val !== undefined) {
+              this.eventFormData[evtId][f.id] = val;
+            }
+          }
+        } catch {}
+      }
+    }
+    this.eventFormMode[evtId] = mode;
+  }
+
+  getFieldConstraint(field: WaitingEventFormField, constraintName: string): string | null {
+    if (!field.constraints) return null;
+    const c = field.constraints.find(item => item.name.toLowerCase() === constraintName.toLowerCase());
+    return c ? (c.config || '') : null;
+  }
+
+  validateSingleField(evt: WaitingEvent, field: WaitingEventFormField): string {
+    const val = this.eventFormData[evt.id]?.[field.id];
+    const required = field.required || this.getFieldConstraint(field, 'required') !== null;
+
+    if (required) {
+      if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
+        return `Field "${field.label || field.id}" is required`;
+      }
+    }
+
+    if (val !== undefined && val !== null && val !== '') {
+      const typeLower = (field.type || 'string').toLowerCase();
+
+      if (['long', 'int', 'integer', 'double', 'float', 'number'].includes(typeLower)) {
+        const num = Number(val);
+        if (isNaN(num)) {
+          return `Field "${field.label || field.id}" must be a valid number`;
+        }
+        const minStr = this.getFieldConstraint(field, 'min');
+        if (minStr !== null && minStr !== '') {
+          const minVal = parseFloat(minStr);
+          if (!isNaN(minVal) && num < minVal) {
+            return `Value must be at least ${minVal}`;
+          }
+        }
+        const maxStr = this.getFieldConstraint(field, 'max');
+        if (maxStr !== null && maxStr !== '') {
+          const maxVal = parseFloat(maxStr);
+          if (!isNaN(maxVal) && num > maxVal) {
+            return `Value cannot exceed ${maxVal}`;
+          }
+        }
+      }
+
+      if (typeof val === 'string') {
+        const minLenStr = this.getFieldConstraint(field, 'minlength');
+        if (minLenStr !== null && minLenStr !== '') {
+          const minLen = parseInt(minLenStr, 10);
+          if (!isNaN(minLen) && val.length < minLen) {
+            return `Minimum length is ${minLen} characters`;
+          }
+        }
+        const maxLenStr = this.getFieldConstraint(field, 'maxlength');
+        if (maxLenStr !== null && maxLenStr !== '') {
+          const maxLen = parseInt(maxLenStr, 10);
+          if (!isNaN(maxLen) && val.length > maxLen) {
+            return `Maximum length is ${maxLen} characters`;
+          }
+        }
+        const patternStr = this.getFieldConstraint(field, 'pattern');
+        if (patternStr !== null && patternStr !== '') {
+          try {
+            const regex = new RegExp(patternStr);
+            if (!regex.test(val)) {
+              return `Value does not match required pattern: ${patternStr}`;
+            }
+          } catch {}
+        }
+      }
+    }
+
+    return '';
+  }
+
+  validateField(evt: WaitingEvent, field: WaitingEventFormField): void {
+    if (!this.fieldValidationErrors[evt.id]) {
+      this.fieldValidationErrors[evt.id] = {};
+    }
+    const err = this.validateSingleField(evt, field);
+    if (err) {
+      this.fieldValidationErrors[evt.id][field.id] = err;
+    } else {
+      delete this.fieldValidationErrors[evt.id][field.id];
+    }
+  }
+
+  validateAllFields(evt: WaitingEvent): boolean {
+    if (!this.fieldValidationErrors[evt.id]) {
+      this.fieldValidationErrors[evt.id] = {};
+    }
+    const fields = this.getEventFields(evt);
+    let hasErrors = false;
+    for (const f of fields) {
+      const err = this.validateSingleField(evt, f);
+      if (err) {
+        this.fieldValidationErrors[evt.id][f.id] = err;
+        hasErrors = true;
+      } else {
+        delete this.fieldValidationErrors[evt.id][f.id];
+      }
+    }
+    return !hasErrors;
+  }
+
+  submitWaitEvent(evt: WaitingEvent): void {
+    this.submittingWaitEvent[evt.id] = true;
+    this.waitEventErrors[evt.id] = '';
+    this.waitEventSuccess[evt.id] = '';
+
+    let payload: any = {};
+    const mode = this.eventFormMode[evt.id] || (this.hasExtensionProperties(evt) ? 'json' : (this.hasFormFields(evt) ? 'form' : 'json'));
+
+    if (mode === 'json') {
+      try {
+        payload = JSON.parse(this.eventRawJson[evt.id] || '{}');
+      } catch (e: any) {
+        this.waitEventErrors[evt.id] = 'Invalid JSON: ' + (e?.message || 'Syntax error');
+        this.submittingWaitEvent[evt.id] = false;
+        return;
+      }
+    } else {
+      const isValid = this.validateAllFields(evt);
+      if (!isValid) {
+        this.waitEventErrors[evt.id] = 'Please fix the validation errors in the form before submitting.';
+        this.submittingWaitEvent[evt.id] = false;
+        return;
+      }
+
+      const formData = this.eventFormData[evt.id] || {};
+      const fields = this.getEventFields(evt);
+      for (const f of fields) {
+        let val = formData[f.id];
+        if (f.type === 'long' || f.type === 'int' || f.type === 'integer') {
+          if (val !== undefined && val !== null && val !== '') {
+            val = parseInt(val, 10);
+          }
+        } else if (f.type === 'double' || f.type === 'float' || f.type === 'number') {
+          if (val !== undefined && val !== null && val !== '') {
+            val = parseFloat(val);
+          }
+        } else if (f.type === 'boolean' || f.type === 'bool') {
+          val = !!val;
+        }
+        this.setNestedProperty(payload, f.id, val);
+      }
+    }
+
+    const req$ = this.scope === 'global'
+      ? this.workflowsService.completeGlobalWaitEvent(evt.id, payload)
+      : this.workflowsService.completeTenantWaitEvent(this.tenantCode, evt.id, payload);
+
+    req$.subscribe({
+      next: () => {
+        this.submittingWaitEvent[evt.id] = false;
+        this.waitEventSuccess[evt.id] = 'Waiting event resumed successfully!';
+        setTimeout(() => {
+          if (this.selectedExecutionId) {
+            this.openExecutionDetail(this.selectedExecutionId);
+          }
+          this.loadExecutions();
+        }, 600);
+      },
+      error: (err) => {
+        this.submittingWaitEvent[evt.id] = false;
+        this.waitEventErrors[evt.id] = ErrorUtil.formatErrorMessage(err);
+      }
+    });
   }
 
   private decodePayload(payloadRaw: any): string {

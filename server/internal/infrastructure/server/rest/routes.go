@@ -142,6 +142,11 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.POST("/:code/workflow-executions", requireScope("workflows:create", "workflows:admin"), workflowExecutionController.StartTenantExecutionHandler)
 				tenantsGroup.GET("/:code/workflow-executions", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.ListTenantExecutionsHandler)
 				tenantsGroup.GET("/:code/workflow-executions/:id", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetTenantExecutionHandler)
+				tenantsGroup.GET("/:code/workflow-executions/:id/waiting-events", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetTenantWaitingEventsHandler)
+				tenantsGroup.POST("/:code/workflow-executions/:id/waiting-events/:waitingEventId/complete", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitTenantEventInputHandler)
+				tenantsGroup.POST("/:code/workflows/waiting-events/:waitingEventId/complete", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitTenantEventInputHandler)
+				tenantsGroup.POST("/:code/workflows/waiting-events/:waitingEventId/submit", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitTenantEventInputHandler)
+				tenantsGroup.POST("/:code/workflows/waiting-events/submit", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitTenantEventInputHandler)
 
 				// Activity Templates (Tenant)
 				tenantsGroup.POST("/:code/activity-templates", requireScope("workflows:create", "workflows:admin"), activityTemplateController.CreateTenantActivityTemplateHandler)
@@ -169,7 +174,12 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			workflowsGroup.POST("/executions", requireScope("workflows:create", "workflows:admin"), workflowExecutionController.StartGlobalExecutionHandler)
 			workflowsGroup.GET("/executions", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.ListGlobalExecutionsHandler)
 			workflowsGroup.GET("/executions/:id", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetGlobalExecutionHandler)
+			workflowsGroup.GET("/executions/:id/waiting-events", requireScope("workflows:list", "workflows:admin"), workflowExecutionController.GetGlobalWaitingEventsHandler)
 			workflowsGroup.POST("/executions/jobs/:jobId/complete", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.CompleteGlobalJobHandler)
+			workflowsGroup.POST("/waiting-events/:waitingEventId/submit", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitEventInputHandler)
+			workflowsGroup.POST("/waiting-events/:waitingEventId/complete", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitEventInputHandler)
+			workflowsGroup.POST("/waiting-events/submit", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitEventInputHandler)
+			workflowsGroup.POST("/executions/:id/waiting-events/:waitingEventId/complete", requireScope("workflows:edit", "workflows:admin"), workflowExecutionController.SubmitEventInputHandler)
 		}
 
 		activityTemplatesGroup := restAPIGroup.Group("/activity-templates")
