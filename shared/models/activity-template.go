@@ -10,20 +10,20 @@ const (
 )
 
 type ActivityTemplate struct {
-	ID               string                `orm:"primary-key"`
-	Code             string                `orm:"unique-compound:0"`
-	VNamespace       string                `orm:"unique-compound:0"`
-	Name             string
-	Description      string                `orm:"data-only"`
-	ActivityFamily   string
-	ParentTemplateId string
-	RootActivity     string
-	Payload          []byte
-	IsActive         bool
-	Scope            ActivityTemplateScope
-	TenantID         string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID               string                `orm:"primary-key" json:"id"`
+	Code             string                `orm:"unique-compound:0" json:"code"`
+	VNamespace       string                `orm:"unique-compound:0" json:"vnamespace"`
+	Name             string                `json:"name"`
+	Description      string                `orm:"data-only" json:"description"`
+	ActivityFamily   string                `json:"activityFamily"`
+	ParentTemplateId string                `json:"parentTemplateId"`
+	RootActivity     string                `json:"rootActivity"`
+	Payload          []byte                `json:"payload"`
+	IsActive         bool                  `json:"isActive"`
+	Scope            ActivityTemplateScope `json:"scope"`
+	TenantID         string                `json:"tenantId"`
+	CreatedAt        time.Time             `json:"createdAt"`
+	UpdatedAt        time.Time             `json:"updatedAt"`
 }
 
 func (ActivityTemplate) TableName() string {
