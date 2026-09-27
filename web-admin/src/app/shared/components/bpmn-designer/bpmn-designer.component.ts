@@ -629,7 +629,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           const rawType = el.type || '';
           const type = rawType.replace(/^bpmn:/, '');
           const id = el.id || '';
-          const rawName = (el.businessObject?.name || '').trim();
+          const bo = el.businessObject || {};
+          const rawName = (bo.name || '').trim();
           const displayName = rawName ? `'${rawName}' (${id})` : `'${id}'`;
 
           // Check if element is a connection / edge (SequenceFlow, Association, MessageFlow, etc.)
@@ -710,7 +711,6 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
           }
 
           // 1c. Script Task / JavaScript Connector Validation:
-          const bo = el.businessObject || {};
           const tplAttr = (bo.modelerTemplate || bo.$attrs?.['camunda:modelerTemplate'] || '').toLowerCase();
           let extPropsMap: Record<string, string> = {};
           if (bo.extensionElements && Array.isArray(bo.extensionElements.values)) {
