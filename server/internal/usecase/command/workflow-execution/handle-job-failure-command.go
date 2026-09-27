@@ -82,18 +82,27 @@ func (cmd *HandleJobFailureCommand) Execute(uow *db.UnitOfWork, now time.Time) c
 		job.CompletedAt = &now
 		jobRepo.UpdateWorkflowJob(job, now)
 
-		compCmd := &CompleteJobCommand{
-			JobID:      cmd.JobID,
-			WorkerID:   cmd.WorkerID,
-			Error:      cmd.ErrorMsg,
-			OutputData: nil,
-			CF:         cmd.CF,
-			CFS:        cmd.CFS,
+		// Update the corresponding ExecutionToken to Cancelled and the
+		// WorkflowExecution to Failed. We do this directly here because
+		// CompleteJobCommand short-circuits when it sees job.Status == Failed.
+		tokenRepo, tokErr := db.NewExecutionTokenRepository(uow, idFactory, cmd.CF, cmd.CFS)
+		if tokErr == nil {
+			token, tokGetErr := tokenRepo.GetExecutionTokenByID(job.ExecutionTokenID, now)
+			if tokGetErr == nil && token != nil {
+				token.Status = models.ExecutionTokenStatusCancelled
+				tokenRepo.UpdateExecutionToken(token, now)
+			}
 		}
-		compRes := compCmd.Execute(uow, now)
-		if compRes.Error != "" {
-			commandResult.Error = compRes.Error
-			return *commandResult
+
+		execRepo, execErr := db.NewWorkflowExecutionRepository(uow, idFactory, cmd.CF, cmd.CFS)
+		if execErr == nil {
+			execution, execGetErr := execRepo.GetWorkflowExecutionByID(job.WorkflowExecutionID, now)
+			if execGetErr == nil && execution != nil && execution.Status == models.WorkflowExecutionStatusRunning {
+				execution.Status = models.WorkflowExecutionStatusFailed
+				execution.Error = cmd.ErrorMsg
+				execution.CompletedAt = &now
+				execRepo.UpdateWorkflowExecution(execution, now)
+			}
 		}
 
 		res := HandleJobFailureResult{
