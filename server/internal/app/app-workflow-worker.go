@@ -68,7 +68,7 @@ func (app *Application) processWorkflowExecutionQueues(batchSize int) {
 	defer cancel()
 
 	// 1. Process MasterNode global execution queues
-	app.processExecutionQueuesForNode(ctx, app.MasterNode, db.AdminFC, db.AdminFCSector, batchSize)
+	app.processExecutionQueuesForNode(ctx, app.MasterNode, db.AdminFC, db.AdminFCSector, batchSize, "global")
 
 	// 2. Process TenantNodes execution queues
 	cursor := ""
@@ -111,7 +111,7 @@ func (app *Application) processWorkflowExecutionQueues(batchSize int) {
 			cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
 			cfs := tenant.ID
 
-			app.processExecutionQueuesForNode(ctx, tenantNode, cf, cfs, batchSize)
+			app.processExecutionQueuesForNode(ctx, tenantNode, cf, cfs, batchSize, tenant.Code)
 		}
 
 		if tenantsResult.Cursor == "" || len(tenantsResult.Entities) < pageSize {
@@ -126,6 +126,7 @@ func (app *Application) processExecutionQueuesForNode(
 	node *dragonboat.RaftNode,
 	cf, cfs string,
 	batchSize int,
+	tenantCode string,
 ) {
 	if node == nil {
 		return
@@ -154,7 +155,15 @@ func (app *Application) processExecutionQueuesForNode(
 		}
 
 		for _, q := range res.Entities {
-			if q.Type != models.WorkflowExecutionQueue || q.State != models.QueueActive || q.MessagesCount == 0 {
+			if q.Type != models.WorkflowExecutionQueue || q.State != models.QueueActive {
+				continue
+			}
+
+			if app.MetricsCollector != nil {
+				app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, uint64(q.MessagesCount), uint64(q.CurrentDeliveringMessages))
+			}
+
+			if q.MessagesCount == 0 {
 				continue
 			}
 
@@ -181,6 +190,11 @@ func (app *Application) processExecutionQueuesForNode(
 				continue
 			}
 
+			if app.MetricsCollector != nil {
+				app.MetricsCollector.RecordDelivery(tenantCode, q.Code, q.VNamespace, 1)
+				app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, deqRes.Pending, deqRes.InProcess)
+			}
+
 			log.Info().
 				Str("queueID", q.ID).
 				Str("messageID", deqRes.Message.ID).
@@ -194,7 +208,7 @@ func (app *Application) processExecutionQueuesForNode(
 					CF:          cf,
 					CFS:         cfs,
 				}
-				_, advanceErr := dragonboat.ExecuteRepositoryCommand[models.WorkflowExecution](
+				advRes, advanceErr := dragonboat.ExecuteRepositoryCommand[models.WorkflowExecution](
 					node,
 					ctx,
 					advanceCmd,
@@ -212,6 +226,13 @@ func (app *Application) processExecutionQueuesForNode(
 						Str("executionID", tokenMsg.ExecutionID).
 						Str("tokenID", tokenMsg.TokenID).
 						Msg("🚀 Successfully advanced workflow execution token")
+
+					if app.MetricsCollector != nil && len(advRes.EnqueuedGauges) > 0 {
+						for _, g := range advRes.EnqueuedGauges {
+							app.MetricsCollector.RecordPublish(tenantCode, g.QueueCode, g.VNamespace, 1)
+							app.MetricsCollector.UpdateGauges(tenantCode, g.QueueCode, g.VNamespace, g.Pending, g.InProcess)
+						}
+					}
 				}
 
 				// Ack message
@@ -220,7 +241,7 @@ func (app *Application) processExecutionQueuesForNode(
 					CF:      cf,
 					CFS:     cfs,
 				}
-				_, ackErr := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
+				ackRes, ackErr := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
 					node,
 					ctx,
 					ackCmd,
@@ -230,6 +251,9 @@ func (app *Application) processExecutionQueuesForNode(
 				)
 				if ackErr != nil {
 					log.Warn().Err(ackErr).Str("leaseID", deqRes.Lease.ID).Msg("⚠️ Failed to ack token message")
+				} else if app.MetricsCollector != nil {
+					app.MetricsCollector.RecordAck(tenantCode, q.Code, q.VNamespace, 1)
+					app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, ackRes.Pending, ackRes.InProcess)
 				}
 			} else {
 				log.Error().

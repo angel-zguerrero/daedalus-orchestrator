@@ -75,7 +75,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.POST("/bulk", requireScope("tenants:create", "tenants:admin"), tenantController.BulkCreateTenantHandler)
 			tenantsGroup.GET("/:code", requireScope("tenants:list", "tenants:admin"), tenantController.GetTenantHandler)
 			tenantsGroup.GET("/:code/summary", requireScope("tenants:list", "tenants:admin"), tenantController.GetTenantSummaryHandler)
-			tenantsGroup.GET("/:code/metrics/tsdb", requireScope("tenants:list", "tenants:admin"), tsdbMetricsController.GetTSDBMetricsHandler)
+			tenantsGroup.GET("/:code/metrics/tsdb", requireScope("tenants:list", "tenants:admin", "workflows:list", "queues:list"), tsdbMetricsController.GetTSDBMetricsHandler)
 			tenantsGroup.DELETE("/:code", requireScope("tenants:delete", "tenants:admin"), tenantController.DeleteTenantHandler)
 
 			// OAuth Service Account Management (Admin Session Only)
