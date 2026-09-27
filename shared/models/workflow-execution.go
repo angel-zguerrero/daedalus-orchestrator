@@ -14,17 +14,17 @@ const (
 )
 
 type WorkflowExecution struct {
-	ID                        string                  `json:"id" orm:"primary-key"`
+	ID                        string                  `orm:"primary-key" json:"id"`
 	WorkflowDefinitionID      string                  `json:"workflowDefinitionId"`
 	WorkflowDefinitionVersion int32                   `json:"workflowDefinitionVersion"`
-	OnVersionChange           VersionChangePolicy     `json:"onVersionChange" orm:"data-only"`
-	PayloadSnapshot           []byte                  `json:"payloadSnapshot,omitempty" orm:"data-only"`
+	OnVersionChange           VersionChangePolicy     `orm:"data-only" json:"onVersionChange,omitempty"`
+	PayloadSnapshot           []byte                  `orm:"data-only" json:"payloadSnapshot,omitempty"`
 	VNamespace                string                  `json:"vnamespace"`
 	ExecutionKey              string                  `json:"executionKey"`
 	Status                    WorkflowExecutionStatus `json:"status"`
-	Input                     map[string]interface{}  `json:"input,omitempty"`
-	Output                    map[string]interface{} `json:"output,omitempty"`
-	StateData                 map[string]interface{} `json:"stateData,omitempty"`
+	Input                     map[string]interface{}  `json:"input"`
+	Output                    map[string]interface{}  `json:"output"`
+	StateData                 map[string]interface{}  `json:"stateData"`
 	Error                     string                  `json:"error,omitempty"`
 	StartedAt                 *time.Time              `json:"startedAt,omitempty"`
 	CompletedAt               *time.Time              `json:"completedAt,omitempty"`
