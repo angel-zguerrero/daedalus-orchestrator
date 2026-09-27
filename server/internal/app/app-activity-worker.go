@@ -77,7 +77,7 @@ func (app *Application) processWorkflowActivityQueues(batchSize int) {
 	defer cancel()
 
 	// 1. Process MasterNode global activity queues
-	app.processActivityQueuesForNode(ctx, app.MasterNode, db.AdminFC, db.AdminFCSector, batchSize)
+	app.processActivityQueuesForNode(ctx, app.MasterNode, db.AdminFC, db.AdminFCSector, batchSize, "global")
 
 	// 2. Process TenantNodes activity queues
 	cursor := ""
@@ -120,7 +120,7 @@ func (app *Application) processWorkflowActivityQueues(batchSize int) {
 			cf := db.ColumnFamilyPrefix + fmt.Sprintf("%d", tenant.ColumnFamilyIndex)
 			cfs := tenant.ID
 
-			app.processActivityQueuesForNode(ctx, tenantNode, cf, cfs, batchSize)
+			app.processActivityQueuesForNode(ctx, tenantNode, cf, cfs, batchSize, tenant.Code)
 		}
 
 		if tenantsResult.Cursor == "" || len(tenantsResult.Entities) < pageSize {
@@ -135,6 +135,7 @@ func (app *Application) processActivityQueuesForNode(
 	node *dragonboat.RaftNode,
 	cf, cfs string,
 	batchSize int,
+	tenantCode string,
 ) {
 	if node == nil {
 		return
@@ -169,6 +170,10 @@ func (app *Application) processActivityQueuesForNode(
 			continue
 		}
 
+		if app.MetricsCollector != nil {
+			app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, uint64(q.MessagesCount), uint64(q.CurrentDeliveringMessages))
+		}
+
 		if q.MessagesCount == 0 {
 			if q.CurrentDeliveringMessages == 0 && q.WorkflowDefinitionID != "" {
 				reconcileCmd := &workflow_execution_command.ReconcilePendingWorkflowJobsCommand{
@@ -194,6 +199,11 @@ func (app *Application) processActivityQueuesForNode(
 					Str("queueID", q.ID).
 					Int("reEnqueuedCount", recRes.ReEnqueuedCount).
 					Msg("🔄 Re-enqueued orphaned pending workflow activity jobs")
+
+				if app.MetricsCollector != nil {
+					app.MetricsCollector.RecordPublish(tenantCode, q.Code, q.VNamespace, uint64(recRes.ReEnqueuedCount))
+					app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, uint64(recRes.ReEnqueuedCount), 0)
+				}
 			} else {
 				continue
 			}
@@ -220,6 +230,11 @@ func (app *Application) processActivityQueuesForNode(
 				log.Debug().Err(err).Str("queueID", q.ID).Msg("⚠️ Failed to dequeue activity job message")
 			}
 			continue
+		}
+
+		if app.MetricsCollector != nil {
+			app.MetricsCollector.RecordDelivery(tenantCode, q.Code, q.VNamespace, 1)
+			app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, deqRes.Pending, deqRes.InProcess)
 		}
 
 		log.Info().
@@ -335,7 +350,7 @@ func (app *Application) processActivityQueuesForNode(
 						CFS:     cfs,
 					}
 					ackCtx, cancelAck := context.WithTimeout(context.Background(), 10*time.Second)
-					_, _ = dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
+					ackRes, _ := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
 						node,
 						ackCtx,
 						ackCmd,
@@ -344,6 +359,11 @@ func (app *Application) processActivityQueuesForNode(
 						"ack failed activity message",
 					)
 					cancelAck()
+					if app.MetricsCollector != nil {
+						app.MetricsCollector.RecordAck(tenantCode, q.Code, q.VNamespace, 1)
+						app.MetricsCollector.RecordFailed(tenantCode, q.Code, q.VNamespace, 1)
+						app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, ackRes.Pending, ackRes.InProcess)
+					}
 				} else if failErr == nil {
 					log.Warn().
 						Str("jobID", jobMsg.JobID).
@@ -418,7 +438,7 @@ func (app *Application) processActivityQueuesForNode(
 						CFS:     cfs,
 					}
 					ackCtx, cancelAck := context.WithTimeout(context.Background(), 10*time.Second)
-					_, _ = dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
+					ackRes, _ := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
 						node,
 						ackCtx,
 						ackCmd,
@@ -427,6 +447,10 @@ func (app *Application) processActivityQueuesForNode(
 						"ack activity message for retry",
 					)
 					cancelAck()
+					if app.MetricsCollector != nil {
+						app.MetricsCollector.RecordAck(tenantCode, q.Code, q.VNamespace, 1)
+						app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, ackRes.Pending, ackRes.InProcess)
+					}
 				} else {
 					log.Error().Err(failErr).Str("jobID", jobMsg.JobID).Msg("❌ Failed to execute HandleJobFailureCommand")
 				}
@@ -441,7 +465,7 @@ func (app *Application) processActivityQueuesForNode(
 					CFS:        cfs,
 				}
 				compCtx, cancelComp := context.WithTimeout(context.Background(), 10*time.Second)
-				_, compErr := dragonboat.ExecuteRepositoryCommand[interface{}](
+				compRes, compErr := dragonboat.ExecuteRepositoryCommand[models.WorkflowExecution](
 					node,
 					compCtx,
 					compCmd,
@@ -458,6 +482,13 @@ func (app *Application) processActivityQueuesForNode(
 					log.Info().
 						Str("jobID", jobMsg.JobID).
 						Msg("✅ Successfully completed workflow activity job")
+
+					if app.MetricsCollector != nil && len(compRes.EnqueuedGauges) > 0 {
+						for _, g := range compRes.EnqueuedGauges {
+							app.MetricsCollector.RecordPublish(tenantCode, g.QueueCode, g.VNamespace, 1)
+							app.MetricsCollector.UpdateGauges(tenantCode, g.QueueCode, g.VNamespace, g.Pending, g.InProcess)
+						}
+					}
 				}
 
 				ackCmd := &queue_command.AckMessageCommand{
@@ -466,7 +497,7 @@ func (app *Application) processActivityQueuesForNode(
 					CFS:     cfs,
 				}
 				ackCtx, cancelAck := context.WithTimeout(context.Background(), 10*time.Second)
-				_, ackErr := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
+				ackRes, ackErr := dragonboat.ExecuteRepositoryCommand[queue_command.AckMessageResult](
 					node,
 					ackCtx,
 					ackCmd,
@@ -477,6 +508,12 @@ func (app *Application) processActivityQueuesForNode(
 				cancelAck()
 				if ackErr != nil {
 					log.Warn().Err(ackErr).Str("leaseID", deqRes.Lease.ID).Msg("⚠️ Failed to ack activity message")
+				} else if app.MetricsCollector != nil {
+					app.MetricsCollector.RecordAck(tenantCode, q.Code, q.VNamespace, 1)
+					if ackRes.ProcessingLatencyMs > 0 {
+						app.MetricsCollector.RecordLatency(tenantCode, q.Code, q.VNamespace, uint64(ackRes.ProcessingLatencyMs))
+					}
+					app.MetricsCollector.UpdateGauges(tenantCode, q.Code, q.VNamespace, ackRes.Pending, ackRes.InProcess)
 				}
 			}
 		}

@@ -11,6 +11,7 @@ declare module 'bpmn-js/lib/NavigatedViewer' {
 declare module 'bpmn-js-properties-panel' {
   export const BpmnPropertiesPanelModule: any;
   export const BpmnPropertiesProviderModule: any;
+  export const CamundaPlatformPropertiesProviderModule: any;
 }
 
 declare module 'bpmn-js-element-templates' {

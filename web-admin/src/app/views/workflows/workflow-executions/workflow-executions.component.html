@@ -152,6 +152,13 @@
           </button>
         </li>
         <li class="nav-item">
+          <button class="nav-link d-flex align-items-center gap-1" [class.active]="activeDetailTab === 'waitingEvents'" (click)="selectDetailTab('waitingEvents')">
+            <svg cIcon name="cil-clock" class="me-1"></svg> Waiting Events
+            <span *ngIf="waitingEvents.length > 0" class="badge bg-warning text-dark ms-1">{{ waitingEvents.length }}</span>
+            <span *ngIf="waitingEvents.length === 0" class="badge bg-secondary ms-1">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
           <button class="nav-link" [class.active]="activeDetailTab === 'diagram'" (click)="selectDetailTab('diagram')">
             <svg cIcon name="cil-map" class="me-1"></svg> BPMN Diagram (v{{ selectedExecutionDetail.execution.workflowDefinitionVersion }})
           </button>
@@ -296,6 +303,202 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- TAB: WAITING EVENTS -->
+      <div *ngIf="activeDetailTab === 'waitingEvents'">
+        <div *ngIf="waitingEvents.length === 0" class="card border-secondary bg-dark text-muted text-center py-5">
+          <div class="card-body">
+            <svg cIcon name="cil-check-circle" size="2xl" class="text-success mb-2"></svg>
+            <h6>No Active Waiting Events</h6>
+            <p class="small mb-0">This execution currently has no paused tokens awaiting user or external input.</p>
+          </div>
+        </div>
+
+        <div *ngFor="let evt of waitingEvents" class="card border-warning mb-3 bg-dark text-light shadow-sm">
+          <div class="card-header bg-dark border-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge" [ngClass]="evt.type === 'USER_INPUT' ? 'bg-warning text-dark' : 'bg-info text-dark'">
+                {{ evt.type || 'USER_INPUT' }}
+              </span>
+              <strong>Waiting Event: <code class="text-warning">{{ evt.id }}</code></strong>
+            </div>
+            <div class="small text-muted d-flex align-items-center gap-3">
+              <span>Token ID: <code class="text-info">{{ evt.executionTokenId }}</code></span>
+              <span>Event / Node: <code class="text-info">{{ evt.eventId }}</code></span>
+              <span>Created: {{ evt.createdAt | date:'medium' }}</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Alert for error / success -->
+            <c-alert color="danger" *ngIf="waitEventErrors[evt.id]" dismissible class="py-2 mb-3">
+              <strong>Error:</strong> {{ waitEventErrors[evt.id] }}
+            </c-alert>
+            <c-alert color="success" *ngIf="waitEventSuccess[evt.id]" dismissible class="py-2 mb-3">
+              {{ waitEventSuccess[evt.id] }}
+            </c-alert>
+
+            <!-- Extension Properties Metadata Bullet List -->
+            <div *ngIf="hasExtensionProperties(evt)" class="card mb-3 bg-dark border-secondary">
+              <div class="card-body py-2 px-3">
+                <div class="small fw-bold text-info mb-1 d-flex align-items-center gap-1">
+                  <svg cIcon name="cil-list" size="sm"></svg>
+                  <span>Extension Properties Metadata:</span>
+                </div>
+                <ul class="mb-0 ps-3 small text-light">
+                  <li *ngFor="let prop of getExtensionPropertyList(evt)" class="py-1">
+                    <code class="text-warning fw-bold">{{ prop.key }}</code>
+                    <span *ngIf="prop.value" class="text-light ms-2">&mdash; <span class="text-muted">{{ prop.value }}</span></span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Mode Switcher if fields exist -->
+            <div *ngIf="hasFormFields(evt)" class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <span *ngIf="hasExtensionProperties(evt)" class="badge bg-info text-dark">
+                  <svg cIcon name="cil-code" size="sm" class="me-1"></svg> Extension Properties Active
+                </span>
+                <span *ngIf="!hasExtensionProperties(evt)" class="badge bg-secondary">
+                  <svg cIcon name="cil-task" size="sm" class="me-1"></svg> Standard Form Task
+                </span>
+              </div>
+              <div class="btn-group btn-group-sm">
+                <button
+                  type="button"
+                  class="btn"
+                  [ngClass]="eventFormMode[evt.id] === 'form' ? 'btn-primary' : 'btn-outline-secondary'"
+                  (click)="setEventFormMode(evt.id, 'form')">
+                  Form View
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  [ngClass]="eventFormMode[evt.id] === 'json' ? 'btn-primary' : 'btn-outline-secondary'"
+                  (click)="setEventFormMode(evt.id, 'json')">
+                  JSON View
+                </button>
+              </div>
+            </div>
+
+            <!-- Structured Dynamic Form View -->
+            <div *ngIf="hasFormFields(evt) && eventFormMode[evt.id] === 'form'">
+              <div class="row g-3">
+                <div *ngFor="let field of getEventFields(evt)" class="col-md-6">
+                  <label class="form-label small fw-bold mb-1 d-flex align-items-center flex-wrap gap-1">
+                    <span>{{ field.label || field.id }}</span>
+                    <span *ngIf="field.required" class="text-danger">*</span>
+                    <span class="badge bg-secondary font-monospace ms-1" style="font-size: 0.65rem;">{{ field.type || 'string' }}</span>
+                    <span *ngIf="getFieldConstraint(field, 'min')" class="badge bg-dark border border-secondary text-info" style="font-size: 0.65rem;">min: {{ getFieldConstraint(field, 'min') }}</span>
+                    <span *ngIf="getFieldConstraint(field, 'max')" class="badge bg-dark border border-secondary text-info" style="font-size: 0.65rem;">max: {{ getFieldConstraint(field, 'max') }}</span>
+                    <span *ngIf="getFieldConstraint(field, 'minlength')" class="badge bg-dark border border-secondary text-info" style="font-size: 0.65rem;">minlen: {{ getFieldConstraint(field, 'minlength') }}</span>
+                    <span *ngIf="getFieldConstraint(field, 'maxlength')" class="badge bg-dark border border-secondary text-info" style="font-size: 0.65rem;">maxlen: {{ getFieldConstraint(field, 'maxlength') }}</span>
+                    <span *ngIf="getFieldConstraint(field, 'pattern')" class="badge bg-dark border border-secondary text-info" style="font-size: 0.65rem;">pattern</span>
+                  </label>
+
+                  <!-- Text / String Input -->
+                  <div *ngIf="!field.type || field.type === 'string'">
+                    <input
+                      type="text"
+                      class="form-control form-control-sm bg-dark text-light border-secondary"
+                      [class.is-invalid]="fieldValidationErrors[evt.id][field.id]"
+                      [(ngModel)]="eventFormData[evt.id][field.id]"
+                      (input)="validateField(evt, field)"
+                      (change)="validateField(evt, field)"
+                      [placeholder]="field.defaultValue || ('Enter ' + (field.label || field.id))" />
+                  </div>
+
+                  <!-- Number / Long / Double Input -->
+                  <div *ngIf="field.type === 'long' || field.type === 'int' || field.type === 'integer' || field.type === 'double' || field.type === 'float' || field.type === 'number'">
+                    <input
+                      type="number"
+                      class="form-control form-control-sm bg-dark text-light border-secondary"
+                      [class.is-invalid]="fieldValidationErrors[evt.id][field.id]"
+                      [(ngModel)]="eventFormData[evt.id][field.id]"
+                      (input)="validateField(evt, field)"
+                      (change)="validateField(evt, field)"
+                      [placeholder]="field.defaultValue !== undefined ? field.defaultValue : '0'" />
+                  </div>
+
+                  <!-- Date Input -->
+                  <div *ngIf="field.type === 'date'">
+                    <input
+                      type="date"
+                      class="form-control form-control-sm bg-dark text-light border-secondary"
+                      [class.is-invalid]="fieldValidationErrors[evt.id][field.id]"
+                      [(ngModel)]="eventFormData[evt.id][field.id]"
+                      (input)="validateField(evt, field)"
+                      (change)="validateField(evt, field)" />
+                  </div>
+
+                  <!-- Enum / Select Dropdown -->
+                  <div *ngIf="field.type === 'enum'">
+                    <select
+                      class="form-select form-select-sm bg-dark text-light border-secondary"
+                      [class.is-invalid]="fieldValidationErrors[evt.id][field.id]"
+                      [(ngModel)]="eventFormData[evt.id][field.id]"
+                      (change)="validateField(evt, field)">
+                      <option *ngFor="let opt of (field.values || [])" [value]="opt.id">
+                        {{ opt.name || opt.id }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- Checkbox / Boolean Input -->
+                  <div *ngIf="field.type === 'boolean' || field.type === 'bool'" class="form-check form-switch mt-2">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      [id]="'field-' + evt.id + '-' + field.id"
+                      [(ngModel)]="eventFormData[evt.id][field.id]"
+                      (change)="validateField(evt, field)" />
+                    <label class="form-check-label small text-muted" [for]="'field-' + evt.id + '-' + field.id">
+                      {{ field.label || field.id }} (Checked = True)
+                    </label>
+                  </div>
+
+                  <!-- Validation Error Message -->
+                  <div class="invalid-feedback d-block" *ngIf="fieldValidationErrors[evt.id][field.id]">
+                    {{ fieldValidationErrors[evt.id][field.id] }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fallback / Raw JSON Textarea View -->
+            <div *ngIf="!hasFormFields(evt) || eventFormMode[evt.id] === 'json'">
+              <div *ngIf="hasExtensionProperties(evt)" class="alert alert-info py-2 px-3 small mb-2 d-flex align-items-center gap-2">
+                <svg cIcon name="cil-info" size="sm"></svg>
+                <span>Generated JSON structure ready for input. Extension properties metadata is displayed in the list above:</span>
+              </div>
+              <label class="form-label small fw-bold mb-1">
+                Payload (JSON):
+                <span class="text-muted fw-normal ms-1">(Structured key-value payload to inject into execution context)</span>
+              </label>
+              <textarea
+                class="form-control font-monospace bg-dark text-light border-secondary"
+                rows="8"
+                [(ngModel)]="eventRawJson[evt.id]"
+                placeholder='{ "key": "value" }'></textarea>
+            </div>
+
+            <!-- Submit / Resume Action Button -->
+            <div class="d-flex justify-content-end align-items-center mt-3 pt-3 border-top border-secondary gap-2">
+              <button
+                cButton
+                color="warning"
+                size="sm"
+                [disabled]="submittingWaitEvent[evt.id]"
+                (click)="submitWaitEvent(evt)"
+                class="d-flex align-items-center gap-1 font-weight-bold">
+                <c-spinner *ngIf="submittingWaitEvent[evt.id]" size="sm" class="me-1"></c-spinner>
+                <svg *ngIf="!submittingWaitEvent[evt.id]" cIcon name="cil-media-play" size="sm"></svg>
+                <span>Submit / Resume</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

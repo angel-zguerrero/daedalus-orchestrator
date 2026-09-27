@@ -11,6 +11,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
+	"deadalus-orch/shared/models"
 	"errors"
 	"fmt"
 	"net/http"
@@ -31,6 +32,22 @@ func tenantContextMiddleware(tenantBO *bo.TenantBO, serverConfig *common.ServerC
 	return func(c *gin.Context) {
 		tenantCode := c.Param("code")
 		if tenantCode == "" {
+			c.Next()
+			return
+		}
+
+		if tenantCode == "global" {
+			tenantCtx := &common.TenantContext{
+				Tenant: &models.TenantInMaster{
+					Code: "global",
+					ID:   db.AdminFCSector,
+				},
+				Node: serverConfig.MasterNode,
+				CF:   db.AdminFC,
+				CFS:  db.AdminFCSector,
+			}
+			newCtx := common.SetTenantContext(c.Request.Context(), tenantCtx)
+			c.Request = c.Request.WithContext(newCtx)
 			c.Next()
 			return
 		}

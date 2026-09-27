@@ -16,9 +16,10 @@ func init() {
 }
 
 type WorkflowExecutionDetail struct {
-	Execution models.WorkflowExecution `json:"execution"`
-	Tokens    []models.ExecutionToken  `json:"tokens"`
-	Jobs      []models.WorkflowJob     `json:"jobs"`
+	Execution     models.WorkflowExecution `json:"execution"`
+	Tokens        []models.ExecutionToken  `json:"tokens"`
+	Jobs          []models.WorkflowJob     `json:"jobs"`
+	WaitingEvents []models.WaitingEvent    `json:"waitingEvents"`
 }
 
 type GetWorkflowExecutionCommand struct {
@@ -50,6 +51,7 @@ func (cmd *GetWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.Tim
 
 	tokenRepo, _ := db.NewExecutionTokenRepository(uow, idFactory, cmd.CF, cmd.CFS)
 	jobRepo, _ := db.NewWorkflowJobRepository(uow, idFactory, cmd.CF, cmd.CFS)
+	waitingEventRepo, _ := db.NewWaitingEventRepository(uow, idFactory, cmd.CF, cmd.CFS)
 
 	var tokens []models.ExecutionToken
 	if tokenRepo != nil {
@@ -69,10 +71,16 @@ func (cmd *GetWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.Tim
 		jobs, _ = jobRepo.GetJobsByExecutionID(cmd.ID, now)
 	}
 
+	var waitingEvents []models.WaitingEvent
+	if waitingEventRepo != nil {
+		waitingEvents, _ = waitingEventRepo.GetWaitingEventsByExecutionID(cmd.ID, now)
+	}
+
 	detail := WorkflowExecutionDetail{
-		Execution: *exec,
-		Tokens:    tokens,
-		Jobs:      jobs,
+		Execution:     *exec,
+		Tokens:        tokens,
+		Jobs:          jobs,
+		WaitingEvents: waitingEvents,
 	}
 
 	commandResult.Result = detail

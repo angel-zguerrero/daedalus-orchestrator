@@ -214,6 +214,8 @@ func init() {
 	RegisterRepoCommand("HandleJobFailureCommand", func() commands.Command { return &workflow_execution_command.HandleJobFailureCommand{} })
 	RegisterRepoCommand("ReconcilePendingWorkflowJobsCommand", func() commands.Command { return &workflow_execution_command.ReconcilePendingWorkflowJobsCommand{} })
 	RegisterRepoCommand("GetWorkflowExecutionCommand", func() commands.Command { return &workflow_execution_command.GetWorkflowExecutionCommand{} })
+	RegisterRepoCommand("GetWaitingEventCommand", func() commands.Command { return &workflow_execution_command.GetWaitingEventCommand{} })
+	RegisterRepoCommand("ResumeWaitEventCommand", func() commands.Command { return &workflow_execution_command.ResumeWaitEventCommand{} })
 	RegisterRepoCommand("ListWorkflowExecutionsCommand", func() commands.Command { return &workflow_execution_command.ListWorkflowExecutionsCommand{} })
 
 	// OAuth commands
