@@ -14,22 +14,22 @@ const (
 )
 
 type WorkflowExecution struct {
-	ID                        string `orm:"primary-key"`
-	WorkflowDefinitionID      string
-	WorkflowDefinitionVersion int32
-	OnVersionChange           VersionChangePolicy `orm:"data-only"`
-	PayloadSnapshot           []byte              `orm:"data-only"`
-	VNamespace                string
-	ExecutionKey              string
-	Status                    WorkflowExecutionStatus
-	Input                     map[string]interface{}
-	Output                    map[string]interface{}
-	StateData                 map[string]interface{}
-	Error                     string
-	StartedAt                 *time.Time
-	CompletedAt               *time.Time
-	CreatedAt                 time.Time
-	UpdatedAt                 time.Time
+	ID                        string                  `json:"id" orm:"primary-key"`
+	WorkflowDefinitionID      string                  `json:"workflowDefinitionId"`
+	WorkflowDefinitionVersion int32                   `json:"workflowDefinitionVersion"`
+	OnVersionChange           VersionChangePolicy     `json:"onVersionChange" orm:"data-only"`
+	PayloadSnapshot           []byte                  `json:"payloadSnapshot,omitempty" orm:"data-only"`
+	VNamespace                string                  `json:"vnamespace"`
+	ExecutionKey              string                  `json:"executionKey"`
+	Status                    WorkflowExecutionStatus `json:"status"`
+	Input                     map[string]interface{}  `json:"input,omitempty"`
+	Output                    map[string]interface{} `json:"output,omitempty"`
+	StateData                 map[string]interface{} `json:"stateData,omitempty"`
+	Error                     string                  `json:"error,omitempty"`
+	StartedAt                 *time.Time              `json:"startedAt,omitempty"`
+	CompletedAt               *time.Time              `json:"completedAt,omitempty"`
+	CreatedAt                 time.Time               `json:"createdAt"`
+	UpdatedAt                 time.Time               `json:"updatedAt"`
 }
 
 func (WorkflowExecution) TableName() string {

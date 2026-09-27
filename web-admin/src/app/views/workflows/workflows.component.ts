@@ -795,7 +795,15 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     exec$.subscribe({
       next: (res: any) => {
         this.executing = false;
-        this.executionResult = res?.Result || res?.result || res;
+        const raw = res?.Result || res?.result || res;
+        this.executionResult = raw ? {
+          ...raw,
+          id: raw.id || raw.ID || raw.executionKey || raw.ExecutionKey || '',
+          executionKey: raw.executionKey || raw.ExecutionKey || raw.id || raw.ID || '',
+          workflowDefinitionId: raw.workflowDefinitionId || raw.WorkflowDefinitionID || this.executingWorkflow?.id || '',
+          status: raw.status || raw.Status || 'running',
+          startedAt: raw.startedAt || raw.StartedAt || raw.createdAt || raw.CreatedAt || ''
+        } : null;
         this.lastExecutedWorkflow = this.executingWorkflow;
         this.showExecuteModal = false;
         this.showExecutionSuccessModal = true;
