@@ -138,6 +138,15 @@ func (cmd *CreateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 	}
 
 	cmd.WorkflowDefinition.ID = id
+
+	// Update tenant summary with workflow counter
+	if cmd.CFS != "" && cmd.CFS != db.AdminFCSector {
+		tenantSummaryRepo, errSummary := db.NewTenantSummaryRepository(uow, idFactory)
+		if errSummary == nil {
+			_ = tenantSummaryRepo.UpdateWorkflowCounter(cmd.CFS, 1, now)
+		}
+	}
+
 	commandResult.Result = cmd.WorkflowDefinition
 	return *commandResult
 }

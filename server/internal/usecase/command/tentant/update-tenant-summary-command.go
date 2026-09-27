@@ -53,6 +53,7 @@ func (cmd *UpdateTenantSummaryInMasterCommand) Execute(uow *db.UnitOfWork, now t
 		}
 
 		// Update the tenant with the summary counters
+		tenant.WorkflowsCount = summary.WorkflowsCount
 		tenant.ExchangesCount = summary.ExchangesCount
 		tenant.QueuesCount = summary.QueuesCount
 		tenant.BindingsCount = summary.BindingsCount
