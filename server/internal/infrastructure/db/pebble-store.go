@@ -282,9 +282,15 @@ func (ps *PebbleStore) PutRaw(columnFamily, columnFamilySector, key string, valu
 // CleanExpiredKeys iterates through TTL-enabled column families and removes expired keys.
 // Assumes keys in TTL CFs are structured with specific prefixes for data, index, and expiry.
 func (ps *PebbleStore) CleanExpiredKeys(now time.Time) error {
-	nowMillis := now.UnixMilli()
-
+	allCFs := make(map[string][]byte, len(ps.ttlCfPrefixes)+len(ps.cfPrefixes))
 	for cfName, actualCfPrefix := range ps.ttlCfPrefixes {
+		allCFs[cfName] = actualCfPrefix
+	}
+	for cfName, actualCfPrefix := range ps.cfPrefixes {
+		allCFs[cfName] = actualCfPrefix
+	}
+
+	for cfName, actualCfPrefix := range allCFs {
 		// Construct the specific prefix for scanning TTL index entries within this CF
 		// actualCfPrefix is like "myTTLCF:", so ttlIndexScanPrefix becomes "myTTLCF:_ttlidx:"
 		ttlIndexScanPrefixBytes := actualCfPrefix
@@ -299,6 +305,7 @@ func (ps *PebbleStore) CleanExpiredKeys(now time.Time) error {
 		b := ps.db.NewBatch()
 		var operationsInBatch int
 
+		nowMillis := now.UnixMilli()
 		for iter.First(); iter.Valid(); iter.Next() {
 			fullIndexKey := iter.Key() // e.g., "myTTLCF:_ttlidx:1678886400000:actualUserKey"
 
@@ -470,16 +477,15 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cur
 		keyWithoutPrefix := bytes.TrimPrefix(rawKey, cfPrefix)
 		keyStr := string(keyWithoutPrefix)
 
+		if strings.HasPrefix(keyStr, PrefixTTLExpire) || strings.HasPrefix(keyStr, PrefixTTLIndex) {
+			continue
+		}
+
+		expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
+		expireKey = append(expireKey, []byte(keyStr)...)
+
 		// Si es TTL, validar expiración
 		if isTTL {
-			// Solo considerar claves con prefijo de datos reales
-			if !bytes.HasPrefix(rawKey, cfPrefix) {
-				continue
-			}
-			actualKey := string(bytes.TrimPrefix(rawKey, cfPrefix))
-			expireKey := append(append([]byte(nil), cfPrefix...), []byte(PrefixTTLExpire)...)
-			expireKey = append(expireKey, []byte(actualKey)...)
-
 			expired, err := ps.isTTLKeyExpired(expireKey, now)
 			if err != nil {
 				return nil, "", fmt.Errorf("SearchByPatternPaginatedKV TTL check error: %w", err)
@@ -487,7 +493,15 @@ func (ps *PebbleStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cur
 			if expired {
 				continue
 			}
-			keyStr = actualKey // mostrar sin el prefijo "_ttldata:"
+		} else {
+			valExp, closer, errExp := ps.db.Get(expireKey)
+			if errExp == nil {
+				defer closer.Close()
+				expAt, errP := strconv.ParseInt(string(valExp), 10, 64)
+				if errP == nil && expAt <= now.UnixMilli() {
+					continue
+				}
+			}
 		}
 
 		// Filtrado por patrón
@@ -609,15 +623,23 @@ func (ps *PebbleStore) Get(columnFamily, columnFamilySector, key string, now tim
 		return nil, fmt.Errorf("Get: %w", err)
 	}
 
+	expireKey := append(append([]byte(nil), cfPrefix...), []byte(columnFamilySector+":")...)
+	expireKey = append(expireKey, []byte(PrefixTTLExpire)...)
+	expireKey = append(expireKey, []byte(key)...)
+
 	if isTTL {
-
-		expireKey := append(append([]byte(nil), cfPrefix...), []byte(columnFamilySector+":")...)
-		expireKey = append(expireKey, []byte(PrefixTTLExpire)...)
-		expireKey = append(expireKey, []byte(key)...)
 		expired, err := ps.isTTLKeyExpired(expireKey, now)
-
 		if err != nil || expired {
 			return nil, err
+		}
+	} else {
+		value, closer, err := ps.db.Get(expireKey)
+		if err == nil {
+			defer closer.Close()
+			expireAtMillis, errParse := strconv.ParseInt(string(value), 10, 64)
+			if errParse == nil && expireAtMillis <= now.UnixMilli() {
+				return nil, nil
+			}
 		}
 	}
 
@@ -778,9 +800,11 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 			return fmt.Errorf("Write: error getting prefixed key for cf '%s', key '%s': %w", op.CF, op.Key, err)
 		}
 
+		hasKeyTTL := isTTL || op.TTL > 0
+
 		switch op.Type {
 		case "put":
-			if !isTTL {
+			if !hasKeyTTL {
 				if err := b.Set(dataKey, op.Value, nil); err != nil {
 					return fmt.Errorf("Write: failed to add put for key '%s': %w", op.Key, err)
 				}
@@ -823,36 +847,30 @@ func (ps *PebbleStore) Write(batch *WriteBatch) error {
 			}
 
 		case "delete":
-			if !isTTL {
-				if err := b.Delete(dataKey, nil); err != nil {
-					return fmt.Errorf("Write: failed to delete key '%s': %w", op.Key, err)
-				}
-			} else {
-				ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(op.CFS+":")...)
-				ttlExpireKey = append(ttlExpireKey, []byte(PrefixTTLExpire)...)
-				ttlExpireKey = append(ttlExpireKey, []byte(op.Key)...)
+			ttlExpireKey := append(append([]byte(nil), cfPrefix...), []byte(op.CFS+":")...)
+			ttlExpireKey = append(ttlExpireKey, []byte(PrefixTTLExpire)...)
+			ttlExpireKey = append(ttlExpireKey, []byte(op.Key)...)
 
-				oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
-				if err != nil && !errors.Is(err, pebble.ErrNotFound) {
-					return fmt.Errorf("Write: failed to get TTL expire key for delete: %w", err)
-				}
-				if err == nil {
-					defer closer.Close()
-					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
-					if err == nil {
-						oldIndexKey := fmt.Sprintf("%s%s:%s%020d:%s", string(cfPrefix), op.CFS, PrefixTTLIndex, oldTTLMillis, op.Key)
-						if err := b.Delete([]byte(oldIndexKey), nil); err != nil {
-							return fmt.Errorf("Write: failed to delete TTL index key: %w", err)
-						}
+			oldTTLBytes, closer, err := ps.db.Get(ttlExpireKey)
+			if err != nil && !errors.Is(err, pebble.ErrNotFound) {
+				return fmt.Errorf("Write: failed to get TTL expire key for delete: %w", err)
+			}
+			if err == nil {
+				defer closer.Close()
+				oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+				if err == nil && oldTTLMillis > 0 {
+					oldIndexKey := fmt.Sprintf("%s%s:%s%020d:%s", string(cfPrefix), op.CFS, PrefixTTLIndex, oldTTLMillis, op.Key)
+					if err := b.Delete([]byte(oldIndexKey), nil); err != nil {
+						return fmt.Errorf("Write: failed to delete TTL index key: %w", err)
 					}
-				}
-
-				if err := b.Delete(dataKey, nil); err != nil {
-					return fmt.Errorf("Write: failed to delete data key: %w", err)
 				}
 				if err := b.Delete(ttlExpireKey, nil); err != nil {
 					return fmt.Errorf("Write: failed to delete expire key: %w", err)
 				}
+			}
+
+			if err := b.Delete(dataKey, nil); err != nil {
+				return fmt.Errorf("Write: failed to delete data key: %w", err)
 			}
 
 		default:

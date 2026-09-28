@@ -29,6 +29,9 @@ func (r *ExecutionTokenRepository) CreateExecutionToken(input *models.ExecutionT
 	if input.Status == "" {
 		input.Status = models.ExecutionTokenStatusActive
 	}
+	if input.TTL <= 0 {
+		input.TTL = models.CalculateWorkflowExecutionTTL(0)
+	}
 	input.CreatedAt = now
 	input.UpdatedAt = now
 	return r.Create(input, now)
