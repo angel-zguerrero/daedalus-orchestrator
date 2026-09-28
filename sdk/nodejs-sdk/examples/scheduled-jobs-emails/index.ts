@@ -26,16 +26,7 @@ async function main() {
       name: 'Acme Corporation',
     });
 
-    // 2. Assert Exchange
-    await sdk.assertExchange({
-      tenantCode: tenantCode,
-      code: 'email-events',
-      name: 'Email Events Exchange',
-      type: 'topic',
-      vnamespace: vnamespace,
-    });
-
-    // 3. Assert Queues
+    // 2. Assert Queues
     await sdk.assertQueue({
       tenantCode: tenantCode,
       code: 'email-delayed',
@@ -56,28 +47,7 @@ async function main() {
       maxAttempts: 3,
     });
 
-    // 4. Assert Bindings
-    await sdk.assertBinding({
-      tenantCode: tenantCode,
-      code: 'delayed-emails-binding',
-      exchangeCode: 'email-events',
-      queueCode: 'email-delayed',
-      pattern: 'email.delayed.*',
-      vnamespace: vnamespace,
-      bindingType: 'classic',
-    });
-
-    await sdk.assertBinding({
-      tenantCode: tenantCode,
-      code: 'weekly-reports-binding',
-      exchangeCode: 'email-events',
-      queueCode: 'weekly-reports',
-      pattern: 'report.weekly.*',
-      vnamespace: vnamespace,
-      bindingType: 'classic',
-    });
-
-    // ===== 5. Schedule Delayed Email (OneOff Scheduled Job) =====
+    // ===== 3. Schedule Delayed Email (OneOff Scheduled Job) =====
     console.log('📅 Scheduling One-Off delayed welcome email (runs after 5s)...');
     const delayedEmailPayload: ScheduledEmail = {
       subject: 'Welcome to Acme Corp!',
@@ -89,19 +59,17 @@ async function main() {
     const oneOffJob = await sdk.createOneOffScheduledJob({
       code: "welcome-job-1",
       tenantCode: tenantCode,
-      targetType: 'exchange',
-      targetCode: 'email-events',
+      queueCode: 'email-delayed',
       vnamespace: vnamespace,
       content: JSON.stringify(delayedEmailPayload),
       contentType: 'application/json',
       handler: 'email.send',
       runAfter: '5s',
       priority: 1,
-      headers: { routing_key: 'email.delayed.welcome' },
     });
     console.log(`✅ OneOff Scheduled Job Created! ID: ${oneOffJob.id} | NextRunAt: ${oneOffJob.nextRunAt}`);
 
-    // ===== 6. Schedule Recurring Weekly Report (Recurring Scheduled Job) =====
+    // ===== 4. Schedule Recurring Weekly Report (Recurring Scheduled Job) =====
     console.log('🔄 Scheduling Recurring Weekly Report (runs every 10s)...');
     const recurringReportPayload: ScheduledEmail = {
       subject: 'Weekly Analytics & Performance Summary',
@@ -113,8 +81,7 @@ async function main() {
     const recurringJob = await sdk.createRecurringScheduledJob({
       code: "weekly-reports-job-1",
       tenantCode: tenantCode,
-      targetType: 'queue',
-      targetCode: 'weekly-reports',
+      queueCode: 'weekly-reports',
       vnamespace: vnamespace,
       content: JSON.stringify(recurringReportPayload),
       contentType: 'application/json',
@@ -124,7 +91,7 @@ async function main() {
     });
     console.log(`✅ Recurring Scheduled Job Created! ID: ${recurringJob.id} | Every: ${recurringJob.every} | NextRunAt: ${recurringJob.nextRunAt}`);
 
-    // ===== 7. List Scheduled Jobs =====
+    // ===== 5. List Scheduled Jobs =====
     const listRes = await sdk.listScheduledJobs({
       tenantCode: tenantCode,
       vnamespace: vnamespace,
@@ -132,7 +99,7 @@ async function main() {
     });
     console.log(`📋 Currently Scheduled Jobs Count: ${listRes.entities.length}`);
     for (const j of listRes.entities) {
-      console.log(`   - [${j.type}] ID: ${j.id} | Target: ${j.targetCode} (${j.targetType}) | NextRunAt: ${j.nextRunAt} | State: ${j.state}`);
+      console.log(`   - [${j.type}] ID: ${j.id} | Queue: ${j.queueCode} | NextRunAt: ${j.nextRunAt} | State: ${j.state}`);
     }
 
     // ===== 8. Start Worker to Process Scheduled Emails =====

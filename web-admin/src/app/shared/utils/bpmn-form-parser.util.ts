@@ -24,7 +24,35 @@ export interface GeneratedFormField {
   constraints?: FormFieldConstraint[];
 }
 
+export interface StartEventDefinition {
+  fields: GeneratedFormField[];
+  extensionProperties: Record<string, string>;
+  hasFormFields: boolean;
+  hasExtensionProperties: boolean;
+}
+
 export class BpmnFormParserUtil {
+
+  /**
+   * Normalizes raw XML string: handles base64 encoding and JSON-stringified XML.
+   */
+  private static normalizeXml(xmlString: string): string | null {
+    if (!xmlString || typeof xmlString !== 'string' || !xmlString.trim()) return null;
+    let rawXml = xmlString.trim();
+    if (!rawXml.startsWith('<')) {
+      try {
+        const decoded = atob(rawXml);
+        if (decoded.trim().startsWith('<')) rawXml = decoded.trim();
+      } catch { /* Not base64 */ }
+    }
+    if (rawXml.startsWith('"') && rawXml.endsWith('"')) {
+      try {
+        const unescaped = JSON.parse(rawXml);
+        if (typeof unescaped === 'string' && unescaped.trim().startsWith('<')) rawXml = unescaped.trim();
+      } catch { /* ignore */ }
+    }
+    return rawXml;
+  }
   /**
    * Parses BPMN XML string and extracts Generated Task Form fields (<camunda:formData>)
    * from the StartEvent node along with rich validation constraints.
@@ -282,6 +310,70 @@ export class BpmnFormParserUtil {
     }
 
     return { isValid: errors.length === 0, errors };
+  }
+
+  /**
+   * Parses BPMN XML string and extracts Extension Properties (<camunda:properties> / <property>)
+   * from the StartEvent node. Returns a key→value map.
+   */
+  public static extractStartExtensionProperties(xmlString: string): Record<string, string> {
+    const rawXml = this.normalizeXml(xmlString);
+    if (!rawXml) return {};
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawXml, 'text/xml');
+
+      const parserError = doc.querySelector('parsererror');
+      if (parserError) {
+        console.warn('BpmnFormParserUtil: XML parse error in extractStartExtensionProperties', parserError.textContent);
+        return {};
+      }
+
+      // Find the first startEvent node
+      const allElements = doc.getElementsByTagName('*');
+      let startNode: Element | null = null;
+      for (let i = 0; i < allElements.length; i++) {
+        if (allElements[i].localName === 'startEvent') {
+          startNode = allElements[i];
+          break;
+        }
+      }
+
+      if (!startNode) return {};
+
+      const extProps: Record<string, string> = {};
+      const children = startNode.getElementsByTagName('*');
+      for (let i = 0; i < children.length; i++) {
+        const el = children[i];
+        if (el.localName === 'property') {
+          const name = el.getAttribute('name');
+          if (name) {
+            extProps[name] = el.getAttribute('value') || '';
+          }
+        }
+      }
+
+      return extProps;
+    } catch (err) {
+      console.error('BpmnFormParserUtil error parsing start extension properties:', err);
+      return {};
+    }
+  }
+
+  /**
+   * Convenience method: extracts both Generated Form Fields and Extension Properties
+   * from the StartEvent node in a single call.
+   */
+  public static extractStartDefinition(xmlString: string): StartEventDefinition {
+    const fields = this.extractStartFormFields(xmlString);
+    const extensionProperties = this.extractStartExtensionProperties(xmlString);
+    return {
+      fields,
+      extensionProperties,
+      hasFormFields: fields.length > 0,
+      hasExtensionProperties: Object.keys(extensionProperties).length > 0
+    };
   }
 }
 

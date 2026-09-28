@@ -4,8 +4,6 @@ import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/pkg/config"
 	commands "deadalus-orch/server/internal/usecase/command"
-	binding_command "deadalus-orch/server/internal/usecase/command/binding"
-	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	general_command "deadalus-orch/server/internal/usecase/command/general"
 	header_command "deadalus-orch/server/internal/usecase/command/header"
 	metrics_command "deadalus-orch/server/internal/usecase/command/metrics"
@@ -57,16 +55,6 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return c.Execute(uow, now)
 	}
 
-	findExchangeCommand, ok := cmd.(exchange_command.FindExchangeCommand)
-	if ok {
-		return findExchangeCommand.Execute(uow, now)
-	}
-
-	paginateExchangesCommand, ok := cmd.(exchange_command.PaginateExchangesCommand)
-	if ok {
-		return paginateExchangesCommand.Execute(uow, now)
-	}
-
 	findQueueCommand, ok := cmd.(queue_command.FindQueueCommand)
 	if ok {
 		return findQueueCommand.Execute(uow, now)
@@ -85,21 +73,6 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	paginateQueueMessagesCommand, ok := cmd.(queue_command.PaginateQueueMessagesCommand)
 	if ok {
 		return paginateQueueMessagesCommand.Execute(uow, now)
-	}
-
-	findBindingCommand, ok := cmd.(binding_command.FindBindingCommand)
-	if ok {
-		return findBindingCommand.Execute(uow, now)
-	}
-
-	paginateBindingsCommand, ok := cmd.(binding_command.PaginateBindingsCommand)
-	if ok {
-		return paginateBindingsCommand.Execute(uow, now)
-	}
-
-	paginateByExchangeBindingsCommand, ok := cmd.(binding_command.PaginateByExchangeBindingsCommand)
-	if ok {
-		return paginateByExchangeBindingsCommand.Execute(uow, now)
 	}
 
 	paginateVNamespacesCommand, ok := cmd.(vnamespace_command.PaginateVNamespacesCommand)
@@ -137,11 +110,6 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 		return findQueueByIDsCommand.Execute(uow, now)
 	}
 
-	findExchangeByIDCommand, ok := cmd.(exchange_command.FindExchangeByIDCommand)
-	if ok {
-		return findExchangeByIDCommand.Execute(uow, now)
-	}
-
 	listHeadersCommand, ok := cmd.(header_command.ListHeadersCommand)
 	if ok {
 		return listHeadersCommand.Execute(uow, now)
@@ -160,16 +128,6 @@ func (r *TenantKVBaseStateMachine) Lookup(cmd any, uow *db.UnitOfWork, now time.
 	getQueueGaugesCommand, ok := cmd.(queue_command.GetQueueGaugesCommand)
 	if ok {
 		return getQueueGaugesCommand.Execute(uow, now)
-	}
-
-	resolveRoutesCommand, ok := cmd.(binding_command.ResolveRoutesCommand)
-	if ok {
-		return resolveRoutesCommand.Execute(uow, now)
-	}
-
-	resolveAndFetchQueuesCommand, ok := cmd.(binding_command.ResolveAndFetchQueuesCommand)
-	if ok {
-		return resolveAndFetchQueuesCommand.Execute(uow, now)
 	}
 
 	commandResult := &commands.CommandResult{}
@@ -197,16 +155,6 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 		return deleteColumnFamilySectorCommand.Execute(uow, now)
 	}
 
-	AssertExchangeCommand, ok := cmd.(exchange_command.AssertExchangeCommand)
-	if ok {
-		return AssertExchangeCommand.Execute(uow, now)
-	}
-
-	deleteExchangeCommand, ok := cmd.(exchange_command.DeleteExchangeCommand)
-	if ok {
-		return deleteExchangeCommand.Execute(uow, now)
-	}
-
 	AssertQueueCommand, ok := cmd.(queue_command.AssertQueueCommand)
 	if ok {
 		return AssertQueueCommand.Execute(uow, now)
@@ -215,21 +163,6 @@ func (r *TenantKVBaseStateMachine) Update(cmd any, uow *db.UnitOfWork, now time.
 	deleteQueueCommand, ok := cmd.(queue_command.DeleteQueueCommand)
 	if ok {
 		return deleteQueueCommand.Execute(uow, now)
-	}
-
-	assertBindingCommand, ok := cmd.(binding_command.AssertBindingCommand)
-	if ok {
-		return assertBindingCommand.Execute(uow, now)
-	}
-
-	bulkAssertBindingCommand, ok := cmd.(binding_command.BulkAssertBindingCommand)
-	if ok {
-		return bulkAssertBindingCommand.Execute(uow, now)
-	}
-
-	deleteBindingCommand, ok := cmd.(binding_command.DeleteBindingCommand)
-	if ok {
-		return deleteBindingCommand.Execute(uow, now)
 	}
 
 	refreshLastUpdateAtFromCommand, ok := cmd.(tenant_summary_command.RefreshLastUpdateAtFromCommand)

@@ -122,13 +122,15 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   showExecutionSuccessModal: boolean = false;
   executingWorkflow: WorkflowDefinition | null = null;
   lastExecutedWorkflow: WorkflowDefinition | null = null;
-  executeInputJson: string = '{\n  "approved": true\n}';
+  executeInputJson: string = '{}';
   executionKey: string = '';
   executionOnVersionChange: string = 'continue';
   executing: boolean = false;
   executionResult: any = null;
   executeErrorMessage: string = '';
   startFormFields: GeneratedFormField[] = [];
+  startExtensionProperties: Record<string, string> = {};
+  hasStartExtensionProperties: boolean = false;
   formValues: { [key: string]: any } = {};
   formErrors: { [key: string]: string } = {};
   hasStartForm: boolean = false;
@@ -638,35 +640,157 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       xmlPayload = this.decodePayload(this.workflowForm.get('payload')?.value);
     }
 
-    // Extract Generated Task Form fields from StartEvent
+    // Extract Generated Task Form fields and Extension Properties from StartEvent
     this.startFormFields = BpmnFormParserUtil.extractStartFormFields(xmlPayload);
+    this.startExtensionProperties = BpmnFormParserUtil.extractStartExtensionProperties(xmlPayload);
+    this.hasStartExtensionProperties = Object.keys(this.startExtensionProperties).length > 0;
+    this.hasStartForm = this.startFormFields.length > 0;
     this.formValues = {};
     this.formErrors = {};
 
-    if (this.startFormFields.length > 0) {
-      this.hasStartForm = true;
-      this.executionInputMode = 'form';
-      // Populate default values
-      for (const field of this.startFormFields) {
-        if (field.type === 'boolean') {
-          this.formValues[field.id] = field.defaultValue === 'true';
-        } else if (field.type === 'long' || field.type === 'integer') {
-          this.formValues[field.id] = field.defaultValue ? Number(field.defaultValue) : 0;
-        } else if (field.type === 'enum' && field.values && field.values.length > 0) {
-          this.formValues[field.id] = field.defaultValue || field.values[0].id;
-        } else {
-          this.formValues[field.id] = field.defaultValue || '';
-        }
-      }
-      this.executeInputJson = JSON.stringify(this.formValues, null, 2);
-    } else {
-      this.hasStartForm = false;
+    // Business rule:
+    // - Extension properties present → JSON view (shows the required JSON schema)
+    // - Only form fields present → Form view with validations
+    // - Neither → JSON view (empty object)
+    if (this.hasStartExtensionProperties) {
       this.executionInputMode = 'json';
-      this.executeInputJson = '{\n  "approved": true\n}';
+    } else if (this.hasStartForm) {
+      this.executionInputMode = 'form';
+    } else {
+      this.executionInputMode = 'json';
+    }
+
+    // Populate default form values
+    for (const field of this.startFormFields) {
+      if (field.type === 'boolean') {
+        this.formValues[field.id] = field.defaultValue === 'true';
+      } else if (field.type === 'long' || field.type === 'integer') {
+        this.formValues[field.id] = field.defaultValue ? Number(field.defaultValue) : 0;
+      } else if (field.type === 'enum' && field.values && field.values.length > 0) {
+        this.formValues[field.id] = field.defaultValue || field.values[0].id;
+      } else {
+        this.formValues[field.id] = field.defaultValue || '';
+      }
+    }
+
+    if (this.hasStartForm || this.hasStartExtensionProperties) {
+      this.executeInputJson = this.generateCombinedJsonPayload();
+    } else {
+      this.executeInputJson = '{}';
     }
 
     this.showExecuteModal = true;
   }
+
+  hasExtensionProperties(): boolean {
+    return this.hasStartExtensionProperties;
+  }
+
+  hasFormFields(): boolean {
+    return this.hasStartForm;
+  }
+
+  getExtensionProperties(): Record<string, string> {
+    return this.startExtensionProperties;
+  }
+
+  getExtensionPropertyList(): Array<{ key: string; value: string }> {
+    return Object.entries(this.startExtensionProperties).map(([key, value]) => ({ key, value }));
+  }
+
+  /**
+   * Sets a value at a dot-notation path in the given object (e.g. "a.b.c" → obj.a.b.c = value).
+   */
+  setNestedProperty(obj: Record<string, any>, path: string, value: any): void {
+    const parts = path.split('.');
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!current[part] || typeof current[part] !== 'object' || Array.isArray(current[part])) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    current[parts[parts.length - 1]] = value;
+  }
+
+  /**
+   * Resolves a dot-notation path from an object (e.g. "a.b.c" → obj.a.b.c).
+   */
+  resolveVariablePathInObject(path: string, obj: any): any {
+    if (!obj || typeof obj !== 'object') return undefined;
+    if (path in obj) return obj[path];
+    const parts = path.split('.');
+    let curr = obj;
+    for (const p of parts) {
+      if (curr === null || curr === undefined || typeof curr !== 'object') return undefined;
+      curr = curr[p];
+    }
+    return curr;
+  }
+
+  /**
+   * Generates the combined JSON payload from form fields + extension properties.
+   * Form fields contribute their current values; extension property keys are
+   * scaffolded with empty strings (user fills them in the JSON editor).
+   */
+  generateCombinedJsonPayload(): string {
+    const combined: Record<string, any> = {};
+
+    // 1. Add form fields with their default/current values
+    for (const f of this.startFormFields) {
+      let defaultVal: any = '';
+      if (f.defaultValue !== undefined && f.defaultValue !== null && f.defaultValue !== '') {
+        if (f.type === 'boolean' || f.type === 'bool') {
+          defaultVal = f.defaultValue === 'true';
+        } else if (f.type === 'long' || f.type === 'int' || f.type === 'integer' || f.type === 'double' || f.type === 'number') {
+          const num = Number(f.defaultValue);
+          defaultVal = isNaN(num) ? f.defaultValue : num;
+        } else {
+          defaultVal = f.defaultValue;
+        }
+      } else if (f.type === 'boolean' || f.type === 'bool') {
+        defaultVal = false;
+      } else if (f.type === 'long' || f.type === 'int' || f.type === 'integer' || f.type === 'double' || f.type === 'number') {
+        defaultVal = 0;
+      }
+      if (this.formValues && this.formValues[f.id] !== undefined) {
+        defaultVal = this.formValues[f.id];
+      }
+      this.setNestedProperty(combined, f.id, defaultVal);
+    }
+
+    // 2. Scaffold extension property keys (dot-notation supported, values left empty)
+    for (const k of Object.keys(this.startExtensionProperties)) {
+      this.setNestedProperty(combined, k, '');
+    }
+
+    return JSON.stringify(combined, null, 2);
+  }
+
+  /**
+   * Switches between 'form' and 'json' execution input modes,
+   * syncing values between the two representations.
+   */
+  setExecutionInputMode(mode: 'form' | 'json'): void {
+    if (mode === 'json' && this.executionInputMode === 'form') {
+      this.executeInputJson = this.generateCombinedJsonPayload();
+    } else if (mode === 'form' && this.executionInputMode === 'json') {
+      try {
+        const parsed = JSON.parse(this.executeInputJson || '{}');
+        for (const f of this.startFormFields) {
+          const val = this.resolveVariablePathInObject(f.id, parsed);
+          if (val !== undefined) {
+            this.formValues[f.id] = val;
+          }
+        }
+      } catch {
+        // keep existing form values if JSON parse fails
+      }
+    }
+    this.executionInputMode = mode;
+  }
+
 
   async openExecuteModalFromForm(): Promise<void> {
     if (this.selectedWorkflow) {
@@ -785,16 +909,23 @@ export class WorkflowsComponent implements OnInit, OnChanges {
         return;
       }
 
-      inputObj = {};
+      try {
+        inputObj = JSON.parse(this.generateCombinedJsonPayload());
+      } catch {
+        inputObj = {};
+      }
+
       for (const field of this.startFormFields) {
         const val = this.formValues[field.id];
+        let fieldVal: any;
         if (field.type === 'boolean') {
-          inputObj[field.id] = Boolean(val);
+          fieldVal = Boolean(val);
         } else if (field.type === 'long' || field.type === 'integer') {
-          inputObj[field.id] = val !== '' && val !== null && !isNaN(Number(val)) ? Number(val) : 0;
+          fieldVal = val !== '' && val !== null && !isNaN(Number(val)) ? Number(val) : 0;
         } else {
-          inputObj[field.id] = val !== undefined && val !== null ? val : '';
+          fieldVal = val !== undefined && val !== null ? val : '';
         }
+        this.setNestedProperty(inputObj, field.id, fieldVal);
       }
       this.executeInputJson = JSON.stringify(inputObj, null, 2);
     } else if (this.executeInputJson && this.executeInputJson.trim()) {
@@ -847,6 +978,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.executingWorkflow = null;
     this.executionResult = null;
     this.startFormFields = [];
+    this.startExtensionProperties = {};
+    this.hasStartExtensionProperties = false;
     this.formValues = {};
     this.formErrors = {};
     this.hasStartForm = false;

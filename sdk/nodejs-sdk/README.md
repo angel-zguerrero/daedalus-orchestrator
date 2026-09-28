@@ -124,7 +124,7 @@ const sdk = new DaedalusSDK({
 
 ## 🛠️ Monorepo Development & Contribution
 
-If you are developing inside the [Daedalus Orchestrator Monorepo](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator), follow these steps to build and run the SDK.
+If you are developing inside the [Daedalus Orchestrator Monorepo](https://github.com/angel-zguerrero/daedalus-orchestrator), follow these steps to build and run the SDK.
 
 ### Prerequisites
 
@@ -154,11 +154,12 @@ npm run build
 
 ## 📚 Examples Reference
 
-We provide fully functional examples in the [examples/](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator/sdk/nodejs-sdk/examples) folder:
+We provide fully functional examples in the [examples/](examples/) folder:
 
-- **[Simple Worker](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator/sdk/nodejs-sdk/examples/simple-worker/index.ts)**: A basic worker showing connection and message consumption.
-- **[Assert Resources](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator/sdk/nodejs-sdk/examples/assert-resources/index.ts)**: A comprehensive example demonstrating how to upsert a tenant, exchange, queue, and binding, plus publishing and enqueueing messages.
-- **[Email Simulator](file:///Users/angel/Documents/daedalus-orchestrator-project/daedalus-orchestrator/sdk/nodejs-sdk/examples/email%20simulator/index.ts)**: A realistic example simulating a multi-tenant email platform with distinct queues for transactional, marketing, and report emails, highlighting how Daedalus orchestrates fairness and isolates noisy neighbors.
+- **[Simple Worker](examples/simple-worker/index.ts)**: A basic worker showing connection and message consumption.
+- **[Assert Resources](examples/assert-resources/index.ts)**: A comprehensive example demonstrating how to upsert a tenant and queue, plus enqueueing messages directly.
+- **[Email Simulator](examples/email%20simulator/index.ts)**: A realistic example simulating a multi-tenant email platform with distinct queues for transactional, marketing, and report emails, highlighting how Daedalus orchestrates fairness and isolates noisy neighbors.
+- **[Scheduled Jobs Emails](examples/scheduled-jobs-emails/index.ts)**: Demonstrates how to schedule one-off and recurring tasks directly into queues.
 
 ### Running the Examples
 
@@ -205,3 +206,59 @@ Navigate to `sdk/nodejs-sdk` first, then run:
   # or manually:
   npx ts-node "examples/email simulator/index.ts"
   ```
+
+- **Scheduled Jobs Emails**:
+  ```bash
+  npm run example:scheduled-jobs-emails
+  # or manually:
+  npx ts-node examples/scheduled-jobs-emails/index.ts
+  ```
+
+---
+
+## 📖 API Reference
+
+### `new DaedalusSDK(config: SDKConfig)`
+Creates a new SDK instance.
+
+### `sdk.connect(): Promise<void>`
+Establishes the gRPC connection and performs initial login.
+
+### `sdk.disconnect(): Promise<void>`
+Closes the gRPC connection.
+
+### `sdk.assertTenant(input: AssertTenantInput): Promise<any>`
+Upserts a tenant.
+
+### `sdk.assertQueue(input: AssertQueueInput): Promise<any>`
+Upserts a queue.
+
+### `sdk.bulkAssertQueues(input: BulkAssertQueuesInput): Promise<any>`
+Upserts multiple queues in bulk.
+
+### `sdk.enqueueMessage(input: EnqueueMessageInput): Promise<EnqueueResult>`
+Enqueues a message directly into a queue.
+
+### `sdk.createOneOffScheduledJob(input: CreateOneOffScheduledJobInput): Promise<ScheduledJob>`
+Creates a single-execution delayed scheduled job targeting a queue.
+
+### `sdk.createRecurringScheduledJob(input: CreateRecurringScheduledJobInput): Promise<ScheduledJob>`
+Creates a recurring scheduled job targeting a queue.
+
+### `sdk.getScheduledJob(tenantCode: string, id: string): Promise<ScheduledJob>`
+Retrieves a scheduled job by ID.
+
+### `sdk.listScheduledJobs(input: ListScheduledJobsInput): Promise<{ entities: ScheduledJob[], cursor: string }>`
+Lists scheduled jobs with pagination.
+
+### `sdk.deleteScheduledJob(tenantCode: string, id: string): Promise<void>`
+Deletes a scheduled job by ID.
+
+### `sdk.ackMessage(leaseID: string, tenantCode: string): Promise<void>`
+Acknowledges a claimed message.
+
+### `sdk.bulkAckMessages(leaseIDs: string[], tenantCode: string): Promise<void>`
+Acknowledges multiple claimed messages in batch.
+
+### `sdk.createWorker(options: WorkerOptions): Promise<void>`
+Starts a bidirectional streaming worker loop.

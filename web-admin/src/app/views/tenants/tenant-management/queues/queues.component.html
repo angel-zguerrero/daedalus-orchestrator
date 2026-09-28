@@ -385,37 +385,6 @@
         </c-alert>
       </div>
 
-      <!-- Dead Letter Exchange Configuration Section -->
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="12">
-          <hr>
-          <h6 class="mb-3">
-            <svg cIcon name="cil-warning" class="me-2"></svg>
-            Dead Letter Exchange (Optional)
-          </h6>
-        </c-col>
-      </c-row>
-
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="8">
-          <label cLabel for="deadLetterExchangeId">Dead Letter Exchange</label>
-          <select cSelect id="deadLetterExchangeId" formControlName="deadLetterExchangeId" class="form-control">
-            <option value="">-- No Dead Letter Exchange --</option>
-            <option *ngFor="let exchange of filteredExchanges" [value]="exchange.ID">
-              {{exchange.Name}} ({{getExchangeTypeLabel(exchange.Type)}})
-            </option>
-          </select>
-          <small class="form-text text-muted">Select an exchange for dead letter messages (Direct, Topic, or Fanout
-            only)</small>
-        </c-col>
-        <c-col [md]="4" *ngIf="isRoutingKeyRequired(queueForm.get('deadLetterExchangeId')?.value)">
-          <label cLabel for="deadLetterRoutingKey">Routing Key/Pattern *</label>
-          <input cFormControl id="deadLetterRoutingKey" formControlName="deadLetterExchangeRoutingKeyOrPattern"
-            type="text" placeholder="Enter routing key or pattern" />
-          <small class="form-text text-muted">Required for Direct and Topic exchanges</small>
-        </c-col>
-      </c-row>
-
       <!-- Headers Configuration Section -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="12">
@@ -658,37 +627,6 @@
           Higher priorities (higher numbers) will always be processed before lower priorities.
         </c-alert>
       </div>
-
-      <!-- Dead Letter Exchange Configuration Section -->
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="12">
-          <hr>
-          <h6 class="mb-3">
-            <svg cIcon name="cil-warning" class="me-2"></svg>
-            Dead Letter Exchange (Optional)
-          </h6>
-        </c-col>
-      </c-row>
-
-      <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
-        <c-col [md]="8">
-          <label cLabel for="updateDeadLetterExchangeId">Dead Letter Exchange</label>
-          <select cSelect id="updateDeadLetterExchangeId" formControlName="deadLetterExchangeId" class="form-control">
-            <option value="">-- No Dead Letter Exchange --</option>
-            <option *ngFor="let exchange of filteredExchanges" [value]="exchange.ID">
-              {{exchange.Name}} ({{getExchangeTypeLabel(exchange.Type)}})
-            </option>
-          </select>
-          <small class="form-text text-muted">Select an exchange for dead letter messages (Direct, Topic, or Fanout
-            only)</small>
-        </c-col>
-        <c-col [md]="4" *ngIf="isRoutingKeyRequired(queueFormUpdate.get('deadLetterExchangeId')?.value)">
-          <label cLabel for="updateDeadLetterRoutingKey">Routing Key/Pattern *</label>
-          <input cFormControl id="updateDeadLetterRoutingKey" formControlName="deadLetterExchangeRoutingKeyOrPattern"
-            type="text" placeholder="Enter routing key or pattern" />
-          <small class="form-text text-muted">Required for Direct and Topic exchanges</small>
-        </c-col>
-      </c-row>
 
       <!-- Headers Configuration Section -->
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">

@@ -153,6 +153,8 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		}
 	}
 
+	executionTTL := def.CalculateExecutionTTL()
+
 	execution := &models.WorkflowExecution{
 		ID:                        execID,
 		WorkflowDefinitionID:      def.ID,
@@ -168,6 +170,7 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		AccountID:                 cmd.AccountID,
 		AccountName:               cmd.AccountName,
 		ExternalUserID:            cmd.ExternalUserID,
+		TTL:                       executionTTL,
 		StartedAt:                 &now,
 		CreatedAt:                 now,
 		UpdatedAt:                 now,
@@ -188,11 +191,12 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 
 	initialToken := &models.ExecutionToken{
 		ID:                   tokenID,
-		WorkflowExecutionID: execution.ID,
+		WorkflowExecutionID:  execution.ID,
 		WorkflowDefinitionID: def.ID,
 		VNamespace:           vns,
 		CurrentNodeID:        bpmnModel.StartNodeID,
 		Status:               models.ExecutionTokenStatusActive,
+		TTL:                  executionTTL,
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	}

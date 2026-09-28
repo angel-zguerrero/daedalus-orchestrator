@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestPebbleStore(t *testing.T) db.KVStore {
+func newTestCounterPebbleStore(t *testing.T) db.KVStore {
 	config.GlobalConfiguration = &config.Config{
 		MaxHeaders: 100,
 	}
@@ -35,7 +35,7 @@ func newTestPebbleStore(t *testing.T) db.KVStore {
 }
 
 func TestWorkflowDefinitionCounter_CreateAndDelete(t *testing.T) {
-	store := newTestPebbleStore(t)
+	store := newTestCounterPebbleStore(t)
 	uow := db.NewUnitOfWork(store, nil)
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 	now := time.Now()
@@ -133,7 +133,7 @@ func TestWorkflowDefinitionCounter_CreateAndDelete(t *testing.T) {
 }
 
 func TestTenantSummaryInMaster_WorkflowsCount(t *testing.T) {
-	store := newTestPebbleStore(t)
+	store := newTestCounterPebbleStore(t)
 	uow := db.NewUnitOfWork(store, nil)
 	idFactory := &db.DeterministicIDGeneratorFactory{}
 	now := time.Now()
@@ -161,9 +161,7 @@ func TestTenantSummaryInMaster_WorkflowsCount(t *testing.T) {
 			{
 				ID:             "t-100",
 				WorkflowsCount: 5,
-				ExchangesCount: 3,
 				QueuesCount:    4,
-				BindingsCount:  2,
 				MessagesCount:  10,
 			},
 		},
@@ -183,8 +181,6 @@ func TestTenantSummaryInMaster_WorkflowsCount(t *testing.T) {
 	summaryResult, ok := getRes.Result.(models.TenantSummary)
 	require.True(t, ok)
 	assert.Equal(t, 5, summaryResult.WorkflowsCount)
-	assert.Equal(t, 3, summaryResult.ExchangesCount)
 	assert.Equal(t, 4, summaryResult.QueuesCount)
-	assert.Equal(t, 2, summaryResult.BindingsCount)
 	assert.Equal(t, 10, summaryResult.MessagesCount)
 }

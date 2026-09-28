@@ -29,6 +29,9 @@ func (r *WaitingEventRepository) CreateWaitingEvent(input *models.WaitingEvent, 
 	if input.ExecutionTokenID == "" {
 		return "", fmt.Errorf("ExecutionTokenID is required")
 	}
+	if input.TTL <= 0 {
+		input.TTL = models.CalculateWorkflowExecutionTTL(0)
+	}
 	input.CreatedAt = now
 	input.UpdatedAt = now
 	return r.Create(input, now)

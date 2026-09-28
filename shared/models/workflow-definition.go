@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 type WorkflowScope string
 
@@ -15,7 +18,9 @@ const (
 	WorkflowPayloadFormatJSON WorkflowPayloadFormat = "json"
 	WorkflowPayloadFormatYAML WorkflowPayloadFormat = "yaml"
 	WorkflowPayloadFormatBPMN WorkflowPayloadFormat = "bpmn"
+	WorkflowPayloadFormatXML  WorkflowPayloadFormat = "xml"
 )
+
 
 type VersionChangePolicy string
 
@@ -51,4 +56,20 @@ type WorkflowDefinition struct {
 
 func (WorkflowDefinition) TableName() string {
 	return "workflow_definitions"
+}
+
+// CalculateWorkflowExecutionTTL calculates the TTL in seconds for workflow execution tables based on
+// the workflow definition's MaxDurationSeconds + 30% of it.
+// If maxDurationSeconds is <= 0, a safe default of 86400 seconds (24 hours) is used, yielding 112320 seconds (31.2h).
+func CalculateWorkflowExecutionTTL(maxDurationSeconds int32) int64 {
+	duration := maxDurationSeconds
+	if duration <= 0 {
+		duration = 86400
+	}
+	return int64(math.Ceil(float64(duration) * 1.30))
+}
+
+// CalculateExecutionTTL calculates the execution TTL based on this definition's MaxDurationSeconds + 30%.
+func (wd *WorkflowDefinition) CalculateExecutionTTL() int64 {
+	return CalculateWorkflowExecutionTTL(wd.MaxDurationSeconds)
 }

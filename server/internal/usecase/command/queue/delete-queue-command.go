@@ -37,12 +37,6 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 		return *commandResult
 	}
 
-	bindingRepo, err := db.NewBindingRepository(uow, idFactory, cmd.CF, cmd.CFS)
-	if err != nil {
-		commandResult.Error = err.Error()
-		return *commandResult
-	}
-
 	tenantSummaryRepo, err := db.NewTenantSummaryRepository(uow, idFactory)
 	if err != nil {
 		commandResult.Error = err.Error()
@@ -84,55 +78,6 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 	if _, err = activeQueueRepo.DeleteActiveQueue(queue.ID, now); err != nil {
 		commandResult.Error = fmt.Sprintf("failed to delete active queue %s: %s", queue.ID, err.Error())
 		return *commandResult
-	}
-
-	// Find and delete all bindings associated with this queue (with pagination)
-	bindingCount := 0
-	cursor := ""
-
-	for {
-		bindingsResult, err := bindingRepo.Find("QueueID = "+queue.ID, 100, cursor, now)
-		if err != nil {
-			commandResult.Error = "error retrieving queue bindings: " + err.Error()
-			return *commandResult
-		}
-
-		if bindingsResult == nil || len(bindingsResult.Entities) == 0 {
-			break
-		}
-
-		for _, binding := range bindingsResult.Entities {
-			// Delete all routing headers associated with this binding
-			headersResult, err := routingHeadersRepo.GetRoutingHeadersByBinding(binding.ID, now)
-			if err != nil {
-				commandResult.Error = "error retrieving binding headers: " + err.Error()
-				return *commandResult
-			}
-
-			if headersResult != nil && len(headersResult.Entities) > 0 {
-				for _, header := range headersResult.Entities {
-					_, err := routingHeadersRepo.DeleteRoutingHeader(header.ID, now)
-					if err != nil {
-						commandResult.Error = "error deleting binding header: " + err.Error()
-						return *commandResult
-					}
-				}
-			}
-
-			// Delete the binding
-			_, err = bindingRepo.DeleteBinding(binding.ID, now)
-			if err != nil {
-				commandResult.Error = "error deleting binding: " + err.Error()
-				return *commandResult
-			}
-			bindingCount++
-		}
-
-		// Update cursor for next page
-		cursor = bindingsResult.Cursor
-		if cursor == "" {
-			break
-		}
 	}
 
 	// Delete all messages in the queue before deleting the queue itself
@@ -246,8 +191,8 @@ func (cmd *DeleteQueueCommand) Execute(uow *db.UnitOfWork, now time.Time) comman
 	}
 
 	// Update tenant summary with a single operation
-	// Decrease queue count by 1, binding count by bindingCount, and message count by messageCount
-	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, -messageCount, 0, -1, -bindingCount, now)
+	// Decrease queue count by 1 and message count by messageCount
+	err = tenantSummaryRepo.UpdateCounters(cmd.CFS, -messageCount, -1, now)
 	if err != nil {
 		commandResult.Error = err.Error()
 		return *commandResult

@@ -54,19 +54,7 @@ func main() {
 		log.Fatalf("💥 Fatal error asserting tenant: %v", err)
 	}
 
-	// 2. Assert Exchange
-	_, err = sdk.AssertExchange(ctx, daedalus.AssertExchangeInput{
-		TenantCode: tenantCode,
-		Code:       "email-events",
-		Name:       "Email Events Exchange",
-		Type:       "topic",
-		VNamespace: vnamespace,
-	})
-	if err != nil {
-		log.Fatalf("💥 Fatal error asserting exchange: %v", err)
-	}
-
-	// 3. Assert Queues
+	// 2. Assert Queues
 	_, err = sdk.AssertQueue(ctx, daedalus.AssertQueueInput{
 		TenantCode:  tenantCode,
 		Code:        "email-delayed",
@@ -93,34 +81,7 @@ func main() {
 		log.Fatalf("💥 Fatal error asserting queue weekly-reports: %v", err)
 	}
 
-	// 4. Assert Bindings
-	_, err = sdk.AssertBinding(ctx, daedalus.AssertBindingInput{
-		TenantCode:   tenantCode,
-		Code:         "delayed-emails-binding",
-		ExchangeCode: "email-events",
-		QueueCode:    "email-delayed",
-		Pattern:      "email.delayed.*",
-		VNamespace:   vnamespace,
-		BindingType:  "classic",
-	})
-	if err != nil {
-		log.Fatalf("💥 Fatal error asserting binding: %v", err)
-	}
-
-	_, err = sdk.AssertBinding(ctx, daedalus.AssertBindingInput{
-		TenantCode:   tenantCode,
-		Code:         "weekly-reports-binding",
-		ExchangeCode: "email-events",
-		QueueCode:    "weekly-reports",
-		Pattern:      "report.weekly.*",
-		VNamespace:   vnamespace,
-		BindingType:  "classic",
-	})
-	if err != nil {
-		log.Fatalf("💥 Fatal error asserting binding: %v", err)
-	}
-
-	// ===== 5. Schedule Delayed Email (OneOff Scheduled Job) =====
+	// ===== 3. Schedule Delayed Email (OneOff Scheduled Job) =====
 	log.Println("📅 Scheduling One-Off delayed welcome email (runs after 5s)...")
 	delayedEmailPayload, _ := json.Marshal(ScheduledEmail{
 		Subject:   "Welcome to Acme Corp!",
@@ -131,8 +92,7 @@ func main() {
 
 	oneOffJob, err := sdk.CreateOneOffScheduledJob(ctx, daedalus.CreateOneOffScheduledJobInput{
 		TenantCode:  tenantCode,
-		TargetType:  "exchange",
-		TargetCode:  "email-events",
+		QueueCode:   "email-delayed",
 		VNamespace:  vnamespace,
 		Code:        "welcome-email-job-1",
 		Content:     delayedEmailPayload,
@@ -140,14 +100,13 @@ func main() {
 		Handler:     "email.send",
 		RunAfter:    "5s",
 		Priority:    1,
-		Headers:     map[string]string{"routing_key": "email.delayed.welcome"},
 	})
 	if err != nil {
 		log.Fatalf("💥 Fatal error creating OneOff scheduled job: %v", err)
 	}
 	log.Printf("✅ OneOff Scheduled Job Created! ID: %s | NextRunAt: %s", oneOffJob.ID, oneOffJob.NextRunAt)
 
-	// ===== 6. Schedule Recurring Weekly Report (Recurring Scheduled Job) =====
+	// ===== 4. Schedule Recurring Weekly Report (Recurring Scheduled Job) =====
 	log.Println("🔄 Scheduling Recurring Weekly Report (runs every 10s)...")
 	recurringReportPayload, _ := json.Marshal(ScheduledEmail{
 		Subject:   "Weekly Analytics & Performance Summary",
@@ -158,8 +117,7 @@ func main() {
 
 	recurringJob, err := sdk.CreateRecurringScheduledJob(ctx, daedalus.CreateRecurringScheduledJobInput{
 		TenantCode:  tenantCode,
-		TargetType:  "queue",
-		TargetCode:  "weekly-reports",
+		QueueCode:   "weekly-reports",
 		VNamespace:  vnamespace,
 		Code:        "weekly-reports-job-1",
 		Content:     recurringReportPayload,
@@ -184,8 +142,8 @@ func main() {
 	} else {
 		log.Printf("📋 Currently Scheduled Jobs Count: %d", len(jobs))
 		for _, j := range jobs {
-			log.Printf("   - [%s] ID: %s | Target: %s (%s) | NextRunAt: %s | State: %s",
-				j.Type, j.ID, j.TargetCode, j.TargetType, j.NextRunAt, j.State)
+			log.Printf("   - [%s] ID: %s | Queue: %s | NextRunAt: %s | State: %s",
+				j.Type, j.ID, j.QueueCode, j.NextRunAt, j.State)
 		}
 	}
 

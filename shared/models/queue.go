@@ -61,9 +61,6 @@ type Queue struct {
 
 	MaxQueueSize int
 
-	DeadLetterExchangeId                  string
-	DeadLetterExchangeRoutingKeyOrPattern string
-
 	WorkflowDefinitionID string
 
 	UserID         string `json:"userId,omitempty"`

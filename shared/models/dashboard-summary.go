@@ -9,12 +9,9 @@ const DashboardSummaryID = "global"
 // It is stored in the master node and kept up to date by the DashboardSummaryWorker.
 type DashboardSummary struct {
 	ID string `orm:"primary-key"`
-
 	WorkflowsCount int
 	TenantsCount   int
-	ExchangesCount int
 	QueuesCount    int
-	BindingsCount  int
 	MessagesCount  int
 
 	UpdatedAt time.Time

@@ -12,18 +12,18 @@ type Config struct {
 
 // ClaimWorkFilter defines filter criteria for claiming work from queues.
 type ClaimWorkFilter struct {
-	TenantCodes            []string
-	ExcludeTenantCodes     []string
-	TenantPatterns         []string
-	ExcludeTenantPatterns  []string
-	VNamespaces            []string
-	ExcludeVNamespaces     []string
-	VNamespacePatterns     []string
+	TenantCodes               []string
+	ExcludeTenantCodes        []string
+	TenantPatterns            []string
+	ExcludeTenantPatterns     []string
+	VNamespaces               []string
+	ExcludeVNamespaces        []string
+	VNamespacePatterns        []string
 	ExcludeVNamespacePatterns []string
-	QueueCodes             []string
-	ExcludeQueueCodes      []string
-	QueuePatterns          []string
-	ExcludeQueuePatterns   []string
+	QueueCodes                []string
+	ExcludeQueueCodes         []string
+	QueuePatterns             []string
+	ExcludeQueuePatterns      []string
 }
 
 // ClaimWorkCapacityPolicy defines the capacity policy for a worker.
@@ -81,16 +81,6 @@ type AssertTenantInput struct {
 	Name string
 }
 
-// AssertExchangeInput defines the parameters for upserting an exchange.
-type AssertExchangeInput struct {
-	TenantCode string
-	Code       string
-	Name       string
-	Type       string
-	VNamespace string
-	Headers    map[string]string
-}
-
 // AssertQueueInput defines the parameters for upserting a queue.
 type AssertQueueInput struct {
 	TenantCode                   string
@@ -116,29 +106,6 @@ type AssertQueueInput struct {
 type BulkAssertQueuesInput struct {
 	TenantCode string
 	Queues     []AssertQueueInput
-}
-
-// AssertBindingInput defines the parameters for upserting a binding.
-type AssertBindingInput struct {
-	TenantCode            string
-	Code                  string
-	ExchangeCode          string
-	QueueCode             string
-	TargetExchangeCode    string
-	AlternateExchangeCode string
-	VNamespace            string
-	RoutingKey            string
-	Pattern               string
-	XMatch                string
-	BindingType           string
-	TargetExchangeType    string
-	Headers               map[string]string
-}
-
-// BulkAssertBindingsInput defines the parameters for upserting multiple bindings in bulk.
-type BulkAssertBindingsInput struct {
-	TenantCode string
-	Bindings   []AssertBindingInput
 }
 
 // EnqueueOptions holds options for enqueueing a message via streaming.
@@ -168,68 +135,36 @@ type EnqueueMessageInput struct {
 	Options     *EnqueueOptions
 }
 
-// PublishOptions holds options for publishing a message via streaming.
-type PublishOptions struct {
-	WaitForConfirmation bool
-	TimeoutMs           int
-}
-
-// PublishResult is returned when publishing a message via streaming.
-type PublishResult struct {
-	ClientMessageID string
-	Confirmed       bool
-	QueueMessages   map[string]string
-}
-
-// PublishMessageInput defines the parameters for publishing a message via an exchange.
-type PublishMessageInput struct {
-	TenantCode                    string
-	ExchangeCode                  string
-	RoutingKeyOrPatternOrQueueCode string
-	VNamespace                    string
-	Content                       []byte
-	ContentType                   string
-	Priority                      int32
-	Handler                       string
-	Headers                       map[string]string
-	Parameters                    map[string]string
-	MessageID                     string
-	Options                       *PublishOptions
-}
-
 // ScheduledJob represents a scheduled job returned by the server.
 type ScheduledJob struct {
-	ID                             string
-	Code                           string
-	TenantID                       string
-	TargetType                     string
-	TargetID                       string
-	TargetCode                     string
-	RoutingKeyOrPatternOrQueueCode string
-	VNamespace                     string
-	Content                        string
-	ContentType                    string
-	Headers                        map[string]string
-	Handler                        string
-	Parameters                     map[string]string
-	Priority                       int32
-	State                          string
-	Type                           string
-	Every                          string
-	CronExpression                 string
-	RunAt                          string
-	RunAfter                       string
-	NextRunAt                      string
-	CreatedAt                      string
-	UpdatedAt                      string
+	ID             string
+	Code           string
+	TenantID       string
+	QueueID        string
+	QueueCode      string
+	VNamespace     string
+	Content        string
+	ContentType    string
+	Headers        map[string]string
+	Handler        string
+	Parameters     map[string]string
+	Priority       int32
+	State          string
+	Type           string
+	Every          string
+	CronExpression string
+	RunAt          string
+	RunAfter       string
+	NextRunAt      string
+	CreatedAt      string
+	UpdatedAt      string
 }
 
 // CreateOneOffScheduledJobInput defines parameters for scheduling a single execution task.
 type CreateOneOffScheduledJobInput struct {
 	Code        string
 	TenantCode  string
-	TargetType  string // "queue" or "exchange"
-	TargetCode  string // exchangeCode or routingKeyOrPatternOrQueueCode
+	QueueCode   string
 	VNamespace  string
 	Content     []byte
 	ContentType string
@@ -245,8 +180,7 @@ type CreateOneOffScheduledJobInput struct {
 type CreateRecurringScheduledJobInput struct {
 	Code           string
 	TenantCode     string
-	TargetType     string // "queue" or "exchange"
-	TargetCode     string // exchangeCode or routingKeyOrPatternOrQueueCode
+	QueueCode      string
 	VNamespace     string
 	Content        []byte
 	ContentType    string

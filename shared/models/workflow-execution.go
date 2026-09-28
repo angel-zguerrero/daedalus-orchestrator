@@ -32,6 +32,7 @@ type WorkflowExecution struct {
 	ExternalUserID            string                  `json:"externalUserId,omitempty"`
 	StartedAt                 *time.Time              `json:"startedAt,omitempty"`
 	CompletedAt               *time.Time              `json:"completedAt,omitempty"`
+	TTL                       int64                   `orm:"ttl" json:"ttl,omitempty"`
 	CreatedAt                 time.Time               `json:"createdAt"`
 	UpdatedAt                 time.Time               `json:"updatedAt"`
 
