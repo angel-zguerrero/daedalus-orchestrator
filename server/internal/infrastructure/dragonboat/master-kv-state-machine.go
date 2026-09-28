@@ -99,6 +99,22 @@ func (r *MasterKVDBStateMachine) Lookup(input any, uow *db.UnitOfWork, now time.
 		return getUsersCommand.Execute(uow, now)
 	}
 
+	getUserByIdCommand, ok := input.(user_command.GetUserByIdCommand)
+	if ok {
+		return getUserByIdCommand.Execute(uow, now)
+	}
+	if pCmd, ok := input.(*user_command.GetUserByIdCommand); ok && pCmd != nil {
+		return pCmd.Execute(uow, now)
+	}
+
+	getUsersByIdsCommand, ok := input.(user_command.GetUsersByIdsCommand)
+	if ok {
+		return getUsersByIdsCommand.Execute(uow, now)
+	}
+	if pCmd, ok := input.(*user_command.GetUsersByIdsCommand); ok && pCmd != nil {
+		return pCmd.Execute(uow, now)
+	}
+
 	commandResult := &commands.CommandResult{}
 	commandResult.Error = "invalid command type"
 

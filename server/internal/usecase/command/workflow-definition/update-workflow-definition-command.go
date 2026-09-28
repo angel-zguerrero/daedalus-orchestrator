@@ -91,6 +91,18 @@ func (cmd *UpdateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 	if cmd.WorkflowDefinition.VNamespace != "" {
 		existing.VNamespace = cmd.WorkflowDefinition.VNamespace
 	}
+	if cmd.WorkflowDefinition.UserID != "" {
+		existing.UserID = cmd.WorkflowDefinition.UserID
+	}
+	if cmd.WorkflowDefinition.AccountID != "" {
+		existing.AccountID = cmd.WorkflowDefinition.AccountID
+	}
+	if cmd.WorkflowDefinition.AccountName != "" {
+		existing.AccountName = cmd.WorkflowDefinition.AccountName
+	}
+	if cmd.WorkflowDefinition.ExternalUserID != "" {
+		existing.ExternalUserID = cmd.WorkflowDefinition.ExternalUserID
+	}
 
 	ok, err := repo.UpdateWorkflowDefinition(existing, now)
 	if err != nil || !ok {

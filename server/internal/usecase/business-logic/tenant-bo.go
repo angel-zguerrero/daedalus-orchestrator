@@ -69,10 +69,25 @@ func (bo *TenantBO) BulkCreateTenant(ctx context.Context, tenants []*models.Tena
 		return nil, errors.New("no tenants provided")
 	}
 
-	// Asegurar IDs válidos
+	// Asegurar IDs válidos y asignar auditoría
+	caller := common.GetCallerIdentity(ctx)
 	for _, t := range tenants {
 		if t.ID == "" {
 			t.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
+		}
+		if caller != nil {
+			if t.UserID == "" {
+				t.UserID = caller.UserID
+			}
+			if t.AccountID == "" {
+				t.AccountID = caller.AccountID
+			}
+			if t.AccountName == "" {
+				t.AccountName = caller.AccountName
+			}
+			if t.ExternalUserID == "" {
+				t.ExternalUserID = caller.ExternalUserID
+			}
 		}
 	}
 

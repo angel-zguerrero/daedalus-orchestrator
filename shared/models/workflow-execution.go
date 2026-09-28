@@ -26,6 +26,10 @@ type WorkflowExecution struct {
 	Output                    map[string]interface{}  `json:"output"`
 	StateData                 map[string]interface{}  `json:"stateData"`
 	Error                     string                  `json:"error,omitempty"`
+	UserID                    string                  `json:"userId,omitempty"`
+	AccountID                 string                  `json:"accountId,omitempty"`
+	AccountName               string                  `json:"accountName,omitempty"`
+	ExternalUserID            string                  `json:"externalUserId,omitempty"`
 	StartedAt                 *time.Time              `json:"startedAt,omitempty"`
 	CompletedAt               *time.Time              `json:"completedAt,omitempty"`
 	CreatedAt                 time.Time               `json:"createdAt"`

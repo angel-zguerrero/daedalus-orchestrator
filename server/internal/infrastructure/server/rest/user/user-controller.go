@@ -113,3 +113,60 @@ func (ctrl *UserController) DeleteUserHandler(c *gin.Context) {
 		"result":  success,
 	})
 }
+
+func (ctrl *UserController) GetUserHandler(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
+
+	user, err := ctrl.UserBO.GetUserByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	user.PasswordHash = ""
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User details",
+		"result":  user,
+	})
+}
+
+type GetUsersByIdsRequest struct {
+	IDs []string `json:"ids"`
+}
+
+func (ctrl *UserController) GetUsersByIdsHandler(c *gin.Context) {
+	var req GetUsersByIdsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	users, err := ctrl.UserBO.GetUsersByIDs(c.Request.Context(), req.IDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if users == nil {
+		users = []models.User{}
+	}
+	for i := range users {
+		users[i].PasswordHash = ""
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Users list by IDs",
+		"result":  users,
+	})
+}
+

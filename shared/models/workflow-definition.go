@@ -14,6 +14,7 @@ type WorkflowPayloadFormat string
 const (
 	WorkflowPayloadFormatJSON WorkflowPayloadFormat = "json"
 	WorkflowPayloadFormatYAML WorkflowPayloadFormat = "yaml"
+	WorkflowPayloadFormatBPMN WorkflowPayloadFormat = "bpmn"
 )
 
 type VersionChangePolicy string
@@ -38,6 +39,10 @@ type WorkflowDefinition struct {
 	IsActive            bool                  `json:"isActive"`
 	Scope               WorkflowScope         `json:"scope"`
 	TenantID            string                `json:"tenantId"`
+	UserID              string                `json:"userId,omitempty"`
+	AccountID           string                `json:"accountId,omitempty"`
+	AccountName         string                `json:"accountName,omitempty"`
+	ExternalUserID      string                `json:"externalUserId,omitempty"`
 	HasDesignErrors     bool                  `orm:"data-only" json:"hasDesignErrors"`
 	DesignErrorMessages []string              `orm:"data-only" json:"designErrorMessages,omitempty"`
 	CreatedAt           time.Time             `json:"createdAt"`

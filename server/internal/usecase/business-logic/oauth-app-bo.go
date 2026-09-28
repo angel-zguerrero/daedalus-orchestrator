@@ -22,9 +22,10 @@ import (
 // These tokens are validated by unifiedAuthMiddleware and are STATELESS.
 type OAuthClaims struct {
 	jwt.RegisteredClaims
-	Scopes    []string `json:"scopes"`
-	TenantID  string   `json:"tenant_id"`
-	TokenType string   `json:"token_type"` // Always "oauth"
+	ClientName string   `json:"client_name,omitempty"`
+	Scopes     []string `json:"scopes"`
+	TenantID   string   `json:"tenant_id"`
+	TokenType  string   `json:"token_type"` // Always "oauth"
 }
 
 // OAuthAppBO provides business logic for managing OAuth 2.0 Service Accounts
@@ -66,6 +67,7 @@ func (bo *OAuthAppBO) IssueToken(ctx context.Context, clientID, clientSecret str
 			ExpiresAt: jwt.NewNumericDate(now.Add(bo.TokenTTL)),
 			ID:        uuid.New().String(),
 		},
+		ClientName: app.Name,
 		Scopes:    app.AllowedScopes,
 		TenantID:  app.TenantID,
 		TokenType: "oauth",

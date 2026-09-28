@@ -29,6 +29,11 @@ export interface WorkflowDefinition {
   isActive: boolean;
   scope: 'global' | 'tenant';
   tenantId?: string;
+  userId?: string;
+  userName?: string;
+  accountId?: string;
+  accountName?: string;
+  externalUserId?: string;
   hasDesignErrors?: boolean;
   designErrorMessages?: string[];
   createdAt?: string;
@@ -48,6 +53,11 @@ export interface WorkflowExecution {
   output?: any;
   stateData?: any;
   error?: string;
+  userId?: string;
+  userName?: string;
+  accountId?: string;
+  accountName?: string;
+  externalUserId?: string;
   startedAt?: string;
   completedAt?: string;
   createdAt: string;

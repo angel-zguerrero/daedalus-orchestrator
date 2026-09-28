@@ -58,6 +58,8 @@
             <th>Bindings Count</th>
             <th>Messages Count</th>
             <th>Active</th>
+            <th>Usuario</th>
+            <th>App</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -85,6 +87,16 @@
               <c-badge [color]="tenant.HasMessages ? 'success' : 'secondary'" shape="rounded-pill">
                 {{ tenant.HasMessages ? 'Yes' : 'No' }}
               </c-badge>
+            </td>
+            <td>
+              <span class="fw-medium text-dark">{{ tenant.userName || tenant.UserID || tenant.userId || '-' }}</span>
+            </td>
+            <td>
+              <div *ngIf="tenant.AccountName || tenant.accountName || tenant.AccountID || tenant.accountId; else noAppTenant">
+                <span class="fw-medium text-dark">{{ tenant.AccountName || tenant.accountName || tenant.AccountID || tenant.accountId }}</span>
+                <div *ngIf="tenant.ExternalUserID || tenant.externalUserId" class="text-secondary small font-monospace">{{ tenant.ExternalUserID || tenant.externalUserId }}</div>
+              </div>
+              <ng-template #noAppTenant><span class="text-muted">-</span></ng-template>
             </td>
             <td>
               <div class="btn-group" role="group">
@@ -128,7 +140,7 @@
             </td>
           </tr>
           <tr *ngIf="tenants.length === 0">
-            <td colspan="10" class="text-center py-4">
+            <td colspan="14" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No tenants found</h6>
@@ -336,6 +348,11 @@
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.ShardId || selectedTenant?.shardId || 'N/A' }}</div>
           <div class="form-text">Database shard identifier for data distribution</div>
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Usuario</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenantUserName || selectedTenant?.userName || selectedTenant?.UserID || selectedTenant?.userId || '-' }}</div>
+          <div class="form-text">Responsible user</div>
+        </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
@@ -379,6 +396,14 @@
           <label class="form-label fw-bold">Messages Count</label>
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.MessagesCount || '0' }}</div>
           <div class="form-text">Total number of messages</div>
+        </div>
+        <div class="mb-3" *ngIf="selectedTenant?.AccountName || selectedTenant?.accountName || selectedTenant?.AccountID || selectedTenant?.accountId">
+          <label class="form-label fw-bold">App</label>
+          <div class="p-2 bg-dark rounded">
+            <div>{{ selectedTenant?.AccountName || selectedTenant?.accountName || selectedTenant?.AccountID || selectedTenant?.accountId }}</div>
+            <div *ngIf="selectedTenant?.ExternalUserID || selectedTenant?.externalUserId" class="text-secondary small font-monospace mt-1">External User: {{ selectedTenant?.ExternalUserID || selectedTenant?.externalUserId }}</div>
+          </div>
+          <div class="form-text">Responsible application / account</div>
         </div>
       </div>
     </div>

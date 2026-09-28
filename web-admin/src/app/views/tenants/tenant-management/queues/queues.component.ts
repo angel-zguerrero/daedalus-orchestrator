@@ -29,6 +29,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { Observable, of } from 'rxjs';
 import { startWith, map, debounceTime, switchMap } from 'rxjs/operators';
 import { ErrorUtil } from '../../../../shared/utils/error.util';
+import { UsersService } from '../../../users/services/users.service';
 import { QueueDetailComponent } from './queue-detail/queue-detail.component';
 
 interface Queue {
@@ -58,6 +59,15 @@ interface Queue {
   NodeSchedulerSupervisorName?: string;
   CreatedAt: string;
   UpdatedAt: string;
+  userId?: string;
+  userName?: string;
+  accountId?: string;
+  accountName?: string;
+  externalUserId?: string;
+  UserID?: string;
+  AccountID?: string;
+  AccountName?: string;
+  ExternalUserID?: string;
 }
 
 interface Exchange {
@@ -233,6 +243,7 @@ export class QueuesComponent implements OnInit {
     private exchangesService: ExchangesService,
     private vNamespacesService: VNamespacesService,
     private tsdbMetricsService: TSDBMetricsService,
+    private usersService: UsersService,
     private fb: FormBuilder,
     private router: Router
   ) {
@@ -348,6 +359,21 @@ export class QueuesComponent implements OnInit {
         }
         this.cursor = response.result.Cursor;
         this.loading = false;
+
+        const userIds = (this.queues || [])
+          .map(q => q.UserID || q.userId)
+          .filter((id): id is string => !!id && id.trim().length > 0);
+
+        if (userIds.length > 0) {
+          this.usersService.resolveUsers(userIds).subscribe((userMap: Map<string, string>) => {
+            this.queues.forEach(q => {
+              const uid = q.UserID || q.userId;
+              if (uid && userMap.has(uid)) {
+                q.userName = userMap.get(uid);
+              }
+            });
+          });
+        }
       },
       error: (error) => {
         this.showAlert = true;
@@ -491,6 +517,12 @@ export class QueuesComponent implements OnInit {
   openDetailsModal(queue: any): void {
     // Use the queue data directly from the table instead of making an API call
     this.selectedQueue = queue;
+    const uid = queue?.UserID || queue?.userId;
+    if (uid && (!queue.userName || queue.userName === uid)) {
+      this.usersService.resolveUser(uid).subscribe(name => {
+        queue.userName = name;
+      });
+    }
     this.detailsModalVisible = true;
     this.showAlert = false; // Clear any previous alerts
     

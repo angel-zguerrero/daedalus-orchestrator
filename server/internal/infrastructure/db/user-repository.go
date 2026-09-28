@@ -52,6 +52,49 @@ func (r *UserRepository) GetUserByUsername(username string, now time.Time) (*mod
 	return r.repo.FindByField("Username", username, now)
 }
 
+func (r *UserRepository) GetUserByID(id string, now time.Time) (*models.User, error) {
+	user, err := r.repo.FindByField("ID", id, now)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		// Fallback to Username lookup for backwards compatibility
+		user, err = r.repo.FindByField("Username", id, now)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return user, nil
+}
+
+func (r *UserRepository) GetUsersByIDs(ids []string, now time.Time) ([]*models.User, error) {
+	if len(ids) == 0 {
+		return []*models.User{}, nil
+	}
+
+	seen := make(map[string]bool)
+	uniqueIDs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			uniqueIDs = append(uniqueIDs, id)
+		}
+	}
+
+	users := make([]*models.User, 0, len(uniqueIDs))
+	for _, id := range uniqueIDs {
+		user, err := r.GetUserByID(id, now)
+		if err != nil {
+			return nil, err
+		}
+		if user != nil {
+			users = append(users, user)
+		}
+	}
+
+	return users, nil
+}
+
 func (r *UserRepository) GetUserRoot(now time.Time) (*models.User, error) {
 	return r.repo.FindByField("IsRootUser", "true", now)
 }
