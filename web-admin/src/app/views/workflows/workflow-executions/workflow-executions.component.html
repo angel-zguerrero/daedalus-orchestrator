@@ -69,11 +69,11 @@
               </c-badge>
             </td>
             <td>
-              <span class="fw-medium text-dark">{{ exec.userName || exec.userId || '-' }}</span>
+              <span class="fw-medium">{{ exec.userName || exec.userId || '-' }}</span>
             </td>
             <td>
               <div *ngIf="exec.accountName || exec.accountId; else noAppExec">
-                <span class="fw-medium text-dark">{{ exec.accountName || exec.accountId }}</span>
+                <span class="fw-medium">{{ exec.accountName || exec.accountId }}</span>
                 <div *ngIf="exec.externalUserId" class="text-secondary small font-monospace">{{ exec.externalUserId }}</div>
               </div>
               <ng-template #noAppExec><span class="text-muted">-</span></ng-template>

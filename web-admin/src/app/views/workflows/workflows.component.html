@@ -98,11 +98,11 @@
                 </c-badge>
               </td>
               <td>
-                <span class="fw-medium text-dark">{{ wf.userName || wf.userId || '-' }}</span>
+                <span class="fw-medium">{{ wf.userName || wf.userId || '-' }}</span>
               </td>
               <td>
                 <div *ngIf="wf.accountName || wf.accountId; else noAppWf">
-                  <span class="fw-medium text-dark">{{ wf.accountName || wf.accountId }}</span>
+                  <span class="fw-medium">{{ wf.accountName || wf.accountId }}</span>
                   <div *ngIf="wf.externalUserId" class="text-secondary small font-monospace">{{ wf.externalUserId }}</div>
                 </div>
                 <ng-template #noAppWf><span class="text-muted">-</span></ng-template>
@@ -858,11 +858,11 @@
               </c-badge>
             </td>
             <td>
-              <span class="fw-medium text-dark">{{ exec.userName || exec.userId || '-' }}</span>
+              <span class="fw-medium">{{ exec.userName || exec.userId || '-' }}</span>
             </td>
             <td>
               <div *ngIf="exec.accountName || exec.accountId; else noAppExec">
-                <span class="fw-medium text-dark">{{ exec.accountName || exec.accountId }}</span>
+                <span class="fw-medium">{{ exec.accountName || exec.accountId }}</span>
                 <div *ngIf="exec.externalUserId" class="text-secondary small font-monospace">{{ exec.externalUserId }}</div>
               </div>
               <ng-template #noAppExec><span class="text-muted">-</span></ng-template>
