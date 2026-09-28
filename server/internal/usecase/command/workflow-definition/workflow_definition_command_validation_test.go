@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestPebbleStore(t *testing.T) db.KVStore {
+func newValidationTestPebbleStore(t *testing.T) db.KVStore {
 	tempDir, err := os.MkdirTemp("", "workflow_def_test_*")
 	require.NoError(t, err)
 
@@ -56,7 +56,7 @@ const testInvalidBPMN = `<?xml version="1.0" encoding="UTF-8"?>
 </bpmn:definitions>`
 
 func TestCreateWorkflowDefinitionCommand_RejectsInvalidFormFieldID(t *testing.T) {
-	store := newTestPebbleStore(t)
+	store := newValidationTestPebbleStore(t)
 	uow := db.NewUnitOfWork(store, nil)
 	now := time.Now()
 
@@ -81,7 +81,7 @@ func TestCreateWorkflowDefinitionCommand_RejectsInvalidFormFieldID(t *testing.T)
 }
 
 func TestCreateWorkflowDefinitionCommand_AcceptsValidDiagram(t *testing.T) {
-	store := newTestPebbleStore(t)
+	store := newValidationTestPebbleStore(t)
 	uow := db.NewUnitOfWork(store, nil)
 	now := time.Now()
 
@@ -105,7 +105,7 @@ func TestCreateWorkflowDefinitionCommand_AcceptsValidDiagram(t *testing.T) {
 }
 
 func TestUpdateWorkflowDefinitionCommand_RejectsInvalidFormFieldID(t *testing.T) {
-	store := newTestPebbleStore(t)
+	store := newValidationTestPebbleStore(t)
 	uow := db.NewUnitOfWork(store, nil)
 	now := time.Now()
 

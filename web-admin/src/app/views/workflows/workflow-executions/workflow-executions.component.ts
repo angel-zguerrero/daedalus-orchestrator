@@ -45,6 +45,7 @@ export class WorkflowExecutionsComponent implements OnInit {
   executionIdParam: string = '';
   scope: 'global' | 'tenant' = 'global';
   tenantCode: string = '';
+  workflowSource: 'tenant' | 'global' = 'tenant';
 
   workflow: WorkflowDefinition | null = null;
   loadingWorkflow: boolean = false;
@@ -87,6 +88,9 @@ export class WorkflowExecutionsComponent implements OnInit {
       } else if (queryParams['scope']) {
         this.scope = queryParams['scope'];
       }
+      if (queryParams['source']) {
+        this.workflowSource = queryParams['source'] === 'global' ? 'global' : 'tenant';
+      }
     });
 
     this.route.params.subscribe(params => {
@@ -105,33 +109,49 @@ export class WorkflowExecutionsComponent implements OnInit {
 
   loadWorkflow(id: string): void {
     this.loadingWorkflow = true;
-    const req$ = this.scope === 'global'
-      ? this.workflowsService.getGlobalWorkflow(id)
-      : this.workflowsService.getTenantWorkflow(this.tenantCode, id);
+    const fetchGlobal = () => {
+      this.workflowsService.getGlobalWorkflow(id).subscribe({
+        next: (wf: any) => {
+          this.setWorkflowFromEntity(wf, 'global');
+          this.loadingWorkflow = false;
+        },
+        error: () => {
+          this.loadingWorkflow = false;
+        }
+      });
+    };
 
-    req$.subscribe({
-      next: (wf: any) => {
-        const entity = wf.Entity || wf.entity || wf;
-        this.workflow = {
-          id: entity.id || entity.ID || '',
-          code: entity.code || entity.Code || '',
-          vnamespace: entity.vnamespace || entity.VNamespace || '',
-          name: entity.name || entity.Name || entity.code || '',
-          description: entity.description || entity.Description || '',
-          version: entity.version || entity.Version || 1,
-          onVersionChange: entity.onVersionChange || entity.OnVersionChange || 'defined_in_execution',
-          payload: entity.payload || entity.Payload || '',
-          payloadFormat: (entity.payloadFormat || entity.PayloadFormat || 'json').toLowerCase() as any,
-          maxDurationSeconds: entity.maxDurationSeconds || 0,
-          isActive: entity.isActive !== undefined ? entity.isActive : true,
-          scope: this.scope
-        };
-        this.loadingWorkflow = false;
-      },
-      error: () => {
-        this.loadingWorkflow = false;
-      }
-    });
+    if (this.scope === 'tenant' && this.workflowSource !== 'global') {
+      this.workflowsService.getTenantWorkflow(this.tenantCode, id).subscribe({
+        next: (wf: any) => {
+          this.setWorkflowFromEntity(wf, 'tenant');
+          this.loadingWorkflow = false;
+        },
+        error: () => {
+          fetchGlobal();
+        }
+      });
+    } else {
+      fetchGlobal();
+    }
+  }
+
+  private setWorkflowFromEntity(wf: any, fallbackScope: 'global' | 'tenant'): void {
+    const entity = wf.Entity || wf.entity || wf;
+    this.workflow = {
+      id: entity.id || entity.ID || '',
+      code: entity.code || entity.Code || '',
+      vnamespace: entity.vnamespace || entity.VNamespace || '',
+      name: entity.name || entity.Name || entity.code || '',
+      description: entity.description || entity.Description || '',
+      version: entity.version || entity.Version || 1,
+      onVersionChange: entity.onVersionChange || entity.OnVersionChange || 'defined_in_execution',
+      payload: entity.payload || entity.Payload || '',
+      payloadFormat: (entity.payloadFormat || entity.PayloadFormat || 'json').toLowerCase() as any,
+      maxDurationSeconds: entity.maxDurationSeconds || 0,
+      isActive: entity.isActive !== undefined ? entity.isActive : true,
+      scope: entity.scope || fallbackScope
+    };
   }
 
   loadExecutions(): void {
@@ -757,7 +777,11 @@ export class WorkflowExecutionsComponent implements OnInit {
 
   navigateBack(): void {
     if (this.tenantCode) {
-      this.router.navigate(['/tenants', this.tenantCode, 'management'], { queryParams: { tab: 'workflows' } });
+      const queryParams: any = { tab: 'workflows' };
+      if (this.workflowSource) {
+        queryParams.source = this.workflowSource;
+      }
+      this.router.navigate(['/tenants', this.tenantCode, 'management'], { queryParams });
     } else {
       this.router.navigate(['/workflows']);
     }

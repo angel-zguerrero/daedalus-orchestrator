@@ -311,13 +311,34 @@ func (bo *WorkflowDefinitionBO) GetWorkflow(
 		bo.Config.Logger,
 		"get workflow definition",
 	)
+	if err == nil && wf.ID != "" {
+		return &wf, nil
+	}
+
+	// Fallback to MasterNode (Global Workflows) if scope was tenant
+	if scope == models.WorkflowScopeTenant && bo.Config.MasterNode != nil {
+		globalCmd := &workflow_definition_command.GetWorkflowDefinitionCommand{
+			WorkflowID: workflowID,
+			CF:         db.AdminFC,
+			CFS:        db.AdminFCSector,
+		}
+		globalWf, gErr := dragonboat.ExecuteRepositoryQuery[models.WorkflowDefinition](
+			bo.Config.MasterNode,
+			ctx,
+			globalCmd,
+			timeout,
+			bo.Config.Logger,
+			"get global workflow definition fallback",
+		)
+		if gErr == nil && globalWf.ID != "" {
+			return &globalWf, nil
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	if wf.ID == "" {
-		return nil, nil
-	}
-	return &wf, nil
+	return nil, nil
 }
 
 func (bo *WorkflowDefinitionBO) ListWorkflows(
@@ -436,6 +457,32 @@ func (bo *WorkflowDefinitionBO) ListWorkflowVersions(
 		bo.Config.Logger,
 		"list workflow versions",
 	)
+	if err == nil && len(res.Entities) > 0 {
+		return &res, nil
+	}
+
+	// Fallback to MasterNode if scope was tenant
+	if scope == models.WorkflowScopeTenant && bo.Config.MasterNode != nil {
+		globalCmd := &workflow_definition_command.ListWorkflowVersionsCommand{
+			WorkflowDefinitionID: workflowID,
+			PageSize:             pageSize,
+			Cursor:               cursor,
+			CF:                   db.AdminFC,
+			CFS:                  db.AdminFCSector,
+		}
+		globalRes, gErr := dragonboat.ExecuteRepositoryQuery[db.FindResult[models.WorkflowDefinitionVersion]](
+			bo.Config.MasterNode,
+			ctx,
+			globalCmd,
+			timeout,
+			bo.Config.Logger,
+			"list global workflow versions fallback",
+		)
+		if gErr == nil && len(globalRes.Entities) > 0 {
+			return &globalRes, nil
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -475,11 +522,33 @@ func (bo *WorkflowDefinitionBO) GetWorkflowVersion(
 		bo.Config.Logger,
 		"get workflow version",
 	)
+	if err == nil && ver.ID != "" {
+		return &ver, nil
+	}
+
+	// Fallback to MasterNode if scope was tenant
+	if scope == models.WorkflowScopeTenant && bo.Config.MasterNode != nil {
+		globalCmd := &workflow_definition_command.GetWorkflowVersionCommand{
+			WorkflowDefinitionID: workflowID,
+			Version:              version,
+			CF:                   db.AdminFC,
+			CFS:                  db.AdminFCSector,
+		}
+		globalVer, gErr := dragonboat.ExecuteRepositoryQuery[models.WorkflowDefinitionVersion](
+			bo.Config.MasterNode,
+			ctx,
+			globalCmd,
+			timeout,
+			bo.Config.Logger,
+			"get global workflow version fallback",
+		)
+		if gErr == nil && globalVer.ID != "" {
+			return &globalVer, nil
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	if ver.ID == "" {
-		return nil, nil
-	}
-	return &ver, nil
+	return nil, nil
 }

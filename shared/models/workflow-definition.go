@@ -14,6 +14,7 @@ type WorkflowPayloadFormat string
 const (
 	WorkflowPayloadFormatJSON WorkflowPayloadFormat = "json"
 	WorkflowPayloadFormatYAML WorkflowPayloadFormat = "yaml"
+	WorkflowPayloadFormatBPMN WorkflowPayloadFormat = "bpmn"
 )
 
 type VersionChangePolicy string

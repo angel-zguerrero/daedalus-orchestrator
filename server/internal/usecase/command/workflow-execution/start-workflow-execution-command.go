@@ -62,6 +62,12 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 	}
 
 	def, err := defRepo.GetWorkflowDefinitionByID(cmd.WorkflowDefinitionID, now)
+	if (err != nil || def == nil) && (cmd.CF != db.AdminFC || cmd.CFS != db.AdminFCSector) {
+		globalDefRepo, gErr := db.NewWorkflowDefinitionRepository(uow, idFactory, db.AdminFC, db.AdminFCSector)
+		if gErr == nil {
+			def, err = globalDefRepo.GetWorkflowDefinitionByID(cmd.WorkflowDefinitionID, now)
+		}
+	}
 	if err != nil || def == nil {
 		commandResult.Error = fmt.Sprintf("workflow definition not found: %s", cmd.WorkflowDefinitionID)
 		return *commandResult
@@ -222,6 +228,66 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 			execQ = qByCode
 		} else if qByCodeDef, _ := queueRepo.GetQueueByCode(execCode, "default", now); qByCodeDef != nil {
 			execQ = qByCodeDef
+		}
+	}
+
+	if execQ == nil {
+		execQueueID := strings.ReplaceAll(uuid.New().String(), "-", "")
+		actQueueID := strings.ReplaceAll(uuid.New().String(), "-", "")
+
+		execQueue := models.Queue{
+			ID:                        execQueueID,
+			Code:                      fmt.Sprintf("wf-exec-%s", def.Code),
+			Name:                      fmt.Sprintf("%s Executions", def.Name),
+			Type:                      models.WorkflowExecutionQueue,
+			WorkflowDefinitionID:      def.ID,
+			VNamespace:                vns,
+			State:                     models.QueueActive,
+			AllowDuplicated:           true,
+			MaxAttempts:               1000,
+			DesiredPriorityThresholds: map[int]int{0: 0},
+			PriorityThresholds:        map[int]int{0: 0},
+		}
+
+		actQueue := models.Queue{
+			ID:                        actQueueID,
+			Code:                      fmt.Sprintf("wf-act-%s", def.Code),
+			Name:                      fmt.Sprintf("%s Activities", def.Name),
+			Type:                      models.WorkflowActivityQueue,
+			WorkflowDefinitionID:      def.ID,
+			VNamespace:                vns,
+			State:                     models.QueueActive,
+			AllowDuplicated:           true,
+			MaxAttempts:               1000,
+			DesiredPriorityThresholds: map[int]int{0: 0},
+			PriorityThresholds:        map[int]int{0: 0},
+		}
+
+		assertCmd := &queue.AssertQueueCommand{
+			Queues: []models.Queue{execQueue, actQueue},
+			CF:     cmd.CF,
+			CFS:    cmd.CFS,
+		}
+		assertRes := assertCmd.Execute(uow, now)
+		if assertRes.Error != "" {
+			commandResult.Error = fmt.Sprintf("failed to auto-provision workflow queues: %s", assertRes.Error)
+			return *commandResult
+		}
+
+		queues, _ = queueRepo.GetQueuesByWorkflowDefinitionID(def.ID, now)
+		for i := range queues {
+			if queues[i].Type == models.WorkflowExecutionQueue {
+				execQ = &queues[i]
+				break
+			}
+		}
+		if execQ == nil {
+			execCode := fmt.Sprintf("wf-exec-%s", def.Code)
+			if qByCode, _ := queueRepo.GetQueueByCode(execCode, vns, now); qByCode != nil {
+				execQ = qByCode
+			} else if qByCodeDef, _ := queueRepo.GetQueueByCode(execCode, "default", now); qByCodeDef != nil {
+				execQ = qByCodeDef
+			}
 		}
 	}
 

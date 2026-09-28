@@ -103,6 +103,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 	}
 
 	def, err := defRepo.GetWorkflowDefinitionByID(execution.WorkflowDefinitionID, now)
+	if (err != nil || def == nil) && (cmd.CF != db.AdminFC || cmd.CFS != db.AdminFCSector) {
+		globalDefRepo, gErr := db.NewWorkflowDefinitionRepository(uow, idFactory, db.AdminFC, db.AdminFCSector)
+		if gErr == nil {
+			def, err = globalDefRepo.GetWorkflowDefinitionByID(execution.WorkflowDefinitionID, now)
+		}
+	}
 	if err != nil || def == nil {
 		commandResult.Error = fmt.Sprintf("workflow definition not found: %s", execution.WorkflowDefinitionID)
 		return *commandResult

@@ -1,13 +1,44 @@
 <c-card class="mb-4">
-  <c-card-header class="d-flex justify-content-between align-items-center">
-    <h5 class="mb-0">
-      <svg cIcon name="cil-task" class="me-2"></svg>
-      Workflows Management {{ scope === 'tenant' ? '(' + tenantCode + ')' : '(Global)' }}
-    </h5>
+  <c-card-header class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <h5 class="mb-0">
+        <svg cIcon name="cil-task" class="me-2"></svg>
+        Workflows Management {{ scope === 'tenant' ? '(' + tenantCode + ')' : '(Global)' }}
+      </h5>
+      <!-- Source Toggle for Tenant Scope -->
+      <div class="btn-group" role="group" *ngIf="scope === 'tenant'" aria-label="Workflow Source">
+        <button 
+          cButton 
+          [color]="workflowSource === 'tenant' ? 'primary' : 'secondary'"
+          [variant]="workflowSource === 'tenant' ? undefined : 'outline'"
+          size="sm"
+          (click)="setWorkflowSource('tenant')">
+          <svg cIcon name="cil-task" class="me-1"></svg>
+          Tenant Workflows
+        </button>
+        <button 
+          cButton 
+          [color]="workflowSource === 'global' ? 'primary' : 'secondary'"
+          [variant]="workflowSource === 'global' ? undefined : 'outline'"
+          size="sm"
+          (click)="setWorkflowSource('global')">
+          <svg cIcon name="cil-layers" class="me-1"></svg>
+          Global Workflows
+        </button>
+      </div>
+    </div>
   </c-card-header>
   <c-card-body>
     <c-alert color="danger" *ngIf="showAlert" [innerHTML]="errorMessage"></c-alert>
     <c-alert color="success" *ngIf="successMsg" dismissible>{{ successMsg }}</c-alert>
+
+    <!-- Info banner when viewing global workflows in tenant mode -->
+    <c-alert color="info" class="d-flex align-items-center mb-3" *ngIf="scope === 'tenant' && workflowSource === 'global'">
+      <svg cIcon name="cil-info" class="flex-shrink-0 me-2" size="lg"></svg>
+      <div>
+        Showing <strong>Global Workflows</strong>. These workflows are read-only and cannot be modified or deleted from a tenant, but you can <strong>execute them directly within {{ tenantCode }}</strong>. Their execution history will be recorded and filtered exclusively inside <strong>{{ tenantCode }}</strong>.
+      </div>
+    </c-alert>
 
     <!-- Search and Actions Row -->
     <c-row class="mb-3">
@@ -41,7 +72,7 @@
           </mat-autocomplete>
         </mat-form-field>
       </c-col>
-      <c-col [md]="6" class="d-flex justify-content-end align-items-end">
+      <c-col [md]="6" class="d-flex justify-content-end align-items-end" *ngIf="workflowSource !== 'global'">
         <button cButton color="primary" (click)="openCreateModal()">
           <svg cIcon name="cil-plus" class="me-1"></svg>
           Create Workflow
@@ -75,6 +106,7 @@
             <tr class="align-middle" [class.table-danger]="wf.hasDesignErrors">
               <td class="text-truncate" style="max-width: 180px;" title="{{ wf.name }}">
                 <strong>{{ wf.name }}</strong>
+                <span *ngIf="wf.scope === 'global' && scope === 'tenant'" class="badge bg-secondary ms-1">Global</span>
                 <span *ngIf="wf.hasDesignErrors" class="badge bg-danger ms-1" title="Workflow has design errors">Design Error</span>
               </td>
               <td class="text-truncate" style="max-width: 150px;" title="{{ wf.code }}">
@@ -135,6 +167,7 @@
                     <svg cIcon name="cil-info"></svg>
                   </button>
                   <button 
+                    *ngIf="workflowSource !== 'global'"
                     cButton 
                     color="warning" 
                     variant="outline"
@@ -144,6 +177,7 @@
                     <svg cIcon name="cil-pencil"></svg>
                   </button>
                   <button 
+                    *ngIf="workflowSource !== 'global'"
                     cButton 
                     color="danger" 
                     variant="outline"
@@ -171,8 +205,9 @@
             <td [attr.colspan]="scope === 'global' ? 7 : 8" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
-                <h6>No workflows found</h6>
-                <p class="mb-0">Create your first workflow definition to get started.</p>
+                <h6>No {{ workflowSource === 'global' ? 'global' : 'tenant' }} workflows found</h6>
+                <p class="mb-0" *ngIf="workflowSource !== 'global'">Create your first workflow definition to get started.</p>
+                <p class="mb-0" *ngIf="workflowSource === 'global'">No global workflow definitions available.</p>
               </div>
             </td>
           </tr>
