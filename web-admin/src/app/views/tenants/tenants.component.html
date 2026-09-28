@@ -85,11 +85,11 @@
               </c-badge>
             </td>
             <td>
-              <span class="fw-medium text-dark">{{ tenant.userName || tenant.UserID || tenant.userId || '-' }}</span>
+              <span class="fw-medium">{{ tenant.userName || tenant.UserID || tenant.userId || '-' }}</span>
             </td>
             <td>
               <div *ngIf="tenant.AccountName || tenant.accountName || tenant.AccountID || tenant.accountId; else noAppTenant">
-                <span class="fw-medium text-dark">{{ tenant.AccountName || tenant.accountName || tenant.AccountID || tenant.accountId }}</span>
+                <span class="fw-medium">{{ tenant.AccountName || tenant.accountName || tenant.AccountID || tenant.accountId }}</span>
                 <div *ngIf="tenant.ExternalUserID || tenant.externalUserId" class="text-secondary small font-monospace">{{ tenant.ExternalUserID || tenant.externalUserId }}</div>
               </div>
               <ng-template #noAppTenant><span class="text-muted">-</span></ng-template>
