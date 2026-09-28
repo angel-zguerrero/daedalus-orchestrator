@@ -6,6 +6,7 @@ import (
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
 	"deadalus-orch/server/internal/pkg/utils"
 	commands "deadalus-orch/server/internal/usecase/command"
+	workflow_definition_command "deadalus-orch/server/internal/usecase/command/workflow-definition"
 	"deadalus-orch/shared/models"
 	"fmt"
 	"sync"
@@ -80,16 +81,15 @@ func (app *Application) updateDashboardSummary() {
 	}
 
 	log.Info().
+		Int("workflows", summary.WorkflowsCount).
 		Int("tenants", summary.TenantsCount).
-		Int("exchanges", summary.ExchangesCount).
 		Int("queues", summary.QueuesCount).
-		Int("bindings", summary.BindingsCount).
 		Int("messages", summary.MessagesCount).
 		Msg("✅ Dashboard summary updated")
 }
 
 // aggregateDashboardSummary paginates all TenantInMaster records (100 per batch) from the
-// master node and accumulates the global counters.
+// master node and accumulates the global counters, and adds any global workflows.
 func (app *Application) aggregateDashboardSummary(now time.Time) (models.DashboardSummary, error) {
 	cursor := ""
 	pageSize := 100
@@ -134,9 +134,8 @@ func (app *Application) aggregateDashboardSummary(now time.Time) (models.Dashboa
 
 		for _, tenant := range tenantsResult.Entities {
 			summary.TenantsCount++
-			summary.ExchangesCount += tenant.ExchangesCount
+			summary.WorkflowsCount += tenant.WorkflowsCount
 			summary.QueuesCount += tenant.QueuesCount
-			summary.BindingsCount += tenant.BindingsCount
 			summary.MessagesCount += tenant.MessagesCount
 		}
 
@@ -149,6 +148,54 @@ func (app *Application) aggregateDashboardSummary(now time.Time) (models.Dashboa
 			break
 		}
 		cursor = tenantsResult.Cursor
+	}
+
+	// Count global workflows stored in master node
+	wfCursor := ""
+	for {
+		select {
+		case <-app.DashboardSummaryWorkerStopper.ShouldStop():
+			log.Info().Msg("🛑 DashboardSummary worker received stop signal during global workflows aggregation")
+			return summary, nil
+		default:
+		}
+
+		globalWfCmd := &workflow_definition_command.ListWorkflowDefinitionsCommand{
+			Scope:    string(models.WorkflowScopeGlobal),
+			CF:       db.AdminFC,
+			CFS:      db.AdminFCSector,
+			PageSize: 100,
+			Cursor:   wfCursor,
+		}
+
+		queryCmd := &general_command.Query_Command{
+			Command: &general_command.Repository_Command{
+				CMD: globalWfCmd,
+			},
+			Now: now.UnixNano(),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		res, err := app.MasterNode.Read(ctx, *queryCmd)
+		cancel()
+
+		if err != nil {
+			log.Debug().Err(err).Msg("Skipping global workflows aggregation due to error")
+			break
+		}
+
+		wfResult, err := commands.DecodeCommandResult[db.FindResult[models.WorkflowDefinition]](res.([]byte))
+		if err != nil {
+			log.Debug().Err(err).Msg("Skipping global workflows decode due to error")
+			break
+		}
+
+		summary.WorkflowsCount += len(wfResult.Entities)
+
+		if wfResult.Cursor == "" || len(wfResult.Entities) < 100 {
+			break
+		}
+		wfCursor = wfResult.Cursor
 	}
 
 	return summary, nil

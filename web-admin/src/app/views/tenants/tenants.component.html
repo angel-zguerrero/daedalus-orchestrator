@@ -52,9 +52,8 @@
             <th>Shard ID</th>
             <th>Column Family Index</th>
             <th>Status</th>
-            <th>Exchanges Count</th>
+            <th>Workflows Count</th>
             <th>Queues Count</th>
-            <th>Bindings Count</th>
             <th>Messages Count</th>
             <th>Active</th>
             <th>Actions</th>
@@ -75,9 +74,8 @@
                 {{ tenant.Status }}
               </c-badge>
             </td>
-            <td>{{ tenant.ExchangesCount }}</td>
+            <td>{{ tenant.WorkflowsCount }}</td>
             <td>{{ tenant.QueuesCount }}</td>
-            <td>{{ tenant.BindingsCount }}</td>
             <td>{{ tenant.MessagesCount }}</td>
             <td>
               <c-badge [color]="tenant.HasMessages ? 'success' : 'secondary'" shape="rounded-pill">
@@ -354,19 +352,14 @@
           <div class="form-text">Last modification timestamp</div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-bold">Exchanges Count</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.ExchangesCount || '0' }}</div>
-          <div class="form-text">Total number of exchanges</div>
+          <label class="form-label fw-bold">Workflows Count</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.WorkflowsCount || '0' }}</div>
+          <div class="form-text">Total number of workflows</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Queues Count</label>
           <div class="p-2 bg-dark rounded">{{ selectedTenant?.QueuesCount || '0' }}</div>
           <div class="form-text">Total number of queues</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Bindings Count</label>
-          <div class="p-2 bg-dark rounded">{{ selectedTenant?.BindingsCount || '0' }}</div>
-          <div class="form-text">Total number of bindings</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Messages Count</label>

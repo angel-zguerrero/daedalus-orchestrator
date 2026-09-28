@@ -46,9 +46,8 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 			Status:         string(tenantInMaster.Status),
 			CreatedAt:      tenantInMaster.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:      tenantInMaster.UpdatedAt.Format(time.RFC3339),
-			ExchangesCount: int32(tenantInMaster.ExchangesCount),
+			WorkflowsCount: int32(tenantInMaster.WorkflowsCount),
 			QueuesCount:    int32(tenantInMaster.QueuesCount),
-			BindingsCount:  int32(tenantInMaster.BindingsCount),
 			MessagesCount:  int32(tenantInMaster.MessagesCount),
 		},
 	}, nil
@@ -80,9 +79,8 @@ func (s *TenantService) AssertBulkTenant(ctx context.Context, r *pb.AssertBulkTe
 			Status:         string(t.Status),
 			CreatedAt:      t.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
-			ExchangesCount: int32(t.ExchangesCount),
+			WorkflowsCount: int32(t.WorkflowsCount),
 			QueuesCount:    int32(t.QueuesCount),
-			BindingsCount:  int32(t.BindingsCount),
 			MessagesCount:  int32(t.MessagesCount),
 		}
 		rTenants = append(rTenants, tt)
@@ -115,9 +113,8 @@ func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoReque
 			Status:         string(tenantInMaster.Status),
 			CreatedAt:      tenantInMaster.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:      tenantInMaster.UpdatedAt.Format(time.RFC3339),
-			ExchangesCount: int32(tenantInMaster.ExchangesCount),
+			WorkflowsCount: int32(tenantInMaster.WorkflowsCount),
 			QueuesCount:    int32(tenantInMaster.QueuesCount),
-			BindingsCount:  int32(tenantInMaster.BindingsCount),
 			MessagesCount:  int32(tenantInMaster.MessagesCount),
 		},
 		Node: &pb.Node{
@@ -155,7 +152,7 @@ func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummar
 		Message: "Tenant Summary",
 		Result: &pb.TenantSummary{
 			ID:             tenantSummary.ID,
-			ExchangesCount: int32(tenantSummary.ExchangesCount),
+			WorkflowsCount: int32(tenantSummary.WorkflowsCount),
 			QueuesCount:    int32(tenantSummary.QueuesCount),
 			MessagesCount:  int32(tenantSummary.MessagesCount),
 			CreatedAt:      tenantSummary.CreatedAt.Format(time.RFC3339),
@@ -191,9 +188,8 @@ func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest)
 			Status:         string(t.Status),
 			CreatedAt:      t.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
-			ExchangesCount: int32(t.ExchangesCount),
+			WorkflowsCount: int32(t.WorkflowsCount),
 			QueuesCount:    int32(t.QueuesCount),
-			BindingsCount:  int32(t.BindingsCount),
 			MessagesCount:  int32(t.MessagesCount),
 		}
 	}

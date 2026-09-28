@@ -5,11 +5,9 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/server/rest/activitytemplate"
 	"deadalus-orch/server/internal/infrastructure/server/rest/auth"
-	"deadalus-orch/server/internal/infrastructure/server/rest/binding"
 	"deadalus-orch/server/internal/infrastructure/server/rest/cluster"
 	"deadalus-orch/server/internal/infrastructure/server/rest/dashboard"
 	"deadalus-orch/server/internal/infrastructure/server/rest/envconfig"
-	"deadalus-orch/server/internal/infrastructure/server/rest/exchange"
 	"deadalus-orch/server/internal/infrastructure/server/rest/jobworker"
 	"deadalus-orch/server/internal/infrastructure/server/rest/metrics"
 	"deadalus-orch/server/internal/infrastructure/server/rest/oauthapp"
@@ -31,9 +29,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 	metricsController := metrics.NewMetricsController(s.Config)
 	tsdbMetricsController := metrics.NewTSDBMetricsController(s.Config)
 	tenantController := tenant.NewTenantController(s.Config)
-	exchangeController := exchange.NewExchangeController(s.Config)
 	queueController := queue.NewQueueController(s.Config)
-	bindingController := binding.NewBindingController(s.Config)
 	vnamespaceController := vnamespace.NewVNamespaceController(s.Config)
 	jobWorkerController := jobworker.NewJobWorkerController(s.Config)
 	clusterController := cluster.NewClusterController(s.Config)
@@ -86,14 +82,6 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 			tenantsGroup.POST("/:code/oauth-apps/:id/rotate-secret", sessionOnlyMiddleware(), oauthAppController.RotateSecretHandler)
 
 			{
-				// Exchanges
-				tenantsGroup.POST("/:code/exchange", requireScope("exchanges:create", "exchanges:admin"), exchangeController.CreateExchangeHandler)
-				tenantsGroup.POST("/:code/exchange/bulk", requireScope("exchanges:create", "exchanges:admin"), exchangeController.BulkCreateExchangeHandler)
-				tenantsGroup.POST("/:code/exchange/publish-message", requireScope("exchanges:create", "exchanges:admin"), exchangeController.PublishMessageHandler)
-				tenantsGroup.GET("/:code/exchange", requireScope("exchanges:list", "exchanges:admin"), exchangeController.GetExchangesHandler)
-				tenantsGroup.GET("/:code/exchange/:exchangeCode/:vnamespace", requireScope("exchanges:list", "exchanges:admin"), exchangeController.GetExchangeHandler)
-				tenantsGroup.DELETE("/:code/exchange/:exchangeCode/:vnamespace", requireScope("exchanges:delete", "exchanges:admin"), exchangeController.DeleteExchangeHandler)
-
 				// Queues
 				tenantsGroup.POST("/:code/queue", requireScope("queues:create", "queues:admin"), queueController.CreateQueueHandler)
 				tenantsGroup.POST("/:code/queue/bulk", requireScope("queues:create", "queues:admin"), queueController.BulkCreateQueueHandler)
@@ -103,13 +91,7 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 				tenantsGroup.GET("/:code/queue/:queueCode/:vnamespace/messages", requireScope("queues:list", "queues:admin"), queueController.GetQueueMessagesHandler)
 				tenantsGroup.DELETE("/:code/queue/:queueCode/:vnamespace", requireScope("queues:delete", "queues:admin"), queueController.DeleteQueueHandler)
 
-				// Bindings
-				tenantsGroup.POST("/:code/binding", requireScope("bindings:create", "bindings:admin"), bindingController.CreateBindingHandler)
-				tenantsGroup.GET("/:code/bindings", requireScope("bindings:list", "bindings:admin"), bindingController.GetBindingsHandler)
-				tenantsGroup.GET("/:code/binding/:exchangeCode/:queueCode/:vnamespace", requireScope("bindings:list", "bindings:admin"), bindingController.GetBindingHandler)
-				tenantsGroup.DELETE("/:code/binding/:bindingCode/:vnamespace", requireScope("bindings:delete", "bindings:admin"), bindingController.DeleteBindingHandler)
-
-				tenantsGroup.GET("/:code/vnamespaces", requireScope("exchanges:list", "queues:list", "workflows:list", "tenants:list", "tenants:admin"), vnamespaceController.GetVNamespacesHandler)
+				tenantsGroup.GET("/:code/vnamespaces", requireScope("queues:list", "workflows:list", "tenants:list", "tenants:admin"), vnamespaceController.GetVNamespacesHandler)
 
 				// Scheduled Jobs
 				tenantsGroup.POST("/:code/scheduled-job/one-off", requireScope("workflows:create", "workflows:admin"), scheduledJobController.CreateOneOffScheduledJobHandler)

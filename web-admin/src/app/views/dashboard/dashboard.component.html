@@ -133,6 +133,17 @@
         <!-- Metrics cards (Moved below charts and made smaller) -->
         <div *ngIf="dashboardSummary && !dashboardLoading" class="row mt-4">
 
+          <!-- Workflows -->
+          <div class="col">
+            <div class="card border-info h-100">
+              <div class="card-body text-center py-2">
+                <svg cIcon name="cil-transfer" size="xl" class="text-info mb-1"></svg>
+                <h5 class="card-title text-info mb-1">{{ dashboardSummary.WorkflowsCount || 0 }}</h5>
+                <p class="card-text text-muted small mb-0">Workflows</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Tenants -->
           <div class="col">
             <div class="card border-primary h-100">
@@ -144,17 +155,6 @@
             </div>
           </div>
 
-          <!-- Exchanges -->
-          <div class="col">
-            <div class="card border-success h-100">
-              <div class="card-body text-center py-2">
-                <svg cIcon name="cil-share" size="xl" class="text-success mb-1"></svg>
-                <h5 class="card-title text-success mb-1">{{ dashboardSummary.ExchangesCount || 0 }}</h5>
-                <p class="card-text text-muted small mb-0">Exchanges</p>
-              </div>
-            </div>
-          </div>
-
           <!-- Queues -->
           <div class="col">
             <div class="card border-warning h-100">
@@ -162,17 +162,6 @@
                 <svg cIcon name="cil-list" size="xl" class="text-warning mb-1"></svg>
                 <h5 class="card-title text-warning mb-1">{{ dashboardSummary.QueuesCount || 0 }}</h5>
                 <p class="card-text text-muted small mb-0">Queues</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Bindings -->
-          <div class="col">
-            <div class="card border-info h-100">
-              <div class="card-body text-center py-2">
-                <svg cIcon name="cil-link" size="xl" class="text-info mb-1"></svg>
-                <h5 class="card-title text-info mb-1">{{ dashboardSummary.BindingsCount || 0 }}</h5>
-                <p class="card-text text-muted small mb-0">Bindings</p>
               </div>
             </div>
           </div>

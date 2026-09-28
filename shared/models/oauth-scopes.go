@@ -19,18 +19,6 @@ const (
 	ScopeQueueEdit   = "queues:edit"
 	ScopeQueueList   = "queues:list"
 
-	ScopeExchangeAdmin  = "exchanges:admin"
-	ScopeExchangeCreate = "exchanges:create"
-	ScopeExchangeDelete = "exchanges:delete"
-	ScopeExchangeEdit   = "exchanges:edit"
-	ScopeExchangeList   = "exchanges:list"
-
-	ScopeBindingAdmin  = "bindings:admin"
-	ScopeBindingCreate = "bindings:create"
-	ScopeBindingDelete = "bindings:delete"
-	ScopeBindingEdit   = "bindings:edit"
-	ScopeBindingList   = "bindings:list"
-
 	ScopeWorkflowAdmin  = "workflows:admin"
 	ScopeWorkflowCreate = "workflows:create"
 	ScopeWorkflowDelete = "workflows:delete"
@@ -43,7 +31,5 @@ var AllScopes = []string{
 	ScopeTenantAdmin, ScopeTenantCreate, ScopeTenantDelete, ScopeTenantEdit, ScopeTenantList,
 	ScopeUserAdmin, ScopeUserCreate, ScopeUserDelete, ScopeUserEdit, ScopeUserList,
 	ScopeQueueAdmin, ScopeQueueCreate, ScopeQueueDelete, ScopeQueueEdit, ScopeQueueList,
-	ScopeExchangeAdmin, ScopeExchangeCreate, ScopeExchangeDelete, ScopeExchangeEdit, ScopeExchangeList,
-	ScopeBindingAdmin, ScopeBindingCreate, ScopeBindingDelete, ScopeBindingEdit, ScopeBindingList,
 	ScopeWorkflowAdmin, ScopeWorkflowCreate, ScopeWorkflowDelete, ScopeWorkflowEdit, ScopeWorkflowList,
 }

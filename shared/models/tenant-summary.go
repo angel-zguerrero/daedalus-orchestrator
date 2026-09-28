@@ -4,10 +4,8 @@ import "time"
 
 type TenantSummary struct {
 	ID string `orm:"primary-key"`
-
-	ExchangesCount int
+	WorkflowsCount int
 	QueuesCount    int
-	BindingsCount  int
 	MessagesCount  int
 	HasMessages    bool
 

@@ -16,22 +16,13 @@ const (
 	ScheduledJobRecurring ScheduledJobType = "Recurring"
 )
 
-type ScheduledJobTargetType string
-
-const (
-	ScheduledJobTargetQueue    ScheduledJobTargetType = "queue"
-	ScheduledJobTargetExchange ScheduledJobTargetType = "exchange"
-)
-
 type ScheduledJob struct {
 	ID   string `orm:"primary-key"`
 	Code string `orm:"unique"`
 
-	TenantID                       string
-	TargetType                     string // "queue" or "exchange"
-	TargetID                       string // resolved queue ID or exchange ID
-	TargetCode                     string
-	RoutingKeyOrPatternOrQueueCode string
+	TenantID  string
+	QueueID   string
+	QueueCode string
 
 	VNamespace  string
 	Content     string            `orm:"data-only"`
