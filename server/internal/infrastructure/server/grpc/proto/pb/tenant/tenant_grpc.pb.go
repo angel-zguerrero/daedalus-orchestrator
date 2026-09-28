@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v6.33.4
-// source: internal/infrastructure/server/grpc/proto/definitions/tenant.proto
+// source: tenant.proto
 
 package tenant
 
@@ -307,5 +307,5 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/infrastructure/server/grpc/proto/definitions/tenant.proto",
+	Metadata: "tenant.proto",
 }

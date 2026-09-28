@@ -3,7 +3,6 @@ package scheduled_job
 import (
 	"deadalus-orch/server/internal/infrastructure/db"
 	"deadalus-orch/server/internal/usecase/command"
-	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	"deadalus-orch/shared/models"
 	"encoding/gob"
@@ -191,11 +190,16 @@ func (cmd *ProcessDueScheduledJobsCommand) resolveTargetMessages(
 	executionID string,
 	now time.Time,
 ) ([]models.QueueMessage, []*models.ScheduledJobTracker, error) {
+	if job.QueueID == "" {
+		return nil, nil, fmt.Errorf("scheduled job %s has no QueueID", job.ID)
+	}
+
 	msgID := fmt.Sprintf("msg_%s_%d", job.ID, job.NextRunAt.Unix())
 
 	baseMessage := models.QueueMessage{
-		ID:             fmt.Sprintf("msg_%s_%d", job.ID, job.NextRunAt.Unix()),
+		ID:             fmt.Sprintf("msg_%s_%d_%s", job.ID, job.NextRunAt.Unix(), job.QueueID),
 		MessageID:      msgID,
+		QueueID:        job.QueueID,
 		Content:        []byte(job.Content),
 		ContentType:    job.ContentType,
 		Headers:        job.Headers,
@@ -209,69 +213,13 @@ func (cmd *ProcessDueScheduledJobsCommand) resolveTargetMessages(
 		UpdatedAt:      now,
 	}
 
-	if job.TargetType == string(models.ScheduledJobTargetQueue) {
-		baseMessage.QueueID = job.TargetID
-		baseMessage.ID = fmt.Sprintf("msg_%s_%d_%s", job.ID, job.NextRunAt.Unix(), job.TargetID)
-
-		tracker := &models.ScheduledJobTracker{
-			ID:             fmt.Sprintf("trk_%s_%s", executionID, job.TargetID),
-			ScheduledJobID: job.ID,
-			ExecutionID:    executionID,
-			QueueID:        job.TargetID,
-			Status:         models.ScheduledJobTrackerPending,
-		}
-		return []models.QueueMessage{baseMessage}, []*models.ScheduledJobTracker{tracker}, nil
+	tracker := &models.ScheduledJobTracker{
+		ID:             fmt.Sprintf("trk_%s_%s", executionID, job.QueueID),
+		ScheduledJobID: job.ID,
+		ExecutionID:    executionID,
+		QueueID:        job.QueueID,
+		Status:         models.ScheduledJobTrackerPending,
 	}
 
-	if job.TargetType == string(models.ScheduledJobTargetExchange) {
-		routingKey := job.RoutingKeyOrPatternOrQueueCode
-		if rk, ok := job.Headers["routing_key"]; ok && rk != "" {
-			routingKey = rk
-		} else if rk, ok := job.Headers["routingKey"]; ok && rk != "" {
-			routingKey = rk
-		}
-
-		resolveCmd := &binding_command.ResolveAndFetchQueuesCommand{
-			ExchangeCode:   job.TargetCode,
-			RoutingKey:     routingKey,
-			MessageHeaders: job.Headers,
-			VNamespace:     job.VNamespace,
-			CF:             cmd.CF,
-			CFS:            cmd.CFS,
-		}
-
-		res := resolveCmd.Execute(uow, now)
-		if res.Error != "" {
-			return nil, nil, fmt.Errorf("exchange queue resolution error: %s", res.Error)
-		}
-
-		fetchRes, ok := res.Result.(binding_command.ResolveAndFetchQueuesResult)
-		if !ok || len(fetchRes.Queues) == 0 {
-			return nil, nil, nil
-		}
-
-		messages := make([]models.QueueMessage, 0, len(fetchRes.Queues))
-		trackers := make([]*models.ScheduledJobTracker, 0, len(fetchRes.Queues))
-		for _, q := range fetchRes.Queues {
-			if q.State == models.QueueActive {
-				m := baseMessage
-				m.ID = fmt.Sprintf("msg_%s_%d_%s", job.ID, job.NextRunAt.Unix(), q.ID)
-				m.QueueID = q.ID
-				messages = append(messages, m)
-
-				t := &models.ScheduledJobTracker{
-					ID:             fmt.Sprintf("trk_%s_%s", executionID, q.ID),
-					ScheduledJobID: job.ID,
-					ExecutionID:    executionID,
-					QueueID:        q.ID,
-					Status:         models.ScheduledJobTrackerPending,
-				}
-				trackers = append(trackers, t)
-			}
-		}
-
-		return messages, trackers, nil
-	}
-
-	return nil, nil, fmt.Errorf("unknown target type: %s", job.TargetType)
+	return []models.QueueMessage{baseMessage}, []*models.ScheduledJobTracker{tracker}, nil
 }
