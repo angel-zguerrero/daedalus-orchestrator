@@ -15,6 +15,7 @@ import {
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
 import { WorkflowsService, WorkflowDefinition, WorkflowExecution, WorkflowExecutionDetail, WaitingEvent, WaitingEventFormField } from '../services/workflows.service';
+import { UsersService } from '../../users/services/users.service';
 import { ErrorUtil } from '../../../shared/utils/error.util';
 import { BpmnDesignerComponent, DEFAULT_BPMN_XML } from '../../../shared/components/bpmn-designer/bpmn-designer.component';
 
@@ -57,6 +58,7 @@ export class WorkflowExecutionsComponent implements OnInit {
   showExecutionDetailModal: boolean = false;
   selectedExecutionDetail: WorkflowExecutionDetail | null = null;
   selectedExecutionId: string = '';
+  selectedExecutionUserName: string = '';
   loadingExecutionDetail: boolean = false;
   executionDetailError: string = '';
   activeDetailTab: 'overview' | 'payloads' | 'activities' | 'tokens' | 'waitingEvents' | 'diagram' = 'overview';
@@ -76,7 +78,8 @@ export class WorkflowExecutionsComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private location: Location,
-    private workflowsService: WorkflowsService
+    private workflowsService: WorkflowsService,
+    private usersService: UsersService
   ) {}
 
   ngOnInit(): void {
@@ -124,7 +127,12 @@ export class WorkflowExecutionsComponent implements OnInit {
           payloadFormat: (entity.payloadFormat || entity.PayloadFormat || 'json').toLowerCase() as any,
           maxDurationSeconds: entity.maxDurationSeconds || 0,
           isActive: entity.isActive !== undefined ? entity.isActive : true,
-          scope: this.scope
+          scope: this.scope,
+          userId: entity.userId || entity.UserID || '',
+          userName: entity.userName || entity.UserName || '',
+          accountId: entity.accountId || entity.AccountID || '',
+          accountName: entity.accountName || entity.AccountName || '',
+          externalUserId: entity.externalUserId || entity.ExternalUserID || ''
         };
         this.loadingWorkflow = false;
       },
@@ -158,11 +166,28 @@ export class WorkflowExecutionsComponent implements OnInit {
           output: e.output || e.Output || null,
           stateData: e.stateData || e.StateData || null,
           error: e.error || e.Error || '',
+          userId: e.userId || e.UserID || '',
+          userName: e.userName || e.UserName || '',
+          accountId: e.accountId || e.AccountID || '',
+          accountName: e.accountName || e.AccountName || '',
+          externalUserId: e.externalUserId || e.ExternalUserID || '',
           startedAt: e.startedAt || e.StartedAt || null,
           completedAt: e.completedAt || e.CompletedAt || null,
           createdAt: e.createdAt || e.CreatedAt || '',
           updatedAt: e.updatedAt || e.UpdatedAt || ''
         }));
+
+        const userIds = this.executionsList.map(x => x.userId).filter((id): id is string => !!id);
+        if (userIds.length > 0) {
+          this.usersService.resolveUsers(userIds).subscribe(userMap => {
+            this.executionsList.forEach(x => {
+              if (x.userId && userMap.has(x.userId)) {
+                x.userName = userMap.get(x.userId);
+              }
+            });
+          });
+        }
+
         this.loadingExecutions = false;
       },
       error: (err) => {
@@ -178,6 +203,7 @@ export class WorkflowExecutionsComponent implements OnInit {
     this.loadingExecutionDetail = true;
     this.executionDetailError = '';
     this.selectedExecutionDetail = null;
+    this.selectedExecutionUserName = '';
 
     const req$ = this.scope === 'global'
       ? this.workflowsService.getGlobalExecutionDetail(executionId)
@@ -203,6 +229,11 @@ export class WorkflowExecutionsComponent implements OnInit {
             output: rawExec.output || rawExec.Output || null,
             stateData: rawExec.stateData || rawExec.StateData || null,
             error: rawExec.error || rawExec.Error || '',
+            userId: rawExec.userId || rawExec.UserID || '',
+            userName: rawExec.userName || rawExec.UserName || '',
+            accountId: rawExec.accountId || rawExec.AccountID || '',
+            accountName: rawExec.accountName || rawExec.AccountName || '',
+            externalUserId: rawExec.externalUserId || rawExec.ExternalUserID || '',
             startedAt: rawExec.startedAt || rawExec.StartedAt || null,
             completedAt: rawExec.completedAt || rawExec.CompletedAt || null,
             createdAt: rawExec.createdAt || rawExec.CreatedAt || '',
@@ -257,6 +288,14 @@ export class WorkflowExecutionsComponent implements OnInit {
         };
         this.waitingEvents = this.selectedExecutionDetail.waitingEvents || [];
         this.initWaitEventForms();
+
+        this.selectedExecutionUserName = this.selectedExecutionDetail.execution.userName || this.selectedExecutionDetail.execution.userId || '';
+        if (this.selectedExecutionDetail.execution.userId) {
+          this.usersService.resolveUser(this.selectedExecutionDetail.execution.userId).subscribe(name => {
+            this.selectedExecutionUserName = name;
+          });
+        }
+
         this.loadingExecutionDetail = false;
 
         if (this.activeDetailTab === 'diagram') {

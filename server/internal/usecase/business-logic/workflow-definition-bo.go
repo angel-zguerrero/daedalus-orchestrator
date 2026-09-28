@@ -158,6 +158,24 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 		UpdatedAt:          time.Now().UTC(),
 	}
 
+	caller := common.GetCallerIdentity(ctx)
+	if caller != nil {
+		wf.UserID = caller.UserID
+		wf.AccountID = caller.AccountID
+		wf.AccountName = caller.AccountName
+		wf.ExternalUserID = caller.ExternalUserID
+
+		execQueue.UserID = caller.UserID
+		execQueue.AccountID = caller.AccountID
+		execQueue.AccountName = caller.AccountName
+		execQueue.ExternalUserID = caller.ExternalUserID
+
+		actQueue.UserID = caller.UserID
+		actQueue.AccountID = caller.AccountID
+		actQueue.AccountName = caller.AccountName
+		actQueue.ExternalUserID = caller.ExternalUserID
+	}
+
 	cmd := &workflow_definition_command.CreateWorkflowDefinitionCommand{
 		WorkflowDefinition: wf,
 		ExecQueue:          execQueue,
@@ -222,6 +240,14 @@ func (bo *WorkflowDefinitionBO) UpdateWorkflow(
 		MaxDurationSeconds: maxDurationSeconds,
 		IsActive:           isActive,
 		VNamespace:         vnamespace,
+	}
+
+	caller := common.GetCallerIdentity(ctx)
+	if caller != nil {
+		wf.UserID = caller.UserID
+		wf.AccountID = caller.AccountID
+		wf.AccountName = caller.AccountName
+		wf.ExternalUserID = caller.ExternalUserID
 	}
 
 	cmd := &workflow_definition_command.UpdateWorkflowDefinitionCommand{

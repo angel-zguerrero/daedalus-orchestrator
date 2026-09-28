@@ -30,6 +30,10 @@ type StartWorkflowExecutionCommand struct {
 	OnVersionChange      models.VersionChangePolicy
 	Input                map[string]interface{}
 	VNamespace           string
+	UserID               string
+	AccountID            string
+	AccountName          string
+	ExternalUserID       string
 	CF                   string
 	CFS                  string
 }
@@ -162,6 +166,10 @@ func (cmd *StartWorkflowExecutionCommand) Execute(uow *db.UnitOfWork, now time.T
 		Status:                    models.WorkflowExecutionStatusRunning,
 		Input:                     inputData,
 		StateData:                 stateData,
+		UserID:                    cmd.UserID,
+		AccountID:                 cmd.AccountID,
+		AccountName:               cmd.AccountName,
+		ExternalUserID:            cmd.ExternalUserID,
 		TTL:                       executionTTL,
 		StartedAt:                 &now,
 		CreatedAt:                 now,

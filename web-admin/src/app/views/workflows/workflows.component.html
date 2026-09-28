@@ -67,6 +67,8 @@
             <th>Payload Format</th>
             <th>Max Duration</th>
             <th>Status</th>
+            <th>Usuario</th>
+            <th>App</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -94,6 +96,16 @@
                 <c-badge [color]="wf.isActive ? 'success' : 'secondary'" shape="rounded-pill">
                   {{ wf.isActive ? 'Active' : 'Inactive' }}
                 </c-badge>
+              </td>
+              <td>
+                <span class="fw-medium">{{ wf.userName || wf.userId || '-' }}</span>
+              </td>
+              <td>
+                <div *ngIf="wf.accountName || wf.accountId; else noAppWf">
+                  <span class="fw-medium">{{ wf.accountName || wf.accountId }}</span>
+                  <div *ngIf="wf.externalUserId" class="text-secondary small font-monospace">{{ wf.externalUserId }}</div>
+                </div>
+                <ng-template #noAppWf><span class="text-muted">-</span></ng-template>
               </td>
               <td>
                 <div class="btn-group" role="group">
@@ -158,7 +170,7 @@
 
             <!-- Expanded full-width error sub-row when workflow has design errors -->
             <tr *ngIf="wf.hasDesignErrors && wf.designErrorMessages && wf.designErrorMessages.length > 0">
-              <td [attr.colspan]="scope !== 'global' ? 8 : 7" class="p-0 border-0">
+              <td [attr.colspan]="scope !== 'global' ? 10 : 9" class="p-0 border-0">
                 <app-design-errors-console
                   [errors]="wf.designErrorMessages"
                   mode="table-row"
@@ -168,7 +180,7 @@
             </tr>
           </ng-container>
           <tr *ngIf="filteredWorkflows.length === 0">
-            <td [attr.colspan]="scope === 'global' ? 7 : 8" class="text-center py-4">
+            <td [attr.colspan]="scope === 'global' ? 9 : 10" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No workflows found</h6>
@@ -480,6 +492,10 @@
             </c-badge>
           </div>
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Usuario</label>
+          <div class="p-2 bg-dark rounded">{{ selectedWorkflowUserName || selectedWorkflow.userName || selectedWorkflow.userId || '-' }}</div>
+        </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
@@ -497,6 +513,13 @@
         <div class="mb-3">
           <label class="form-label fw-bold">Scope</label>
           <div class="p-2 bg-dark rounded">{{ selectedWorkflow.scope | titlecase }}</div>
+        </div>
+        <div class="mb-3" *ngIf="selectedWorkflow.accountName || selectedWorkflow.accountId">
+          <label class="form-label fw-bold">App</label>
+          <div class="p-2 bg-dark rounded">
+            <div>{{ selectedWorkflow.accountName || selectedWorkflow.accountId }}</div>
+            <div *ngIf="selectedWorkflow.externalUserId" class="text-secondary small font-monospace mt-1">External User: {{ selectedWorkflow.externalUserId }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -812,6 +835,8 @@
             <th>Execution Key</th>
             <th>VNamespace</th>
             <th>Status</th>
+            <th>Usuario</th>
+            <th>App</th>
             <th>Started At</th>
             <th>Completed At</th>
             <th>Actions</th>
@@ -832,6 +857,16 @@
                 {{ exec.status | uppercase }}
               </c-badge>
             </td>
+            <td>
+              <span class="fw-medium">{{ exec.userName || exec.userId || '-' }}</span>
+            </td>
+            <td>
+              <div *ngIf="exec.accountName || exec.accountId; else noAppExec">
+                <span class="fw-medium">{{ exec.accountName || exec.accountId }}</span>
+                <div *ngIf="exec.externalUserId" class="text-secondary small font-monospace">{{ exec.externalUserId }}</div>
+              </div>
+              <ng-template #noAppExec><span class="text-muted">-</span></ng-template>
+            </td>
             <td class="small">{{ exec.startedAt ? (exec.startedAt | date:'medium') : (exec.createdAt | date:'medium') }}</td>
             <td class="small">{{ exec.completedAt ? (exec.completedAt | date:'medium') : '-' }}</td>
             <td>
@@ -841,7 +876,7 @@
             </td>
           </tr>
           <tr *ngIf="executionsList.length === 0">
-            <td colspan="7" class="text-center py-4 text-muted">
+            <td colspan="9" class="text-center py-4 text-muted">
               <svg cIcon name="cil-inbox" size="2xl" class="d-block mx-auto mb-2"></svg>
               No executions found for this workflow definition.
             </td>
@@ -948,6 +983,14 @@
                         {{ selectedExecutionDetail.execution.status | uppercase }}
                       </c-badge>
                     </td></tr>
+                    <tr><td><strong>Usuario:</strong></td><td>{{ selectedExecutionUserName || selectedExecutionDetail.execution.userName || selectedExecutionDetail.execution.userId || '-' }}</td></tr>
+                    <tr *ngIf="selectedExecutionDetail.execution.accountName || selectedExecutionDetail.execution.accountId">
+                      <td><strong>App:</strong></td>
+                      <td>
+                        <div>{{ selectedExecutionDetail.execution.accountName || selectedExecutionDetail.execution.accountId }}</div>
+                        <div *ngIf="selectedExecutionDetail.execution.externalUserId" class="text-secondary small font-monospace">External User: {{ selectedExecutionDetail.execution.externalUserId }}</div>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

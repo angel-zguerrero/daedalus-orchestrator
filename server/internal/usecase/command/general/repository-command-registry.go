@@ -152,6 +152,8 @@ func init() {
 	RegisterRepoCommand("DeleteUserCommand", func() commands.Command { return &user_command.DeleteUserCommand{} })
 	RegisterRepoCommand("GetUsersCommand", func() commands.Command { return &user_command.GetUsersCommand{} })
 	RegisterRepoCommand("UpdateUserCommand", func() commands.Command { return &user_command.UpdateUserCommand{} })
+	RegisterRepoCommand("GetUserByIdCommand", func() commands.Command { return &user_command.GetUserByIdCommand{} })
+	RegisterRepoCommand("GetUsersByIdsCommand", func() commands.Command { return &user_command.GetUsersByIdsCommand{} })
 
 	// VNamespace commands
 	RegisterRepoCommand("PaginateVNamespacesCommand", func() commands.Command { return &vnamespace_command.PaginateVNamespacesCommand{} })

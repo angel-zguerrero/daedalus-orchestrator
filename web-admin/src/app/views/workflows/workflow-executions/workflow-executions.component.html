@@ -46,6 +46,8 @@
             <th>Execution Key</th>
             <th>VNamespace</th>
             <th>Status</th>
+            <th>Usuario</th>
+            <th>App</th>
             <th>Started At</th>
             <th>Completed At</th>
             <th>Actions</th>
@@ -66,6 +68,16 @@
                 {{ exec.status | uppercase }}
               </c-badge>
             </td>
+            <td>
+              <span class="fw-medium">{{ exec.userName || exec.userId || '-' }}</span>
+            </td>
+            <td>
+              <div *ngIf="exec.accountName || exec.accountId; else noAppExec">
+                <span class="fw-medium">{{ exec.accountName || exec.accountId }}</span>
+                <div *ngIf="exec.externalUserId" class="text-secondary small font-monospace">{{ exec.externalUserId }}</div>
+              </div>
+              <ng-template #noAppExec><span class="text-muted">-</span></ng-template>
+            </td>
             <td class="small">{{ exec.startedAt ? (exec.startedAt | date:'medium') : (exec.createdAt | date:'medium') }}</td>
             <td class="small">{{ exec.completedAt ? (exec.completedAt | date:'medium') : '-' }}</td>
             <td>
@@ -76,7 +88,7 @@
             </td>
           </tr>
           <tr *ngIf="executionsList.length === 0">
-            <td colspan="7" class="text-center py-4 text-muted">
+            <td colspan="9" class="text-center py-4 text-muted">
               <svg cIcon name="cil-inbox" size="2xl" class="d-block mx-auto mb-2"></svg>
               No executions found for this workflow definition.
             </td>
@@ -184,6 +196,14 @@
                         {{ selectedExecutionDetail.execution.status | uppercase }}
                       </c-badge>
                     </td></tr>
+                    <tr><td><strong>Usuario:</strong></td><td>{{ selectedExecutionUserName || selectedExecutionDetail.execution.userName || selectedExecutionDetail.execution.userId || '-' }}</td></tr>
+                    <tr *ngIf="selectedExecutionDetail.execution.accountName || selectedExecutionDetail.execution.accountId">
+                      <td><strong>App:</strong></td>
+                      <td>
+                        <div>{{ selectedExecutionDetail.execution.accountName || selectedExecutionDetail.execution.accountId }}</div>
+                        <div *ngIf="selectedExecutionDetail.execution.externalUserId" class="text-secondary small font-monospace">External User: {{ selectedExecutionDetail.execution.externalUserId }}</div>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

@@ -210,6 +210,8 @@ func (s *RestServer) setupRoutes(engine *gin.Engine) {
 		usersGroup.Use(rateLimitMiddleware(s.Config.MasterNode, "token", 1*time.Minute, 300))
 		{
 			usersGroup.GET("", userController.GetUsersHandler)
+			usersGroup.POST("/by-ids", userController.GetUsersByIdsHandler)
+			usersGroup.GET("/:id", userController.GetUserHandler)
 			usersGroup.POST("", userController.CreateUserHandler)
 			usersGroup.PUT("/:id", userController.UpdateUserHandler)
 			usersGroup.DELETE("/:id", userController.DeleteUserHandler)

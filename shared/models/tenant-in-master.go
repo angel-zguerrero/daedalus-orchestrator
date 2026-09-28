@@ -24,6 +24,11 @@ type TenantInMaster struct {
 
 	Status TenantInMasterStatus
 
+	UserID         string `json:"userId,omitempty"`
+	AccountID      string `json:"accountId,omitempty"`
+	AccountName    string `json:"accountName,omitempty"`
+	ExternalUserID string `json:"externalUserId,omitempty"`
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
