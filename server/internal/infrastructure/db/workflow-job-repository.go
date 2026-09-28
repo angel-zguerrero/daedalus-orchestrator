@@ -29,6 +29,9 @@ func (r *WorkflowJobRepository) CreateWorkflowJob(input *models.WorkflowJob, now
 	if input.Status == "" {
 		input.Status = models.WorkflowJobStatusPending
 	}
+	if input.TTL <= 0 {
+		input.TTL = models.CalculateWorkflowExecutionTTL(0)
+	}
 	input.CreatedAt = now
 	input.UpdatedAt = now
 	return r.Create(input, now)

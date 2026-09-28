@@ -31,6 +31,7 @@ type WorkflowJob struct {
 	AssignedWorkerID     string            `json:"assignedWorkerId,omitempty"`
 	LockExpiresAt        *time.Time        `json:"lockExpiresAt,omitempty"`
 	CompletedAt          *time.Time        `json:"completedAt,omitempty"`
+	TTL                  int64             `orm:"ttl" json:"ttl,omitempty"`
 	CreatedAt            time.Time         `json:"createdAt"`
 	UpdatedAt            time.Time         `json:"updatedAt"`
 }
