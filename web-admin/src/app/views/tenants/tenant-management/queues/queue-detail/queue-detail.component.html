@@ -396,35 +396,6 @@
         </div>
       </div>
 
-      <!-- Dead Letter Exchange Section -->
-      <div class="mb-3">
-        <label class="form-label fw-bold">
-          <svg cIcon name="cil-warning" class="me-2"></svg>
-          Dead Letter Exchange
-        </label>
-        <div class="form-text mb-2">Configuration for handling failed message processing</div>
-
-        <div *ngIf="queue?.DeadLetterExchangeId || queue?.deadLetterExchangeId; else noDeadLetterExchange" class="border rounded p-3">
-          <div class="row">
-            <div class="col-md-8">
-              <strong>Exchange ID:</strong>
-              <div class="p-2 bg-dark rounded mt-1 font-monospace">{{ queue?.DeadLetterExchangeId || queue?.deadLetterExchangeId }}</div>
-            </div>
-            <div class="col-md-4" *ngIf="queue?.DeadLetterExchangeRoutingKeyOrPattern || queue?.deadLetterExchangeRoutingKeyOrPattern">
-              <strong>Routing Key/Pattern:</strong>
-              <div class="p-2 bg-dark rounded mt-1 font-monospace">{{ queue?.DeadLetterExchangeRoutingKeyOrPattern || queue?.deadLetterExchangeRoutingKeyOrPattern }}</div>
-            </div>
-          </div>
-        </div>
-
-        <ng-template #noDeadLetterExchange>
-          <div class="p-3 text-muted border rounded bg-light">
-            <svg cIcon name="cil-info" class="me-1"></svg>
-            No Dead Letter Exchange configured
-          </div>
-        </ng-template>
-      </div>
-
       <!-- Headers Section -->
       <div class="mb-3">
         <label class="form-label fw-bold">

@@ -77,27 +77,25 @@ func (QueueType) EnumDescriptor() ([]byte, []int) {
 }
 
 type CreateQueueRequest struct {
-	state                                 protoimpl.MessageState `protogen:"open.v1"`
-	TenantCode                            string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
-	Code                                  string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name                                  string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Type                                  string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	State                                 string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace                            string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	DefaultQueueMessageTTL                int32                  `protobuf:"varint,7,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
-	DefaultQueueMessageDelayTime          int32                  `protobuf:"varint,8,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
-	QueueExpires                          int32                  `protobuf:"varint,9,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
-	AllowDuplicated                       bool                   `protobuf:"varint,10,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts                           int32                  `protobuf:"varint,11,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	DesiredPriorityThresholds             map[int32]int32        `protobuf:"bytes,12,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	Headers                               map[string]string      `protobuf:"bytes,13,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	DeadLetterExchangeId                  string                 `protobuf:"bytes,14,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
-	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,15,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
-	MaxQueueSize                          int32                  `protobuf:"varint,16,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
-	MaxDeliveringMessages                 int32                  `protobuf:"varint,17,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
-	WorkflowDefinitionID                  string                 `protobuf:"bytes,18,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
-	unknownFields                         protoimpl.UnknownFields
-	sizeCache                             protoimpl.SizeCache
+	state                        protoimpl.MessageState `protogen:"open.v1"`
+	TenantCode                   string                 `protobuf:"bytes,1,opt,name=tenantCode,proto3" json:"tenantCode,omitempty"`
+	Code                         string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name                         string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type                         string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	State                        string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace                   string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	DefaultQueueMessageTTL       int32                  `protobuf:"varint,7,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
+	DefaultQueueMessageDelayTime int32                  `protobuf:"varint,8,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
+	QueueExpires                 int32                  `protobuf:"varint,9,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
+	AllowDuplicated              bool                   `protobuf:"varint,10,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts                  int32                  `protobuf:"varint,11,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	DesiredPriorityThresholds    map[int32]int32        `protobuf:"bytes,12,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                      map[string]string      `protobuf:"bytes,13,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MaxQueueSize                 int32                  `protobuf:"varint,14,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
+	MaxDeliveringMessages        int32                  `protobuf:"varint,15,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
+	WorkflowDefinitionID         string                 `protobuf:"bytes,16,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *CreateQueueRequest) Reset() {
@@ -219,20 +217,6 @@ func (x *CreateQueueRequest) GetHeaders() map[string]string {
 		return x.Headers
 	}
 	return nil
-}
-
-func (x *CreateQueueRequest) GetDeadLetterExchangeId() string {
-	if x != nil {
-		return x.DeadLetterExchangeId
-	}
-	return ""
-}
-
-func (x *CreateQueueRequest) GetDeadLetterExchangeRoutingKeyOrPattern() string {
-	if x != nil {
-		return x.DeadLetterExchangeRoutingKeyOrPattern
-	}
-	return ""
 }
 
 func (x *CreateQueueRequest) GetMaxQueueSize() int32 {
@@ -361,26 +345,24 @@ func (x *BulkCreateQueueRequest) GetQueues() []*CreateQueueItem {
 }
 
 type CreateQueueItem struct {
-	state                                 protoimpl.MessageState `protogen:"open.v1"`
-	Code                                  string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Name                                  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Type                                  string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	State                                 string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace                            string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	DefaultQueueMessageTTL                int32                  `protobuf:"varint,6,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
-	DefaultQueueMessageDelayTime          int32                  `protobuf:"varint,7,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
-	QueueExpires                          int32                  `protobuf:"varint,8,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
-	AllowDuplicated                       bool                   `protobuf:"varint,9,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts                           int32                  `protobuf:"varint,10,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	DesiredPriorityThresholds             map[int32]int32        `protobuf:"bytes,11,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	Headers                               map[string]string      `protobuf:"bytes,12,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	DeadLetterExchangeId                  string                 `protobuf:"bytes,13,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
-	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,14,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
-	MaxQueueSize                          int32                  `protobuf:"varint,15,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
-	MaxDeliveringMessages                 int32                  `protobuf:"varint,16,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
-	WorkflowDefinitionID                  string                 `protobuf:"bytes,17,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
-	unknownFields                         protoimpl.UnknownFields
-	sizeCache                             protoimpl.SizeCache
+	state                        protoimpl.MessageState `protogen:"open.v1"`
+	Code                         string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Name                         string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Type                         string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	State                        string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace                   string                 `protobuf:"bytes,5,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	DefaultQueueMessageTTL       int32                  `protobuf:"varint,6,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
+	DefaultQueueMessageDelayTime int32                  `protobuf:"varint,7,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
+	QueueExpires                 int32                  `protobuf:"varint,8,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
+	AllowDuplicated              bool                   `protobuf:"varint,9,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts                  int32                  `protobuf:"varint,10,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	DesiredPriorityThresholds    map[int32]int32        `protobuf:"bytes,11,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                      map[string]string      `protobuf:"bytes,12,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MaxQueueSize                 int32                  `protobuf:"varint,13,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
+	MaxDeliveringMessages        int32                  `protobuf:"varint,14,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
+	WorkflowDefinitionID         string                 `protobuf:"bytes,15,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *CreateQueueItem) Reset() {
@@ -495,20 +477,6 @@ func (x *CreateQueueItem) GetHeaders() map[string]string {
 		return x.Headers
 	}
 	return nil
-}
-
-func (x *CreateQueueItem) GetDeadLetterExchangeId() string {
-	if x != nil {
-		return x.DeadLetterExchangeId
-	}
-	return ""
-}
-
-func (x *CreateQueueItem) GetDeadLetterExchangeRoutingKeyOrPattern() string {
-	if x != nil {
-		return x.DeadLetterExchangeRoutingKeyOrPattern
-	}
-	return ""
 }
 
 func (x *CreateQueueItem) GetMaxQueueSize() int32 {
@@ -781,37 +749,35 @@ func (x *GetQueuesRequest) GetIncludeHeaders() bool {
 }
 
 type Queue struct {
-	state                                 protoimpl.MessageState `protogen:"open.v1"`
-	Id                                    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Code                                  string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Name                                  string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Type                                  string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	State                                 string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	Vnamespace                            string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
-	CreatedAt                             string                 `protobuf:"bytes,7,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
-	UpdatedAt                             string                 `protobuf:"bytes,8,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
-	DefaultQueueMessageTTL                int32                  `protobuf:"varint,9,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
-	DefaultQueueMessageDelayTime          int32                  `protobuf:"varint,10,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
-	QueueExpires                          int32                  `protobuf:"varint,11,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
-	ExpireAt                              string                 `protobuf:"bytes,12,opt,name=expireAt,proto3" json:"expireAt,omitempty"`
-	AllowDuplicated                       bool                   `protobuf:"varint,13,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
-	MaxAttempts                           int32                  `protobuf:"varint,14,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
-	DesiredPriorityThresholds             map[int32]int32        `protobuf:"bytes,15,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	PriorityThresholds                    map[int32]int32        `protobuf:"bytes,16,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	Headers                               map[string]string      `protobuf:"bytes,17,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	DeadLetterExchangeId                  string                 `protobuf:"bytes,18,opt,name=deadLetterExchangeId,proto3" json:"deadLetterExchangeId,omitempty"`
-	DeadLetterExchangeRoutingKeyOrPattern string                 `protobuf:"bytes,19,opt,name=deadLetterExchangeRoutingKeyOrPattern,proto3" json:"deadLetterExchangeRoutingKeyOrPattern,omitempty"`
-	MessagesCount                         int32                  `protobuf:"varint,20,opt,name=messagesCount,proto3" json:"messagesCount,omitempty"`
-	MaxQueueSize                          int32                  `protobuf:"varint,21,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
-	NodeSchedulerSupervisorId             string                 `protobuf:"bytes,22,opt,name=nodeSchedulerSupervisorId,proto3" json:"nodeSchedulerSupervisorId,omitempty"`
-	NodeSchedulerSupervisorCode           string                 `protobuf:"bytes,23,opt,name=nodeSchedulerSupervisorCode,proto3" json:"nodeSchedulerSupervisorCode,omitempty"`
-	NodeSchedulerSupervisorName           string                 `protobuf:"bytes,24,opt,name=nodeSchedulerSupervisorName,proto3" json:"nodeSchedulerSupervisorName,omitempty"`
-	NodeSchedulerQueueSupervisionState    string                 `protobuf:"bytes,25,opt,name=nodeSchedulerQueueSupervisionState,proto3" json:"nodeSchedulerQueueSupervisionState,omitempty"`
-	MaxDeliveringMessages                 int32                  `protobuf:"varint,26,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
-	CurrentDeliveringMessages             int32                  `protobuf:"varint,27,opt,name=currentDeliveringMessages,proto3" json:"currentDeliveringMessages,omitempty"`
-	WorkflowDefinitionID                  string                 `protobuf:"bytes,28,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
-	unknownFields                         protoimpl.UnknownFields
-	sizeCache                             protoimpl.SizeCache
+	state                              protoimpl.MessageState `protogen:"open.v1"`
+	Id                                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Code                               string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Name                               string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type                               string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	State                              string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Vnamespace                         string                 `protobuf:"bytes,6,opt,name=vnamespace,proto3" json:"vnamespace,omitempty"`
+	CreatedAt                          string                 `protobuf:"bytes,7,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt                          string                 `protobuf:"bytes,8,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	DefaultQueueMessageTTL             int32                  `protobuf:"varint,9,opt,name=defaultQueueMessageTTL,proto3" json:"defaultQueueMessageTTL,omitempty"`
+	DefaultQueueMessageDelayTime       int32                  `protobuf:"varint,10,opt,name=defaultQueueMessageDelayTime,proto3" json:"defaultQueueMessageDelayTime,omitempty"`
+	QueueExpires                       int32                  `protobuf:"varint,11,opt,name=queueExpires,proto3" json:"queueExpires,omitempty"`
+	ExpireAt                           string                 `protobuf:"bytes,12,opt,name=expireAt,proto3" json:"expireAt,omitempty"`
+	AllowDuplicated                    bool                   `protobuf:"varint,13,opt,name=allowDuplicated,proto3" json:"allowDuplicated,omitempty"`
+	MaxAttempts                        int32                  `protobuf:"varint,14,opt,name=maxAttempts,proto3" json:"maxAttempts,omitempty"`
+	DesiredPriorityThresholds          map[int32]int32        `protobuf:"bytes,15,rep,name=desiredPriorityThresholds,proto3" json:"desiredPriorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	PriorityThresholds                 map[int32]int32        `protobuf:"bytes,16,rep,name=priorityThresholds,proto3" json:"priorityThresholds,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Headers                            map[string]string      `protobuf:"bytes,17,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MessagesCount                      int32                  `protobuf:"varint,18,opt,name=messagesCount,proto3" json:"messagesCount,omitempty"`
+	MaxQueueSize                       int32                  `protobuf:"varint,19,opt,name=maxQueueSize,proto3" json:"maxQueueSize,omitempty"`
+	NodeSchedulerSupervisorId          string                 `protobuf:"bytes,20,opt,name=nodeSchedulerSupervisorId,proto3" json:"nodeSchedulerSupervisorId,omitempty"`
+	NodeSchedulerSupervisorCode        string                 `protobuf:"bytes,21,opt,name=nodeSchedulerSupervisorCode,proto3" json:"nodeSchedulerSupervisorCode,omitempty"`
+	NodeSchedulerSupervisorName        string                 `protobuf:"bytes,22,opt,name=nodeSchedulerSupervisorName,proto3" json:"nodeSchedulerSupervisorName,omitempty"`
+	NodeSchedulerQueueSupervisionState string                 `protobuf:"bytes,23,opt,name=nodeSchedulerQueueSupervisionState,proto3" json:"nodeSchedulerQueueSupervisionState,omitempty"`
+	MaxDeliveringMessages              int32                  `protobuf:"varint,24,opt,name=maxDeliveringMessages,proto3" json:"maxDeliveringMessages,omitempty"`
+	CurrentDeliveringMessages          int32                  `protobuf:"varint,25,opt,name=currentDeliveringMessages,proto3" json:"currentDeliveringMessages,omitempty"`
+	WorkflowDefinitionID               string                 `protobuf:"bytes,26,opt,name=workflowDefinitionID,proto3" json:"workflowDefinitionID,omitempty"`
+	unknownFields                      protoimpl.UnknownFields
+	sizeCache                          protoimpl.SizeCache
 }
 
 func (x *Queue) Reset() {
@@ -961,20 +927,6 @@ func (x *Queue) GetHeaders() map[string]string {
 		return x.Headers
 	}
 	return nil
-}
-
-func (x *Queue) GetDeadLetterExchangeId() string {
-	if x != nil {
-		return x.DeadLetterExchangeId
-	}
-	return ""
-}
-
-func (x *Queue) GetDeadLetterExchangeRoutingKeyOrPattern() string {
-	if x != nil {
-		return x.DeadLetterExchangeRoutingKeyOrPattern
-	}
-	return ""
 }
 
 func (x *Queue) GetMessagesCount() int32 {
@@ -1604,7 +1556,7 @@ var File_queue_proto protoreflect.FileDescriptor
 
 const file_queue_proto_rawDesc = "" +
 	"\n" +
-	"\vqueue.proto\x12\x05queue\"\xee\a\n" +
+	"\vqueue.proto\x12\x05queue\"\xe4\x06\n" +
 	"\x12CreateQueueRequest\x12\x1e\n" +
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
@@ -1623,12 +1575,10 @@ const file_queue_proto_rawDesc = "" +
 	" \x01(\bR\x0fallowDuplicated\x12 \n" +
 	"\vmaxAttempts\x18\v \x01(\x05R\vmaxAttempts\x12v\n" +
 	"\x19desiredPriorityThresholds\x18\f \x03(\v28.queue.CreateQueueRequest.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12@\n" +
-	"\aheaders\x18\r \x03(\v2&.queue.CreateQueueRequest.HeadersEntryR\aheaders\x122\n" +
-	"\x14deadLetterExchangeId\x18\x0e \x01(\tR\x14deadLetterExchangeId\x12T\n" +
-	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0f \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12\"\n" +
-	"\fmaxQueueSize\x18\x10 \x01(\x05R\fmaxQueueSize\x124\n" +
-	"\x15maxDeliveringMessages\x18\x11 \x01(\x05R\x15maxDeliveringMessages\x122\n" +
-	"\x14workflowDefinitionID\x18\x12 \x01(\tR\x14workflowDefinitionID\x1aL\n" +
+	"\aheaders\x18\r \x03(\v2&.queue.CreateQueueRequest.HeadersEntryR\aheaders\x12\"\n" +
+	"\fmaxQueueSize\x18\x0e \x01(\x05R\fmaxQueueSize\x124\n" +
+	"\x15maxDeliveringMessages\x18\x0f \x01(\x05R\x15maxDeliveringMessages\x122\n" +
+	"\x14workflowDefinitionID\x18\x10 \x01(\tR\x14workflowDefinitionID\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1642,7 +1592,7 @@ const file_queue_proto_rawDesc = "" +
 	"\n" +
 	"tenantCode\x18\x01 \x01(\tR\n" +
 	"tenantCode\x12.\n" +
-	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xc5\a\n" +
+	"\x06queues\x18\x02 \x03(\v2\x16.queue.CreateQueueItemR\x06queues\"\xbb\x06\n" +
 	"\x0fCreateQueueItem\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1658,12 +1608,10 @@ const file_queue_proto_rawDesc = "" +
 	"\vmaxAttempts\x18\n" +
 	" \x01(\x05R\vmaxAttempts\x12s\n" +
 	"\x19desiredPriorityThresholds\x18\v \x03(\v25.queue.CreateQueueItem.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12=\n" +
-	"\aheaders\x18\f \x03(\v2#.queue.CreateQueueItem.HeadersEntryR\aheaders\x122\n" +
-	"\x14deadLetterExchangeId\x18\r \x01(\tR\x14deadLetterExchangeId\x12T\n" +
-	"%deadLetterExchangeRoutingKeyOrPattern\x18\x0e \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12\"\n" +
-	"\fmaxQueueSize\x18\x0f \x01(\x05R\fmaxQueueSize\x124\n" +
-	"\x15maxDeliveringMessages\x18\x10 \x01(\x05R\x15maxDeliveringMessages\x122\n" +
-	"\x14workflowDefinitionID\x18\x11 \x01(\tR\x14workflowDefinitionID\x1aL\n" +
+	"\aheaders\x18\f \x03(\v2#.queue.CreateQueueItem.HeadersEntryR\aheaders\x12\"\n" +
+	"\fmaxQueueSize\x18\r \x01(\x05R\fmaxQueueSize\x124\n" +
+	"\x15maxDeliveringMessages\x18\x0e \x01(\x05R\x15maxDeliveringMessages\x122\n" +
+	"\x14workflowDefinitionID\x18\x0f \x01(\tR\x14workflowDefinitionID\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a:\n" +
@@ -1694,7 +1642,7 @@ const file_queue_proto_rawDesc = "" +
 	"\n" +
 	"vnamespace\x18\x05 \x01(\tR\n" +
 	"vnamespace\x12&\n" +
-	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\xa2\f\n" +
+	"\x0eincludeHeaders\x18\x06 \x01(\bR\x0eincludeHeaders\"\x98\v\n" +
 	"\x05Queue\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x12\n" +
@@ -1715,18 +1663,16 @@ const file_queue_proto_rawDesc = "" +
 	"\vmaxAttempts\x18\x0e \x01(\x05R\vmaxAttempts\x12i\n" +
 	"\x19desiredPriorityThresholds\x18\x0f \x03(\v2+.queue.Queue.DesiredPriorityThresholdsEntryR\x19desiredPriorityThresholds\x12T\n" +
 	"\x12priorityThresholds\x18\x10 \x03(\v2$.queue.Queue.PriorityThresholdsEntryR\x12priorityThresholds\x123\n" +
-	"\aheaders\x18\x11 \x03(\v2\x19.queue.Queue.HeadersEntryR\aheaders\x122\n" +
-	"\x14deadLetterExchangeId\x18\x12 \x01(\tR\x14deadLetterExchangeId\x12T\n" +
-	"%deadLetterExchangeRoutingKeyOrPattern\x18\x13 \x01(\tR%deadLetterExchangeRoutingKeyOrPattern\x12$\n" +
-	"\rmessagesCount\x18\x14 \x01(\x05R\rmessagesCount\x12\"\n" +
-	"\fmaxQueueSize\x18\x15 \x01(\x05R\fmaxQueueSize\x12<\n" +
-	"\x19nodeSchedulerSupervisorId\x18\x16 \x01(\tR\x19nodeSchedulerSupervisorId\x12@\n" +
-	"\x1bnodeSchedulerSupervisorCode\x18\x17 \x01(\tR\x1bnodeSchedulerSupervisorCode\x12@\n" +
-	"\x1bnodeSchedulerSupervisorName\x18\x18 \x01(\tR\x1bnodeSchedulerSupervisorName\x12N\n" +
-	"\"nodeSchedulerQueueSupervisionState\x18\x19 \x01(\tR\"nodeSchedulerQueueSupervisionState\x124\n" +
-	"\x15maxDeliveringMessages\x18\x1a \x01(\x05R\x15maxDeliveringMessages\x12<\n" +
-	"\x19currentDeliveringMessages\x18\x1b \x01(\x05R\x19currentDeliveringMessages\x122\n" +
-	"\x14workflowDefinitionID\x18\x1c \x01(\tR\x14workflowDefinitionID\x1aL\n" +
+	"\aheaders\x18\x11 \x03(\v2\x19.queue.Queue.HeadersEntryR\aheaders\x12$\n" +
+	"\rmessagesCount\x18\x12 \x01(\x05R\rmessagesCount\x12\"\n" +
+	"\fmaxQueueSize\x18\x13 \x01(\x05R\fmaxQueueSize\x12<\n" +
+	"\x19nodeSchedulerSupervisorId\x18\x14 \x01(\tR\x19nodeSchedulerSupervisorId\x12@\n" +
+	"\x1bnodeSchedulerSupervisorCode\x18\x15 \x01(\tR\x1bnodeSchedulerSupervisorCode\x12@\n" +
+	"\x1bnodeSchedulerSupervisorName\x18\x16 \x01(\tR\x1bnodeSchedulerSupervisorName\x12N\n" +
+	"\"nodeSchedulerQueueSupervisionState\x18\x17 \x01(\tR\"nodeSchedulerQueueSupervisionState\x124\n" +
+	"\x15maxDeliveringMessages\x18\x18 \x01(\x05R\x15maxDeliveringMessages\x12<\n" +
+	"\x19currentDeliveringMessages\x18\x19 \x01(\x05R\x19currentDeliveringMessages\x122\n" +
+	"\x14workflowDefinitionID\x18\x1a \x01(\tR\x14workflowDefinitionID\x1aL\n" +
 	"\x1eDesiredPriorityThresholdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aE\n" +

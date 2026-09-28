@@ -30,6 +30,9 @@ func (r *WorkflowExecutionRepository) CreateWorkflowExecution(input *models.Work
 	if input.Status == "" {
 		input.Status = models.WorkflowExecutionStatusPending
 	}
+	if input.TTL <= 0 {
+		input.TTL = models.CalculateWorkflowExecutionTTL(0)
+	}
 	input.CreatedAt = now
 	input.UpdatedAt = now
 	return r.Create(input, now)

@@ -40,8 +40,6 @@ type createQueueRequest struct {
 	MaxDeliveringMessages                 int               `json:"maxDeliveringMessages" binding:"min=0"`
 	DesiredPriorityThresholds             map[int]int       `json:"desiredPriorityThresholds"`
 	Headers                               map[string]string `json:"headers"`
-	DeadLetterExchangeId                  string            `json:"deadLetterExchangeId"`
-	DeadLetterExchangeRoutingKeyOrPattern string            `json:"deadLetterExchangeRoutingKeyOrPattern"`
 }
 
 func (r createQueueRequest) GetCode() string {
@@ -115,9 +113,7 @@ func (ctrl *QueueController) CreateQueueHandler(c *gin.Context) {
 		MaxQueueSize:                          req.MaxQueueSize,
 		MaxDeliveringMessages:                 req.MaxDeliveringMessages,
 		DesiredPriorityThresholds:             req.DesiredPriorityThresholds,
-		Headers:                               req.Headers,
-		DeadLetterExchangeId:                  req.DeadLetterExchangeId,
-		DeadLetterExchangeRoutingKeyOrPattern: req.DeadLetterExchangeRoutingKeyOrPattern,
+		Headers:                   req.Headers,
 	}
 
 	queuesResult, err := ctrl.QueueBO.BulkCreateQueue(c.Request.Context(), []*models.Queue{queue}, cf, cfs, tenant, tenantNode)
@@ -169,22 +165,20 @@ func (ctrl *QueueController) BulkCreateQueueHandler(c *gin.Context) {
 			t.MaxAttempts = 1
 		}
 		queue := &models.Queue{
-			Code:                                  code,
-			VNamespace:                            t.VNamespace,
-			Name:                                  name,
-			Type:                                  models.QueueType(t.Type),
-			State:                                 models.QueueState(t.State),
-			DefaultQueueMessageTTL:                t.DefaultQueueMessageTTL,
-			DefaultQueueMessageDelayTime:          t.DefaultQueueMessageDelayTime,
-			QueueExpires:                          t.QueueExpires,
-			AllowDuplicated:                       t.AllowDuplicated,
-			MaxAttempts:                           t.MaxAttempts,
-			MaxQueueSize:                          t.MaxQueueSize,
-			MaxDeliveringMessages:                 t.MaxDeliveringMessages,
-			DesiredPriorityThresholds:             t.DesiredPriorityThresholds,
-			Headers:                               t.Headers,
-			DeadLetterExchangeId:                  t.DeadLetterExchangeId,
-			DeadLetterExchangeRoutingKeyOrPattern: t.DeadLetterExchangeRoutingKeyOrPattern,
+			Code:                      code,
+			VNamespace:                t.VNamespace,
+			Name:                      name,
+			Type:                      models.QueueType(t.Type),
+			State:                     models.QueueState(t.State),
+			DefaultQueueMessageTTL:    t.DefaultQueueMessageTTL,
+			DefaultQueueMessageDelayTime: t.DefaultQueueMessageDelayTime,
+			QueueExpires:              t.QueueExpires,
+			AllowDuplicated:           t.AllowDuplicated,
+			MaxAttempts:               t.MaxAttempts,
+			MaxQueueSize:              t.MaxQueueSize,
+			MaxDeliveringMessages:     t.MaxDeliveringMessages,
+			DesiredPriorityThresholds: t.DesiredPriorityThresholds,
+			Headers:                   t.Headers,
 		}
 
 		// Default to normal priority (single level, drain all) when no thresholds configured

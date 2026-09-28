@@ -211,8 +211,8 @@ Order processing with priorities: VIP (P3), Premium (P2), Standard (P1).
 To connect workers, register task handlers, publish/enqueue messages, and interact with the **Daedalus Orchestrator Server**, you need to use a client SDK.
 
 Currently, we provide:
-- **[Go SDK](sdk/golang-sdk/README.md)**: A native Go client library designed to establish persistent gRPC connections with the orchestrator, manage topologies (tenants, exchanges, queues, bindings), and process queued tasks. For installation, usage examples, and configuration guides, refer to the [Go SDK README](sdk/golang-sdk/README.md).
-- **[Node.js / TypeScript SDK](sdk/nodejs-sdk/README.md)**: A client library built to establish persistent gRPC connections with the orchestrator, manage topologies (tenants, exchanges, queues, bindings), and process queued tasks. For installation, usage examples, and configuration guides, refer to the [Node.js SDK README](sdk/nodejs-sdk/README.md).
+- **[Go SDK](sdk/golang-sdk/README.md)**: A native Go client library designed to establish persistent gRPC connections with the orchestrator, manage tenants and queues, directly enqueue messages, and process queued tasks. For installation, usage examples, and configuration guides, refer to the [Go SDK README](sdk/golang-sdk/README.md).
+- **[Node.js / TypeScript SDK](sdk/nodejs-sdk/README.md)**: A client library built to establish persistent gRPC connections with the orchestrator, manage tenants and queues, directly enqueue messages, and process queued tasks. For installation, usage examples, and configuration guides, refer to the [Node.js SDK README](sdk/nodejs-sdk/README.md).
 
 ---
 

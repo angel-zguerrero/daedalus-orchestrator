@@ -205,6 +205,17 @@ func (r *RocksdbStore) Get(columnFamily, columnFamilySector, key string, now tim
 	defer ro.Destroy()
 
 	if !isTTL {
+		expireKey := fmt.Sprintf("%s:%s%s", columnFamilySector, PrefixTTLExpire, key)
+		slice, err := r.DB.GetCF(ro, cf, []byte(expireKey))
+		if err == nil && slice != nil && slice.Exists() {
+			expireAt, errParse := strconv.ParseInt(string(slice.Data()), 10, 64)
+			slice.Free()
+			if errParse == nil && now.UnixMilli() > expireAt {
+				return nil, nil
+			}
+		} else if slice != nil {
+			slice.Free()
+		}
 		return r.getValue(cf, ro, columnFamilySector, key)
 	}
 
@@ -281,46 +292,39 @@ func (r *RocksdbStore) Delete(columnFamily, columnFamilySector, key string, now 
 		return fmt.Errorf("column family sector cannot be empty")
 	}
 
-	cf, isTTL, err := r.resolveColumnFamily(columnFamily)
+	cf, _, err := r.resolveColumnFamily(columnFamily)
 	if err != nil {
 		return err
 	}
-	if !isTTL {
-		// old
-		wo := grocksdb.NewDefaultWriteOptions()
-		defer wo.Destroy()
-		finalKey := fmt.Sprintf("%s:%s", columnFamilySector, key)
-		return r.DB.DeleteCF(wo, cf, []byte(finalKey))
-	} else {
-		finalKey := fmt.Sprintf("%s:%s", columnFamilySector, key)
-		ttlExpireIndexKeyRelative := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
 
-		ro := grocksdb.NewDefaultReadOptions()
-		defer ro.Destroy()
-		oldTTLBytes, err := r.getValue(cf, ro, columnFamilySector, ttlExpireIndexKeyRelative)
-		if err != nil {
-			return err
-		}
+	finalKey := fmt.Sprintf("%s:%s", columnFamilySector, key)
+	ttlExpireIndexKeyRelative := fmt.Sprintf("%s%s", PrefixTTLExpire, key)
 
-		rocksBatch := grocksdb.NewWriteBatch()
-		defer rocksBatch.Destroy()
-		if oldTTLBytes != nil {
-			oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
-			if err == nil {
-				oldTTLIndexKey := fmt.Sprintf("%s:%s%020d:%s", columnFamilySector, PrefixTTLIndex, oldTTLMillis, key)
-				rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
-			}
-		}
-
-		dataKey := finalKey
-		rocksBatch.DeleteCF(cf, []byte(dataKey))
-		ttlExpireIndexKey := fmt.Sprintf("%s:%s", columnFamilySector, ttlExpireIndexKeyRelative)
-		rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
-		wo := grocksdb.NewDefaultWriteOptions()
-		defer wo.Destroy()
-
-		return r.DB.Write(wo, rocksBatch)
+	ro := grocksdb.NewDefaultReadOptions()
+	defer ro.Destroy()
+	oldTTLBytes, err := r.getValue(cf, ro, columnFamilySector, ttlExpireIndexKeyRelative)
+	if err != nil {
+		return err
 	}
+
+	rocksBatch := grocksdb.NewWriteBatch()
+	defer rocksBatch.Destroy()
+	if oldTTLBytes != nil {
+		oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+		if err == nil {
+			oldTTLIndexKey := fmt.Sprintf("%s:%s%020d:%s", columnFamilySector, PrefixTTLIndex, oldTTLMillis, key)
+			rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
+		}
+	}
+
+	dataKey := finalKey
+	rocksBatch.DeleteCF(cf, []byte(dataKey))
+	ttlExpireIndexKey := fmt.Sprintf("%s:%s", columnFamilySector, ttlExpireIndexKeyRelative)
+	rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
+	wo := grocksdb.NewDefaultWriteOptions()
+	defer wo.Destroy()
+
+	return r.DB.Write(wo, rocksBatch)
 }
 
 func (r *RocksdbStore) Exists(columnFamily, columnFamilySector, key string, now time.Time) (bool, error) {
@@ -393,6 +397,10 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cur
 		keyWithoutPrefix := rawKey[len(cfPrefix):]
 		keyStr := string(keyWithoutPrefix)
 
+		if strings.HasPrefix(keyStr, PrefixTTLExpire) || strings.HasPrefix(keyStr, PrefixTTLIndex) {
+			continue
+		}
+
 		// TTL check
 		if isTTL {
 			expired, err := r.isTTLKeyExpired(cf, readOpts, cfSector, keyStr, now)
@@ -401,6 +409,18 @@ func (r *RocksdbStore) SearchByPatternPaginatedKV(cfName, cfSector, pattern, cur
 			}
 			if expired {
 				continue
+			}
+		} else {
+			expireKey := fmt.Sprintf("%s:%s%s", cfSector, PrefixTTLExpire, keyStr)
+			slice, err := r.DB.GetCF(readOpts, cf, []byte(expireKey))
+			if err == nil && slice != nil && slice.Exists() {
+				expireAt, errParse := strconv.ParseInt(string(slice.Data()), 10, 64)
+				slice.Free()
+				if errParse == nil && now.UnixMilli() > expireAt {
+					continue
+				}
+			} else if slice != nil {
+				slice.Free()
 			}
 		}
 
@@ -469,7 +489,8 @@ func (r *RocksdbStore) Put(columnFamily, columnFamilySector, key string, value [
 	if err != nil {
 		return err
 	}
-	if !isTTL {
+	hasKeyTTL := isTTL || ttl > 0
+	if !hasKeyTTL {
 		wo := grocksdb.NewDefaultWriteOptions()
 		defer wo.Destroy()
 		finalKey := fmt.Sprintf("%s:%s", columnFamilySector, key)
@@ -547,9 +568,11 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 			return err
 		}
 
+		hasKeyTTL := isTTL || op.TTL > 0
+
 		switch op.Type {
 		case "put":
-			if !isTTL {
+			if !hasKeyTTL {
 				finalKey := fmt.Sprintf("%s:%s", op.CFS, op.Key)
 				rocksBatch.PutCF(cf, []byte(finalKey), op.Value)
 			} else {
@@ -581,30 +604,26 @@ func (r *RocksdbStore) Write(batch *WriteBatch) error {
 			}
 		case "delete":
 			finalKey := fmt.Sprintf("%s:%s", op.CFS, op.Key)
-			if !isTTL {
-				rocksBatch.DeleteCF(cf, []byte(finalKey))
-			} else {
-				ro := grocksdb.NewDefaultReadOptions()
-				defer ro.Destroy()
-				ttlExpireIndexKeyRelative := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)
-				oldTTLBytes, err := r.getValue(cf, ro, op.CFS, ttlExpireIndexKeyRelative)
-				if err != nil {
-					return err
-				}
-
-				if oldTTLBytes != nil {
-					oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
-					if err == nil {
-						oldTTLIndexKey := fmt.Sprintf("%s:%s%020d:%s", op.CFS, PrefixTTLIndex, oldTTLMillis, op.Key)
-						rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
-					}
-				}
-
-				dataKey := finalKey
-				ttlExpireIndexKey := fmt.Sprintf("%s:%s", op.CFS, ttlExpireIndexKeyRelative)
-				rocksBatch.DeleteCF(cf, []byte(dataKey))
-				rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
+			ro := grocksdb.NewDefaultReadOptions()
+			defer ro.Destroy()
+			ttlExpireIndexKeyRelative := fmt.Sprintf("%s%s", PrefixTTLExpire, op.Key)
+			oldTTLBytes, err := r.getValue(cf, ro, op.CFS, ttlExpireIndexKeyRelative)
+			if err != nil {
+				return err
 			}
+
+			if oldTTLBytes != nil {
+				oldTTLMillis, err := strconv.ParseInt(string(oldTTLBytes), 10, 64)
+				if err == nil {
+					oldTTLIndexKey := fmt.Sprintf("%s:%s%020d:%s", op.CFS, PrefixTTLIndex, oldTTLMillis, op.Key)
+					rocksBatch.DeleteCF(cf, []byte(oldTTLIndexKey))
+				}
+			}
+
+			dataKey := finalKey
+			ttlExpireIndexKey := fmt.Sprintf("%s:%s", op.CFS, ttlExpireIndexKeyRelative)
+			rocksBatch.DeleteCF(cf, []byte(dataKey))
+			rocksBatch.DeleteCF(cf, []byte(ttlExpireIndexKey))
 		default:
 			return fmt.Errorf("unsupported operation type: %s", op.Type)
 		}
@@ -953,7 +972,14 @@ func (r *RocksdbStore) ExistsColumnFamily(columnFamilyName string) (bool, bool, 
 }
 
 func (r *RocksdbStore) CleanExpiredKeys(now time.Time) error {
+	allCFs := make(map[string]*grocksdb.ColumnFamilyHandle, len(r.TTLColumnFamilyHandles)+len(r.ColumnFamilyHandles))
 	for name, handle := range r.TTLColumnFamilyHandles {
+		allCFs[name] = handle
+	}
+	for name, handle := range r.ColumnFamilyHandles {
+		allCFs[name] = handle
+	}
+	for name, handle := range allCFs {
 		err := cleanExpiredKeys(r.DB, handle, now)
 		if err != nil {
 			return fmt.Errorf("error cleaning expired keys for CF %s: %w", name, err)

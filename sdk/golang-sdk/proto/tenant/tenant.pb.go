@@ -114,12 +114,11 @@ type TenantSummary struct {
 	ID             string                 `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
 	TenantId       string                 `protobuf:"bytes,2,opt,name=TenantId,proto3" json:"TenantId,omitempty"`
 	Code           string                 `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
-	ExchangesCount int32                  `protobuf:"varint,4,opt,name=ExchangesCount,proto3" json:"ExchangesCount,omitempty"`
-	QueuesCount    int32                  `protobuf:"varint,5,opt,name=QueuesCount,proto3" json:"QueuesCount,omitempty"`
-	MessagesCount  int32                  `protobuf:"varint,6,opt,name=MessagesCount,proto3" json:"MessagesCount,omitempty"`
-	CreatedAt      string                 `protobuf:"bytes,7,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	UpdatedAt      string                 `protobuf:"bytes,8,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
-	WorkflowsCount int32                  `protobuf:"varint,9,opt,name=WorkflowsCount,proto3" json:"WorkflowsCount,omitempty"`
+	QueuesCount    int32                  `protobuf:"varint,4,opt,name=QueuesCount,proto3" json:"QueuesCount,omitempty"`
+	MessagesCount  int32                  `protobuf:"varint,5,opt,name=MessagesCount,proto3" json:"MessagesCount,omitempty"`
+	CreatedAt      string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt      string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	WorkflowsCount int32                  `protobuf:"varint,8,opt,name=WorkflowsCount,proto3" json:"WorkflowsCount,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -173,13 +172,6 @@ func (x *TenantSummary) GetCode() string {
 		return x.Code
 	}
 	return ""
-}
-
-func (x *TenantSummary) GetExchangesCount() int32 {
-	if x != nil {
-		return x.ExchangesCount
-	}
-	return 0
 }
 
 func (x *TenantSummary) GetQueuesCount() int32 {
@@ -598,11 +590,9 @@ type Tenant struct {
 	Status         string                 `protobuf:"bytes,5,opt,name=Status,proto3" json:"Status,omitempty"`
 	CreatedAt      string                 `protobuf:"bytes,6,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
 	UpdatedAt      string                 `protobuf:"bytes,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
-	ExchangesCount int32                  `protobuf:"varint,8,opt,name=ExchangesCount,proto3" json:"ExchangesCount,omitempty"`
-	QueuesCount    int32                  `protobuf:"varint,9,opt,name=QueuesCount,proto3" json:"QueuesCount,omitempty"`
-	BindingsCount  int32                  `protobuf:"varint,10,opt,name=BindingsCount,proto3" json:"BindingsCount,omitempty"`
-	MessagesCount  int32                  `protobuf:"varint,11,opt,name=MessagesCount,proto3" json:"MessagesCount,omitempty"`
-	WorkflowsCount int32                  `protobuf:"varint,12,opt,name=WorkflowsCount,proto3" json:"WorkflowsCount,omitempty"`
+	QueuesCount    int32                  `protobuf:"varint,8,opt,name=QueuesCount,proto3" json:"QueuesCount,omitempty"`
+	MessagesCount  int32                  `protobuf:"varint,9,opt,name=MessagesCount,proto3" json:"MessagesCount,omitempty"`
+	WorkflowsCount int32                  `protobuf:"varint,10,opt,name=WorkflowsCount,proto3" json:"WorkflowsCount,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -686,23 +676,9 @@ func (x *Tenant) GetUpdatedAt() string {
 	return ""
 }
 
-func (x *Tenant) GetExchangesCount() int32 {
-	if x != nil {
-		return x.ExchangesCount
-	}
-	return 0
-}
-
 func (x *Tenant) GetQueuesCount() int32 {
 	if x != nil {
 		return x.QueuesCount
-	}
-	return 0
-}
-
-func (x *Tenant) GetBindingsCount() int32 {
-	if x != nil {
-		return x.BindingsCount
 	}
 	return 0
 }
@@ -1033,17 +1009,16 @@ const file_tenant_proto_rawDesc = "" +
 	"\x11TenantInfoRequest\x12\x12\n" +
 	"\x04Code\x18\x01 \x01(\tR\x04Code\"*\n" +
 	"\x14TenantSummaryRequest\x12\x12\n" +
-	"\x04Code\x18\x01 \x01(\tR\x04Code\"\xa3\x02\n" +
+	"\x04Code\x18\x01 \x01(\tR\x04Code\"\xfb\x01\n" +
 	"\rTenantSummary\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x1a\n" +
 	"\bTenantId\x18\x02 \x01(\tR\bTenantId\x12\x12\n" +
-	"\x04Code\x18\x03 \x01(\tR\x04Code\x12&\n" +
-	"\x0eExchangesCount\x18\x04 \x01(\x05R\x0eExchangesCount\x12 \n" +
-	"\vQueuesCount\x18\x05 \x01(\x05R\vQueuesCount\x12$\n" +
-	"\rMessagesCount\x18\x06 \x01(\x05R\rMessagesCount\x12\x1c\n" +
-	"\tCreatedAt\x18\a \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\b \x01(\tR\tUpdatedAt\x12&\n" +
-	"\x0eWorkflowsCount\x18\t \x01(\x05R\x0eWorkflowsCount\"`\n" +
+	"\x04Code\x18\x03 \x01(\tR\x04Code\x12 \n" +
+	"\vQueuesCount\x18\x04 \x01(\x05R\vQueuesCount\x12$\n" +
+	"\rMessagesCount\x18\x05 \x01(\x05R\rMessagesCount\x12\x1c\n" +
+	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\x12&\n" +
+	"\x0eWorkflowsCount\x18\b \x01(\x05R\x0eWorkflowsCount\"`\n" +
 	"\x15TenantSummaryResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12-\n" +
 	"\x06result\x18\x02 \x01(\v2\x15.tenant.TenantSummaryR\x06result\"0\n" +
@@ -1068,7 +1043,7 @@ const file_tenant_proto_rawDesc = "" +
 	"\x11GetTenantsRequest\x12\f\n" +
 	"\x01q\x18\x01 \x01(\tR\x01q\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x1a\n" +
-	"\bpageSize\x18\x03 \x01(\x05R\bpageSize\"\xec\x02\n" +
+	"\bpageSize\x18\x03 \x01(\x05R\bpageSize\"\x9e\x02\n" +
 	"\x06Tenant\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x12\n" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +
@@ -1076,13 +1051,11 @@ const file_tenant_proto_rawDesc = "" +
 	"\aShardId\x18\x04 \x01(\x03R\aShardId\x12\x16\n" +
 	"\x06Status\x18\x05 \x01(\tR\x06Status\x12\x1c\n" +
 	"\tCreatedAt\x18\x06 \x01(\tR\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\x12&\n" +
-	"\x0eExchangesCount\x18\b \x01(\x05R\x0eExchangesCount\x12 \n" +
-	"\vQueuesCount\x18\t \x01(\x05R\vQueuesCount\x12$\n" +
-	"\rBindingsCount\x18\n" +
-	" \x01(\x05R\rBindingsCount\x12$\n" +
-	"\rMessagesCount\x18\v \x01(\x05R\rMessagesCount\x12&\n" +
-	"\x0eWorkflowsCount\x18\f \x01(\x05R\x0eWorkflowsCount\"P\n" +
+	"\tUpdatedAt\x18\a \x01(\tR\tUpdatedAt\x12 \n" +
+	"\vQueuesCount\x18\b \x01(\x05R\vQueuesCount\x12$\n" +
+	"\rMessagesCount\x18\t \x01(\x05R\rMessagesCount\x12&\n" +
+	"\x0eWorkflowsCount\x18\n" +
+	" \x01(\x05R\x0eWorkflowsCount\"P\n" +
 	"\n" +
 	"FindResult\x12*\n" +
 	"\bEntities\x18\x01 \x03(\v2\x0e.tenant.TenantR\bEntities\x12\x16\n" +

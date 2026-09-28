@@ -20,6 +20,7 @@ type ExecutionToken struct {
 	Status               ExecutionTokenStatus   `json:"status"`
 	ScopeVariables       map[string]interface{} `json:"scopeVariables,omitempty"`
 	ParentTokenID        string                 `json:"parentTokenId,omitempty"`
+	TTL                  int64                  `orm:"ttl" json:"ttl,omitempty"`
 	CreatedAt            time.Time              `json:"createdAt"`
 	UpdatedAt            time.Time              `json:"updatedAt"`
 }

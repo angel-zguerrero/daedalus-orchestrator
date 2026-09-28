@@ -323,7 +323,7 @@ func (cmd *EnqueueCommand) Execute(uow *db.UnitOfWork, now time.Time) command.Co
 	// Update tenant summary with the total count of new messages created
 	totalMessagesCreated := len(processedMessages)
 	if totalMessagesCreated > 0 {
-		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, totalMessagesCreated, 0, 0, 0, now)
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, totalMessagesCreated, 0, now)
 		if err != nil {
 			commandResult.Error = err.Error()
 			return *commandResult

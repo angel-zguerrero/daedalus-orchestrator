@@ -53,8 +53,6 @@ export class TenantSummary extends jspb.Message {
     setTenantid(value: string): TenantSummary;
     getCode(): string;
     setCode(value: string): TenantSummary;
-    getExchangescount(): number;
-    setExchangescount(value: number): TenantSummary;
     getQueuescount(): number;
     setQueuescount(value: number): TenantSummary;
     getMessagescount(): number;
@@ -63,6 +61,8 @@ export class TenantSummary extends jspb.Message {
     setCreatedat(value: string): TenantSummary;
     getUpdatedat(): string;
     setUpdatedat(value: string): TenantSummary;
+    getWorkflowscount(): number;
+    setWorkflowscount(value: number): TenantSummary;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): TenantSummary.AsObject;
@@ -79,11 +79,11 @@ export namespace TenantSummary {
         id: string,
         tenantid: string,
         code: string,
-        exchangescount: number,
         queuescount: number,
         messagescount: number,
         createdat: string,
         updatedat: string,
+        workflowscount: number,
     }
 }
 
@@ -280,14 +280,12 @@ export class Tenant extends jspb.Message {
     setCreatedat(value: string): Tenant;
     getUpdatedat(): string;
     setUpdatedat(value: string): Tenant;
-    getExchangescount(): number;
-    setExchangescount(value: number): Tenant;
     getQueuescount(): number;
     setQueuescount(value: number): Tenant;
-    getBindingscount(): number;
-    setBindingscount(value: number): Tenant;
     getMessagescount(): number;
     setMessagescount(value: number): Tenant;
+    getWorkflowscount(): number;
+    setWorkflowscount(value: number): Tenant;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): Tenant.AsObject;
@@ -308,10 +306,9 @@ export namespace Tenant {
         status: string,
         createdat: string,
         updatedat: string,
-        exchangescount: number,
         queuescount: number,
-        bindingscount: number,
         messagescount: number,
+        workflowscount: number,
     }
 }
 

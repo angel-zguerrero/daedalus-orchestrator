@@ -166,7 +166,7 @@ func (cmd *ProcessExpiredLeasesCommand) Execute(uow *db.UnitOfWork, now time.Tim
 	// ── 3. update tenant summary ─────────────────────────────────────────────────
 
 	if messagesDeleted > 0 {
-		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, -messagesDeleted, 0, 0, 0, now)
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, -messagesDeleted, 0, now)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("failed to update tenant summary: %s", err.Error()))
 		}

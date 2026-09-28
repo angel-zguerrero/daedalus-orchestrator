@@ -48,6 +48,7 @@ export interface WorkflowExecution {
   output?: any;
   stateData?: any;
   error?: string;
+  ttl?: number;
   startedAt?: string;
   completedAt?: string;
   createdAt: string;
@@ -62,6 +63,7 @@ export interface ExecutionToken {
   currentNodeId: string;
   status: string;
   parentTokenId?: string;
+  ttl?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -83,6 +85,7 @@ export interface WorkflowJob {
   retries?: number;
   maxRetries?: number;
   timeoutSeconds?: number;
+  ttl?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -121,6 +124,7 @@ export interface WaitingEvent {
   eventId: string;
   type: 'USER_INPUT' | 'SYSTEM_MESSAGE' | string;
   expectedInput?: WaitingEventExpectedInput | any;
+  ttl?: number;
   createdAt: string;
   updatedAt: string;
 }

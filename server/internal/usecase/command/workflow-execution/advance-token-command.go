@@ -114,6 +114,15 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 		return *commandResult
 	}
 
+	executionTTL := execution.TTL
+	if executionTTL <= 0 && def != nil {
+		executionTTL = def.CalculateExecutionTTL()
+		execution.TTL = executionTTL
+	}
+	if token.TTL <= 0 {
+		token.TTL = executionTTL
+	}
+
 	// 3. Parse BPMN Model
 	bpmnModel, err := bpmn.ParseBPMN(def.Payload)
 	if err != nil {
@@ -358,12 +367,13 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					mergedTokenID := strings.ReplaceAll(uuid.New().String(), "-", "")
 					mergedToken := &models.ExecutionToken{
 						ID:                   mergedTokenID,
-						WorkflowExecutionID: execution.ID,
+						WorkflowExecutionID:  execution.ID,
 						WorkflowDefinitionID: def.ID,
 						VNamespace:           execution.VNamespace,
 						CurrentNodeID:        outgoing[0].TargetRef,
 						Status:               models.ExecutionTokenStatusActive,
 						ParentTokenID:        token.ID,
+						TTL:                  executionTTL,
 						CreatedAt:            now,
 						UpdatedAt:            now,
 					}
@@ -403,12 +413,13 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					childTokenID := strings.ReplaceAll(uuid.New().String(), "-", "")
 					childToken := &models.ExecutionToken{
 						ID:                   childTokenID,
-						WorkflowExecutionID: execution.ID,
+						WorkflowExecutionID:  execution.ID,
 						WorkflowDefinitionID: def.ID,
 						VNamespace:           execution.VNamespace,
 						CurrentNodeID:        flow.TargetRef,
 						Status:               models.ExecutionTokenStatusActive,
 						ParentTokenID:        token.ID,
+						TTL:                  executionTTL,
 						CreatedAt:            now,
 						UpdatedAt:            now,
 					}
@@ -677,11 +688,12 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 			waitingEvent := &models.WaitingEvent{
 				ID:                   waitingEventID,
 				WorkflowDefinitionID: def.ID,
-				WorkflowExecutionID: execution.ID,
+				WorkflowExecutionID:  execution.ID,
 				ExecutionTokenID:     token.ID,
 				EventID:              currentNode.ID,
 				Type:                 waitType,
 				ExpectedInput:        expectedInput,
+				TTL:                  executionTTL,
 				CreatedAt:            now,
 				UpdatedAt:            now,
 			}
@@ -909,7 +921,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 
 			job := &models.WorkflowJob{
 				ID:                   jobID,
-				WorkflowExecutionID: execution.ID,
+				WorkflowExecutionID:  execution.ID,
 				ExecutionTokenID:     token.ID,
 				WorkflowDefinitionID: def.ID,
 				VNamespace:           execution.VNamespace,
@@ -921,6 +933,7 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 				Retries:              0,
 				MaxRetries:           3,
 				TimeoutSeconds:       300,
+				TTL:                  executionTTL,
 				CreatedAt:            now,
 				UpdatedAt:            now,
 			}
@@ -1177,8 +1190,8 @@ func (cmd *AdvanceTokenCommand) Execute(uow *db.UnitOfWork, now time.Time) comma
 					Code:        schedJobID,
 					TenantID:    execution.VNamespace,
 					VNamespace:  execution.VNamespace,
-					TargetType:  string(models.ScheduledJobTargetQueue),
-					TargetID:    execQ.ID,
+					QueueID:     execQ.ID,
+					QueueCode:   execQ.Code,
 					Type:        models.ScheduledJobOneOff,
 					State:       models.ScheduledJobIdle,
 					NextRunAt:   targetRunAt,
@@ -1329,7 +1342,7 @@ func (cmd *AdvanceTokenCommand) failExecutionAndActivity(
 			}
 			failedJob := &models.WorkflowJob{
 				ID:                   jobID,
-				WorkflowExecutionID: execution.ID,
+				WorkflowExecutionID:  execution.ID,
 				ExecutionTokenID:     token.ID,
 				WorkflowDefinitionID: execution.WorkflowDefinitionID,
 				VNamespace:           execution.VNamespace,
@@ -1338,6 +1351,7 @@ func (cmd *AdvanceTokenCommand) failExecutionAndActivity(
 				ActivityType:         activityType,
 				Status:               models.WorkflowJobStatusFailed,
 				Error:                errMsg,
+				TTL:                  execution.TTL,
 				CreatedAt:            now,
 				UpdatedAt:            now,
 				CompletedAt:          &now,

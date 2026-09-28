@@ -83,9 +83,7 @@ func (app *Application) updateDashboardSummary() {
 	log.Info().
 		Int("workflows", summary.WorkflowsCount).
 		Int("tenants", summary.TenantsCount).
-		Int("exchanges", summary.ExchangesCount).
 		Int("queues", summary.QueuesCount).
-		Int("bindings", summary.BindingsCount).
 		Int("messages", summary.MessagesCount).
 		Msg("✅ Dashboard summary updated")
 }
@@ -137,9 +135,7 @@ func (app *Application) aggregateDashboardSummary(now time.Time) (models.Dashboa
 		for _, tenant := range tenantsResult.Entities {
 			summary.TenantsCount++
 			summary.WorkflowsCount += tenant.WorkflowsCount
-			summary.ExchangesCount += tenant.ExchangesCount
 			summary.QueuesCount += tenant.QueuesCount
-			summary.BindingsCount += tenant.BindingsCount
 			summary.MessagesCount += tenant.MessagesCount
 		}
 

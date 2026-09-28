@@ -35,14 +35,12 @@ export class CreateQueueRequest extends jspb.Message {
 
     getHeadersMap(): jspb.Map<string, string>;
     clearHeadersMap(): void;
-    getDeadletterexchangeid(): string;
-    setDeadletterexchangeid(value: string): CreateQueueRequest;
-    getDeadletterexchangeroutingkeyorpattern(): string;
-    setDeadletterexchangeroutingkeyorpattern(value: string): CreateQueueRequest;
     getMaxqueuesize(): number;
     setMaxqueuesize(value: number): CreateQueueRequest;
     getMaxdeliveringmessages(): number;
     setMaxdeliveringmessages(value: number): CreateQueueRequest;
+    getWorkflowdefinitionid(): string;
+    setWorkflowdefinitionid(value: string): CreateQueueRequest;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): CreateQueueRequest.AsObject;
@@ -71,10 +69,9 @@ export namespace CreateQueueRequest {
         desiredprioritythresholdsMap: Array<[number, number]>,
 
         headersMap: Array<[string, string]>,
-        deadletterexchangeid: string,
-        deadletterexchangeroutingkeyorpattern: string,
         maxqueuesize: number,
         maxdeliveringmessages: number,
+        workflowdefinitionid: string,
     }
 }
 
@@ -156,14 +153,12 @@ export class CreateQueueItem extends jspb.Message {
 
     getHeadersMap(): jspb.Map<string, string>;
     clearHeadersMap(): void;
-    getDeadletterexchangeid(): string;
-    setDeadletterexchangeid(value: string): CreateQueueItem;
-    getDeadletterexchangeroutingkeyorpattern(): string;
-    setDeadletterexchangeroutingkeyorpattern(value: string): CreateQueueItem;
     getMaxqueuesize(): number;
     setMaxqueuesize(value: number): CreateQueueItem;
     getMaxdeliveringmessages(): number;
     setMaxdeliveringmessages(value: number): CreateQueueItem;
+    getWorkflowdefinitionid(): string;
+    setWorkflowdefinitionid(value: string): CreateQueueItem;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): CreateQueueItem.AsObject;
@@ -191,10 +186,9 @@ export namespace CreateQueueItem {
         desiredprioritythresholdsMap: Array<[number, number]>,
 
         headersMap: Array<[string, string]>,
-        deadletterexchangeid: string,
-        deadletterexchangeroutingkeyorpattern: string,
         maxqueuesize: number,
         maxdeliveringmessages: number,
+        workflowdefinitionid: string,
     }
 }
 
@@ -348,10 +342,6 @@ export class Queue extends jspb.Message {
 
     getHeadersMap(): jspb.Map<string, string>;
     clearHeadersMap(): void;
-    getDeadletterexchangeid(): string;
-    setDeadletterexchangeid(value: string): Queue;
-    getDeadletterexchangeroutingkeyorpattern(): string;
-    setDeadletterexchangeroutingkeyorpattern(value: string): Queue;
     getMessagescount(): number;
     setMessagescount(value: number): Queue;
     getMaxqueuesize(): number;
@@ -368,6 +358,8 @@ export class Queue extends jspb.Message {
     setMaxdeliveringmessages(value: number): Queue;
     getCurrentdeliveringmessages(): number;
     setCurrentdeliveringmessages(value: number): Queue;
+    getWorkflowdefinitionid(): string;
+    setWorkflowdefinitionid(value: string): Queue;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): Queue.AsObject;
@@ -401,8 +393,6 @@ export namespace Queue {
         prioritythresholdsMap: Array<[number, number]>,
 
         headersMap: Array<[string, string]>,
-        deadletterexchangeid: string,
-        deadletterexchangeroutingkeyorpattern: string,
         messagescount: number,
         maxqueuesize: number,
         nodeschedulersupervisorid: string,
@@ -411,6 +401,7 @@ export namespace Queue {
         nodeschedulerqueuesupervisionstate: string,
         maxdeliveringmessages: number,
         currentdeliveringmessages: number,
+        workflowdefinitionid: string,
     }
 }
 
@@ -671,4 +662,6 @@ export enum QueueType {
     STANDARD = 0,
     DELAYED = 1,
     DEAD_LETTER = 2,
+    WORKFLOW_EXECUTION = 3,
+    WORKFLOW_ACTIVITY = 4,
 }

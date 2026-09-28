@@ -16,17 +16,7 @@ async function main() {
     });
     console.log('Tenant:', tenant);
 
-    // 2. Assert exchange
-    const exchange = await sdk.assertExchange({
-        tenantCode: 'my-tenant',
-        code: 'my-exchange',
-        name: 'My Exchange',
-        type: 'direct',
-        vnamespace: 'default'
-    });
-    console.log('Exchange:', exchange);
-
-    // 3. Assert queue
+    // 2. Assert queue
     const queue = await sdk.assertQueue({
         tenantCode: 'my-tenant',
         code: 'my-queue',
@@ -40,19 +30,7 @@ async function main() {
     });
     console.log('Queue:', queue);
 
-    // 4. Assert binding (exchange → queue)
-    const binding = await sdk.assertBinding({
-        tenantCode: 'my-tenant',
-        code: 'my-binding',
-        exchangeCode: 'my-exchange',
-        queueCode: 'my-queue',
-        vnamespace: 'default',
-        routingKey: 'my.routing.key',
-        bindingType: 'classic'
-    });
-    console.log('Binding:', binding);
-
-        await sdk.createWorker({
+    await sdk.createWorker({
         workerName: 'Simple Node.js Worker 2',
         intervalMs: 500,
         capacityPolicies: [
@@ -75,7 +53,7 @@ async function main() {
         }
     });
 
-    // 5. Enqueue 1000 messages directly to the queue (batches of 50)
+    // 3. Enqueue 1000 messages directly to the queue (batches of 50)
     console.log('📤 Enqueueing 1000 messages directly to the queue (batch size: 50)...');
     const total = 1000;
     const batchSize = 50;
@@ -98,29 +76,6 @@ async function main() {
         console.log(`  ✅ ${succeeded}/${total} messages enqueued`);
     }
     console.log(`✅ Done. ${succeeded} messages enqueued directly to 'my-queue'.`);
-
-    // 6. Publish 1000 messages via exchange (batches of 50)
-    console.log('📨 Publishing 1000 messages via exchange (batch size: 50)...');
-    let published = 0;
-    for (let i = 0; i < total; i += batchSize) {
-        const batch = Array.from({ length: Math.min(batchSize, total - i) }, (_, j) => {
-            const idx = i + j;
-            return sdk.publishMessage({
-                tenantCode: 'my-tenant',
-                exchangeCode: 'my-exchange',
-                routingKeyOrPatternOrQueueCode: 'my.routing.key',
-                vnamespace: 'default',
-                content: JSON.stringify({ index: idx, msg: `Published message ${idx}` }),
-                contentType: 'application/json',
-                priority: 0,
-                handler: 'my-handler'
-            });
-        });
-        await Promise.all(batch);
-        published += batch.length;
-        console.log(`  ✅ ${published}/${total} messages published`);
-    }
-    console.log(`✅ Done. ${published} messages published via 'my-exchange'.`);
 
     //await sdk.disconnect();
 

@@ -6,13 +6,11 @@
 
 import * as jspb from "google-protobuf";
 
-export class CreateOneOffScheduledJobRequest extends jspb.Message {
+export class CreateOneOffScheduledJobRequest extends jspb.Message { 
     getTenantcode(): string;
     setTenantcode(value: string): CreateOneOffScheduledJobRequest;
-    getTargettype(): string;
-    setTargettype(value: string): CreateOneOffScheduledJobRequest;
-    getTargetcode(): string;
-    setTargetcode(value: string): CreateOneOffScheduledJobRequest;
+    getQueuecode(): string;
+    setQueuecode(value: string): CreateOneOffScheduledJobRequest;
     getVnamespace(): string;
     setVnamespace(value: string): CreateOneOffScheduledJobRequest;
     getContent(): string;
@@ -49,8 +47,7 @@ export class CreateOneOffScheduledJobRequest extends jspb.Message {
 export namespace CreateOneOffScheduledJobRequest {
     export type AsObject = {
         tenantcode: string,
-        targettype: string,
-        targetcode: string,
+        queuecode: string,
         vnamespace: string,
         content: string,
         contenttype: string,
@@ -66,13 +63,11 @@ export namespace CreateOneOffScheduledJobRequest {
     }
 }
 
-export class CreateRecurringScheduledJobRequest extends jspb.Message {
+export class CreateRecurringScheduledJobRequest extends jspb.Message { 
     getTenantcode(): string;
     setTenantcode(value: string): CreateRecurringScheduledJobRequest;
-    getTargettype(): string;
-    setTargettype(value: string): CreateRecurringScheduledJobRequest;
-    getTargetcode(): string;
-    setTargetcode(value: string): CreateRecurringScheduledJobRequest;
+    getQueuecode(): string;
+    setQueuecode(value: string): CreateRecurringScheduledJobRequest;
     getVnamespace(): string;
     setVnamespace(value: string): CreateRecurringScheduledJobRequest;
     getContent(): string;
@@ -109,8 +104,7 @@ export class CreateRecurringScheduledJobRequest extends jspb.Message {
 export namespace CreateRecurringScheduledJobRequest {
     export type AsObject = {
         tenantcode: string,
-        targettype: string,
-        targetcode: string,
+        queuecode: string,
         vnamespace: string,
         content: string,
         contenttype: string,
@@ -126,21 +120,17 @@ export namespace CreateRecurringScheduledJobRequest {
     }
 }
 
-export class ScheduledJob extends jspb.Message {
+export class ScheduledJob extends jspb.Message { 
     getId(): string;
     setId(value: string): ScheduledJob;
     getCode(): string;
     setCode(value: string): ScheduledJob;
     getTenantid(): string;
     setTenantid(value: string): ScheduledJob;
-    getTargettype(): string;
-    setTargettype(value: string): ScheduledJob;
-    getTargetid(): string;
-    setTargetid(value: string): ScheduledJob;
-    getTargetcode(): string;
-    setTargetcode(value: string): ScheduledJob;
-    getRoutingkeyorpatternorqueuecode(): string;
-    setRoutingkeyorpatternorqueuecode(value: string): ScheduledJob;
+    getQueueid(): string;
+    setQueueid(value: string): ScheduledJob;
+    getQueuecode(): string;
+    setQueuecode(value: string): ScheduledJob;
     getVnamespace(): string;
     setVnamespace(value: string): ScheduledJob;
     getContent(): string;
@@ -191,10 +181,8 @@ export namespace ScheduledJob {
         id: string,
         code: string,
         tenantid: string,
-        targettype: string,
-        targetid: string,
-        targetcode: string,
-        routingkeyorpatternorqueuecode: string,
+        queueid: string,
+        queuecode: string,
         vnamespace: string,
         content: string,
         contenttype: string,
@@ -216,7 +204,7 @@ export namespace ScheduledJob {
     }
 }
 
-export class CreateScheduledJobResponse extends jspb.Message {
+export class CreateScheduledJobResponse extends jspb.Message { 
     getMessage(): string;
     setMessage(value: string): CreateScheduledJobResponse;
 
@@ -242,7 +230,7 @@ export namespace CreateScheduledJobResponse {
     }
 }
 
-export class GetScheduledJobRequest extends jspb.Message {
+export class GetScheduledJobRequest extends jspb.Message { 
     getTenantcode(): string;
     setTenantcode(value: string): GetScheduledJobRequest;
     getId(): string;
@@ -265,7 +253,7 @@ export namespace GetScheduledJobRequest {
     }
 }
 
-export class GetScheduledJobResponse extends jspb.Message {
+export class GetScheduledJobResponse extends jspb.Message { 
     getMessage(): string;
     setMessage(value: string): GetScheduledJobResponse;
 
@@ -291,7 +279,7 @@ export namespace GetScheduledJobResponse {
     }
 }
 
-export class ListScheduledJobsRequest extends jspb.Message {
+export class ListScheduledJobsRequest extends jspb.Message { 
     getTenantcode(): string;
     setTenantcode(value: string): ListScheduledJobsRequest;
     getVnamespace(): string;
@@ -320,7 +308,7 @@ export namespace ListScheduledJobsRequest {
     }
 }
 
-export class ScheduledJobFindResult extends jspb.Message {
+export class ScheduledJobFindResult extends jspb.Message { 
     clearEntitiesList(): void;
     getEntitiesList(): Array<ScheduledJob>;
     setEntitiesList(value: Array<ScheduledJob>): ScheduledJobFindResult;
@@ -345,7 +333,7 @@ export namespace ScheduledJobFindResult {
     }
 }
 
-export class ListScheduledJobsResponse extends jspb.Message {
+export class ListScheduledJobsResponse extends jspb.Message { 
     getMessage(): string;
     setMessage(value: string): ListScheduledJobsResponse;
 
@@ -371,7 +359,7 @@ export namespace ListScheduledJobsResponse {
     }
 }
 
-export class DeleteScheduledJobRequest extends jspb.Message {
+export class DeleteScheduledJobRequest extends jspb.Message { 
     getTenantcode(): string;
     setTenantcode(value: string): DeleteScheduledJobRequest;
     getId(): string;
@@ -394,7 +382,7 @@ export namespace DeleteScheduledJobRequest {
     }
 }
 
-export class DeleteScheduledJobResponse extends jspb.Message {
+export class DeleteScheduledJobResponse extends jspb.Message { 
     getMessage(): string;
     setMessage(value: string): DeleteScheduledJobResponse;
 

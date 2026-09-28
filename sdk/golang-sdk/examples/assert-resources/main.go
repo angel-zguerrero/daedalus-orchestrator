@@ -48,20 +48,7 @@ func main() {
 	}
 	log.Printf("Tenant: %+v", tenant)
 
-	// 2. Assert exchange
-	exchange, err := sdk.AssertExchange(ctx, daedalus.AssertExchangeInput{
-		TenantCode: "my-tenant",
-		Code:       "my-exchange",
-		Name:       "My Exchange",
-		Type:       "direct",
-		VNamespace: "default",
-	})
-	if err != nil {
-		log.Fatalf("💥 Fatal error: %v", err)
-	}
-	log.Printf("Exchange: %+v", exchange)
-
-	// 3. Assert queue
+	// 2. Assert queue
 	queue, err := sdk.AssertQueue(ctx, daedalus.AssertQueueInput{
 		TenantCode:   "my-tenant",
 		Code:         "my-queue",
@@ -77,21 +64,6 @@ func main() {
 		log.Fatalf("💥 Fatal error: %v", err)
 	}
 	log.Printf("Queue: %+v", queue)
-
-	// 4. Assert binding (exchange → queue)
-	binding, err := sdk.AssertBinding(ctx, daedalus.AssertBindingInput{
-		TenantCode:   "my-tenant",
-		Code:         "my-binding",
-		ExchangeCode: "my-exchange",
-		QueueCode:    "my-queue",
-		VNamespace:   "default",
-		RoutingKey:   "my.routing.key",
-		BindingType:  "classic",
-	})
-	if err != nil {
-		log.Fatalf("💥 Fatal error: %v", err)
-	}
-	log.Printf("Binding: %+v", binding)
 
 	// Start a worker in a separate goroutine
 	go func() {
@@ -121,7 +93,7 @@ func main() {
 		}
 	}()
 
-	// 5. Enqueue 1000 messages directly to the queue (batches of 50)
+	// 3. Enqueue 1000 messages directly to the queue (batches of 50)
 	total := 1000
 	batchSize := 50
 
@@ -169,53 +141,6 @@ func main() {
 		log.Printf("  ✅ %d/%d messages enqueued", succeeded, total)
 	}
 	log.Printf("✅ Done. %d messages enqueued directly to 'my-queue'.", succeeded)
-
-	// 6. Publish 1000 messages via exchange (batches of 50)
-	log.Printf("📨 Publishing %d messages via exchange (batch size: %d)...", total, batchSize)
-	published := 0
-	for i := 0; i < total; i += batchSize {
-		count := batchSize
-		if total-i < batchSize {
-			count = total - i
-		}
-
-		var wg sync.WaitGroup
-		errCh := make(chan error, count)
-		for j := 0; j < count; j++ {
-			idx := i + j
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
-				payload, _ := json.Marshal(map[string]interface{}{
-					"index": idx,
-					"msg":   fmt.Sprintf("Published message %d", idx),
-				})
-				_, err := sdk.PublishMessage(ctx, daedalus.PublishMessageInput{
-					TenantCode:                    "my-tenant",
-					ExchangeCode:                  "my-exchange",
-					RoutingKeyOrPatternOrQueueCode: "my.routing.key",
-					VNamespace:                    "default",
-					Content:                       payload,
-					ContentType:                   "application/json",
-					Priority:                      0,
-					Handler:                       "my-handler",
-				})
-				if err != nil {
-					errCh <- err
-				}
-			}(idx)
-		}
-		wg.Wait()
-		close(errCh)
-
-		for err := range errCh {
-			log.Printf("❌ Publish error: %v", err)
-		}
-
-		published += count
-		log.Printf("  ✅ %d/%d messages published", published, total)
-	}
-	log.Printf("✅ Done. %d messages published via 'my-exchange'.", published)
 
 	log.Println("✅ Worker is running. Press Ctrl+C to stop.")
 	log.Println("✅ All resources asserted successfully.")

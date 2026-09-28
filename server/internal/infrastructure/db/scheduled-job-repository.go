@@ -69,8 +69,8 @@ func (r *ScheduledJobRepository) CreateScheduledJob(job *models.ScheduledJob, no
 			oldNextRunAt := existingJob.NextRunAt
 
 			existingJob.TenantID = job.TenantID
-			existingJob.TargetType = job.TargetType
-			existingJob.TargetID = job.TargetID
+			existingJob.QueueID = job.QueueID
+			existingJob.QueueCode = job.QueueCode
 			existingJob.VNamespace = job.VNamespace
 			existingJob.Type = job.Type
 			existingJob.RunAt = job.RunAt

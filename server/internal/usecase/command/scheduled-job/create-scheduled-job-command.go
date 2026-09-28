@@ -27,8 +27,8 @@ func (cmd *CreateScheduledJobCommand) Execute(uow *db.UnitOfWork, now time.Time)
 		return *commandResult
 	}
 
-	if cmd.ScheduledJob.TargetType == "" || cmd.ScheduledJob.TargetID == "" {
-		commandResult.Error = "TargetType and TargetID are required"
+	if cmd.ScheduledJob.QueueID == "" {
+		commandResult.Error = "QueueID is required"
 		return *commandResult
 	}
 

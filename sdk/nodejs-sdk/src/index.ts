@@ -5,17 +5,13 @@ const crypto = require('crypto');
 import { AuthServiceClient } from './proto/auth_grpc_pb';
 import { JobWorkerServiceClient } from './proto/jobworker_grpc_pb';
 import { TenantServiceClient } from './proto/tenant_grpc_pb';
-import { ExchangeServiceClient } from './proto/exchange_grpc_pb';
 import { QueueServiceClient } from './proto/queue_grpc_pb';
-import { BindingServiceClient } from './proto/binding_grpc_pb';
 import { ScheduledJobServiceClient } from './proto/scheduled_job_grpc_pb';
 
 import { LoginRequest } from './proto/auth_pb';
 import { ClaimWorkRequest, ClaimWorkCapacityPolicy as PBClaimWorkCapacityPolicy, ClaimWorkFilter as PBClaimWorkFilter, ClaimWorkStreamMessage, AckMessageRequest, BulkAckMessageRequest } from './proto/jobworker_pb';
 import { AssertTenantRequest } from './proto/tenant_pb';
-import { CreateExchangeRequest, PublishMessageRequest, QueueMessage as ExchangeQueueMessage, PublishStreamRequest } from './proto/exchange_pb';
 import { CreateQueueRequest, EnqueueMessageRequest, EnqueueStreamRequest, BulkCreateQueueRequest, CreateQueueItem } from './proto/queue_pb';
-import { CreateBindingRequest, BulkCreateBindingRequest, CreateBindingItem } from './proto/binding_pb';
 import {
   CreateOneOffScheduledJobRequest,
   CreateRecurringScheduledJobRequest,
@@ -111,15 +107,6 @@ export interface AssertTenantInput {
   name: string;
 }
 
-export interface AssertExchangeInput {
-  tenantCode: string;
-  code: string;
-  name: string;
-  type: string;
-  vnamespace?: string;
-  headers?: Record<string, string>;
-}
-
 export interface AssertQueueInput {
   tenantCode: string;
   code: string;
@@ -142,27 +129,6 @@ export interface AssertQueueInput {
 export interface BulkAssertQueuesInput {
   tenantCode: string;
   queues: AssertQueueInput[];
-}
-
-export interface AssertBindingInput {
-  tenantCode: string;
-  code: string;
-  exchangeCode: string;
-  queueCode?: string;
-  targetExchangeCode?: string;
-  alternateExchangeCode?: string;
-  vnamespace?: string;
-  routingKey?: string;
-  pattern?: string;
-  xMatch?: string;
-  bindingType?: string;
-  targetExchangeType?: string;
-  headers?: Record<string, string>;
-}
-
-export interface BulkAssertBindingsInput {
-  tenantCode: string;
-  bindings: AssertBindingInput[];
 }
 
 export interface EnqueueOptions {
@@ -189,40 +155,12 @@ export interface EnqueueMessageInput {
   options?: EnqueueOptions;
 }
 
-export interface PublishOptions {
-  waitForConfirmation?: boolean; // default true
-  timeoutMs?: number; // default 5000
-}
-
-export interface PublishResult {
-  clientMessageId: string;
-  confirmed: boolean;
-  queueMessages?: Record<string, string>;
-}
-
-export interface PublishMessageInput {
-  tenantCode: string;
-  exchangeCode: string;
-  routingKeyOrPatternOrQueueCode?: string;
-  vnamespace?: string;
-  content: string | Buffer;
-  contentType?: string;
-  priority?: number;
-  handler?: string;
-  headers?: Record<string, string>;
-  parameters?: Record<string, string>;
-  messageId?: string;
-  options?: PublishOptions;
-}
-
 export interface ScheduledJob {
   id: string;
   code: string;
   tenantId: string;
-  targetType: string;
-  targetId: string;
-  targetCode: string;
-  routingKeyOrPatternOrQueueCode: string;
+  queueId: string;
+  queueCode: string;
   vnamespace: string;
   content: string;
   contentType: string;
@@ -248,10 +186,8 @@ export function mapScheduledJobProto(raw: any): ScheduledJob {
     id: obj.id,
     code: obj.code,
     tenantId: obj.tenantid ?? obj.tenantId,
-    targetType: obj.targettype ?? obj.targetType,
-    targetId: obj.targetid ?? obj.targetId,
-    targetCode: obj.targetcode ?? obj.targetCode,
-    routingKeyOrPatternOrQueueCode: obj.routingkeyorpatternorqueuecode ?? obj.routingKeyOrPatternOrQueueCode,
+    queueId: obj.queueid ?? obj.queueId,
+    queueCode: obj.queuecode ?? obj.queueCode,
     vnamespace: obj.vnamespace,
     content: obj.content,
     contentType: obj.contenttype ?? obj.contentType,
@@ -274,8 +210,7 @@ export function mapScheduledJobProto(raw: any): ScheduledJob {
 export interface CreateOneOffScheduledJobInput {
   code?: string;
   tenantCode: string;
-  targetType: string; // "queue" or "exchange"
-  targetCode: string; // exchangeCode or routingKeyOrPatternOrQueueCode
+  queueCode: string;
   vnamespace?: string;
   content: string | Buffer;
   contentType?: string;
@@ -290,8 +225,7 @@ export interface CreateOneOffScheduledJobInput {
 export interface CreateRecurringScheduledJobInput {
   code?: string;
   tenantCode: string;
-  targetType: string; // "queue" or "exchange"
-  targetCode: string; // exchangeCode or routingKeyOrPatternOrQueueCode
+  queueCode: string;
   vnamespace?: string;
   content: string | Buffer;
   contentType?: string;
@@ -323,14 +257,9 @@ export class DaedalusSDK {
   private jobWorkerClient?: JobWorkerServiceClient;
   private authClient?: AuthServiceClient;
   private tenantClient?: TenantServiceClient;
-  private exchangeClient?: ExchangeServiceClient;
   private queueClient?: QueueServiceClient;
-  private bindingClient?: BindingServiceClient;
   private scheduledJobClient?: ScheduledJobServiceClient;
   private token: string | null = null;
-
-  private publishStream: any = null;
-  private publishPending: Map<string, { resolve: Function, reject: Function, timer: NodeJS.Timeout }> = new Map();
 
   private enqueueStream: any = null;
   private enqueuePending: Map<string, { resolve: Function, reject: Function, timer: NodeJS.Timeout }> = new Map();
@@ -388,17 +317,7 @@ export class DaedalusSDK {
       grpc.credentials.createInsecure()
     );
 
-    this.exchangeClient = new ExchangeServiceClient(
-      target,
-      grpc.credentials.createInsecure()
-    );
-
     this.queueClient = new QueueServiceClient(
-      target,
-      grpc.credentials.createInsecure()
-    );
-
-    this.bindingClient = new BindingServiceClient(
       target,
       grpc.credentials.createInsecure()
     );
@@ -441,21 +360,11 @@ export class DaedalusSDK {
     if (this.tenantClient) {
       this.tenantClient.close();
     }
-    if (this.exchangeClient) {
-      this.exchangeClient.close();
-    }
     if (this.queueClient) {
       this.queueClient.close();
     }
-    if (this.bindingClient) {
-      this.bindingClient.close();
-    }
     if (this.scheduledJobClient) {
       this.scheduledJobClient.close();
-    }
-    if (this.publishStream) {
-      this.publishStream.end();
-      this.publishStream = null;
     }
     if (this.enqueueStream) {
       this.enqueueStream.end();
@@ -538,37 +447,6 @@ export class DaedalusSDK {
             return reject(err);
           }
           console.log(`✅ Tenant asserted: ${input.code}`);
-          resolve(response.toObject().result);
-        }
-      );
-    });
-  }
-
-  async assertExchange(input: AssertExchangeInput): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const req = new CreateExchangeRequest();
-      req.setTenantcode(input.tenantCode);
-      req.setCode(input.code);
-      req.setName(input.name);
-      req.setType(input.type);
-      req.setVnamespace(input.vnamespace ?? '');
-
-      if (input.headers) {
-        const headersMap = req.getHeadersMap();
-        for (const [k, v] of Object.entries(input.headers)) {
-          headersMap.set(k, v);
-        }
-      }
-
-      this.exchangeClient!.createExchange(
-        req,
-        this.getMetadata(),
-        (err: any, response: any) => {
-          if (err) {
-            console.error('❌ Failed to assert exchange:', err.message);
-            return reject(err);
-          }
-          console.log(`✅ Exchange asserted: ${input.code}`);
           resolve(response.toObject().result);
         }
       );
@@ -703,35 +581,6 @@ export class DaedalusSDK {
     }
   }
 
-  private ensurePublishStream() {
-    if (!this.publishStream) {
-      this.publishStream = this.exchangeClient!.publishStream(this.getMetadata());
-      this.publishStream.on('data', (response: any) => {
-        const clientMessageId = response.getClientmessageid();
-        const pending = this.publishPending.get(clientMessageId);
-        if (pending) {
-          clearTimeout(pending.timer);
-          this.publishPending.delete(clientMessageId);
-          if (!response.getConfirmed()) {
-            pending.reject(new Error(response.getError() || 'Failed to publish message'));
-          } else {
-            pending.resolve({
-              clientMessageId: clientMessageId,
-              confirmed: true
-            });
-          }
-        }
-      });
-      this.publishStream.on('error', (err: any) => {
-        console.error('PublishStream error:', err);
-        this.publishStream = null;
-      });
-      this.publishStream.on('end', () => {
-        this.publishStream = null;
-      });
-    }
-  }
-
   async enqueueMessage(input: EnqueueMessageInput): Promise<EnqueueResult> {
     const contentBytes = Buffer.isBuffer(input.content)
       ? input.content
@@ -790,115 +639,12 @@ export class DaedalusSDK {
     });
   }
 
-  async publishMessage(input: PublishMessageInput): Promise<PublishResult> {
-    const contentBytes = Buffer.isBuffer(input.content)
-      ? input.content
-      : Buffer.from(input.content);
-
-    this.ensurePublishStream();
-
-    const clientMessageId = crypto.randomUUID();
-    const waitForConfirmation = input.options?.waitForConfirmation ?? true;
-    const timeoutMs = input.options?.timeoutMs ?? 5000;
-
-    const request = new PublishStreamRequest();
-    request.setClientmessageid(clientMessageId);
-    request.setTenantcode(input.tenantCode);
-    request.setExchangecode(input.exchangeCode);
-    request.setRoutingkeyorpatternorqueuecode(input.routingKeyOrPatternOrQueueCode ?? '');
-    request.setVnamespace(input.vnamespace ?? '');
-
-    const message = new ExchangeQueueMessage();
-    message.setMessageid(input.messageId ?? '');
-    message.setHandler(input.handler ?? '');
-    message.setPriority(input.priority ?? 0);
-    message.setContenttype(input.contentType ?? 'text/plain');
-    message.setContent(contentBytes);
-
-    const headersMap = message.getHeadersMap();
-    if (input.headers) {
-      for (const [k, v] of Object.entries(input.headers)) {
-        headersMap.set(k, v);
-      }
-    }
-
-    const paramsMap = message.getParametersMap();
-    if (input.parameters) {
-      for (const [k, v] of Object.entries(input.parameters)) {
-        paramsMap.set(k, v);
-      }
-    }
-
-    request.setMessage(message);
-
-    if (!waitForConfirmation) {
-      this.publishStream.write(request);
-      return { clientMessageId, confirmed: false };
-    }
-
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.publishPending.delete(clientMessageId);
-        reject(new Error(`Publish confirmation timeout after ${timeoutMs}ms`));
-      }, timeoutMs);
-
-      this.publishPending.set(clientMessageId, { resolve, reject, timer });
-
-      this.publishStream.write(request, (err: any) => {
-        if (err) {
-          clearTimeout(timer);
-          this.publishPending.delete(clientMessageId);
-          reject(err);
-        }
-      });
-    });
-  }
-
-  async assertBinding(input: AssertBindingInput): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const req = new CreateBindingRequest();
-      req.setTenantcode(input.tenantCode);
-      req.setCode(input.code);
-      req.setExchangecode(input.exchangeCode);
-      req.setQueuecode(input.queueCode ?? '');
-      req.setTargetexchangecode(input.targetExchangeCode ?? '');
-      req.setAlternateexchangecode(input.alternateExchangeCode ?? '');
-      req.setVnamespace(input.vnamespace ?? '');
-      req.setRoutingkey(input.routingKey ?? '');
-      req.setPattern(input.pattern ?? '');
-      req.setXmatch(input.xMatch ?? '');
-      req.setBindingtype(input.bindingType ?? 'classic');
-      req.setTargetexchangetype(input.targetExchangeType ?? '');
-
-      if (input.headers) {
-        const headersMap = req.getHeadersMap();
-        for (const [k, v] of Object.entries(input.headers)) {
-          headersMap.set(k, v);
-        }
-      }
-
-      this.bindingClient!.createBinding(
-        req,
-        this.getMetadata(),
-        (err: any, response: any) => {
-          if (err) {
-            console.error('❌ Failed to assert binding:', err.message);
-            return reject(err);
-          }
-          console.log(`✅ Binding asserted: ${input.code}`);
-          resolve(response.toObject().result);
-        }
-      );
-    });
-  }
-
   async createOneOffScheduledJob(input: CreateOneOffScheduledJobInput): Promise<ScheduledJob> {
     const contentBytes = Buffer.isBuffer(input.content) ? input.content.toString('utf8') : input.content;
     return new Promise((resolve, reject) => {
       const req = new CreateOneOffScheduledJobRequest();
       req.setTenantcode(input.tenantCode);
-      req.setTargettype(input.targetType);
-      req.setTargetcode(input.targetCode);
+      req.setQueuecode(input.queueCode);
       req.setVnamespace(input.vnamespace ?? '');
       req.setContent(contentBytes);
       req.setContenttype(input.contentType ?? 'text/plain');
@@ -943,8 +689,7 @@ export class DaedalusSDK {
     return new Promise((resolve, reject) => {
       const req = new CreateRecurringScheduledJobRequest();
       req.setTenantcode(input.tenantCode);
-      req.setTargettype(input.targetType);
-      req.setTargetcode(input.targetCode);
+      req.setQueuecode(input.queueCode);
       req.setVnamespace(input.vnamespace ?? '');
       req.setContent(contentBytes);
       req.setContenttype(input.contentType ?? 'text/plain');
@@ -1047,51 +792,6 @@ export class DaedalusSDK {
           }
           console.log(`✅ Scheduled job deleted: ${id}`);
           resolve();
-        }
-      );
-    });
-  }
-
-  async bulkAssertBindings(input: BulkAssertBindingsInput): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const req = new BulkCreateBindingRequest();
-      req.setTenantcode(input.tenantCode);
-
-      const bindingItems: CreateBindingItem[] = input.bindings.map(b => {
-        const item = new CreateBindingItem();
-        item.setCode(b.code);
-        item.setExchangecode(b.exchangeCode);
-        item.setQueuecode(b.queueCode ?? '');
-        item.setTargetexchangecode(b.targetExchangeCode ?? '');
-        item.setAlternateexchangecode(b.alternateExchangeCode ?? '');
-        item.setVnamespace(b.vnamespace ?? '');
-        item.setRoutingkey(b.routingKey ?? '');
-        item.setPattern(b.pattern ?? '');
-        item.setXmatch(b.xMatch ?? '');
-        item.setBindingtype(b.bindingType ?? 'classic');
-        item.setTargetexchangetype(b.targetExchangeType ?? '');
-
-        if (b.headers) {
-          const headersMap = item.getHeadersMap();
-          for (const [k, v] of Object.entries(b.headers)) {
-            headersMap.set(k, v);
-          }
-        }
-        return item;
-      });
-
-      req.setBindingsList(bindingItems);
-
-      this.bindingClient!.bulkCreateBinding(
-        req,
-        this.getMetadata(),
-        (err: any, response: any) => {
-          if (err) {
-            console.error('❌ Failed to bulk assert bindings:', err.message);
-            return reject(err);
-          }
-          console.log(`✅ Bulk Bindings asserted: ${input.bindings.length}`);
-          resolve(response.toObject().resultsList);
         }
       );
     });

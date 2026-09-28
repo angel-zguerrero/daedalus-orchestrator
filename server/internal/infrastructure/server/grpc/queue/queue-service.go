@@ -88,8 +88,6 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 		MaxDeliveringMessages:                 int(r.MaxDeliveringMessages),
 		DesiredPriorityThresholds:             convertDesiredPriorityThresholds(r.DesiredPriorityThresholds),
 		Headers:                               r.Headers,
-		DeadLetterExchangeId:                  r.DeadLetterExchangeId,
-		DeadLetterExchangeRoutingKeyOrPattern: r.DeadLetterExchangeRoutingKeyOrPattern,
 	}
 
 	// Set defaults if not provided
@@ -132,8 +130,6 @@ func (s *QueueService) CreateQueue(ctx context.Context, r *pb.CreateQueueRequest
 			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(result.DesiredPriorityThresholds),
 			PriorityThresholds:                    convertPriorityThresholdsToProto(result.PriorityThresholds),
 			Headers:                               result.Headers,
-			DeadLetterExchangeId:                  result.DeadLetterExchangeId,
-			DeadLetterExchangeRoutingKeyOrPattern: result.DeadLetterExchangeRoutingKeyOrPattern,
 		},
 	}, nil
 }
@@ -163,8 +159,6 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 			MaxDeliveringMessages:                 int(t.MaxDeliveringMessages),
 			DesiredPriorityThresholds:             convertDesiredPriorityThresholds(t.DesiredPriorityThresholds),
 			Headers:                               t.Headers,
-			DeadLetterExchangeId:                  t.DeadLetterExchangeId,
-			DeadLetterExchangeRoutingKeyOrPattern: t.DeadLetterExchangeRoutingKeyOrPattern,
 		}
 		// Set defaults if not provided
 		if queue.MaxAttempts == 0 {
@@ -207,8 +201,6 @@ func (s *QueueService) BulkCreateQueue(ctx context.Context, r *pb.BulkCreateQueu
 			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
 			PriorityThresholds:                    convertPriorityThresholdsToProto(e.PriorityThresholds),
 			Headers:                               e.Headers,
-			DeadLetterExchangeId:                  e.DeadLetterExchangeId,
-			DeadLetterExchangeRoutingKeyOrPattern: e.DeadLetterExchangeRoutingKeyOrPattern,
 		}
 		rQueues = append(rQueues, ex)
 	}
@@ -250,8 +242,6 @@ func (s *QueueService) GetQueue(ctx context.Context, r *pb.GetQueueRequest) (*pb
 			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(queue.DesiredPriorityThresholds),
 			PriorityThresholds:                    convertPriorityThresholdsToProto(queue.PriorityThresholds),
 			Headers:                               queue.Headers,
-			DeadLetterExchangeId:                  queue.DeadLetterExchangeId,
-			DeadLetterExchangeRoutingKeyOrPattern: queue.DeadLetterExchangeRoutingKeyOrPattern,
 		},
 	}, nil
 }
@@ -286,8 +276,6 @@ func (s *QueueService) GetQueues(ctx context.Context, r *pb.GetQueuesRequest) (*
 			MessagesCount:                         int32(e.MessagesCount),
 			DesiredPriorityThresholds:             convertPriorityThresholdsToProto(e.DesiredPriorityThresholds),
 			PriorityThresholds:                    convertPriorityThresholdsToProto(e.PriorityThresholds),
-			DeadLetterExchangeId:                  e.DeadLetterExchangeId,
-			DeadLetterExchangeRoutingKeyOrPattern: e.DeadLetterExchangeRoutingKeyOrPattern,
 		}
 
 		// Add headers if requested and available

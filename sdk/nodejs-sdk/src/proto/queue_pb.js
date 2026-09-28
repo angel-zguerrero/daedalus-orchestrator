@@ -441,10 +441,9 @@ proto.queue.CreateQueueRequest.toObject = function(includeInstance, msg) {
     maxattempts: jspb.Message.getFieldWithDefault(msg, 11, 0),
     desiredprioritythresholdsMap: (f = msg.getDesiredprioritythresholdsMap()) ? f.toObject(includeInstance, undefined) : [],
     headersMap: (f = msg.getHeadersMap()) ? f.toObject(includeInstance, undefined) : [],
-    deadletterexchangeid: jspb.Message.getFieldWithDefault(msg, 14, ""),
-    deadletterexchangeroutingkeyorpattern: jspb.Message.getFieldWithDefault(msg, 15, ""),
-    maxqueuesize: jspb.Message.getFieldWithDefault(msg, 16, 0),
-    maxdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 17, 0)
+    maxqueuesize: jspb.Message.getFieldWithDefault(msg, 14, 0),
+    maxdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 15, 0),
+    workflowdefinitionid: jspb.Message.getFieldWithDefault(msg, 16, "")
   };
 
   if (includeInstance) {
@@ -538,20 +537,16 @@ proto.queue.CreateQueueRequest.deserializeBinaryFromReader = function(msg, reade
          });
       break;
     case 14:
-      var value = /** @type {string} */ (reader.readString());
-      msg.setDeadletterexchangeid(value);
-      break;
-    case 15:
-      var value = /** @type {string} */ (reader.readString());
-      msg.setDeadletterexchangeroutingkeyorpattern(value);
-      break;
-    case 16:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMaxqueuesize(value);
       break;
-    case 17:
+    case 15:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMaxdeliveringmessages(value);
+      break;
+    case 16:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setWorkflowdefinitionid(value);
       break;
     default:
       reader.skipField();
@@ -667,31 +662,24 @@ proto.queue.CreateQueueRequest.serializeBinaryToWriter = function(message, write
   if (f && f.getLength() > 0) {
     f.serializeBinary(13, writer, jspb.BinaryWriter.prototype.writeString, jspb.BinaryWriter.prototype.writeString);
   }
-  f = message.getDeadletterexchangeid();
-  if (f.length > 0) {
-    writer.writeString(
-      14,
-      f
-    );
-  }
-  f = message.getDeadletterexchangeroutingkeyorpattern();
-  if (f.length > 0) {
-    writer.writeString(
-      15,
-      f
-    );
-  }
   f = message.getMaxqueuesize();
   if (f !== 0) {
     writer.writeInt32(
-      16,
+      14,
       f
     );
   }
   f = message.getMaxdeliveringmessages();
   if (f !== 0) {
     writer.writeInt32(
-      17,
+      15,
+      f
+    );
+  }
+  f = message.getWorkflowdefinitionid();
+  if (f.length > 0) {
+    writer.writeString(
+      16,
       f
     );
   }
@@ -941,47 +929,11 @@ proto.queue.CreateQueueRequest.prototype.clearHeadersMap = function() {
 
 
 /**
- * optional string deadLetterExchangeId = 14;
- * @return {string}
- */
-proto.queue.CreateQueueRequest.prototype.getDeadletterexchangeid = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 14, ""));
-};
-
-
-/**
- * @param {string} value
- * @return {!proto.queue.CreateQueueRequest} returns this
- */
-proto.queue.CreateQueueRequest.prototype.setDeadletterexchangeid = function(value) {
-  return jspb.Message.setProto3StringField(this, 14, value);
-};
-
-
-/**
- * optional string deadLetterExchangeRoutingKeyOrPattern = 15;
- * @return {string}
- */
-proto.queue.CreateQueueRequest.prototype.getDeadletterexchangeroutingkeyorpattern = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 15, ""));
-};
-
-
-/**
- * @param {string} value
- * @return {!proto.queue.CreateQueueRequest} returns this
- */
-proto.queue.CreateQueueRequest.prototype.setDeadletterexchangeroutingkeyorpattern = function(value) {
-  return jspb.Message.setProto3StringField(this, 15, value);
-};
-
-
-/**
- * optional int32 maxQueueSize = 16;
+ * optional int32 maxQueueSize = 14;
  * @return {number}
  */
 proto.queue.CreateQueueRequest.prototype.getMaxqueuesize = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 16, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 14, 0));
 };
 
 
@@ -990,16 +942,16 @@ proto.queue.CreateQueueRequest.prototype.getMaxqueuesize = function() {
  * @return {!proto.queue.CreateQueueRequest} returns this
  */
 proto.queue.CreateQueueRequest.prototype.setMaxqueuesize = function(value) {
-  return jspb.Message.setProto3IntField(this, 16, value);
+  return jspb.Message.setProto3IntField(this, 14, value);
 };
 
 
 /**
- * optional int32 maxDeliveringMessages = 17;
+ * optional int32 maxDeliveringMessages = 15;
  * @return {number}
  */
 proto.queue.CreateQueueRequest.prototype.getMaxdeliveringmessages = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 17, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 15, 0));
 };
 
 
@@ -1008,7 +960,25 @@ proto.queue.CreateQueueRequest.prototype.getMaxdeliveringmessages = function() {
  * @return {!proto.queue.CreateQueueRequest} returns this
  */
 proto.queue.CreateQueueRequest.prototype.setMaxdeliveringmessages = function(value) {
-  return jspb.Message.setProto3IntField(this, 17, value);
+  return jspb.Message.setProto3IntField(this, 15, value);
+};
+
+
+/**
+ * optional string workflowDefinitionID = 16;
+ * @return {string}
+ */
+proto.queue.CreateQueueRequest.prototype.getWorkflowdefinitionid = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 16, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.queue.CreateQueueRequest} returns this
+ */
+proto.queue.CreateQueueRequest.prototype.setWorkflowdefinitionid = function(value) {
+  return jspb.Message.setProto3StringField(this, 16, value);
 };
 
 
@@ -1427,10 +1397,9 @@ proto.queue.CreateQueueItem.toObject = function(includeInstance, msg) {
     maxattempts: jspb.Message.getFieldWithDefault(msg, 10, 0),
     desiredprioritythresholdsMap: (f = msg.getDesiredprioritythresholdsMap()) ? f.toObject(includeInstance, undefined) : [],
     headersMap: (f = msg.getHeadersMap()) ? f.toObject(includeInstance, undefined) : [],
-    deadletterexchangeid: jspb.Message.getFieldWithDefault(msg, 13, ""),
-    deadletterexchangeroutingkeyorpattern: jspb.Message.getFieldWithDefault(msg, 14, ""),
-    maxqueuesize: jspb.Message.getFieldWithDefault(msg, 15, 0),
-    maxdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 16, 0)
+    maxqueuesize: jspb.Message.getFieldWithDefault(msg, 13, 0),
+    maxdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 14, 0),
+    workflowdefinitionid: jspb.Message.getFieldWithDefault(msg, 15, "")
   };
 
   if (includeInstance) {
@@ -1520,20 +1489,16 @@ proto.queue.CreateQueueItem.deserializeBinaryFromReader = function(msg, reader) 
          });
       break;
     case 13:
-      var value = /** @type {string} */ (reader.readString());
-      msg.setDeadletterexchangeid(value);
-      break;
-    case 14:
-      var value = /** @type {string} */ (reader.readString());
-      msg.setDeadletterexchangeroutingkeyorpattern(value);
-      break;
-    case 15:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMaxqueuesize(value);
       break;
-    case 16:
+    case 14:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMaxdeliveringmessages(value);
+      break;
+    case 15:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setWorkflowdefinitionid(value);
       break;
     default:
       reader.skipField();
@@ -1642,31 +1607,24 @@ proto.queue.CreateQueueItem.serializeBinaryToWriter = function(message, writer) 
   if (f && f.getLength() > 0) {
     f.serializeBinary(12, writer, jspb.BinaryWriter.prototype.writeString, jspb.BinaryWriter.prototype.writeString);
   }
-  f = message.getDeadletterexchangeid();
-  if (f.length > 0) {
-    writer.writeString(
-      13,
-      f
-    );
-  }
-  f = message.getDeadletterexchangeroutingkeyorpattern();
-  if (f.length > 0) {
-    writer.writeString(
-      14,
-      f
-    );
-  }
   f = message.getMaxqueuesize();
   if (f !== 0) {
     writer.writeInt32(
-      15,
+      13,
       f
     );
   }
   f = message.getMaxdeliveringmessages();
   if (f !== 0) {
     writer.writeInt32(
-      16,
+      14,
+      f
+    );
+  }
+  f = message.getWorkflowdefinitionid();
+  if (f.length > 0) {
+    writer.writeString(
+      15,
       f
     );
   }
@@ -1898,47 +1856,11 @@ proto.queue.CreateQueueItem.prototype.clearHeadersMap = function() {
 
 
 /**
- * optional string deadLetterExchangeId = 13;
- * @return {string}
- */
-proto.queue.CreateQueueItem.prototype.getDeadletterexchangeid = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 13, ""));
-};
-
-
-/**
- * @param {string} value
- * @return {!proto.queue.CreateQueueItem} returns this
- */
-proto.queue.CreateQueueItem.prototype.setDeadletterexchangeid = function(value) {
-  return jspb.Message.setProto3StringField(this, 13, value);
-};
-
-
-/**
- * optional string deadLetterExchangeRoutingKeyOrPattern = 14;
- * @return {string}
- */
-proto.queue.CreateQueueItem.prototype.getDeadletterexchangeroutingkeyorpattern = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 14, ""));
-};
-
-
-/**
- * @param {string} value
- * @return {!proto.queue.CreateQueueItem} returns this
- */
-proto.queue.CreateQueueItem.prototype.setDeadletterexchangeroutingkeyorpattern = function(value) {
-  return jspb.Message.setProto3StringField(this, 14, value);
-};
-
-
-/**
- * optional int32 maxQueueSize = 15;
+ * optional int32 maxQueueSize = 13;
  * @return {number}
  */
 proto.queue.CreateQueueItem.prototype.getMaxqueuesize = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 15, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 13, 0));
 };
 
 
@@ -1947,16 +1869,16 @@ proto.queue.CreateQueueItem.prototype.getMaxqueuesize = function() {
  * @return {!proto.queue.CreateQueueItem} returns this
  */
 proto.queue.CreateQueueItem.prototype.setMaxqueuesize = function(value) {
-  return jspb.Message.setProto3IntField(this, 15, value);
+  return jspb.Message.setProto3IntField(this, 13, value);
 };
 
 
 /**
- * optional int32 maxDeliveringMessages = 16;
+ * optional int32 maxDeliveringMessages = 14;
  * @return {number}
  */
 proto.queue.CreateQueueItem.prototype.getMaxdeliveringmessages = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 16, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 14, 0));
 };
 
 
@@ -1965,7 +1887,25 @@ proto.queue.CreateQueueItem.prototype.getMaxdeliveringmessages = function() {
  * @return {!proto.queue.CreateQueueItem} returns this
  */
 proto.queue.CreateQueueItem.prototype.setMaxdeliveringmessages = function(value) {
-  return jspb.Message.setProto3IntField(this, 16, value);
+  return jspb.Message.setProto3IntField(this, 14, value);
+};
+
+
+/**
+ * optional string workflowDefinitionID = 15;
+ * @return {string}
+ */
+proto.queue.CreateQueueItem.prototype.getWorkflowdefinitionid = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 15, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.queue.CreateQueueItem} returns this
+ */
+proto.queue.CreateQueueItem.prototype.setWorkflowdefinitionid = function(value) {
+  return jspb.Message.setProto3StringField(this, 15, value);
 };
 
 
@@ -2859,16 +2799,15 @@ proto.queue.Queue.toObject = function(includeInstance, msg) {
     desiredprioritythresholdsMap: (f = msg.getDesiredprioritythresholdsMap()) ? f.toObject(includeInstance, undefined) : [],
     prioritythresholdsMap: (f = msg.getPrioritythresholdsMap()) ? f.toObject(includeInstance, undefined) : [],
     headersMap: (f = msg.getHeadersMap()) ? f.toObject(includeInstance, undefined) : [],
-    deadletterexchangeid: jspb.Message.getFieldWithDefault(msg, 18, ""),
-    deadletterexchangeroutingkeyorpattern: jspb.Message.getFieldWithDefault(msg, 19, ""),
-    messagescount: jspb.Message.getFieldWithDefault(msg, 20, 0),
-    maxqueuesize: jspb.Message.getFieldWithDefault(msg, 21, 0),
-    nodeschedulersupervisorid: jspb.Message.getFieldWithDefault(msg, 22, ""),
-    nodeschedulersupervisorcode: jspb.Message.getFieldWithDefault(msg, 23, ""),
-    nodeschedulersupervisorname: jspb.Message.getFieldWithDefault(msg, 24, ""),
-    nodeschedulerqueuesupervisionstate: jspb.Message.getFieldWithDefault(msg, 25, ""),
-    maxdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 26, 0),
-    currentdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 27, 0)
+    messagescount: jspb.Message.getFieldWithDefault(msg, 18, 0),
+    maxqueuesize: jspb.Message.getFieldWithDefault(msg, 19, 0),
+    nodeschedulersupervisorid: jspb.Message.getFieldWithDefault(msg, 20, ""),
+    nodeschedulersupervisorcode: jspb.Message.getFieldWithDefault(msg, 21, ""),
+    nodeschedulersupervisorname: jspb.Message.getFieldWithDefault(msg, 22, ""),
+    nodeschedulerqueuesupervisionstate: jspb.Message.getFieldWithDefault(msg, 23, ""),
+    maxdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 24, 0),
+    currentdeliveringmessages: jspb.Message.getFieldWithDefault(msg, 25, 0),
+    workflowdefinitionid: jspb.Message.getFieldWithDefault(msg, 26, "")
   };
 
   if (includeInstance) {
@@ -2980,44 +2919,40 @@ proto.queue.Queue.deserializeBinaryFromReader = function(msg, reader) {
          });
       break;
     case 18:
-      var value = /** @type {string} */ (reader.readString());
-      msg.setDeadletterexchangeid(value);
-      break;
-    case 19:
-      var value = /** @type {string} */ (reader.readString());
-      msg.setDeadletterexchangeroutingkeyorpattern(value);
-      break;
-    case 20:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMessagescount(value);
       break;
-    case 21:
+    case 19:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMaxqueuesize(value);
       break;
-    case 22:
+    case 20:
       var value = /** @type {string} */ (reader.readString());
       msg.setNodeschedulersupervisorid(value);
       break;
-    case 23:
+    case 21:
       var value = /** @type {string} */ (reader.readString());
       msg.setNodeschedulersupervisorcode(value);
       break;
-    case 24:
+    case 22:
       var value = /** @type {string} */ (reader.readString());
       msg.setNodeschedulersupervisorname(value);
       break;
-    case 25:
+    case 23:
       var value = /** @type {string} */ (reader.readString());
       msg.setNodeschedulerqueuesupervisionstate(value);
       break;
-    case 26:
+    case 24:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMaxdeliveringmessages(value);
       break;
-    case 27:
+    case 25:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setCurrentdeliveringmessages(value);
+      break;
+    case 26:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setWorkflowdefinitionid(value);
       break;
     default:
       reader.skipField();
@@ -3158,73 +3093,66 @@ proto.queue.Queue.serializeBinaryToWriter = function(message, writer) {
   if (f && f.getLength() > 0) {
     f.serializeBinary(17, writer, jspb.BinaryWriter.prototype.writeString, jspb.BinaryWriter.prototype.writeString);
   }
-  f = message.getDeadletterexchangeid();
-  if (f.length > 0) {
-    writer.writeString(
-      18,
-      f
-    );
-  }
-  f = message.getDeadletterexchangeroutingkeyorpattern();
-  if (f.length > 0) {
-    writer.writeString(
-      19,
-      f
-    );
-  }
   f = message.getMessagescount();
   if (f !== 0) {
     writer.writeInt32(
-      20,
+      18,
       f
     );
   }
   f = message.getMaxqueuesize();
   if (f !== 0) {
     writer.writeInt32(
-      21,
+      19,
       f
     );
   }
   f = message.getNodeschedulersupervisorid();
   if (f.length > 0) {
     writer.writeString(
-      22,
+      20,
       f
     );
   }
   f = message.getNodeschedulersupervisorcode();
   if (f.length > 0) {
     writer.writeString(
-      23,
+      21,
       f
     );
   }
   f = message.getNodeschedulersupervisorname();
   if (f.length > 0) {
     writer.writeString(
-      24,
+      22,
       f
     );
   }
   f = message.getNodeschedulerqueuesupervisionstate();
   if (f.length > 0) {
     writer.writeString(
-      25,
+      23,
       f
     );
   }
   f = message.getMaxdeliveringmessages();
   if (f !== 0) {
     writer.writeInt32(
-      26,
+      24,
       f
     );
   }
   f = message.getCurrentdeliveringmessages();
   if (f !== 0) {
     writer.writeInt32(
-      27,
+      25,
+      f
+    );
+  }
+  f = message.getWorkflowdefinitionid();
+  if (f.length > 0) {
+    writer.writeString(
+      26,
       f
     );
   }
@@ -3550,47 +3478,11 @@ proto.queue.Queue.prototype.clearHeadersMap = function() {
 
 
 /**
- * optional string deadLetterExchangeId = 18;
- * @return {string}
- */
-proto.queue.Queue.prototype.getDeadletterexchangeid = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 18, ""));
-};
-
-
-/**
- * @param {string} value
- * @return {!proto.queue.Queue} returns this
- */
-proto.queue.Queue.prototype.setDeadletterexchangeid = function(value) {
-  return jspb.Message.setProto3StringField(this, 18, value);
-};
-
-
-/**
- * optional string deadLetterExchangeRoutingKeyOrPattern = 19;
- * @return {string}
- */
-proto.queue.Queue.prototype.getDeadletterexchangeroutingkeyorpattern = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 19, ""));
-};
-
-
-/**
- * @param {string} value
- * @return {!proto.queue.Queue} returns this
- */
-proto.queue.Queue.prototype.setDeadletterexchangeroutingkeyorpattern = function(value) {
-  return jspb.Message.setProto3StringField(this, 19, value);
-};
-
-
-/**
- * optional int32 messagesCount = 20;
+ * optional int32 messagesCount = 18;
  * @return {number}
  */
 proto.queue.Queue.prototype.getMessagescount = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 20, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 18, 0));
 };
 
 
@@ -3599,16 +3491,16 @@ proto.queue.Queue.prototype.getMessagescount = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setMessagescount = function(value) {
-  return jspb.Message.setProto3IntField(this, 20, value);
+  return jspb.Message.setProto3IntField(this, 18, value);
 };
 
 
 /**
- * optional int32 maxQueueSize = 21;
+ * optional int32 maxQueueSize = 19;
  * @return {number}
  */
 proto.queue.Queue.prototype.getMaxqueuesize = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 21, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 19, 0));
 };
 
 
@@ -3617,16 +3509,16 @@ proto.queue.Queue.prototype.getMaxqueuesize = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setMaxqueuesize = function(value) {
-  return jspb.Message.setProto3IntField(this, 21, value);
+  return jspb.Message.setProto3IntField(this, 19, value);
 };
 
 
 /**
- * optional string nodeSchedulerSupervisorId = 22;
+ * optional string nodeSchedulerSupervisorId = 20;
  * @return {string}
  */
 proto.queue.Queue.prototype.getNodeschedulersupervisorid = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 22, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 20, ""));
 };
 
 
@@ -3635,16 +3527,16 @@ proto.queue.Queue.prototype.getNodeschedulersupervisorid = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setNodeschedulersupervisorid = function(value) {
-  return jspb.Message.setProto3StringField(this, 22, value);
+  return jspb.Message.setProto3StringField(this, 20, value);
 };
 
 
 /**
- * optional string nodeSchedulerSupervisorCode = 23;
+ * optional string nodeSchedulerSupervisorCode = 21;
  * @return {string}
  */
 proto.queue.Queue.prototype.getNodeschedulersupervisorcode = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 23, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 21, ""));
 };
 
 
@@ -3653,16 +3545,16 @@ proto.queue.Queue.prototype.getNodeschedulersupervisorcode = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setNodeschedulersupervisorcode = function(value) {
-  return jspb.Message.setProto3StringField(this, 23, value);
+  return jspb.Message.setProto3StringField(this, 21, value);
 };
 
 
 /**
- * optional string nodeSchedulerSupervisorName = 24;
+ * optional string nodeSchedulerSupervisorName = 22;
  * @return {string}
  */
 proto.queue.Queue.prototype.getNodeschedulersupervisorname = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 24, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 22, ""));
 };
 
 
@@ -3671,16 +3563,16 @@ proto.queue.Queue.prototype.getNodeschedulersupervisorname = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setNodeschedulersupervisorname = function(value) {
-  return jspb.Message.setProto3StringField(this, 24, value);
+  return jspb.Message.setProto3StringField(this, 22, value);
 };
 
 
 /**
- * optional string nodeSchedulerQueueSupervisionState = 25;
+ * optional string nodeSchedulerQueueSupervisionState = 23;
  * @return {string}
  */
 proto.queue.Queue.prototype.getNodeschedulerqueuesupervisionstate = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 25, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 23, ""));
 };
 
 
@@ -3689,16 +3581,16 @@ proto.queue.Queue.prototype.getNodeschedulerqueuesupervisionstate = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setNodeschedulerqueuesupervisionstate = function(value) {
-  return jspb.Message.setProto3StringField(this, 25, value);
+  return jspb.Message.setProto3StringField(this, 23, value);
 };
 
 
 /**
- * optional int32 maxDeliveringMessages = 26;
+ * optional int32 maxDeliveringMessages = 24;
  * @return {number}
  */
 proto.queue.Queue.prototype.getMaxdeliveringmessages = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 26, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 24, 0));
 };
 
 
@@ -3707,16 +3599,16 @@ proto.queue.Queue.prototype.getMaxdeliveringmessages = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setMaxdeliveringmessages = function(value) {
-  return jspb.Message.setProto3IntField(this, 26, value);
+  return jspb.Message.setProto3IntField(this, 24, value);
 };
 
 
 /**
- * optional int32 currentDeliveringMessages = 27;
+ * optional int32 currentDeliveringMessages = 25;
  * @return {number}
  */
 proto.queue.Queue.prototype.getCurrentdeliveringmessages = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 27, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 25, 0));
 };
 
 
@@ -3725,7 +3617,25 @@ proto.queue.Queue.prototype.getCurrentdeliveringmessages = function() {
  * @return {!proto.queue.Queue} returns this
  */
 proto.queue.Queue.prototype.setCurrentdeliveringmessages = function(value) {
-  return jspb.Message.setProto3IntField(this, 27, value);
+  return jspb.Message.setProto3IntField(this, 25, value);
+};
+
+
+/**
+ * optional string workflowDefinitionID = 26;
+ * @return {string}
+ */
+proto.queue.Queue.prototype.getWorkflowdefinitionid = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 26, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.queue.Queue} returns this
+ */
+proto.queue.Queue.prototype.setWorkflowdefinitionid = function(value) {
+  return jspb.Message.setProto3StringField(this, 26, value);
 };
 
 
@@ -5621,7 +5531,9 @@ proto.queue.EnqueueStreamResponse.prototype.setError = function(value) {
 proto.queue.QueueType = {
   STANDARD: 0,
   DELAYED: 1,
-  DEAD_LETTER: 2
+  DEAD_LETTER: 2,
+  WORKFLOW_EXECUTION: 3,
+  WORKFLOW_ACTIVITY: 4
 };
 
 goog.object.extend(exports, proto.queue);

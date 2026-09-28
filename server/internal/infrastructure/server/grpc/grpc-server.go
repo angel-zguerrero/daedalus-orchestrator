@@ -12,14 +12,10 @@ import (
 
 	"deadalus-orch/server/internal/infrastructure/server/common"
 	"deadalus-orch/server/internal/infrastructure/server/grpc/auth"      // Import new auth service
-	"deadalus-orch/server/internal/infrastructure/server/grpc/binding"   // Import binding service
-	"deadalus-orch/server/internal/infrastructure/server/grpc/exchange"  // Import new exchange service
 	"deadalus-orch/server/internal/infrastructure/server/grpc/jobworker" // Import jobworker service
 	healthmetrics "deadalus-orch/server/internal/infrastructure/server/grpc/metrics"
 	pb "deadalus-orch/server/internal/infrastructure/server/grpc/proto/health/metrics"
 	pbAuth "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/auth"                   // Import new auth pb
-	pbBinding "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/binding"             // Import binding pb
-	pbExchange "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/exchange"           // Import new exchange pb
 	pbJobWorker "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/jobworker"         // Import jobworker pb
 	pbQueue "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/queue"                 // Import new queue pb
 	pbT "deadalus-orch/server/internal/infrastructure/server/grpc/proto/pb/tenant"
@@ -74,17 +70,9 @@ func NewGrpcServer(cfg *common.ServerConfing) (*GrpcServer, error) {
 	authSvc := auth.NewAuthService(cfg, authBO)
 	pbAuth.RegisterAuthServiceServer(server, authSvc)
 
-	// Register new ExchangeService
-	exchangeSvc := exchange.NewExchangeService(cfg)
-	pbExchange.RegisterExchangeServiceServer(server, exchangeSvc)
-
 	// Register new QueueService
 	queueSvc := queue.NewQueueService(cfg)
 	pbQueue.RegisterQueueServiceServer(server, queueSvc)
-
-	// Register BindingService
-	bindingSvc := binding.NewBindingService(cfg)
-	pbBinding.RegisterBindingServiceServer(server, bindingSvc)
 
 
 	// Register new JobWorkerService

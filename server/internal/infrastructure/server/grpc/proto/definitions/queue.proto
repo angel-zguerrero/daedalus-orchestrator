@@ -36,11 +36,9 @@ message CreateQueueRequest {
   int32 maxAttempts = 11;
   map<int32, int32> desiredPriorityThresholds = 12;
   map<string, string> headers = 13;
-  string deadLetterExchangeId = 14;
-  string deadLetterExchangeRoutingKeyOrPattern = 15;
-  int32 maxQueueSize = 16;
-  int32 maxDeliveringMessages = 17;
-  string workflowDefinitionID = 18;
+  int32 maxQueueSize = 14;
+  int32 maxDeliveringMessages = 15;
+  string workflowDefinitionID = 16;
 }
 
 message CreateQueueResponse {
@@ -66,11 +64,9 @@ message CreateQueueItem {
   int32 maxAttempts = 10;
   map<int32, int32> desiredPriorityThresholds = 11;
   map<string, string> headers = 12;
-  string deadLetterExchangeId = 13;
-  string deadLetterExchangeRoutingKeyOrPattern = 14;
-  int32 maxQueueSize = 15;
-  int32 maxDeliveringMessages = 16;
-  string workflowDefinitionID = 17;
+  int32 maxQueueSize = 13;
+  int32 maxDeliveringMessages = 14;
+  string workflowDefinitionID = 15;
 }
 
 message BulkCreateQueueResponse {
@@ -116,17 +112,15 @@ message Queue {
   map<int32, int32> desiredPriorityThresholds = 15;
   map<int32, int32> priorityThresholds = 16;
   map<string, string> headers = 17;
-  string deadLetterExchangeId = 18;
-  string deadLetterExchangeRoutingKeyOrPattern = 19;
-  int32 messagesCount = 20;
-  int32 maxQueueSize = 21;
-  string nodeSchedulerSupervisorId = 22;
-  string nodeSchedulerSupervisorCode = 23;
-  string nodeSchedulerSupervisorName = 24;
-  string nodeSchedulerQueueSupervisionState = 25;
-  int32 maxDeliveringMessages = 26;
-  int32 currentDeliveringMessages = 27;
-  string workflowDefinitionID = 28;
+  int32 messagesCount = 18;
+  int32 maxQueueSize = 19;
+  string nodeSchedulerSupervisorId = 20;
+  string nodeSchedulerSupervisorCode = 21;
+  string nodeSchedulerSupervisorName = 22;
+  string nodeSchedulerQueueSupervisionState = 23;
+  int32 maxDeliveringMessages = 24;
+  int32 currentDeliveringMessages = 25;
+  string workflowDefinitionID = 26;
 }
 
 message QueueFindResult {

@@ -207,8 +207,9 @@ go build ./... # Build the SDK
 We provide fully functional examples in the [examples/](examples/) folder:
 
 - **[Simple Worker](examples/simple-worker/main.go)**: A basic worker showing connection and message consumption.
-- **[Assert Resources](examples/assert-resources/main.go)**: A comprehensive example demonstrating how to upsert a tenant, exchange, queue, and binding, plus publishing and enqueueing messages.
+- **[Assert Resources](examples/assert-resources/main.go)**: A comprehensive example demonstrating how to upsert a tenant and queue, plus enqueueing messages directly.
 - **[Email Simulator](examples/email-simulator/main.go)**: A realistic example simulating a multi-tenant email platform with distinct queues for transactional, marketing, and report emails, highlighting how Daedalus orchestrates fairness and isolates noisy neighbors.
+- **[Scheduled Jobs Emails](examples/scheduled-jobs-emails/main.go)**: Demonstrates how to schedule one-off and recurring tasks directly into queues.
 
 ### Running the Examples
 
@@ -250,6 +251,11 @@ Navigate to `sdk/golang-sdk` first, then run:
   go run examples/email-simulator/main.go
   ```
 
+- **Scheduled Jobs Emails**:
+  ```bash
+  go run examples/scheduled-jobs-emails/main.go
+  ```
+
 ---
 
 ## 📖 API Reference
@@ -266,23 +272,32 @@ Closes the gRPC connection.
 ### `sdk.AssertTenant(ctx, input AssertTenantInput) (*tenant.Tenant, error)`
 Upserts a tenant.
 
-### `sdk.AssertExchange(ctx, input AssertExchangeInput) (*exchange.Exchange, error)`
-Upserts an exchange.
-
 ### `sdk.AssertQueue(ctx, input AssertQueueInput) (*queue.Queue, error)`
 Upserts a queue.
 
-### `sdk.AssertBinding(ctx, input AssertBindingInput) (*binding.Binding, error)`
-Upserts a binding.
+### `sdk.BulkAssertQueues(ctx, input BulkAssertQueuesInput) ([]*queue.Queue, error)`
+Upserts multiple queues in bulk.
 
-### `sdk.EnqueueMessage(ctx, input EnqueueMessageInput) (string, error)`
-Enqueues a message directly into a queue. Returns the message ID.
+### `sdk.EnqueueMessage(ctx, input EnqueueMessageInput) (EnqueueResult, error)`
+Enqueues a message directly into a queue.
 
-### `sdk.PublishMessage(ctx, input PublishMessageInput) (map[string]string, error)`
-Publishes a message through an exchange. Returns a map of `queueCode → messageID`.
+### `sdk.CreateOneOffScheduledJob(ctx, input CreateOneOffScheduledJobInput) (*ScheduledJob, error)`
+Creates a single-execution delayed scheduled job targeting a queue.
+
+### `sdk.CreateRecurringScheduledJob(ctx, input CreateRecurringScheduledJobInput) (*ScheduledJob, error)`
+Creates a recurring scheduled job targeting a queue.
+
+### `sdk.ListScheduledJobs(ctx, input ListScheduledJobsInput) ([]*ScheduledJob, string, error)`
+Lists scheduled jobs with pagination.
+
+### `sdk.DeleteScheduledJob(ctx, tenantCode, id string) error`
+Deletes a scheduled job by ID.
 
 ### `sdk.AckMessage(ctx, leaseID, tenantCode string) error`
 Acknowledges a claimed message.
+
+### `sdk.BulkAckMessages(ctx, leaseIDs []string, tenantCode string) error`
+Acknowledges multiple claimed messages in batch.
 
 ### `sdk.CreateWorker(ctx, options WorkerOptions) error`
 Starts a bidirectional streaming worker loop. Blocks until the context is cancelled.

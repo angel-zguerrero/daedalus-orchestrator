@@ -28,6 +28,7 @@ type WorkflowExecution struct {
 	Error                     string                  `json:"error,omitempty"`
 	StartedAt                 *time.Time              `json:"startedAt,omitempty"`
 	CompletedAt               *time.Time              `json:"completedAt,omitempty"`
+	TTL                       int64                   `orm:"ttl" json:"ttl,omitempty"`
 	CreatedAt                 time.Time               `json:"createdAt"`
 	UpdatedAt                 time.Time               `json:"updatedAt"`
 

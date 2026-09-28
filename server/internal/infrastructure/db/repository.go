@@ -1263,6 +1263,16 @@ func (r *Repository[T]) BulkUpdate(entities []*T, now time.Time) ([]bool, error)
 			return nil, err
 		}
 
+		if hasTTL && ttl == 0 {
+			_, oldTTL, errOld := r.checkForTTL(currentEntityReflectVal)
+			if errOld == nil && oldTTL > 0 {
+				ttl = oldTTL
+				if ttlVal, errGet := getNestedFieldValue(newEntityReflectVal, "TTL"); errGet == nil && ttlVal.CanSet() {
+					ttlVal.SetInt(int64(oldTTL))
+				}
+			}
+		}
+
 		forceUdpate := false
 		if hasTTL && ttl != 0 {
 			forceUdpate = true

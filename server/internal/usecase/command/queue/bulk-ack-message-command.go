@@ -204,7 +204,7 @@ func (cmd *BulkAckMessageCommand) Execute(uow *db.UnitOfWork, now time.Time) com
 
 	// Update tenant summary
 	if deletedCount > 0 {
-		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, int(-deletedCount), 0, 0, 0, now)
+		err = tenantSummaryRepo.UpdateCounters(cmd.CFS, int(-deletedCount), 0, now)
 		if err != nil {
 			commandResult.Error = fmt.Sprintf("failed to update tenant summary: %s", err.Error())
 			return *commandResult

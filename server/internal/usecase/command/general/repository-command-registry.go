@@ -4,9 +4,7 @@ import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	activity_template_command "deadalus-orch/server/internal/usecase/command/activity-template"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
-	binding_command "deadalus-orch/server/internal/usecase/command/binding"
 	env_config_command "deadalus-orch/server/internal/usecase/command/env-config"
-	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	header_command "deadalus-orch/server/internal/usecase/command/header"
 	jobworker_command "deadalus-orch/server/internal/usecase/command/job-worker"
 	metrics_command "deadalus-orch/server/internal/usecase/command/metrics"
@@ -148,23 +146,6 @@ func init() {
 	RegisterRepoCommand("PaginateQueuesCommand", func() commands.Command { return &queue_command.PaginateQueuesCommand{} })
 	RegisterRepoCommand("PaginateQueuesWithFilterCommand", func() commands.Command { return &queue_command.PaginateQueuesWithFilterCommand{} })
 	RegisterRepoCommand("PaginateQueueMessagesCommand", func() commands.Command { return &queue_command.PaginateQueueMessagesCommand{} })
-
-	// Exchange commands
-	RegisterRepoCommand("AssertExchangeCommand", func() commands.Command { return &exchange_command.AssertExchangeCommand{} })
-	RegisterRepoCommand("DeleteExchangeCommand", func() commands.Command { return &exchange_command.DeleteExchangeCommand{} })
-	RegisterRepoCommand("FindExchangeByIDCommand", func() commands.Command { return &exchange_command.FindExchangeByIDCommand{} })
-	RegisterRepoCommand("FindExchangeCommand", func() commands.Command { return &exchange_command.FindExchangeCommand{} })
-	RegisterRepoCommand("PaginateExchangesCommand", func() commands.Command { return &exchange_command.PaginateExchangesCommand{} })
-
-	// Binding commands
-	RegisterRepoCommand("AssertBindingCommand", func() commands.Command { return &binding_command.AssertBindingCommand{} })
-	RegisterRepoCommand("BulkAssertBindingCommand", func() commands.Command { return &binding_command.BulkAssertBindingCommand{} })
-	RegisterRepoCommand("ResolveRoutesCommand", func() commands.Command { return &binding_command.ResolveRoutesCommand{} })
-	RegisterRepoCommand("ResolveAndFetchQueuesCommand", func() commands.Command { return &binding_command.ResolveAndFetchQueuesCommand{} })
-	RegisterRepoCommand("FindBindingCommand", func() commands.Command { return &binding_command.FindBindingCommand{} })
-	RegisterRepoCommand("DeleteBindingCommand", func() commands.Command { return &binding_command.DeleteBindingCommand{} })
-	RegisterRepoCommand("PaginateBindingsCommand", func() commands.Command { return &binding_command.PaginateBindingsCommand{} })
-	RegisterRepoCommand("PaginateByExchangeBindingsCommand", func() commands.Command { return &binding_command.PaginateByExchangeBindingsCommand{} })
 
 	// User commands
 	RegisterRepoCommand("CreateUserCommand", func() commands.Command { return &user_command.CreateUserCommand{} })

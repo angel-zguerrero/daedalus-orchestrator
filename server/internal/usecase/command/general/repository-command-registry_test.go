@@ -3,7 +3,6 @@ package general_command
 import (
 	commands "deadalus-orch/server/internal/usecase/command"
 	auth_command "deadalus-orch/server/internal/usecase/command/auth"
-	exchange_command "deadalus-orch/server/internal/usecase/command/exchange"
 	queue_command "deadalus-orch/server/internal/usecase/command/queue"
 	tenant_summary_command "deadalus-orch/server/internal/usecase/command/tenant-summary"
 	tentant_command "deadalus-orch/server/internal/usecase/command/tentant"
@@ -104,36 +103,6 @@ func TestEncodeDecodeRepoCommand_GetOutboxEvents(t *testing.T) {
 	}
 }
 
-func TestEncodeDecodeRepoCommand_DeleteExchange(t *testing.T) {
-	cmd := &exchange_command.DeleteExchangeCommand{
-		Code:       "ex-1",
-		VNamespace: "vns-1",
-	}
-
-	typeName, jsonBytes, err := EncodeRepoCommand(cmd)
-	if err != nil {
-		t.Fatalf("EncodeRepoCommand failed: %v", err)
-	}
-
-	if typeName != "DeleteExchangeCommand" {
-		t.Errorf("Expected typeName 'DeleteExchangeCommand', got '%s'", typeName)
-	}
-
-	decodedCmd, err := DecodeRepoCommand(typeName, jsonBytes)
-	if err != nil {
-		t.Fatalf("DecodeRepoCommand failed: %v", err)
-	}
-
-	delExCmd, ok := decodedCmd.(*exchange_command.DeleteExchangeCommand)
-	if !ok {
-		t.Fatalf("Expected *exchange_command.DeleteExchangeCommand, got %T", decodedCmd)
-	}
-
-	if delExCmd.Code != "ex-1" || delExCmd.VNamespace != "vns-1" {
-		t.Errorf("Decoded content mismatch: %+v", delExCmd)
-	}
-}
-
 func TestDecodeRepoCommand_UnregisteredCommand(t *testing.T) {
 	_, err := DecodeRepoCommand("NonExistentCommand", []byte("{}"))
 	if err == nil {
@@ -217,10 +186,9 @@ func TestEncodeDecodeRepoCommand_UpdateTenantSummaryInMasterCommand(t *testing.T
 	cmd := &tentant_command.UpdateTenantSummaryInMasterCommand{
 		TenantSummaries: []models.TenantSummary{
 			{
-				ID:             "tenant-123",
-				ExchangesCount: 5,
-				QueuesCount:    10,
-				MessagesCount:  42,
+				ID:            "tenant-123",
+				QueuesCount:   10,
+				MessagesCount: 42,
 			},
 		},
 	}

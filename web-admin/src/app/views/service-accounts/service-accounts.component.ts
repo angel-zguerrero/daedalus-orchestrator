@@ -69,8 +69,6 @@ export class ServiceAccountsComponent implements OnInit {
 
   scopeGroups: ScopeGroup[] = [
     { resource: 'queues', actions: ['admin', 'create', 'delete', 'edit', 'list'] },
-    { resource: 'exchanges', actions: ['admin', 'create', 'delete', 'edit', 'list'] },
-    { resource: 'bindings', actions: ['admin', 'create', 'delete', 'edit', 'list'] },
     { resource: 'workflows', actions: ['admin', 'create', 'delete', 'edit', 'list'] },
     { resource: 'tenants', actions: ['admin', 'create', 'delete', 'edit', 'list'] },
     { resource: 'users', actions: ['admin', 'create', 'delete', 'edit', 'list'] },
