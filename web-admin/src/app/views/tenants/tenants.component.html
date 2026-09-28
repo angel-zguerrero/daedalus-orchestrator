@@ -52,6 +52,7 @@
             <th>Shard ID</th>
             <th>Column Family Index</th>
             <th>Status</th>
+            <th>Workflows Count</th>
             <th>Queues Count</th>
             <th>Messages Count</th>
             <th>Active</th>
@@ -73,6 +74,7 @@
                 {{ tenant.Status }}
               </c-badge>
             </td>
+            <td>{{ tenant.WorkflowsCount }}</td>
             <td>{{ tenant.QueuesCount }}</td>
             <td>{{ tenant.MessagesCount }}</td>
             <td>
@@ -122,7 +124,7 @@
             </td>
           </tr>
           <tr *ngIf="tenants.length === 0">
-            <td colspan="9" class="text-center py-4">
+            <td colspan="10" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No tenants found</h6>
@@ -348,6 +350,11 @@
           <label class="form-label fw-bold">Updated At</label>
           <div class="p-2 bg-dark rounded">{{ (selectedTenant?.UpdatedAt || selectedTenant?.updatedAt) | date:'full' }}</div>
           <div class="form-text">Last modification timestamp</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Workflows Count</label>
+          <div class="p-2 bg-dark rounded">{{ selectedTenant?.WorkflowsCount || '0' }}</div>
+          <div class="form-text">Total number of workflows</div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Queues Count</label>

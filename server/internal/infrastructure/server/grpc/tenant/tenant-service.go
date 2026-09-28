@@ -46,8 +46,9 @@ func (s *TenantService) AssertTenant(ctx context.Context, r *pb.AssertTenantRequ
 			Status:         string(tenantInMaster.Status),
 			CreatedAt:      tenantInMaster.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:      tenantInMaster.UpdatedAt.Format(time.RFC3339),
-			QueuesCount:   int32(tenantInMaster.QueuesCount),
-			MessagesCount: int32(tenantInMaster.MessagesCount),
+			WorkflowsCount: int32(tenantInMaster.WorkflowsCount),
+			QueuesCount:    int32(tenantInMaster.QueuesCount),
+			MessagesCount:  int32(tenantInMaster.MessagesCount),
 		},
 	}, nil
 }
@@ -71,15 +72,16 @@ func (s *TenantService) AssertBulkTenant(ctx context.Context, r *pb.AssertBulkTe
 	rTenants := []*pb.Tenant{}
 	for _, t := range tenantsInMaster {
 		tt := &pb.Tenant{
-			ID:            t.ID,
-			Name:          t.Name,
-			ShardId:       int64(t.ShardId),
-			Code:          t.Code,
-			Status:        string(t.Status),
-			CreatedAt:     t.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:     t.UpdatedAt.Format(time.RFC3339),
-			QueuesCount:   int32(t.QueuesCount),
-			MessagesCount: int32(t.MessagesCount),
+			ID:             t.ID,
+			Name:           t.Name,
+			ShardId:        int64(t.ShardId),
+			Code:           t.Code,
+			Status:         string(t.Status),
+			CreatedAt:      t.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
+			WorkflowsCount: int32(t.WorkflowsCount),
+			QueuesCount:    int32(t.QueuesCount),
+			MessagesCount:  int32(t.MessagesCount),
 		}
 		rTenants = append(rTenants, tt)
 	}
@@ -111,8 +113,9 @@ func (s *TenantService) GetTenantInfo(ctx context.Context, r *pb.TenantInfoReque
 			Status:         string(tenantInMaster.Status),
 			CreatedAt:      tenantInMaster.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:      tenantInMaster.UpdatedAt.Format(time.RFC3339),
-			QueuesCount:   int32(tenantInMaster.QueuesCount),
-			MessagesCount: int32(tenantInMaster.MessagesCount),
+			WorkflowsCount: int32(tenantInMaster.WorkflowsCount),
+			QueuesCount:    int32(tenantInMaster.QueuesCount),
+			MessagesCount:  int32(tenantInMaster.MessagesCount),
 		},
 		Node: &pb.Node{
 			SelfMember: &pb.SelfMember{
@@ -148,11 +151,12 @@ func (s *TenantService) GetTenantSummary(ctx context.Context, r *pb.TenantSummar
 	response := &pb.TenantSummaryResponse{
 		Message: "Tenant Summary",
 		Result: &pb.TenantSummary{
-			ID:            tenantSummary.ID,
-			QueuesCount:   int32(tenantSummary.QueuesCount),
-			MessagesCount: int32(tenantSummary.MessagesCount),
-			CreatedAt:     tenantSummary.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:     tenantSummary.UpdatedAt.Format(time.RFC3339),
+			ID:             tenantSummary.ID,
+			WorkflowsCount: int32(tenantSummary.WorkflowsCount),
+			QueuesCount:    int32(tenantSummary.QueuesCount),
+			MessagesCount:  int32(tenantSummary.MessagesCount),
+			CreatedAt:      tenantSummary.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      tenantSummary.UpdatedAt.Format(time.RFC3339),
 		},
 	}
 
@@ -177,15 +181,16 @@ func (s *TenantService) GetTenants(ctx context.Context, r *pb.GetTenantsRequest)
 	tenants := make([]*pb.Tenant, len(findResult.Entities))
 	for i, t := range findResult.Entities {
 		tenants[i] = &pb.Tenant{
-			ID:            t.ID,
-			Name:          t.Name,
-			Code:          t.Code,
-			ShardId:       int64(t.ShardId),
-			Status:        string(t.Status),
-			CreatedAt:     t.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:     t.UpdatedAt.Format(time.RFC3339),
-			QueuesCount:   int32(t.QueuesCount),
-			MessagesCount: int32(t.MessagesCount),
+			ID:             t.ID,
+			Name:           t.Name,
+			Code:           t.Code,
+			ShardId:        int64(t.ShardId),
+			Status:         string(t.Status),
+			CreatedAt:      t.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:      t.UpdatedAt.Format(time.RFC3339),
+			WorkflowsCount: int32(t.WorkflowsCount),
+			QueuesCount:    int32(t.QueuesCount),
+			MessagesCount:  int32(t.MessagesCount),
 		}
 	}
 

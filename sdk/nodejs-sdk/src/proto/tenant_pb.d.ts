@@ -61,6 +61,8 @@ export class TenantSummary extends jspb.Message {
     setCreatedat(value: string): TenantSummary;
     getUpdatedat(): string;
     setUpdatedat(value: string): TenantSummary;
+    getWorkflowscount(): number;
+    setWorkflowscount(value: number): TenantSummary;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): TenantSummary.AsObject;
@@ -81,6 +83,7 @@ export namespace TenantSummary {
         messagescount: number,
         createdat: string,
         updatedat: string,
+        workflowscount: number,
     }
 }
 
@@ -281,6 +284,8 @@ export class Tenant extends jspb.Message {
     setQueuescount(value: number): Tenant;
     getMessagescount(): number;
     setMessagescount(value: number): Tenant;
+    getWorkflowscount(): number;
+    setWorkflowscount(value: number): Tenant;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): Tenant.AsObject;
@@ -303,6 +308,7 @@ export namespace Tenant {
         updatedat: string,
         queuescount: number,
         messagescount: number,
+        workflowscount: number,
     }
 }
 

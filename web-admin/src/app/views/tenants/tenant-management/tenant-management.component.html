@@ -179,7 +179,16 @@
                     
                   </div>                  <!-- Summary data (Moved below charts and made smaller) -->
                   <div *ngIf="tenantSummary && !tenantSummaryLoading" class="row mt-4">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                      <div class="card border-info mb-3 h-100">
+                        <div class="card-body text-center py-2">
+                          <svg cIcon name="cil-transfer" size="xl" class="text-info mb-1"></svg>
+                          <h5 class="card-title text-info mb-1">{{ tenantSummary.WorkflowsCount || 0 }}</h5>
+                          <p class="card-text text-muted small mb-0">Workflows</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
                       <div class="card border-warning mb-3 h-100">
                         <div class="card-body text-center py-2">
                           <svg cIcon name="cil-list" size="xl" class="text-warning mb-1"></svg>
@@ -188,11 +197,11 @@
                         </div>
                       </div>
                     </div>
-                    <div class="col-md-6">
-                      <div class="card border-info mb-3 h-100">
+                    <div class="col-md-4">
+                      <div class="card border-danger mb-3 h-100">
                         <div class="card-body text-center py-2">
-                          <svg cIcon name="cil-envelope-letter" size="xl" class="text-info mb-1"></svg>
-                          <h5 class="card-title text-info mb-1">{{ tenantSummary.MessagesCount || 0 }}</h5>
+                          <svg cIcon name="cil-envelope-letter" size="xl" class="text-danger mb-1"></svg>
+                          <h5 class="card-title text-danger mb-1">{{ tenantSummary.MessagesCount || 0 }}</h5>
                           <p class="card-text text-muted small mb-0">Messages</p>
                         </div>
                       </div>

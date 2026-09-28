@@ -693,7 +693,8 @@ proto.tenant.TenantSummary.toObject = function(includeInstance, msg) {
     queuescount: jspb.Message.getFieldWithDefault(msg, 4, 0),
     messagescount: jspb.Message.getFieldWithDefault(msg, 5, 0),
     createdat: jspb.Message.getFieldWithDefault(msg, 6, ""),
-    updatedat: jspb.Message.getFieldWithDefault(msg, 7, "")
+    updatedat: jspb.Message.getFieldWithDefault(msg, 7, ""),
+    workflowscount: jspb.Message.getFieldWithDefault(msg, 8, 0)
   };
 
   if (includeInstance) {
@@ -757,6 +758,10 @@ proto.tenant.TenantSummary.deserializeBinaryFromReader = function(msg, reader) {
     case 7:
       var value = /** @type {string} */ (reader.readString());
       msg.setUpdatedat(value);
+      break;
+    case 8:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setWorkflowscount(value);
       break;
     default:
       reader.skipField();
@@ -833,6 +838,13 @@ proto.tenant.TenantSummary.serializeBinaryToWriter = function(message, writer) {
   if (f.length > 0) {
     writer.writeString(
       7,
+      f
+    );
+  }
+  f = message.getWorkflowscount();
+  if (f !== 0) {
+    writer.writeInt32(
+      8,
       f
     );
   }
@@ -962,6 +974,24 @@ proto.tenant.TenantSummary.prototype.getUpdatedat = function() {
  */
 proto.tenant.TenantSummary.prototype.setUpdatedat = function(value) {
   return jspb.Message.setProto3StringField(this, 7, value);
+};
+
+
+/**
+ * optional int32 WorkflowsCount = 8;
+ * @return {number}
+ */
+proto.tenant.TenantSummary.prototype.getWorkflowscount = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 8, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.tenant.TenantSummary} returns this
+ */
+proto.tenant.TenantSummary.prototype.setWorkflowscount = function(value) {
+  return jspb.Message.setProto3IntField(this, 8, value);
 };
 
 
@@ -2265,7 +2295,8 @@ proto.tenant.Tenant.toObject = function(includeInstance, msg) {
     createdat: jspb.Message.getFieldWithDefault(msg, 6, ""),
     updatedat: jspb.Message.getFieldWithDefault(msg, 7, ""),
     queuescount: jspb.Message.getFieldWithDefault(msg, 8, 0),
-    messagescount: jspb.Message.getFieldWithDefault(msg, 9, 0)
+    messagescount: jspb.Message.getFieldWithDefault(msg, 9, 0),
+    workflowscount: jspb.Message.getFieldWithDefault(msg, 10, 0)
   };
 
   if (includeInstance) {
@@ -2337,6 +2368,10 @@ proto.tenant.Tenant.deserializeBinaryFromReader = function(msg, reader) {
     case 9:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setMessagescount(value);
+      break;
+    case 10:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setWorkflowscount(value);
       break;
     default:
       reader.skipField();
@@ -2427,6 +2462,13 @@ proto.tenant.Tenant.serializeBinaryToWriter = function(message, writer) {
   if (f !== 0) {
     writer.writeInt32(
       9,
+      f
+    );
+  }
+  f = message.getWorkflowscount();
+  if (f !== 0) {
+    writer.writeInt32(
+      10,
       f
     );
   }
@@ -2592,6 +2634,24 @@ proto.tenant.Tenant.prototype.getMessagescount = function() {
  */
 proto.tenant.Tenant.prototype.setMessagescount = function(value) {
   return jspb.Message.setProto3IntField(this, 9, value);
+};
+
+
+/**
+ * optional int32 WorkflowsCount = 10;
+ * @return {number}
+ */
+proto.tenant.Tenant.prototype.getWorkflowscount = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 10, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.tenant.Tenant} returns this
+ */
+proto.tenant.Tenant.prototype.setWorkflowscount = function(value) {
+  return jspb.Message.setProto3IntField(this, 10, value);
 };
 
 

@@ -29,6 +29,7 @@ message TenantSummary {
   int32 MessagesCount = 5;
   string CreatedAt = 6;
   string UpdatedAt = 7;
+  int32 WorkflowsCount = 8;
 }
 
 message TenantSummaryResponse {
@@ -77,6 +78,7 @@ message Tenant {
   string UpdatedAt = 7;
   int32 QueuesCount = 8;
   int32 MessagesCount = 9;
+  int32 WorkflowsCount = 10;
 }
 
 message FindResult {

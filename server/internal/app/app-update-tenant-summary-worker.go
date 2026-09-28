@@ -195,6 +195,7 @@ func (app *Application) processTenantSummariesFromNode(tenantNode *dragonboat.Ra
 
 				log.Debug().
 					Str("tenant_id", tenantID).
+					Int("workflows", summary.WorkflowsCount).
 					Int("queues", summary.QueuesCount).
 					Int("messages", summary.MessagesCount).
 					Msg("✅ Updated tenant summary in master")

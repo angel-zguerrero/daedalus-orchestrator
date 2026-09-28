@@ -52,7 +52,7 @@ func (cmd *UpdateTenantSummaryInMasterCommand) Execute(uow *db.UnitOfWork, now t
 			tenant.ID = summary.ID
 		}
 
-		// Update the tenant with the summary counters
+		tenant.WorkflowsCount = summary.WorkflowsCount
 		tenant.QueuesCount = summary.QueuesCount
 		tenant.MessagesCount = summary.MessagesCount
 

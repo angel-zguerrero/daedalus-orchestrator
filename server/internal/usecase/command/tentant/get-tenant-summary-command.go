@@ -43,8 +43,9 @@ func (cmd *GetTenantSummaryInMasterCommand) Execute(uow *db.UnitOfWork, now time
 
 	// Create a TenantSummary object with the data from TenantInMaster
 	tenantSummary := models.TenantSummary{
-		ID:            tenant.ID,
-		QueuesCount:   tenant.QueuesCount,
+		ID:             tenant.ID,
+		WorkflowsCount: tenant.WorkflowsCount,
+		QueuesCount:    tenant.QueuesCount,
 		MessagesCount:  tenant.MessagesCount,
 		HasMessages:    tenant.HasMessages,
 		CreatedAt:      tenant.CreatedAt,
