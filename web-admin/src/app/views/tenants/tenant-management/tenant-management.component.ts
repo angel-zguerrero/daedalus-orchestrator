@@ -16,9 +16,7 @@ import {
   TooltipModule
 } from '@coreui/angular';
 import { IconDirective } from '@coreui/icons-angular';
-import { ExchangesComponent } from './exchanges/exchanges.component';
 import { QueuesComponent } from './queues/queues.component';
-import { BindingsComponent } from './bindings/bindings.component';
 import { ScheduledJobsComponent } from './scheduled-jobs/scheduled-jobs.component';
 import { ConfigsSecretsComponent } from '../../configs-secrets/configs-secrets.component';
 import { WorkflowsComponent } from '../../workflows/workflows.component';
@@ -47,9 +45,7 @@ import { SpinnerComponent } from '@coreui/angular';
     TabsContentComponent,
     TabsListComponent,
     IconDirective,
-    ExchangesComponent,
     QueuesComponent,
-    BindingsComponent,
     ScheduledJobsComponent,
     ConfigsSecretsComponent,
     WorkflowsComponent,

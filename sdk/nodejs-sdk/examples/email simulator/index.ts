@@ -37,15 +37,7 @@ async function main() {
             name: company.name
         });
 
-        // 2. Upsert exchange
-        await sdk.assertExchange({
-            tenantCode: company.code,
-            code: 'email-events',
-            name: 'Email Events',
-            type: 'topic'
-        });
-
-        // 3. Upsert queues
+        // 2. Upsert queues
         await sdk.assertQueue({
             tenantCode: company.code,
             code: 'email-transactional',
@@ -81,32 +73,6 @@ async function main() {
             maxAttempts: 3,
             priorityType: 'normal'
         });
-
-        // 4. Bindings
-        await sdk.assertBinding({
-            code: 'transactional',
-            tenantCode: company.code,
-            exchangeCode: 'email-events',
-            queueCode: 'email-transactional',
-            pattern: 'transactional.*',
-            vnamespace: 'default'
-        });
-        await sdk.assertBinding({
-            code: 'marketing',
-            tenantCode: company.code,
-            exchangeCode: 'email-events',
-            queueCode: 'email-marketing',
-            pattern: 'marketing.*',
-            vnamespace: 'default'
-        });
-        await sdk.assertBinding({
-            code: 'report',
-            tenantCode: company.code,
-            exchangeCode: 'email-events',
-            queueCode: 'email-report',
-            pattern: 'report.*',
-            vnamespace: 'default'
-        });
     }
 
     // ===== PUBLISH: Black Friday Email Surge =====
@@ -119,8 +85,7 @@ async function main() {
     await publishBatch(sdk, 50_000, (i) => {
         return {
             tenantCode: 'tienda-a',
-            exchangeCode: 'email-events',
-            routingKeyOrPatternOrQueueCode: 'transactional.order-confirmation',
+            queueCode: 'email-transactional',
             content: JSON.stringify({
                 messageId: `tienda-a-trans-${i}`,
                 companyId: 'tienda-a',
@@ -139,8 +104,7 @@ async function main() {
     await publishBatch(sdk, 10_000, (i) => {
         return {
             tenantCode: 'tienda-a',
-            exchangeCode: 'email-events',
-            routingKeyOrPatternOrQueueCode: 'marketing.black-friday',
+            queueCode: 'email-marketing',
             content: JSON.stringify({
                 messageId: `tienda-a-mkt-${i}`,
                 companyId: 'tienda-a',
@@ -164,8 +128,7 @@ async function main() {
     await publishBatch(sdk, 50_000, (i) => {
         return {
             tenantCode: 'tienda-b',
-            exchangeCode: 'email-events',
-            routingKeyOrPatternOrQueueCode: 'transactional.order-confirmation',
+            queueCode: 'email-transactional',
             content: JSON.stringify({
                 messageId: `tienda-b-trans-${i}`,
                 companyId: 'tienda-b',
@@ -184,8 +147,7 @@ async function main() {
     await publishBatch(sdk, 10_000, (i) => {
         return {
             tenantCode: 'tienda-b',
-            exchangeCode: 'email-events',
-            routingKeyOrPatternOrQueueCode: 'marketing.black-friday-small',
+            queueCode: 'email-marketing',
             content: JSON.stringify({
                 messageId: `tienda-b-mkt-${i}`,
                 companyId: 'tienda-b',
@@ -208,8 +170,7 @@ async function main() {
     await publishBatch(sdk, 50_000, (i) => {
         return {
             tenantCode: 'banco-c',
-            exchangeCode: 'email-events',
-            routingKeyOrPatternOrQueueCode: 'transactional.otp',
+            queueCode: 'email-transactional',
             content: JSON.stringify({
                 messageId: `banco-c-otp-${i}`,
                 companyId: 'banco-c',
@@ -322,8 +283,7 @@ async function publishBatch(
     total: number,
     createMessage: (index: number) => {
         tenantCode: string;
-        exchangeCode: string;
-        routingKeyOrPatternOrQueueCode: string;
+        queueCode: string;
         content: string;
         vnamespace: string;
     }
@@ -332,13 +292,13 @@ async function publishBatch(
         const promises: Promise<unknown>[] = [];
 
         for (let i = offset; i < Math.min(offset + BATCH_SIZE, total); i++) {
-            promises.push(sdk.publishMessage(createMessage(i)));
+            promises.push(sdk.enqueueMessage(createMessage(i)));
         }
 
         await Promise.all(promises);
 
         console.log(
-            `Published ${Math.min(offset + BATCH_SIZE, total)}/${total}`
+            `Enqueued ${Math.min(offset + BATCH_SIZE, total)}/${total}`
         );
     }
 }
