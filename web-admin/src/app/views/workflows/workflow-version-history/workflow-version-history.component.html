@@ -5,12 +5,21 @@
       Version History: <strong>{{ workflow?.name || workflowId }}</strong>
       <span class="badge bg-dark text-info font-monospace ms-2" *ngIf="workflow?.code">{{ workflow?.code }}</span>
       <span class="badge bg-secondary" *ngIf="workflow?.version">Current: v{{ workflow?.version }}</span>
+      <span class="badge bg-info text-dark ms-2" *ngIf="tenantCode">Tenant: {{ tenantCode }}</span>
+      <span class="badge bg-warning text-dark ms-1" *ngIf="scope === 'tenant' && workflowSource === 'global'">Global Workflow</span>
     </h5>
     <button cButton color="secondary" variant="outline" size="sm" (click)="navigateBack()">
       <svg cIcon name="cil-arrow-left" class="me-1"></svg> Back to Workflows
     </button>
   </c-card-header>
   <c-card-body>
+    <c-alert color="info" class="d-flex align-items-center gap-2 mb-3" *ngIf="scope === 'tenant' && workflowSource === 'global'">
+      <svg cIcon name="cil-info" class="flex-shrink-0 text-info"></svg>
+      <div>
+        Showing version history for the global workflow <strong>{{ workflow?.name || workflowId }}</strong>.
+      </div>
+    </c-alert>
+
     <div class="text-center py-4" *ngIf="loadingVersionHistory">
       <c-spinner></c-spinner>
       <p class="mt-2 text-muted">Loading workflow versions...</p>

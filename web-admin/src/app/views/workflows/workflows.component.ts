@@ -34,7 +34,7 @@ import { BpmnFormParserUtil, GeneratedFormField } from '../../shared/utils/bpmn-
 import { DesignErrorsConsoleComponent } from '../../shared/components/design-errors-console/design-errors-console.component';
 import { UsersService } from '../users/services/users.service';
 
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-workflows',
@@ -75,6 +75,7 @@ import { Router, RouterModule } from '@angular/router';
 export class WorkflowsComponent implements OnInit, OnChanges {
   @Input() scope: 'global' | 'tenant' = 'global';
   @Input() tenantCode: string = '';
+  @Input() workflowSource: 'tenant' | 'global' = 'tenant';
 
   workflows: WorkflowDefinition[] = [];
   filteredWorkflows: WorkflowDefinition[] = [];
@@ -178,7 +179,8 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     private workflowsService: WorkflowsService,
     private vNamespacesService: VNamespacesService,
     private usersService: UsersService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.workflowForm = this.fb.group({
       name: ['', Validators.required],
@@ -212,15 +214,35 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
+    if (this.scope === 'global') {
+      this.workflowSource = 'global';
+    } else {
+      this.route.queryParams.subscribe(params => {
+        if (params['source'] === 'global' || params['source'] === 'tenant') {
+          this.workflowSource = params['source'];
+        }
+      });
+    }
     this.loadWorkflows();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['tenantCode'] || changes['scope']) {
+      if (this.scope === 'global') {
+        this.workflowSource = 'global';
+      }
       this.cursor = '';
       this.cursors = [''];
       this.loadWorkflows();
     }
+  }
+
+  setWorkflowSource(source: 'tenant' | 'global'): void {
+    if (this.workflowSource === source) return;
+    this.workflowSource = source;
+    this.cursor = '';
+    this.cursors = [''];
+    this.loadWorkflows();
   }
 
   private decodePayload(payloadRaw: any): string {
@@ -263,7 +285,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       payloadFormat: (w.payloadFormat || w.PayloadFormat || 'json').toLowerCase() as 'json' | 'yaml' | 'bpmn',
       maxDurationSeconds: w.maxDurationSeconds || w.MaxDurationSeconds || 0,
       isActive: w.isActive !== undefined ? w.isActive : (w.IsActive !== undefined ? w.IsActive : true),
-      scope: (w.scope || w.Scope || this.scope).toLowerCase() as 'global' | 'tenant',
+      scope: (w.scope || w.Scope || (this.workflowSource === 'global' ? 'global' : this.scope)).toLowerCase() as 'global' | 'tenant',
       tenantId: w.tenantId || w.TenantID || '',
       userId: w.userId || w.UserID || '',
       userName: w.userName || w.UserName || '',
@@ -302,7 +324,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     this.showAlert = false;
     this.errorMessage = '';
 
-    const req$ = this.scope === 'global'
+    const req$ = (this.scope === 'global' || this.workflowSource === 'global')
       ? this.workflowsService.getGlobalWorkflows(this.pageSize, this.cursor, this.selectedVNamespaceFilter)
       : this.workflowsService.getTenantWorkflows(this.tenantCode, this.pageSize, this.cursor, this.selectedVNamespaceFilter);
 
@@ -386,12 +408,12 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   }
 
   navigateToExecutions(wf: WorkflowDefinition): void {
-    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
+    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode, source: this.workflowSource } : {};
     this.router.navigate(['/workflows', wf.id, 'executions'], { queryParams });
   }
 
   navigateToVersionHistory(wf: WorkflowDefinition): void {
-    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
+    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode, source: this.workflowSource } : {};
     this.router.navigate(['/workflows', wf.id, 'versions'], { queryParams });
   }
 
@@ -466,7 +488,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
   loadWorkflowQueues(wf: WorkflowDefinition): void {
     if (!wf.id) return;
     this.loadingWorkflowQueues = true;
-    const queues$ = this.scope === 'global'
+    const queues$ = (this.scope === 'global' || this.workflowSource === 'global')
       ? this.workflowsService.getGlobalWorkflowQueues(wf.id)
       : this.workflowsService.getTenantWorkflowQueues(this.tenantCode, wf.id);
 

@@ -90,6 +90,12 @@ func (cmd *ResumeWaitEventCommand) Execute(uow *db.UnitOfWork, now time.Time) co
 
 	// 4. Fetch WorkflowDefinition
 	def, err := defRepo.GetWorkflowDefinitionByID(waitingEvent.WorkflowDefinitionID, now)
+	if (err != nil || def == nil) && (cmd.CF != db.AdminFC || cmd.CFS != db.AdminFCSector) {
+		globalDefRepo, gErr := db.NewWorkflowDefinitionRepository(uow, idFactory, db.AdminFC, db.AdminFCSector)
+		if gErr == nil {
+			def, err = globalDefRepo.GetWorkflowDefinitionByID(waitingEvent.WorkflowDefinitionID, now)
+		}
+	}
 	if err != nil || def == nil {
 		commandResult.Error = fmt.Sprintf("workflow definition not found: %s", waitingEvent.WorkflowDefinitionID)
 		return *commandResult
