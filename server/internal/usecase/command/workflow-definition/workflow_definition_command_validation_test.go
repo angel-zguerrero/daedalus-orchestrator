@@ -62,13 +62,14 @@ func TestCreateWorkflowDefinitionCommand_RejectsInvalidFormFieldID(t *testing.T)
 
 	cmd := &workflowDefCommand.CreateWorkflowDefinitionCommand{
 		WorkflowDefinition: models.WorkflowDefinition{
-			ID:            "wf-1",
-			Code:          "wf-test",
-			Name:          "Test Workflow",
-			PayloadFormat: models.WorkflowPayloadFormatBPMN,
-			Payload:       []byte(testInvalidBPMN),
-			VNamespace:    "default",
-			IsActive:      true,
+			ID:                 "wf-1",
+			Code:               "wf-test",
+			Name:               "Test Workflow",
+			PayloadFormat:      models.WorkflowPayloadFormatBPMN,
+			Payload:            []byte(testInvalidBPMN),
+			MaxDurationSeconds: 3600,
+			VNamespace:         "default",
+			IsActive:           true,
 		},
 		CF:  "default",
 		CFS: "default",
@@ -87,13 +88,14 @@ func TestCreateWorkflowDefinitionCommand_AcceptsValidDiagram(t *testing.T) {
 
 	cmd := &workflowDefCommand.CreateWorkflowDefinitionCommand{
 		WorkflowDefinition: models.WorkflowDefinition{
-			ID:            "wf-2",
-			Code:          "wf-valid",
-			Name:          "Valid Workflow",
-			PayloadFormat: models.WorkflowPayloadFormatBPMN,
-			Payload:       []byte(testValidBPMN),
-			VNamespace:    "default",
-			IsActive:      true,
+			ID:                 "wf-2",
+			Code:               "wf-valid",
+			Name:               "Valid Workflow",
+			PayloadFormat:      models.WorkflowPayloadFormatBPMN,
+			Payload:            []byte(testValidBPMN),
+			MaxDurationSeconds: 3600,
+			VNamespace:         "default",
+			IsActive:           true,
 		},
 		CF:  "default",
 		CFS: "default",
@@ -112,13 +114,14 @@ func TestUpdateWorkflowDefinitionCommand_RejectsInvalidFormFieldID(t *testing.T)
 	// First create a valid workflow definition
 	createCmd := &workflowDefCommand.CreateWorkflowDefinitionCommand{
 		WorkflowDefinition: models.WorkflowDefinition{
-			ID:            "wf-3",
-			Code:          "wf-upd",
-			Name:          "Updatable Workflow",
-			PayloadFormat: models.WorkflowPayloadFormatBPMN,
-			Payload:       []byte(testValidBPMN),
-			VNamespace:    "default",
-			IsActive:      true,
+			ID:                 "wf-3",
+			Code:               "wf-upd",
+			Name:               "Updatable Workflow",
+			PayloadFormat:      models.WorkflowPayloadFormatBPMN,
+			Payload:            []byte(testValidBPMN),
+			MaxDurationSeconds: 3600,
+			VNamespace:         "default",
+			IsActive:           true,
 		},
 		CF:  "default",
 		CFS: "default",
@@ -131,10 +134,11 @@ func TestUpdateWorkflowDefinitionCommand_RejectsInvalidFormFieldID(t *testing.T)
 	updateUow := db.NewUnitOfWork(store, nil)
 	updateCmd := &workflowDefCommand.UpdateWorkflowDefinitionCommand{
 		WorkflowDefinition: models.WorkflowDefinition{
-			ID:            "wf-3",
-			Name:          "Updated Workflow",
-			PayloadFormat: models.WorkflowPayloadFormatBPMN,
-			Payload:       []byte(testInvalidBPMN),
+			ID:                 "wf-3",
+			Name:               "Updated Workflow",
+			PayloadFormat:      models.WorkflowPayloadFormatBPMN,
+			Payload:            []byte(testInvalidBPMN),
+			MaxDurationSeconds: 3600,
 		},
 		CF:  "default",
 		CFS: "default",
@@ -144,4 +148,90 @@ func TestUpdateWorkflowDefinitionCommand_RejectsInvalidFormFieldID(t *testing.T)
 	assert.NotEmpty(t, updateRes.Error)
 	assert.Contains(t, updateRes.Error, "invalid workflow diagram")
 	assert.True(t, strings.Contains(updateRes.Error, "missing required 'id'"))
+}
+
+func TestCreateWorkflowDefinitionCommand_RejectsNonPositiveMaxDuration(t *testing.T) {
+	testCases := []struct {
+		name        string
+		maxDuration int32
+	}{
+		{name: "zero duration", maxDuration: 0},
+		{name: "negative duration", maxDuration: -10},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newTestPebbleStore(t)
+			uow := db.NewUnitOfWork(store, nil)
+			now := time.Now()
+
+			cmd := &workflowDefCommand.CreateWorkflowDefinitionCommand{
+				WorkflowDefinition: models.WorkflowDefinition{
+					ID:                 "wf-dur-" + tc.name,
+					Code:               "wf-code-" + tc.name,
+					Name:               "Duration Workflow",
+					MaxDurationSeconds: tc.maxDuration,
+					VNamespace:         "default",
+					IsActive:           true,
+				},
+				CF:  "default",
+				CFS: "default",
+			}
+
+			res := cmd.Execute(uow, now)
+			assert.NotEmpty(t, res.Error)
+			assert.Contains(t, res.Error, "MaxDurationSeconds must be greater than 0")
+		})
+	}
+}
+
+func TestUpdateWorkflowDefinitionCommand_RejectsNonPositiveMaxDuration(t *testing.T) {
+	testCases := []struct {
+		name        string
+		maxDuration int32
+	}{
+		{name: "zero duration", maxDuration: 0},
+		{name: "negative duration", maxDuration: -5},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newTestPebbleStore(t)
+			uow := db.NewUnitOfWork(store, nil)
+			now := time.Now()
+
+			// Create with valid duration
+			createCmd := &workflowDefCommand.CreateWorkflowDefinitionCommand{
+				WorkflowDefinition: models.WorkflowDefinition{
+					ID:                 "wf-upd-dur-" + tc.name,
+					Code:               "wf-upd-code-" + tc.name,
+					Name:               "Updatable Duration Workflow",
+					MaxDurationSeconds: 3600,
+					VNamespace:         "default",
+					IsActive:           true,
+				},
+				CF:  "default",
+				CFS: "default",
+			}
+			createRes := createCmd.Execute(uow, now)
+			require.Empty(t, createRes.Error)
+			require.NoError(t, uow.Commit())
+
+			// Update with non-positive duration
+			updateUow := db.NewUnitOfWork(store, nil)
+			updateCmd := &workflowDefCommand.UpdateWorkflowDefinitionCommand{
+				WorkflowDefinition: models.WorkflowDefinition{
+					ID:                 "wf-upd-dur-" + tc.name,
+					Name:               "Updated Duration Workflow",
+					MaxDurationSeconds: tc.maxDuration,
+				},
+				CF:  "default",
+				CFS: "default",
+			}
+
+			updateRes := updateCmd.Execute(updateUow, now)
+			assert.NotEmpty(t, updateRes.Error)
+			assert.Contains(t, updateRes.Error, "MaxDurationSeconds must be greater than 0")
+		})
+	}
 }

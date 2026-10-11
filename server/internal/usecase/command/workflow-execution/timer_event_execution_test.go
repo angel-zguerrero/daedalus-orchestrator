@@ -71,8 +71,9 @@ func TestAdvanceTokenCommand_TimerIntermediateCatchEvent(t *testing.T) {
 		Code:       "wf-timer-test",
 		Name:       "Timer Test Workflow",
 		VNamespace: "default",
-		Payload:    []byte(bpmnXML),
-		CreatedAt:  now,
+		Payload:            []byte(bpmnXML),
+		MaxDurationSeconds: 3600,
+		CreatedAt:          now,
 		UpdatedAt:  now,
 	}
 	_, err = defRepo.CreateWorkflowDefinition(def, now)

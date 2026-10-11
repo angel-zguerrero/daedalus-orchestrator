@@ -31,6 +31,11 @@ func (cmd *UpdateWorkflowDefinitionCommand) Execute(uow *db.UnitOfWork, now time
 		return *commandResult
 	}
 
+	if cmd.WorkflowDefinition.MaxDurationSeconds <= 0 {
+		commandResult.Error = "MaxDurationSeconds must be greater than 0"
+		return *commandResult
+	}
+
 	if len(cmd.WorkflowDefinition.Payload) > 0 {
 		fmtStr := strings.ToLower(strings.TrimSpace(string(cmd.WorkflowDefinition.PayloadFormat)))
 		isBPMN := fmtStr == "bpmn" || fmtStr == "xml" || strings.HasPrefix(strings.TrimSpace(string(cmd.WorkflowDefinition.Payload)), "<")

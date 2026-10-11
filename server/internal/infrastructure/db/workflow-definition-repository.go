@@ -27,6 +27,9 @@ func (r *WorkflowDefinitionRepository) CreateWorkflowDefinition(input *models.Wo
 	if input.Code == "" {
 		return "", fmt.Errorf("Code is required")
 	}
+	if input.MaxDurationSeconds <= 0 {
+		return "", fmt.Errorf("MaxDurationSeconds must be greater than 0")
+	}
 	if input.Version <= 0 {
 		input.Version = 1
 	}
@@ -39,6 +42,9 @@ func (r *WorkflowDefinitionRepository) CreateWorkflowDefinition(input *models.Wo
 }
 
 func (r *WorkflowDefinitionRepository) UpdateWorkflowDefinition(input *models.WorkflowDefinition, now time.Time) (bool, error) {
+	if input.MaxDurationSeconds <= 0 {
+		return false, fmt.Errorf("MaxDurationSeconds must be greater than 0")
+	}
 	input.UpdatedAt = now
 	return r.Update(input, now)
 }

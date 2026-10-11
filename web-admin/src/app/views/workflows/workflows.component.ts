@@ -182,7 +182,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       onVersionChange: ['defined_in_execution', Validators.required],
       payloadFormat: ['json', Validators.required],
       payload: ['{}'],
-      maxDurationSeconds: [3600, [Validators.required, Validators.min(0)]],
+      maxDurationSeconds: [3600, [Validators.required, Validators.min(1)]],
       isActive: [true]
     });
 
@@ -255,7 +255,7 @@ export class WorkflowsComponent implements OnInit, OnChanges {
       onVersionChange: w.onVersionChange || w.OnVersionChange || 'defined_in_execution',
       payload: w.payload || w.Payload || '',
       payloadFormat: (w.payloadFormat || w.PayloadFormat || 'json').toLowerCase() as 'json' | 'yaml' | 'bpmn',
-      maxDurationSeconds: w.maxDurationSeconds || w.MaxDurationSeconds || 0,
+      maxDurationSeconds: w.maxDurationSeconds || w.MaxDurationSeconds || 3600,
       isActive: w.isActive !== undefined ? w.isActive : (w.IsActive !== undefined ? w.IsActive : true),
       scope: (w.scope || w.Scope || this.scope).toLowerCase() as 'global' | 'tenant',
       tenantId: w.tenantId || w.TenantID || '',
@@ -457,8 +457,15 @@ export class WorkflowsComponent implements OnInit, OnChanges {
     if (!this.workflowForm.get('name')?.value?.trim()) {
       this.workflowForm.patchValue({ name: 'Untitled Workflow' });
     }
-    if (this.workflowForm.get('maxDurationSeconds')?.value === null || this.workflowForm.get('maxDurationSeconds')?.value === undefined) {
+    if (this.workflowForm.get('maxDurationSeconds')?.value === null || this.workflowForm.get('maxDurationSeconds')?.value === undefined || this.workflowForm.get('maxDurationSeconds')?.value === '') {
       this.workflowForm.patchValue({ maxDurationSeconds: 3600 });
+    }
+
+    const maxDur = Number(this.workflowForm.get('maxDurationSeconds')?.value);
+    if (!maxDur || maxDur <= 0) {
+      this.errorMessage = 'Max duration seconds must be greater than 0';
+      this.showAlert = true;
+      return;
     }
 
     let hasDesignErrors = false;

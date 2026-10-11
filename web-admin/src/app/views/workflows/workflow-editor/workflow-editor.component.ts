@@ -91,7 +91,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy, ComponentWith
       onVersionChange: ['defined_in_execution', Validators.required],
       payloadFormat: ['bpmn', Validators.required],
       payload: [DEFAULT_BPMN_XML],
-      maxDurationSeconds: [3600, [Validators.required, Validators.min(0)]],
+      maxDurationSeconds: [3600, [Validators.required, Validators.min(1)]],
       isActive: [true]
     });
 
@@ -221,7 +221,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy, ComponentWith
           onVersionChange: entity.onVersionChange || entity.OnVersionChange || 'defined_in_execution',
           payloadFormat: 'bpmn',
           payload: decodedPayload || DEFAULT_BPMN_XML,
-          maxDurationSeconds: entity.maxDurationSeconds ?? entity.MaxDurationSeconds ?? 3600,
+          maxDurationSeconds: entity.maxDurationSeconds || entity.MaxDurationSeconds || 3600,
           isActive: entity.isActive !== undefined ? entity.isActive : (entity.IsActive !== undefined ? entity.IsActive : true)
         });
         this.workflowForm.get('code')?.disable();
@@ -284,8 +284,16 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy, ComponentWith
     if (!this.workflowForm.get('name')?.value?.trim()) {
       this.workflowForm.patchValue({ name: 'Untitled Workflow' });
     }
-    if (this.workflowForm.get('maxDurationSeconds')?.value === null || this.workflowForm.get('maxDurationSeconds')?.value === undefined) {
+    if (this.workflowForm.get('maxDurationSeconds')?.value === null || this.workflowForm.get('maxDurationSeconds')?.value === undefined || this.workflowForm.get('maxDurationSeconds')?.value === '') {
       this.workflowForm.patchValue({ maxDurationSeconds: 3600 });
+    }
+
+    const maxDur = Number(this.workflowForm.get('maxDurationSeconds')?.value);
+    if (!maxDur || maxDur <= 0) {
+      this.errorMessage = 'Max duration seconds must be greater than 0';
+      this.showAlert = true;
+      this.saving = false;
+      return;
     }
 
     let hasDesignErrors = false;

@@ -123,8 +123,9 @@ func runUserProvidedBPMNTest(t *testing.T, testID string, input map[string]inter
 			Name:       "User Provided Diagram Test",
 			Version:    1,
 			Payload:    []byte(userProvidedBPMN),
-			IsActive:   true,
-			CreatedAt:  now,
+			IsActive:           true,
+			MaxDurationSeconds: 3600,
+			CreatedAt:          now,
 			UpdatedAt:  now,
 		},
 		ExecQueue: models.Queue{ID: "q_exec_" + testID, Type: models.WorkflowExecutionQueue, WorkflowDefinitionID: testID, Code: "wf-exec-CODE_" + testID},
@@ -266,8 +267,9 @@ func TestUserProvidedBPMN_MissingActivityQueue_StrictlyFailsWithError(t *testing
 		Name:       "Missing Queue Test",
 		Version:    1,
 		Payload:    []byte(userProvidedBPMN),
-		IsActive:   true,
-		CreatedAt:  now,
+		IsActive:           true,
+		MaxDurationSeconds: 3600,
+		CreatedAt:          now,
 		UpdatedAt:  now,
 	}, now)
 	require.NoError(t, err)

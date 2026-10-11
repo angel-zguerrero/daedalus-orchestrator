@@ -68,6 +68,11 @@ func (ctrl *WorkflowDefinitionController) CreateGlobalWorkflowHandler(c *gin.Con
 		return
 	}
 
+	if req.MaxDurationSeconds <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maxDurationSeconds must be greater than 0"})
+		return
+	}
+
 	isActive := true
 	if req.IsActive != nil {
 		isActive = *req.IsActive
@@ -90,7 +95,7 @@ func (ctrl *WorkflowDefinitionController) CreateGlobalWorkflowHandler(c *gin.Con
 	)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "greater than") {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
@@ -150,6 +155,11 @@ func (ctrl *WorkflowDefinitionController) UpdateGlobalWorkflowHandler(c *gin.Con
 		return
 	}
 
+	if req.MaxDurationSeconds <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maxDurationSeconds must be greater than 0"})
+		return
+	}
+
 	isActive := true
 	if req.IsActive != nil {
 		isActive = *req.IsActive
@@ -171,7 +181,7 @@ func (ctrl *WorkflowDefinitionController) UpdateGlobalWorkflowHandler(c *gin.Con
 	)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "greater than") {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
@@ -247,6 +257,11 @@ func (ctrl *WorkflowDefinitionController) CreateTenantWorkflowHandler(c *gin.Con
 		return
 	}
 
+	if req.MaxDurationSeconds <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maxDurationSeconds must be greater than 0"})
+		return
+	}
+
 	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
 	isActive := true
@@ -271,7 +286,7 @@ func (ctrl *WorkflowDefinitionController) CreateTenantWorkflowHandler(c *gin.Con
 	)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "greater than") {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
@@ -335,6 +350,11 @@ func (ctrl *WorkflowDefinitionController) UpdateTenantWorkflowHandler(c *gin.Con
 		return
 	}
 
+	if req.MaxDurationSeconds <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maxDurationSeconds must be greater than 0"})
+		return
+	}
+
 	isActive := true
 	if req.IsActive != nil {
 		isActive = *req.IsActive
@@ -356,7 +376,7 @@ func (ctrl *WorkflowDefinitionController) UpdateTenantWorkflowHandler(c *gin.Con
 	)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "greater than") {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})

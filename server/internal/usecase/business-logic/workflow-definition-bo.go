@@ -70,6 +70,10 @@ func (bo *WorkflowDefinitionBO) CreateWorkflow(
 		return models.WorkflowDefinition{}, errors.New("workflow name or code is required")
 	}
 
+	if maxDurationSeconds <= 0 {
+		return models.WorkflowDefinition{}, errors.New("max duration seconds must be greater than 0")
+	}
+
 	if len(payload) > 0 && isBPMNPayload(payload, payloadFormat) {
 		if err := bpmn.ValidateDiagramFormFields(payload); err != nil {
 			return models.WorkflowDefinition{}, fmt.Errorf("invalid workflow diagram: %w", err)
@@ -204,6 +208,10 @@ func (bo *WorkflowDefinitionBO) UpdateWorkflow(
 	if scope == models.WorkflowScopeTenant {
 		targetCF = cf
 		targetCFS = cfs
+	}
+
+	if maxDurationSeconds <= 0 {
+		return models.WorkflowDefinition{}, errors.New("max duration seconds must be greater than 0")
 	}
 
 	if len(payload) > 0 && isBPMNPayload(payload, payloadFormat) {
