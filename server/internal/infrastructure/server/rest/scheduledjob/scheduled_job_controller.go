@@ -6,6 +6,7 @@ import (
 	"deadalus-orch/shared/models"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -107,6 +108,10 @@ func (ctrl *ScheduledJobController) CreateOneOffScheduledJobHandler(c *gin.Conte
 		tenantNode,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "failed to resolve queue target") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -153,6 +158,10 @@ func (ctrl *ScheduledJobController) CreateRecurringScheduledJobHandler(c *gin.Co
 		tenantNode,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "failed to resolve queue target") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

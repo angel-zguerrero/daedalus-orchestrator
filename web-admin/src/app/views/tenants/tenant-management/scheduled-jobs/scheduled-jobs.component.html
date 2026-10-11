@@ -157,7 +157,11 @@
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="oneOffQueueCode">Queue Code *</label>
-          <input cFormControl id="oneOffQueueCode" formControlName="queueCode" placeholder="e.g. email-queue" />
+          <input cFormControl id="oneOffQueueCode" formControlName="queueCode" placeholder="e.g. email-queue" list="oneOffQueueOptions" />
+          <datalist id="oneOffQueueOptions">
+            <option *ngFor="let q of tenantQueues" [value]="q.Code">{{ q.Code }} ({{ q.VNamespace }})</option>
+          </datalist>
+          <div class="form-text">Target queue in virtual namespace: <strong>{{ vnamespaceCtrl.value || 'default' }}</strong></div>
         </c-col>
         <c-col [md]="6">
           <label cLabel for="oneOffCode">Job Code (Optional)</label>
@@ -217,7 +221,11 @@
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
           <label cLabel for="recurringQueueCode">Queue Code *</label>
-          <input cFormControl id="recurringQueueCode" formControlName="queueCode" placeholder="e.g. weekly-reports" />
+          <input cFormControl id="recurringQueueCode" formControlName="queueCode" placeholder="e.g. weekly-reports" list="recurringQueueOptions" />
+          <datalist id="recurringQueueOptions">
+            <option *ngFor="let q of tenantQueues" [value]="q.Code">{{ q.Code }} ({{ q.VNamespace }})</option>
+          </datalist>
+          <div class="form-text">Target queue in virtual namespace: <strong>{{ vnamespaceCtrl.value || 'default' }}</strong></div>
         </c-col>
         <c-col [md]="6">
           <label cLabel for="recurringCode">Job Code (Optional)</label>

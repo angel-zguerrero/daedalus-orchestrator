@@ -179,6 +179,10 @@ func (bo *QueueBO) GetQueue(ctx context.Context, queueCode, vnamespace string, i
 		return models.Queue{}, fmt.Errorf("find queue command failed: %w", err)
 	}
 
+	if queue.ID == "" {
+		return models.Queue{}, errors.New("Queue not found")
+	}
+
 	if bo.queueCache != nil {
 		if cacheKey == "" {
 			cacheKey = fmt.Sprintf("%s|%s|%s", tenant.Code, vnamespace, queueCode)

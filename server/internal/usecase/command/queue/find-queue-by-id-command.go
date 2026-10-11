@@ -36,6 +36,7 @@ func (cmd *FindQueueByIDCommand) Execute(uow *db.UnitOfWork, now time.Time) comm
 	}
 
 	if queue == nil {
+		commandResult.Error = "entity not found"
 		return *commandResult
 	}
 

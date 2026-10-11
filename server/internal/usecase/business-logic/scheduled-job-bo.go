@@ -38,7 +38,10 @@ func (bo *ScheduledJobBO) resolveTargetQueue(
 ) (*models.Queue, error) {
 	q, err := bo.QueueBO.GetQueue(ctx, queueCode, vnamespace, false, cf, cfs, tenant, tenantNode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve queue target %s: %w", queueCode, err)
+		return nil, fmt.Errorf("failed to resolve queue target '%s' in virtual namespace '%s': %w", queueCode, vnamespace, err)
+	}
+	if q.ID == "" {
+		return nil, fmt.Errorf("queue target '%s' not found in virtual namespace '%s'", queueCode, vnamespace)
 	}
 	return &q, nil
 }

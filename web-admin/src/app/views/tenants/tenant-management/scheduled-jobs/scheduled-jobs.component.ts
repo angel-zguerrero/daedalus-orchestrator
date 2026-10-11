@@ -2,6 +2,7 @@ import { Component, OnInit, Input } from '@angular/core';
 import { CommonModule, AsyncPipe, DatePipe } from '@angular/common';
 import { ScheduledJobsService } from '../services/scheduled-jobs.service';
 import { VNamespacesService } from '../services/vnamespaces.service';
+import { QueuesService } from '../services/queues.service';
 import {
   TableModule,
   UtilitiesModule,
@@ -112,9 +113,12 @@ export class ScheduledJobsComponent implements OnInit {
   filteredFilterVNamespaces: Observable<any[]>;
   selectedVNamespaceFilter = '';
 
+  tenantQueues: any[] = [];
+
   constructor(
     private scheduledJobsService: ScheduledJobsService,
     private vNamespacesService: VNamespacesService,
+    private queuesService: QueuesService,
     private fb: FormBuilder
   ) {
     this.oneOffForm = this.fb.group({
@@ -152,6 +156,20 @@ export class ScheduledJobsComponent implements OnInit {
       debounceTime(300),
       switchMap(value => this._filterVNamespaces(value || ''))
     );
+
+    this.vnamespaceCtrl.valueChanges.pipe(
+      debounceTime(300)
+    ).subscribe(() => {
+      this.loadTenantQueues();
+    });
+
+    this.oneOffForm.get('queueCode')?.valueChanges.subscribe(val => {
+      this.onQueueSelected(val || '');
+    });
+
+    this.recurringForm.get('queueCode')?.valueChanges.subscribe(val => {
+      this.onQueueSelected(val || '');
+    });
   }
 
   ngOnInit(): void {
@@ -211,9 +229,29 @@ export class ScheduledJobsComponent implements OnInit {
     }
   }
 
+  loadTenantQueues(): void {
+    if (!this.tenantCode) return;
+    this.queuesService.getQueues(this.tenantCode, '', 100, '', this.vnamespaceCtrl.value || '').subscribe({
+      next: (response) => {
+        this.tenantQueues = response.result?.Entities || [];
+      },
+      error: () => {
+        this.tenantQueues = [];
+      }
+    });
+  }
+
+  onQueueSelected(queueCode: string): void {
+    const matched = this.tenantQueues.find(q => q.Code === queueCode);
+    if (matched && matched.VNamespace && !this.vnamespaceCtrl.value) {
+      this.vnamespaceCtrl.setValue(matched.VNamespace);
+    }
+  }
+
   openCreateModal(): void {
     this.createModalVisible = true;
     this.activeCreateTab = 'one-off';
+    const initialVns = this.selectedVNamespaceFilter || 'default';
     this.oneOffForm.reset({
       code: '',
       queueCode: '',
@@ -234,7 +272,8 @@ export class ScheduledJobsComponent implements OnInit {
       every: '5m',
       cronExpression: ''
     });
-    this.vnamespaceCtrl.setValue('');
+    this.vnamespaceCtrl.setValue(initialVns);
+    this.loadTenantQueues();
     this.showAlert = false;
   }
 
@@ -255,12 +294,16 @@ export class ScheduledJobsComponent implements OnInit {
     }
 
     const formValue = this.oneOffForm.value;
-    const queueCode = formValue.queueCode || formValue.targetCode;
+    const queueCode = (formValue.queueCode || formValue.targetCode || '').trim();
+    const vnamespace = (this.vnamespaceCtrl.value || 'default').trim();
     const payload = {
       ...formValue,
       queueCode: queueCode,
+      QueueCode: queueCode,
       targetCode: queueCode,
-      vnamespace: this.vnamespaceCtrl.value || 'default'
+      TargetCode: queueCode,
+      vnamespace: vnamespace,
+      VNamespace: vnamespace
     };
 
     this.loading = true;
@@ -286,12 +329,16 @@ export class ScheduledJobsComponent implements OnInit {
     }
 
     const formValue = this.recurringForm.value;
-    const queueCode = formValue.queueCode || formValue.targetCode;
+    const queueCode = (formValue.queueCode || formValue.targetCode || '').trim();
+    const vnamespace = (this.vnamespaceCtrl.value || 'default').trim();
     const payload = {
       ...formValue,
       queueCode: queueCode,
+      QueueCode: queueCode,
       targetCode: queueCode,
-      vnamespace: this.vnamespaceCtrl.value || 'default'
+      TargetCode: queueCode,
+      vnamespace: vnamespace,
+      VNamespace: vnamespace
     };
 
     this.loading = true;
