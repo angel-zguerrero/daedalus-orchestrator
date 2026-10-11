@@ -168,6 +168,11 @@ func unifiedAuthMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logge
 			tokenType = "session"
 		}
 
+		externalUserID := c.GetHeader("X-External-User-Id")
+		if externalUserID == "" {
+			externalUserID = c.GetHeader("X-External-User-ID")
+		}
+
 		switch tokenType {
 
 		case "oauth":
@@ -189,6 +194,19 @@ func unifiedAuthMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logge
 			c.Set("oauth_scopes", claims.Scopes)
 			c.Set("oauth_tenant_id", claims.TenantID)
 			c.Set("oauth_client_id", claims.Subject)
+
+			accountName := claims.ClientName
+			if accountName == "" {
+				accountName = claims.Subject
+			}
+			caller := &common.CallerIdentity{
+				AccountID:      claims.Subject,
+				AccountName:    accountName,
+				ExternalUserID: externalUserID,
+			}
+			c.Request = c.Request.WithContext(common.SetCallerIdentity(c.Request.Context(), caller))
+			c.Set("caller_identity", caller)
+
 			logger.Debug().
 				Str("client_id", claims.Subject).
 				Strs("scopes", claims.Scopes).
@@ -224,6 +242,15 @@ func unifiedAuthMiddleware(MasterNode *dragonboat.RaftNode, logger zerolog.Logge
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session is invalid or has expired"})
 				return
 			}
+
+			userID, _ := mapClaims["sub"].(string)
+			caller := &common.CallerIdentity{
+				UserID:         userID,
+				ExternalUserID: externalUserID,
+			}
+			c.Request = c.Request.WithContext(common.SetCallerIdentity(c.Request.Context(), caller))
+			c.Set("caller_identity", caller)
+
 			logger.Debug().Msg("Admin session token authenticated")
 			c.Next()
 		}

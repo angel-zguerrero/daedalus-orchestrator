@@ -98,6 +98,14 @@ func (bo *WorkflowExecutionBO) StartExecution(
 		CFS:                  targetCFS,
 	}
 
+	caller := common.GetCallerIdentity(ctx)
+	if caller != nil {
+		cmd.UserID = caller.UserID
+		cmd.AccountID = caller.AccountID
+		cmd.AccountName = caller.AccountName
+		cmd.ExternalUserID = caller.ExternalUserID
+	}
+
 	timeout := config.GlobalConfiguration.ApiRaftTimeout
 	created, err := dragonboat.ExecuteRepositoryCommand[models.WorkflowExecution](
 		node,

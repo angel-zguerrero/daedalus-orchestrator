@@ -180,6 +180,19 @@
         <div class="form-text">Associated workflow definition</div>
       </div>
       <div class="mb-3">
+        <label class="form-label fw-bold">Usuario</label>
+        <div class="p-2 bg-dark rounded">{{ queueUserName || queue?.userName || queue?.UserID || queue?.userId || '-' }}</div>
+        <div class="form-text">Responsible user</div>
+      </div>
+      <div class="mb-3" *ngIf="queue?.AccountName || queue?.accountName || queue?.AccountID || queue?.accountId">
+        <label class="form-label fw-bold">App</label>
+        <div class="p-2 bg-dark rounded">
+          <div>{{ queue?.AccountName || queue?.accountName || queue?.AccountID || queue?.accountId }}</div>
+          <div *ngIf="queue?.ExternalUserID || queue?.externalUserId" class="text-secondary small font-monospace mt-1">External User: {{ queue?.ExternalUserID || queue?.externalUserId }}</div>
+        </div>
+        <div class="form-text">Responsible application / account</div>
+      </div>
+      <div class="mb-3">
         <hr>
         <h6 class="mb-3">
           <svg cIcon name="cil-user" class="me-2"></svg>

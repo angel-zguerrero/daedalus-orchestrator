@@ -679,7 +679,12 @@ export class ActivityTemplateEditorComponent implements OnInit {
   }
 
   goBack(): void {
-    const queryParams = this.scope === 'tenant' ? { tenantCode: this.tenantCode } : {};
-    this.router.navigate(['/activity-templates'], { queryParams });
+    if (this.tenantCode) {
+      this.router.navigate(['/tenants', this.tenantCode, 'management'], {
+        queryParams: { tab: 'activity-templates' }
+      });
+    } else {
+      this.router.navigate(['/activity-templates']);
+    }
   }
 }

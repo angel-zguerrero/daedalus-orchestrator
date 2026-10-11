@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { TenantsService } from './services/tenants.service';
+import { UsersService } from '../users/services/users.service';
 import { TableModule, UtilitiesModule, ButtonModule, ModalModule, CardModule, FormModule, GridModule, AlertComponent, SpinnerComponent, BadgeComponent } from '@coreui/angular';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { IconDirective } from '@coreui/icons-angular';
@@ -50,9 +51,11 @@ export class TenantsComponent implements OnInit {
   tenantForm: FormGroup;
   tenantFormUpdate: FormGroup;
   selectedTenant: any;
+  selectedTenantUserName: string = '';
 
   constructor(
     private tenantsService: TenantsService,
+    private usersService: UsersService,
     private fb: FormBuilder,
     private router: Router
   ) {
@@ -78,8 +81,24 @@ export class TenantsComponent implements OnInit {
     this.loading = true;
     this.tenantsService.getTenants(cursor, this.pageSize, this.searchQuery).subscribe({
       next: (response) => {
-        this.tenants = response.result.Entities;
+        this.tenants = response.result.Entities || [];
         this.cursor = response.result.Cursor;
+
+        const userIds = this.tenants
+          .map(t => t.UserID || t.userId)
+          .filter((id): id is string => !!id);
+
+        if (userIds.length > 0) {
+          this.usersService.resolveUsers(userIds).subscribe(userMap => {
+            this.tenants.forEach(t => {
+              const uid = t.UserID || t.userId;
+              if (uid && userMap.has(uid)) {
+                t.userName = userMap.get(uid);
+              }
+            });
+          });
+        }
+
         this.loading = false;
       },
       error: (error) => {
@@ -130,8 +149,14 @@ export class TenantsComponent implements OnInit {
 
   openDetailsModal(tenant: any): void {
     console.log('Selected tenant from table:', tenant);
-    // Use the tenant data directly from the table instead of making an API call
     this.selectedTenant = tenant;
+    const uid = tenant?.UserID || tenant?.userId;
+    this.selectedTenantUserName = tenant?.userName || uid || '';
+    if (uid) {
+      this.usersService.resolveUser(uid).subscribe(name => {
+        this.selectedTenantUserName = name;
+      });
+    }
     this.detailsModalVisible = true;
     this.showAlert = false; // Clear any previous alerts
   }

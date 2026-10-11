@@ -150,3 +150,49 @@ func (bo *UserBO) DeleteUser(ctx context.Context, username string) (bool, error)
 
 	return result, nil
 }
+
+func (bo *UserBO) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	cmd := &user_command.GetUserByIdCommand{
+		ID: id,
+	}
+
+	result, err := dragonboat.ExecuteRepositoryQuery[models.User](
+		bo.MasterNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"get user by id",
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if result.ID == "" && result.Username == "" {
+		return nil, nil
+	}
+
+	return &result, nil
+}
+
+func (bo *UserBO) GetUsersByIDs(ctx context.Context, ids []string) ([]models.User, error) {
+	cmd := &user_command.GetUsersByIdsCommand{
+		IDs: ids,
+	}
+
+	result, err := dragonboat.ExecuteRepositoryQuery[[]models.User](
+		bo.MasterNode,
+		ctx,
+		cmd,
+		config.GlobalConfiguration.ApiRaftTimeout,
+		*bo.Logger,
+		"get users by ids",
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users by ids: %w", err)
+	}
+
+	return result, nil
+}

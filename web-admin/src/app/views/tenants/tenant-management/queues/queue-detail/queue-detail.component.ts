@@ -13,6 +13,7 @@ import {
 import { IconDirective } from '@coreui/icons-angular';
 import { ChartjsModule } from '@coreui/angular-chartjs';
 import { TSDBMetricsService } from '../../../services/tsdb-metrics.service';
+import { UsersService } from '../../../../users/services/users.service';
 
 @Component({
   selector: 'app-queue-detail',
@@ -38,6 +39,7 @@ export class QueueDetailComponent implements OnInit, OnChanges {
   @Input() tenantCode: string = '';
   @Input() isWorkflowQueue: boolean = false;
 
+  queueUserName: string = '';
   selectedTimeRange: number = 600; // Default to last 10 minutes
   metricsLoading: boolean = false;
   metricsData: any = { labels: [], datasets: [] };
@@ -62,17 +64,40 @@ export class QueueDetailComponent implements OnInit, OnChanges {
     }
   };
 
-  constructor(private tsdbMetricsService: TSDBMetricsService) {}
+  constructor(
+    private tsdbMetricsService: TSDBMetricsService,
+    private usersService: UsersService
+  ) {}
 
   ngOnInit(): void {
     if (this.queue) {
+      this.resolveQueueUser();
       this.loadMetrics();
     }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['queue'] && this.queue) {
+      this.resolveQueueUser();
       this.loadMetrics();
+    }
+  }
+
+  resolveQueueUser(): void {
+    if (!this.queue) {
+      this.queueUserName = '';
+      return;
+    }
+    const uid = this.queue.UserID || this.queue.userId;
+    if (this.queue.userName) {
+      this.queueUserName = this.queue.userName;
+    } else if (uid) {
+      this.queueUserName = uid;
+      this.usersService.resolveUser(uid).subscribe(name => {
+        this.queueUserName = name;
+      });
+    } else {
+      this.queueUserName = '';
     }
   }
 

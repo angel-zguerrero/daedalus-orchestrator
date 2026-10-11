@@ -96,10 +96,25 @@ func (bo *QueueBO) BulkCreateQueue(ctx context.Context, queues []*models.Queue, 
 		return nil, errors.New("no queues provided")
 	}
 
-	// Asegurar IDs válidos
+	// Asegurar IDs válidos y asignar auditoría
+	caller := common.GetCallerIdentity(ctx)
 	for _, t := range queues {
 		if t.ID == "" {
 			t.ID = strings.ReplaceAll(uuid.New().String(), "-", "")
+		}
+		if caller != nil {
+			if t.UserID == "" {
+				t.UserID = caller.UserID
+			}
+			if t.AccountID == "" {
+				t.AccountID = caller.AccountID
+			}
+			if t.AccountName == "" {
+				t.AccountName = caller.AccountName
+			}
+			if t.ExternalUserID == "" {
+				t.ExternalUserID = caller.ExternalUserID
+			}
 		}
 		// Set default state if not provided
 		if t.State == "" {

@@ -65,6 +65,8 @@
             <th style="min-width: 120px;">Allow Duplicated</th>
             <th style="min-width: 120px;">Priority Type</th>
             <th style="min-width: 150px;">Supervisor Name</th>
+            <th style="min-width: 120px;">Usuario</th>
+            <th style="min-width: 150px;">App</th>
             <th style="min-width: 240px;">Actions</th>
           </tr>
         </thead>
@@ -150,6 +152,20 @@
               {{ queue.NodeSchedulerSupervisorName || '-' }}
             </td>
             <td>
+              <span class="text-truncate d-inline-block" style="max-width: 130px;" [title]="queue.userName || queue.UserID || queue.userId || '-'">
+                {{ queue.userName || queue.UserID || queue.userId || '-' }}
+              </span>
+            </td>
+            <td>
+              <div *ngIf="queue.AccountName || queue.accountName || queue.AccountID || queue.accountId; else noAppQueue">
+                <div>{{ queue.AccountName || queue.accountName || queue.AccountID || queue.accountId }}</div>
+                <div *ngIf="queue.ExternalUserID || queue.externalUserId" class="text-secondary small font-monospace">
+                  {{ queue.ExternalUserID || queue.externalUserId }}
+                </div>
+              </div>
+              <ng-template #noAppQueue><span class="text-muted">-</span></ng-template>
+            </td>
+            <td>
               <div class="btn-group" role="group" aria-label="Queue actions">
                 <button cButton color="info" size="sm" (click)="openDetailsModal(queue)" title="View Details">
                   <svg cIcon name="cil-info"></svg>
@@ -172,7 +188,7 @@
             </td>
           </tr>
           <tr *ngIf="queues.length === 0">
-            <td colspan="10" class="text-center py-4">
+            <td colspan="14" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-inbox" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No queues found</h6>

@@ -1319,16 +1319,22 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
 
         return isGeneral(gId, gLabel) || isDoc(gId, gLabel) || isExtensionProps(gId, gLabel);
       });
-    } else {
-      // Default for other BPMN elements (StartEvent, EndEvent, Gateways, IntermediateCatchEvent, SequenceFlow, etc.)
+    } else if (rawType === 'StartEvent') {
+      // StartEvent: General, Documentation, Forms y Extension Properties
       filtered = groups.filter(g => {
         const gId = (g.id || '').toLowerCase();
         const gLabel = (typeof g.label === 'string' ? g.label : '').toLowerCase();
         if (isUnwantedGroup(gId, gLabel)) return false;
-        if (rawType === 'StartEvent') {
-          if (gId === 'camundaplatform__extensionproperties') return false;
-          return isGeneral(gId, gLabel) || isDoc(gId, gLabel) || isForm(gId, gLabel);
-        }
+        if (isTemplate(gId, gLabel)) return false;
+        if (gId.includes('implementation') || gId.includes('input') || gId.includes('output')) return false;
+        return isGeneral(gId, gLabel) || isDoc(gId, gLabel) || isForm(gId, gLabel) || isExtensionProps(gId, gLabel);
+      });
+    } else {
+      // Default for other BPMN elements (EndEvent, Gateways, IntermediateCatchEvent, SequenceFlow, etc.)
+      filtered = groups.filter(g => {
+        const gId = (g.id || '').toLowerCase();
+        const gLabel = (typeof g.label === 'string' ? g.label : '').toLowerCase();
+        if (isUnwantedGroup(gId, gLabel)) return false;
         return true;
       });
     }
@@ -1558,7 +1564,8 @@ export class BpmnDesignerComponent implements AfterViewInit, OnChanges, OnDestro
             hideGroup = true;
           }
         } else if (selectedType === 'StartEvent') {
-          if (!isBlacklisted && !isExtensionPropsGroup && (isGeneralGroup || isDocGroup || isFormGroup)) {
+          // Start Events MUST show General, Documentation, Forms, and Extension Properties
+          if (!isBlacklisted && !isTemplateGroup && (isGeneralGroup || isDocGroup || isFormGroup || isExtensionPropsGroup)) {
             hideGroup = false;
           } else {
             hideGroup = true;
