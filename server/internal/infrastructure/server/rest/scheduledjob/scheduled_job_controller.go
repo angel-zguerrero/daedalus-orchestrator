@@ -25,7 +25,8 @@ func NewScheduledJobController(config *common.ServerConfing) *ScheduledJobContro
 
 type createOneOffScheduledJobRequest struct {
 	Code        string            `json:"code"`
-	QueueCode   string            `json:"queueCode" binding:"required"`
+	QueueCode   string            `json:"queueCode"`
+	TargetCode  string            `json:"targetCode"`
 	VNamespace  string            `json:"vnamespace" binding:"required"`
 	Content     string            `json:"content"`
 	ContentType string            `json:"contentType"`
@@ -37,9 +38,18 @@ type createOneOffScheduledJobRequest struct {
 	RunAfter    string            `json:"runAfter"`
 }
 
+// resolveQueueCode returns queueCode if set, otherwise falls back to targetCode.
+func resolveQueueCode(queueCode, targetCode string) string {
+	if queueCode != "" {
+		return queueCode
+	}
+	return targetCode
+}
+
 type createRecurringScheduledJobRequest struct {
 	Code           string            `json:"code"`
-	QueueCode      string            `json:"queueCode" binding:"required"`
+	QueueCode      string            `json:"queueCode"`
+	TargetCode     string            `json:"targetCode"`
 	VNamespace     string            `json:"vnamespace" binding:"required"`
 	Content        string            `json:"content"`
 	ContentType    string            `json:"contentType"`
@@ -56,6 +66,12 @@ func (ctrl *ScheduledJobController) CreateOneOffScheduledJobHandler(c *gin.Conte
 	if err := c.ShouldBindJSON(&req); err != nil {
 		ctrl.Config.Logger.Warn().Err(err).Msg("create one-off scheduled job attempt with invalid payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	queueCode := resolveQueueCode(req.QueueCode, req.TargetCode)
+	if queueCode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required"})
 		return
 	}
 
@@ -76,7 +92,7 @@ func (ctrl *ScheduledJobController) CreateOneOffScheduledJobHandler(c *gin.Conte
 		c.Request.Context(),
 		req.Code,
 		tenantCode,
-		req.QueueCode,
+		queueCode,
 		req.VNamespace,
 		req.Content,
 		req.ContentType,
@@ -109,6 +125,12 @@ func (ctrl *ScheduledJobController) CreateRecurringScheduledJobHandler(c *gin.Co
 		return
 	}
 
+	queueCode := resolveQueueCode(req.QueueCode, req.TargetCode)
+	if queueCode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "queueCode is required"})
+		return
+	}
+
 	tenantCode := c.Param("code")
 	tenant, tenantNode, cf, cfs := common.MustGetTenantData(c.Request.Context())
 
@@ -116,7 +138,7 @@ func (ctrl *ScheduledJobController) CreateRecurringScheduledJobHandler(c *gin.Co
 		c.Request.Context(),
 		req.Code,
 		tenantCode,
-		req.QueueCode,
+		queueCode,
 		req.VNamespace,
 		req.Content,
 		req.ContentType,

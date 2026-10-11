@@ -29,10 +29,12 @@ export interface ScheduledJob {
   ID: string;
   Code?: string;
   TenantID: string;
-  TargetType: string;
-  TargetID: string;
-  TargetCode: string;
-  RoutingKeyOrPatternOrQueueCode: string;
+  QueueID?: string;
+  QueueCode: string;
+  TargetType?: string;
+  TargetID?: string;
+  TargetCode?: string;
+  RoutingKeyOrPatternOrQueueCode?: string;
   VNamespace: string;
   Content: string;
   ContentType: string;
@@ -116,8 +118,8 @@ export class ScheduledJobsComponent implements OnInit {
     private fb: FormBuilder
   ) {
     this.oneOffForm = this.fb.group({
-      targetType: ['queue', Validators.required],
-      targetCode: ['', Validators.required],
+      code: [''],
+      queueCode: ['', Validators.required],
       vnamespace: this.vnamespaceCtrl,
       content: [''],
       contentType: ['text/plain'],
@@ -128,8 +130,8 @@ export class ScheduledJobsComponent implements OnInit {
     });
 
     this.recurringForm = this.fb.group({
-      targetType: ['queue', Validators.required],
-      targetCode: ['', Validators.required],
+      code: [''],
+      queueCode: ['', Validators.required],
       vnamespace: this.vnamespaceCtrl,
       content: [''],
       contentType: ['text/plain'],
@@ -213,8 +215,8 @@ export class ScheduledJobsComponent implements OnInit {
     this.createModalVisible = true;
     this.activeCreateTab = 'one-off';
     this.oneOffForm.reset({
-      targetType: 'queue',
-      targetCode: '',
+      code: '',
+      queueCode: '',
       content: '',
       contentType: 'text/plain',
       handler: '',
@@ -223,8 +225,8 @@ export class ScheduledJobsComponent implements OnInit {
       runAfter: '5m'
     });
     this.recurringForm.reset({
-      targetType: 'queue',
-      targetCode: '',
+      code: '',
+      queueCode: '',
       content: '',
       contentType: 'text/plain',
       handler: '',
@@ -232,6 +234,7 @@ export class ScheduledJobsComponent implements OnInit {
       every: '5m',
       cronExpression: ''
     });
+    this.vnamespaceCtrl.setValue('');
     this.showAlert = false;
   }
 
@@ -252,8 +255,11 @@ export class ScheduledJobsComponent implements OnInit {
     }
 
     const formValue = this.oneOffForm.value;
+    const queueCode = formValue.queueCode || formValue.targetCode;
     const payload = {
       ...formValue,
+      queueCode: queueCode,
+      targetCode: queueCode,
       vnamespace: this.vnamespaceCtrl.value || 'default'
     };
 
@@ -280,8 +286,11 @@ export class ScheduledJobsComponent implements OnInit {
     }
 
     const formValue = this.recurringForm.value;
+    const queueCode = formValue.queueCode || formValue.targetCode;
     const payload = {
       ...formValue,
+      queueCode: queueCode,
+      targetCode: queueCode,
       vnamespace: this.vnamespaceCtrl.value || 'default'
     };
 

@@ -38,7 +38,7 @@
           <tr>
             <th style="min-width: 100px;">Type</th>
             <th style="min-width: 120px;">Code</th>
-            <th style="min-width: 150px;">Target</th>
+            <th style="min-width: 150px;">Queue</th>
             <th style="min-width: 120px;">VNamespace</th>
             <th style="min-width: 150px;">Schedule</th>
             <th style="min-width: 180px;">Next Run At</th>
@@ -58,8 +58,7 @@
               <code>{{ job.Code || '-' }}</code>
             </td>
             <td>
-              <strong class="me-1">{{ job.TargetType | uppercase }}:</strong>
-              <code>{{ job.TargetCode }}</code>
+              <code>{{ job.QueueCode || job.TargetCode || '-' }}</code>
             </td>
             <td>{{ job.VNamespace || 'default' }}</td>
             <td>
@@ -96,7 +95,7 @@
             </td>
           </tr>
           <tr *ngIf="scheduledJobs.length === 0">
-            <td colspan="8" class="text-center py-4">
+            <td colspan="9" class="text-center py-4">
               <div class="text-muted">
                 <svg cIcon name="cil-clock" size="3xl" class="d-block mx-auto mb-2"></svg>
                 <h6>No scheduled jobs found</h6>
@@ -157,14 +156,12 @@
     <form *ngIf="activeCreateTab === 'one-off'" [formGroup]="oneOffForm" (ngSubmit)="createOneOffJob()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
-          <label cLabel for="oneOffTargetType">Target Type *</label>
-          <select cSelect id="oneOffTargetType" formControlName="targetType">
-            <option value="queue">Queue</option>
-          </select>
+          <label cLabel for="oneOffQueueCode">Queue Code *</label>
+          <input cFormControl id="oneOffQueueCode" formControlName="queueCode" placeholder="e.g. email-queue" />
         </c-col>
         <c-col [md]="6">
-          <label cLabel for="oneOffTargetCode">Target Code *</label>
-          <input cFormControl id="oneOffTargetCode" formControlName="targetCode" placeholder="e.g. email-queue" />
+          <label cLabel for="oneOffCode">Job Code (Optional)</label>
+          <input cFormControl id="oneOffCode" formControlName="code" placeholder="e.g. send-welcome-email" />
         </c-col>
       </c-row>
 
@@ -219,14 +216,12 @@
     <form *ngIf="activeCreateTab === 'recurring'" [formGroup]="recurringForm" (ngSubmit)="createRecurringJob()">
       <c-row class="mb-3" [gutter]="{gy: 2, gx: 3}">
         <c-col [md]="6">
-          <label cLabel for="recurringTargetType">Target Type *</label>
-          <select cSelect id="recurringTargetType" formControlName="targetType">
-            <option value="queue">Queue</option>
-          </select>
+          <label cLabel for="recurringQueueCode">Queue Code *</label>
+          <input cFormControl id="recurringQueueCode" formControlName="queueCode" placeholder="e.g. weekly-reports" />
         </c-col>
         <c-col [md]="6">
-          <label cLabel for="recurringTargetCode">Target Code *</label>
-          <input cFormControl id="recurringTargetCode" formControlName="targetCode" placeholder="e.g. weekly-reports" />
+          <label cLabel for="recurringCode">Job Code (Optional)</label>
+          <input cFormControl id="recurringCode" formControlName="code" placeholder="e.g. weekly-report-gen" />
         </c-col>
       </c-row>
 
@@ -321,8 +316,8 @@
         </div>
       </div>
       <div class="col-md-6 mb-3">
-        <label class="form-label fw-bold">Target</label>
-        <div class="p-2 bg-dark rounded">{{ selectedJob.TargetType | uppercase }}: <code>{{ selectedJob.TargetCode }}</code></div>
+        <label class="form-label fw-bold">Queue</label>
+        <div class="p-2 bg-dark rounded"><code>{{ selectedJob.QueueCode || selectedJob.TargetCode || '-' }}</code></div>
       </div>
       <div class="col-md-6 mb-3">
         <label class="form-label fw-bold">State</label>
